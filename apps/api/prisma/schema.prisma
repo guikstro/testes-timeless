@@ -35,6 +35,8 @@ model Organization {
   classificationRules ClassificationRule[]
   sales               Sale[]
   auditLogs           AuditLog[]
+  metaConnection      MetaConnection?
+  campaigns           Campaign[]
 
   @@map("organizations")
 }
@@ -412,4 +414,114 @@ model AuditLog {
 
   @@index([organizationId, createdAt])
   @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 6: Meta Ads — connection, campaign hierarchy, spend sync
+// ---------------------------------------------------------------------------
+
+enum MetaConnectionStatus {
+  CONNECTED
+  DISCONNECTED
+  /** Meta's error code 190 — the access token needs to be replaced (Section 53). */
+  TOKEN_EXPIRED
+  /** The last sync attempt failed for a reason other than an expired token. */
+  SYNC_FAILED
+}
+
+model MetaConnection {
+  id                   String               @id @default(uuid())
+  organizationId       String               @unique @map("organization_id")
+  /** Meta's ad account id, e.g. "act_123456789" — the routing key for every Graph API call this connection makes. */
+  adAccountId          String               @map("ad_account_id")
+  /** Required (unlike WhatsApp's optional token): every sync call needs it. Encrypted at rest — never sent back to the frontend. */
+  accessTokenEncrypted String               @map("access_token_encrypted")
+  status               MetaConnectionStatus @default(CONNECTED)
+  lastSyncedAt         DateTime?            @map("last_synced_at")
+  lastSyncError        String?              @map("last_sync_error")
+  connectedAt          DateTime             @default(now()) @map("connected_at")
+  disconnectedAt       DateTime?            @map("disconnected_at")
+  createdAt            DateTime             @default(now()) @map("created_at")
+  updatedAt            DateTime             @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("meta_connections")
+}
+
+/**
+ * `externalId` is Meta's own id — never used as our primary key (Section 47),
+ * since Meta ids aren't guaranteed unique across the whole system the way a
+ * UUID we mint ourselves is, and because we need a stable internal id that
+ * survives even if Meta's id format or meaning ever changed.
+ */
+model Campaign {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  externalId     String    @unique @map("external_id")
+  name           String
+  status         String
+  lastSyncedAt   DateTime  @map("last_synced_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  adSets       AdSet[]
+  spend        AdSpend[]
+
+  @@index([organizationId])
+  @@map("campaigns")
+}
+
+model AdSet {
+  id           String   @id @default(uuid())
+  campaignId   String   @map("campaign_id")
+  externalId   String   @unique @map("external_id")
+  name         String
+  status       String
+  lastSyncedAt DateTime @map("last_synced_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  ads      Ad[]
+
+  @@index([campaignId])
+  @@map("ad_sets")
+}
+
+model Ad {
+  id           String   @id @default(uuid())
+  adSetId      String   @map("ad_set_id")
+  externalId   String   @unique @map("external_id")
+  name         String
+  status       String
+  lastSyncedAt DateTime @map("last_synced_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  adSet AdSet @relation(fields: [adSetId], references: [id], onDelete: Cascade)
+
+  @@index([adSetId])
+  @@map("ads")
+}
+
+/**
+ * Daily granularity at campaign level (Section 51/70: dashboards need to
+ * filter investment by date range via `spend_date`). AdSet/Ad-level spend
+ * history is deferred until Phase 8's actual drill-down reporting needs it
+ * — see docs/META_ADS.md.
+ */
+model AdSpend {
+  id          String   @id @default(uuid())
+  campaignId  String   @map("campaign_id")
+  date        DateTime @db.Date
+  spendCents  Int      @map("spend_cents")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, date])
+  @@map("ad_spend")
 }

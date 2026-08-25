@@ -6,15 +6,16 @@ Meta Conversions API. Ver o escopo completo e as regras do produto em
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 > **Status atual: Fases 1 (Fundação), 2 (Tracking), 3 (WhatsApp), 4
-> (Atribuição) e 5 (Qualificação e Venda) concluídas.** Autenticação,
-> organizações, isolamento multi-tenant, links rastreáveis, captura de
-> cliques/UTMs, conexão com WhatsApp Cloud API, ingestão idempotente de
-> mensagens, o motor de atribuição first-touch, e gatilhos configuráveis de
-> qualificação/venda (com extração de valor e correção manual auditada)
-> estão implementados, testados e rodando via Docker. As demais fases (Meta
-> Ads/CAPI, analytics) ainda não foram implementadas — ver
-> `docs/FUTURE_IDEAS.md` e o stub em `docs/META_CAPI.md` para o que está
-> planejado.
+> (Atribuição), 5 (Qualificação e Venda) e 6 (Meta Ads) concluídas.**
+> Autenticação, organizações, isolamento multi-tenant, links rastreáveis,
+> captura de cliques/UTMs, conexão com WhatsApp Cloud API, ingestão
+> idempotente de mensagens, o motor de atribuição first-touch, gatilhos
+> configuráveis de qualificação/venda (com extração de valor e correção
+> manual auditada), e a sincronização de campanhas/ad sets/anúncios e gasto
+> da Meta Ads (com tratamento de token expirado e rate limit) estão
+> implementados, testados e rodando via Docker. A fase restante (Meta
+> Conversions API) ainda não foi implementada — ver `docs/FUTURE_IDEAS.md` e
+> o stub em `docs/META_CAPI.md` para o que está planejado.
 
 ## Stack
 
@@ -150,8 +151,12 @@ Em produção/CI: `pnpm --filter api prisma:migrate:deploy`.
 
 Ver [`.env.example`](.env.example) para a lista completa e comentada. As
 variáveis de WhatsApp (`WHATSAPP_APP_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`)
-já têm efeito (Fase 3). As de Meta Ads/CAPI ainda não — essa integração
-chega nas Fases 6 e 7.
+já têm efeito (Fase 3), assim como as de Meta Ads (`META_APP_ID`,
+`META_APP_SECRET`, `META_ACCESS_TOKEN`, `META_AD_ACCOUNT_ID`, Fase 6) — mas
+o `adAccountId`/token reais de cada organização são informados pela própria
+tela de conexão, não lidos dessas variáveis; elas servem para
+testes locais/seed. `META_PIXEL_ID`/`META_CAPI_ACCESS_TOKEN` ainda não têm
+efeito — chegam na Fase 7 (Conversions API).
 
 ## Documentação
 
@@ -160,5 +165,6 @@ chega nas Fases 6 e 7.
 - [`docs/ATTRIBUTION.md`](docs/ATTRIBUTION.md) — motor de atribuição, regras de precedência (Fase 4)
 - [`docs/WHATSAPP.md`](docs/WHATSAPP.md) — integração com WhatsApp (Fase 3)
 - [`docs/QUALIFICATION.md`](docs/QUALIFICATION.md) — gatilhos, classificador, venda, correção manual (Fase 5)
-- [`docs/META_CAPI.md`](docs/META_CAPI.md) — Meta Ads e Conversions API (Fases 6-7)
+- [`docs/META_ADS.md`](docs/META_ADS.md) — sincronização de campanhas, ad sets, anúncios e gasto da Meta Ads (Fase 6)
+- [`docs/META_CAPI.md`](docs/META_CAPI.md) — Meta Conversions API (Fase 7, não implementada)
 - [`docs/FUTURE_IDEAS.md`](docs/FUTURE_IDEAS.md) — ideias fora do escopo atual, deliberadamente não implementadas

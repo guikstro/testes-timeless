@@ -29,10 +29,25 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     cache: "no-store",
   });
 
-  const body = await response.json().catch(() => ({}));
+  // NestJS sends a genuinely empty body (Content-Length: 0), not the text
+  // "null", when a controller returns `null` — e.g. GET /integrations/*
+  // for an org with no connection yet. `response.json()` throws on that
+  // empty string, and blindly falling back to `{}` there is a real bug:
+  // `{}` is truthy in JS, so `connection ? <connected> : <emptyState>`
+  // would render the wrong branch for exactly the case that endpoint
+  // exists to report. Parse text ourselves so "empty" maps to `null`.
+  const text = await response.text();
+  let body: unknown = null;
+  if (text) {
+    try {
+      body = JSON.parse(text);
+    } catch {
+      body = { code: "INVALID_RESPONSE", message: "Resposta inválida do servidor." };
+    }
+  }
 
   if (!response.ok) {
-    throw new ApiRequestError(body as ApiError, response.status);
+    throw new ApiRequestError((body as ApiError) ?? { code: "UNKNOWN", message: "Erro desconhecido." }, response.status);
   }
 
   return body as T;

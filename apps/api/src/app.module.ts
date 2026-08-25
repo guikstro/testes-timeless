@@ -11,6 +11,8 @@ import { WhatsAppWebhookModule } from "./whatsapp-webhook/whatsapp-webhook.modul
 import { WhatsAppConnectionsModule } from "./integrations/whatsapp/whatsapp-connections.module";
 import { LeadsModule } from "./leads/leads.module";
 import { ClassificationModule } from "./classification/classification.module";
+import { MetaConnectionsModule } from "./integrations/meta/meta-connections.module";
+import { CampaignsModule } from "./campaigns/campaigns.module";
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { ClassificationModule } from "./classification/classification.module";
     WhatsAppConnectionsModule,
     LeadsModule,
     ClassificationModule,
+    MetaConnectionsModule,
+    CampaignsModule,
   ],
 })
 export class AppModule {}
