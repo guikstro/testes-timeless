@@ -119,4 +119,47 @@ describe("MetaGraphClient", () => {
       until: "2026-08-07",
     });
   });
+
+  describe("sendConversionEvent (Fase 7)", () => {
+    it("posts the event wrapped in a data array, with the access token in the body (not the URL)", async () => {
+      fetchMock.mockResolvedValue(jsonResponse({ events_received: 1, fbtrace_id: "trace-1" }));
+      const client = new MetaGraphClient();
+      const payload = {
+        event_name: "Lead",
+        event_time: 1700000000,
+        event_id: "lead-1:LEAD",
+        action_source: "business_messaging" as const,
+        messaging_channel: "whatsapp" as const,
+        user_data: { ph: ["hash1"] },
+      };
+
+      const result = await client.sendConversionEvent("1234567890", "capi-token", payload);
+
+      expect(result).toEqual({ events_received: 1, fbtrace_id: "trace-1" });
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(new URL(url as string).pathname).toBe("/v21.0/1234567890/events");
+      expect(new URL(url as string).searchParams.get("access_token")).toBeNull();
+      const body = JSON.parse((init as RequestInit).body as string);
+      expect(body).toEqual({ data: [payload], access_token: "capi-token" });
+    });
+
+    it("throws a MetaApiError when Meta rejects the event", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse({ error: { message: "Error validating access token", code: 190 } }, 401),
+      );
+      const client = new MetaGraphClient();
+
+      await expect(
+        client.sendConversionEvent("1234567890", "expired-token", {
+          event_name: "Purchase",
+          event_time: 1700000000,
+          event_id: "lead-1:PURCHASE",
+          action_source: "business_messaging",
+          messaging_channel: "whatsapp",
+          user_data: { ph: ["hash1"] },
+          custom_data: { value: 100, currency: "BRL" },
+        }),
+      ).rejects.toThrow(MetaApiError);
+    });
+  });
 });

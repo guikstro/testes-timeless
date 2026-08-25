@@ -37,6 +37,7 @@ model Organization {
   auditLogs           AuditLog[]
   metaConnection      MetaConnection?
   campaigns           Campaign[]
+  conversionEvents    ConversionEvent[]
 
   @@map("organizations")
 }
@@ -250,11 +251,12 @@ model Lead {
   createdAt       DateTime   @default(now()) @map("created_at")
   updatedAt       DateTime   @updatedAt @map("updated_at")
 
-  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  conversations Conversation[]
-  events        LeadEvent[]
-  attribution   Attribution?
-  sale          Sale?
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversations    Conversation[]
+  events           LeadEvent[]
+  attribution      Attribution?
+  sale             Sale?
+  conversionEvents ConversionEvent[]
 
   @@unique([organizationId, normalizedPhone])
   @@index([organizationId, lastContactAt])
@@ -444,6 +446,11 @@ model MetaConnection {
   createdAt            DateTime             @default(now()) @map("created_at")
   updatedAt            DateTime             @updatedAt @map("updated_at")
 
+  /** Set only once CAPI is configured (Section: Fase 7 is a separate setup step from ads reporting). Null means events are recorded but never sent yet. */
+  pixelId                  String?   @map("pixel_id")
+  capiAccessTokenEncrypted String?   @map("capi_access_token_encrypted")
+  capiConfiguredAt         DateTime? @map("capi_configured_at")
+
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@map("meta_connections")
@@ -524,4 +531,58 @@ model AdSpend {
 
   @@unique([campaignId, date])
   @@map("ad_spend")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 7: Meta Conversions API — sending Lead/QualifiedLead/Purchase events
+// back to Meta, deduplicated and retried with backoff
+// ---------------------------------------------------------------------------
+
+enum ConversionEventType {
+  LEAD
+  QUALIFIED_LEAD
+  PURCHASE
+}
+
+enum ConversionEventStatus {
+  /** Created, queued, not yet successfully sent. */
+  PENDING
+  /** Delivered to Meta — terminal, never re-sent (Meta itself dedupes on event_id, but we never even try again). */
+  SENT
+  /** At least one attempt failed and BullMQ scheduled a retry with backoff — not yet the final attempt. */
+  RETRYING
+  /** The job's last configured attempt failed — terminal until the organization reconfigures the connection (see MetaConnectionsService.connectCapi, which re-enqueues PENDING/FAILED events). */
+  FAILED
+}
+
+/**
+ * One row per (lead, event type) — enforced by `@@unique([leadId, type])`,
+ * which doubles as the source of the deterministic `event_id` sent to Meta
+ * (`buildMetaEventId`), so a duplicate domain trigger (or a BullMQ retry)
+ * can never register a second event at Meta for the same lead/type. Only
+ * ever created once a value is actually known — see docs/META_CAPI.md for
+ * why a PURCHASE row is never created with a null valueCents.
+ */
+model ConversionEvent {
+  id             String                @id @default(uuid())
+  organizationId String                @map("organization_id")
+  leadId         String                @map("lead_id")
+  type           ConversionEventType
+  status         ConversionEventStatus @default(PENDING)
+  /** Cents, never float (Section 48). Only set for PURCHASE. */
+  valueCents     Int?                  @map("value_cents")
+  currency       String?
+  occurredAt     DateTime              @map("occurred_at")
+  sentAt         DateTime?             @map("sent_at")
+  lastError      String?               @map("last_error")
+  attempts       Int                   @default(0)
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([leadId, type])
+  @@index([organizationId])
+  @@map("conversion_events")
 }

@@ -1,6 +1,15 @@
 import { Injectable } from "@nestjs/common";
 import { MetaApiError } from "./meta-api-error";
-import { MetaAd, MetaAdSet, MetaCampaign, MetaErrorResponse, MetaInsight, MetaPagedResponse } from "./meta-graph-types";
+import {
+  MetaAd,
+  MetaAdSet,
+  MetaCampaign,
+  MetaConversionEventPayload,
+  MetaConversionsApiResponse,
+  MetaErrorResponse,
+  MetaInsight,
+  MetaPagedResponse,
+} from "./meta-graph-types";
 
 const DEFAULT_BASE_URL = "https://graph.facebook.com/v21.0";
 
@@ -47,6 +56,27 @@ export class MetaGraphClient {
     return this.fetchAllPages<MetaInsight>(url);
   }
 
+  /**
+   * Sends one event to the Conversions API (`POST /{pixel_id}/events`) —
+   * used for Lead/QualifiedLead/Purchase (Fase 7), never for ads reporting.
+   * Same error envelope as the rest of the Graph API, so it reuses the same
+   * `MetaApiError` parsing/classification (token expired, rate limited).
+   */
+  async sendConversionEvent(
+    pixelId: string,
+    accessToken: string,
+    payload: MetaConversionEventPayload,
+  ): Promise<MetaConversionsApiResponse> {
+    const response = await fetch(`${this.baseUrl}/${pixelId}/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: [payload], access_token: accessToken }),
+    });
+    const body = await response.json();
+    this.throwIfError(response, body);
+    return body as MetaConversionsApiResponse;
+  }
+
   private buildUrl(path: string, accessToken: string, params: Record<string, string>): string {
     const url = new URL(`${this.baseUrl}${path}`);
     for (const [key, value] of Object.entries(params)) {
@@ -63,16 +93,7 @@ export class MetaGraphClient {
     while (nextUrl) {
       const response: Response = await fetch(nextUrl);
       const body = await response.json();
-
-      if (!response.ok) {
-        const errorBody = body as MetaErrorResponse;
-        throw new MetaApiError(
-          errorBody.error?.code,
-          errorBody.error?.error_subcode,
-          errorBody.error?.message ?? `Meta API request failed with status ${response.status}`,
-          response.status,
-        );
-      }
+      this.throwIfError(response, body);
 
       const page = body as MetaPagedResponse<T>;
       results.push(...page.data);
@@ -80,5 +101,16 @@ export class MetaGraphClient {
     }
 
     return results;
+  }
+
+  private throwIfError(response: Response, body: unknown): void {
+    if (response.ok) return;
+    const errorBody = body as MetaErrorResponse;
+    throw new MetaApiError(
+      errorBody.error?.code,
+      errorBody.error?.error_subcode,
+      errorBody.error?.message ?? `Meta API request failed with status ${response.status}`,
+      response.status,
+    );
   }
 }

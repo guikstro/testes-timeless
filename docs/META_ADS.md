@@ -4,9 +4,9 @@
 > real do código em `apps/api/src/integrations/meta/`,
 > `apps/api/src/campaigns/` e
 > `apps/api/src/worker/processors/meta-sync.*`. A fase seguinte, Meta
-> Conversions API (`docs/META_CAPI.md`), ainda não está implementada e
-> consumirá o `adAccountId`/token já capturados aqui para enviar eventos de
-> volta para a Meta.
+> Conversions API (`docs/META_CAPI.md`), também está implementada — reusa o
+> `MetaConnection` construído aqui, com um segundo par de credenciais
+> (Pixel ID + token do Conversions API) configurado à parte.
 
 ## Decisão: sem credenciais reais neste ambiente
 

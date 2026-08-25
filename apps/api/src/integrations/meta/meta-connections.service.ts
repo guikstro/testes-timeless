@@ -8,12 +8,15 @@ import { isUniqueConstraintError } from "../../common/utils/is-unique-constraint
 import { META_SYNC_QUEUE } from "../../common/queue/queue.constants";
 import { MetaSyncJob } from "../../common/queue/meta-sync.job";
 import { ConnectMetaDto } from "./dto/connect-meta.dto";
+import { ConnectMetaCapiDto } from "./dto/connect-meta-capi.dto";
+import { ConversionEventsService } from "./conversion-events.service";
 
 @Injectable()
 export class MetaConnectionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryption: EncryptionService,
+    private readonly conversionEvents: ConversionEventsService,
     @InjectQueue(META_SYNC_QUEUE) private readonly syncQueue: Queue<MetaSyncJob>,
   ) {}
 
@@ -79,12 +82,45 @@ export class MetaConnectionsService {
     );
   }
 
-  private redact<T extends { accessTokenEncrypted: string } | null>(
+  /**
+   * Fase 7 setup step, deliberately separate from `connect()` (Fase 6): the
+   * Pixel + Conversions API token are a different Meta resource/permission
+   * than ad-account read access, often configured later/by someone else —
+   * see docs/META_CAPI.md. Requires an existing connection (mirrors the
+   * mandated phase order: Ads before Conversions API).
+   */
+  async connectCapi(organizationId: string, dto: ConnectMetaCapiDto) {
+    const existing = await this.prisma.metaConnection.findUnique({ where: { organizationId } });
+    if (!existing) {
+      throw new AppException(
+        "NOT_CONNECTED",
+        "Conecte a conta de anúncios da Meta antes de configurar o Conversions API.",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const capiAccessTokenEncrypted = this.encryption.encrypt(dto.capiAccessToken);
+    const connection = await this.prisma.metaConnection.update({
+      where: { organizationId },
+      data: { pixelId: dto.pixelId, capiAccessTokenEncrypted, capiConfiguredAt: new Date() },
+    });
+
+    // Anything recorded before CAPI was configured (or that failed while it
+    // was misconfigured) can finally go out now.
+    await this.conversionEvents.drainPending(organizationId);
+
+    return this.redact(connection);
+  }
+
+  private redact<T extends { accessTokenEncrypted: string; capiAccessTokenEncrypted: string | null } | null>(
     connection: T,
-  ): (Omit<NonNullable<T>, "accessTokenEncrypted"> & { hasAccessToken: true }) | null {
+  ): (Omit<NonNullable<T>, "accessTokenEncrypted" | "capiAccessTokenEncrypted"> & {
+    hasAccessToken: true;
+    hasCapiAccessToken: boolean;
+  }) | null {
     if (!connection) return null;
-    const { accessTokenEncrypted, ...rest } = connection;
+    const { accessTokenEncrypted, capiAccessTokenEncrypted, ...rest } = connection;
     void accessTokenEncrypted;
-    return { ...rest, hasAccessToken: true };
+    return { ...rest, hasAccessToken: true, hasCapiAccessToken: capiAccessTokenEncrypted !== null };
   }
 }

@@ -6,6 +6,7 @@ import { isUniqueConstraintError } from "../../common/utils/is-unique-constraint
 import { WhatsAppInboundMessageJob } from "../../common/queue/whatsapp-event.job";
 import { AttributionEngine } from "../../attribution/attribution-engine";
 import { ConversationClassifierService } from "../../classification/conversation-classifier.service";
+import { ConversionEventsService } from "../../integrations/meta/conversion-events.service";
 
 @Injectable()
 export class WhatsAppIngestionService {
@@ -15,6 +16,7 @@ export class WhatsAppIngestionService {
     private readonly prisma: PrismaService,
     private readonly attributionEngine: AttributionEngine,
     private readonly classifier: ConversationClassifierService,
+    private readonly conversionEvents: ConversionEventsService,
   ) {}
 
   /**
@@ -60,7 +62,10 @@ export class WhatsAppIngestionService {
       });
       // First-touch, computed once from exactly this message's evidence and
       // never revisited afterward (Section 31) — see AttributionEngine.
+      // Recorded before the Meta Lead event so a same-lead conversion send
+      // can already see the ctwa_clid, if any, on first attempt.
       await this.attributeLead(organizationId, lead.id, job);
+      await this.conversionEvents.recordLead(organizationId, lead.id, occurredAt);
     }
 
     const { conversation, wasCreated: conversationWasCreated } = await this.findOrCreateConversation(

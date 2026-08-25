@@ -4,6 +4,7 @@ import { PrismaService } from "../common/prisma/prisma.service";
 import { matchesTriggerPhrase } from "../common/utils/matches-trigger-phrase";
 import { extractRevenueCents } from "../common/utils/extract-revenue-cents";
 import { isUniqueConstraintError } from "../common/utils/is-unique-constraint-error";
+import { ConversionEventsService } from "../integrations/meta/conversion-events.service";
 
 export interface ClassifyInput {
   organizationId: string;
@@ -24,7 +25,10 @@ export interface ClassifyInput {
 export class ConversationClassifierService {
   private readonly logger = new Logger(ConversationClassifierService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly conversionEvents: ConversionEventsService,
+  ) {}
 
   async classify(input: ClassifyInput): Promise<void> {
     if (!input.messageText || input.lead.status === "WON") return;
@@ -66,6 +70,8 @@ export class ConversationClassifierService {
         metadata: { classifierType: "RULE", ruleId, phrase, messageId: input.messageId },
       },
     });
+
+    await this.conversionEvents.recordQualifiedLead(input.organizationId, input.lead.id, input.occurredAt);
   }
 
   private async markWon(input: ClassifyInput, ruleId: string, phrase: string): Promise<void> {
@@ -94,6 +100,7 @@ export class ConversationClassifierService {
           metadata: { classifierType: "RULE", implicitFromSale: true },
         },
       });
+      await this.conversionEvents.recordQualifiedLead(input.organizationId, input.lead.id, input.occurredAt);
     }
 
     try {
@@ -137,6 +144,10 @@ export class ConversationClassifierService {
           metadata: { amountCents: revenueCents, messageId: input.messageId },
         },
       });
+      // Only sent once a value is actually known (Section: never guess) —
+      // a sale detected without a value waits for a manual correction to
+      // set one (see LeadsService.update) before Meta ever hears about it.
+      await this.conversionEvents.recordPurchase(input.organizationId, input.lead.id, input.occurredAt, revenueCents);
     }
   }
 }

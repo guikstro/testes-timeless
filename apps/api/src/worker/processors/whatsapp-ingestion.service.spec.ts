@@ -3,6 +3,7 @@ import { WhatsAppIngestionService } from "./whatsapp-ingestion.service";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { AttributionEngine } from "../../attribution/attribution-engine";
 import { ConversationClassifierService } from "../../classification/conversation-classifier.service";
+import { ConversionEventsService } from "../../integrations/meta/conversion-events.service";
 import { WhatsAppInboundMessageJob } from "../../common/queue/whatsapp-event.job";
 
 function uniqueConstraintError(): Prisma.PrismaClientKnownRequestError {
@@ -64,15 +65,21 @@ describe("WhatsAppIngestionService", () => {
     return { classify: jest.fn().mockResolvedValue(undefined) };
   }
 
+  function buildConversionEventsMock() {
+    return { recordLead: jest.fn(), recordQualifiedLead: jest.fn(), recordPurchase: jest.fn() };
+  }
+
   function buildService(
     prisma: ReturnType<typeof buildPrismaMock>,
     attributionEngine = buildAttributionEngineMock(),
     classifier = buildClassifierMock(),
+    conversionEvents = buildConversionEventsMock(),
   ) {
     return new WhatsAppIngestionService(
       prisma as unknown as PrismaService,
       attributionEngine as unknown as AttributionEngine,
       classifier as unknown as ConversationClassifierService,
+      conversionEvents as unknown as ConversionEventsService,
     );
   }
 
@@ -266,6 +273,37 @@ describe("WhatsAppIngestionService", () => {
       expect(attributionEngine.resolve).toHaveBeenCalledWith(
         expect.objectContaining({ referral }),
       );
+    });
+  });
+
+  describe("conversion events (Fase 7)", () => {
+    it("records a Meta Lead event exactly once, only when the lead is newly created", async () => {
+      const prisma = buildPrismaMock();
+      prisma.lead.create.mockResolvedValue({ id: "lead-1", name: null, lastContactAt: new Date(0) });
+      prisma.conversation.create.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
+      const conversionEvents = buildConversionEventsMock();
+      const service = buildService(prisma, buildAttributionEngineMock(), buildClassifierMock(), conversionEvents);
+
+      await service.ingest(buildJob());
+
+      expect(conversionEvents.recordLead).toHaveBeenCalledTimes(1);
+      expect(conversionEvents.recordLead).toHaveBeenCalledWith("org-1", "lead-1", expect.any(Date));
+    });
+
+    it("never records a Meta Lead event for a message from an already-existing lead", async () => {
+      const prisma = buildPrismaMock();
+      const existingLead = { id: "lead-1", name: "João", lastContactAt: new Date(0) };
+      prisma.lead.findUnique.mockResolvedValue(existingLead);
+      prisma.lead.update.mockResolvedValue(existingLead);
+      const existingConversation = { id: "conv-1", lastMessageAt: new Date(0) };
+      prisma.conversation.findFirst.mockResolvedValue(existingConversation);
+      prisma.conversation.update.mockResolvedValue(existingConversation);
+      const conversionEvents = buildConversionEventsMock();
+      const service = buildService(prisma, buildAttributionEngineMock(), buildClassifierMock(), conversionEvents);
+
+      await service.ingest(buildJob({ messageId: "wamid.SECOND" }));
+
+      expect(conversionEvents.recordLead).not.toHaveBeenCalled();
     });
   });
 

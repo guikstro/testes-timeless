@@ -1,6 +1,7 @@
 import { LeadsService } from "./leads.service";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { AppException } from "../common/exceptions/app-exception";
+import { ConversionEventsService } from "../integrations/meta/conversion-events.service";
 
 describe("LeadsService", () => {
   function buildService() {
@@ -11,8 +12,13 @@ describe("LeadsService", () => {
       sale: { create: jest.fn(), update: jest.fn() },
       auditLog: { create: jest.fn() },
     };
-    const service = new LeadsService(prisma as unknown as PrismaService);
-    return { service, prisma };
+    const conversionEvents = {
+      recordLead: jest.fn(),
+      recordQualifiedLead: jest.fn(),
+      recordPurchase: jest.fn(),
+    };
+    const service = new LeadsService(prisma as unknown as PrismaService, conversionEvents as unknown as ConversionEventsService);
+    return { service, prisma, conversionEvents };
   }
 
   it("scopes the list query to the caller's organization", async () => {
@@ -125,7 +131,7 @@ describe("LeadsService", () => {
     });
 
     it("manually qualifying a NEW lead sets qualifiedAt, emits QUALIFIED, and audits the status change", async () => {
-      const { service, prisma } = buildService();
+      const { service, prisma, conversionEvents } = buildService();
       prisma.lead.findFirst.mockResolvedValue(existingLead());
       prisma.lead.update.mockResolvedValue({});
       prisma.leadEvent.findMany.mockResolvedValue([]);
@@ -149,10 +155,11 @@ describe("LeadsService", () => {
           userId: "user-1",
         }),
       });
+      expect(conversionEvents.recordQualifiedLead).toHaveBeenCalledWith("org-1", "lead-1", expect.any(Date));
     });
 
-    it("manually marking WON with a revenue creates the Sale and audits SALE_CREATED", async () => {
-      const { service, prisma } = buildService();
+    it("manually marking WON with a revenue creates the Sale, audits SALE_CREATED, and records the Meta Purchase", async () => {
+      const { service, prisma, conversionEvents } = buildService();
       prisma.lead.findFirst
         .mockResolvedValueOnce(existingLead({ status: "QUALIFIED", qualifiedAt: new Date(0) }))
         .mockResolvedValueOnce(existingLead({ status: "WON" }));
@@ -175,10 +182,13 @@ describe("LeadsService", () => {
       });
       const eventTypes = prisma.leadEvent.create.mock.calls.map((c) => c[0].data.type);
       expect(eventTypes).toEqual(["SALE_DETECTED"]);
+      expect(conversionEvents.recordPurchase).toHaveBeenCalledWith("org-1", "lead-1", expect.any(Date), 200000);
+      // Was already QUALIFIED before this request — no implicit re-qualification sent to Meta.
+      expect(conversionEvents.recordQualifiedLead).not.toHaveBeenCalled();
     });
 
     it("jumping straight from NEW to WON manually also synthesizes QUALIFIED, like the automatic classifier", async () => {
-      const { service, prisma } = buildService();
+      const { service, prisma, conversionEvents } = buildService();
       prisma.lead.findFirst.mockResolvedValueOnce(existingLead()).mockResolvedValueOnce(existingLead({ status: "WON" }));
       prisma.lead.update.mockResolvedValue({});
       prisma.sale.create.mockResolvedValue({ id: "sale-1", amountCents: null });
@@ -191,10 +201,13 @@ describe("LeadsService", () => {
       });
       const eventTypes = prisma.leadEvent.create.mock.calls.map((c) => c[0].data.type);
       expect(eventTypes).toEqual(["QUALIFIED", "SALE_DETECTED"]);
+      expect(conversionEvents.recordQualifiedLead).toHaveBeenCalledWith("org-1", "lead-1", expect.any(Date));
+      // No revenueCents given — value unknown, so no Purchase is sent yet.
+      expect(conversionEvents.recordPurchase).not.toHaveBeenCalled();
     });
 
-    it("correcting the revenue of an existing sale updates it and audits SALE_UPDATED with before/after", async () => {
-      const { service, prisma } = buildService();
+    it("correcting the revenue of an existing sale updates it, audits SALE_UPDATED with before/after, and records the Meta Purchase now that the value is known", async () => {
+      const { service, prisma, conversionEvents } = buildService();
       prisma.lead.findFirst
         .mockResolvedValueOnce(existingLead({ status: "WON", wonAt: new Date(0), sale: { id: "sale-1", amountCents: 100000 } }))
         .mockResolvedValueOnce(existingLead({ status: "WON" }));
@@ -212,6 +225,9 @@ describe("LeadsService", () => {
       });
       const eventTypes = prisma.leadEvent.create.mock.calls.map((c) => c[0].data.type);
       expect(eventTypes).toEqual(["REVENUE_DETECTED"]);
+      // ConversionEventsService itself dedupes on (leadId, type) — calling
+      // this again for an already-sent Purchase is safe and a no-op there.
+      expect(conversionEvents.recordPurchase).toHaveBeenCalledWith("org-1", "lead-1", expect.any(Date), 250000);
     });
   });
 });

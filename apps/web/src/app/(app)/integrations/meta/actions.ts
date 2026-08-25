@@ -41,3 +41,34 @@ export async function triggerMetaSync(): Promise<void> {
   revalidatePath("/integrations/meta");
   revalidatePath("/campaigns");
 }
+
+export interface ConnectMetaCapiState {
+  error?: string;
+}
+
+export async function connectMetaCapi(
+  _prevState: ConnectMetaCapiState,
+  formData: FormData,
+): Promise<ConnectMetaCapiState> {
+  const pixelId = String(formData.get("pixelId") ?? "").trim();
+  const capiAccessToken = String(formData.get("capiAccessToken") ?? "").trim();
+
+  if (!pixelId || !capiAccessToken) {
+    return { error: "Pixel ID e access token do Conversions API são obrigatórios." };
+  }
+
+  try {
+    await apiFetch("/integrations/meta/capi/connect", {
+      method: "POST",
+      body: JSON.stringify({ pixelId, capiAccessToken }),
+    });
+  } catch (error) {
+    if (error instanceof ApiRequestError) {
+      return { error: error.body.message };
+    }
+    return { error: "Não foi possível configurar o Conversions API." };
+  }
+
+  revalidatePath("/integrations/meta");
+  return {};
+}

@@ -3,13 +3,17 @@ import { LeadStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { AppException } from "../common/exceptions/app-exception";
 import { PaginatedResult, PaginationQueryDto } from "../common/dto/pagination.dto";
+import { ConversionEventsService } from "../integrations/meta/conversion-events.service";
 import { UpdateLeadDto } from "./dto/update-lead.dto";
 
 const STATUS_ORDER: Record<LeadStatus, number> = { NEW: 0, QUALIFIED: 1, WON: 2 };
 
 @Injectable()
 export class LeadsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly conversionEvents: ConversionEventsService,
+  ) {}
 
   async list(organizationId: string, pagination: PaginationQueryDto): Promise<PaginatedResult<unknown>> {
     const offset = pagination.offset ?? 0;
@@ -111,6 +115,7 @@ export class LeadsService {
           metadata: { classifierType: "MANUAL", userId },
         },
       });
+      await this.conversionEvents.recordQualifiedLead(organizationId, id, now);
     }
 
     let sale = lead.sale;
@@ -144,6 +149,11 @@ export class LeadsService {
           after: { amountCents: sale.amountCents },
         },
       });
+      // Only sent once a value is known (Section: never guess) — a WON
+      // correction with no revenueCents waits for a later correction below.
+      if (dto.revenueCents !== undefined) {
+        await this.conversionEvents.recordPurchase(organizationId, id, now, dto.revenueCents);
+      }
     } else if (dto.revenueCents !== undefined && sale) {
       const before = { amountCents: sale.amountCents };
       sale = await this.prisma.sale.update({ where: { id: sale.id }, data: { amountCents: dto.revenueCents } });
@@ -167,6 +177,11 @@ export class LeadsService {
           after: { amountCents: sale.amountCents },
         },
       });
+      // If this is the first time a value became known, this actually sends
+      // the Purchase; if the sale was already sent, ConversionEventsService's
+      // dedup on (leadId, type) makes this a no-op — a corrected value is
+      // never re-sent to Meta (Section: known limitation, docs/META_CAPI.md).
+      await this.conversionEvents.recordPurchase(organizationId, id, now, dto.revenueCents);
     }
 
     if (data.status) {
