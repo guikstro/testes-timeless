@@ -95,7 +95,11 @@ describe("Tracking links and clicks (e2e)", () => {
       .set("Referer", "https://facebook.com")
       .expect(302);
 
-    expect(redirect.headers.location).toBe("https://wa.me/5585988887777");
+    // The exact query string is Fase 4's attribution token (a random per-
+    // click reference embedded into the prefilled WhatsApp text) — asserted
+    // in detail in test/attribution.e2e-spec.ts, so here we only check that
+    // the redirect still goes to the right phone number.
+    expect(redirect.headers.location).toMatch(/^https:\/\/wa\.me\/5585988887777\?text=/);
 
     const click = await prisma.trackingClick.findFirst({
       where: { trackingLinkId: created.body.id },
@@ -110,8 +114,9 @@ describe("Tracking links and clicks (e2e)", () => {
       campaignId: "camp-1",
       adsetId: "adset-1",
       adId: "ad-1",
-      landingUrl: "https://wa.me/5585988887777",
+      landingUrl: redirect.headers.location,
     });
+    expect(click?.attributionToken).toEqual(expect.any(String));
   });
 
   it("falls back to the link's default source/medium/campaign when the click carries none", async () => {

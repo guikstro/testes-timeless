@@ -20,6 +20,14 @@ interface RawWebhookPayload {
           timestamp?: string;
           type?: string;
           text?: { body?: string };
+          // Present only on a message that arrived via a real Click-to-
+          // WhatsApp ad — Meta attaches this itself.
+          referral?: {
+            ctwa_clid?: string;
+            source_id?: string;
+            source_url?: string;
+            headline?: string;
+          };
         }>;
       };
     }>;
@@ -55,6 +63,14 @@ export function parseWebhookPayload(payload: unknown): WhatsAppInboundMessageJob
           type: message.type === "text" ? "text" : "other",
           text: message.type === "text" ? message.text?.body : undefined,
           timestampSeconds: Number(message.timestamp),
+          referral: message.referral
+            ? {
+                ctwaClid: message.referral.ctwa_clid,
+                sourceId: message.referral.source_id,
+                sourceUrl: message.referral.source_url,
+                headline: message.referral.headline,
+              }
+            : undefined,
         });
       }
     }

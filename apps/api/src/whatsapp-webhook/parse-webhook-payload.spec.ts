@@ -65,6 +65,33 @@ describe("parseWebhookPayload", () => {
     ]);
   });
 
+  it("captures the referral block from a real Click-to-WhatsApp ad message", () => {
+    const jobs = parseWebhookPayload(
+      buildPayload({
+        message: {
+          from: "5585999999999",
+          id: "wamid.CTWA1",
+          timestamp: "1700000002",
+          type: "text",
+          text: { body: "Quero saber mais" },
+          referral: { ctwa_clid: "ctwa.abc123", source_id: "ad-42", source_url: "https://fb.me/x", headline: "Rescisão Indireta" },
+        },
+      }),
+    );
+
+    expect(jobs[0].referral).toEqual({
+      ctwaClid: "ctwa.abc123",
+      sourceId: "ad-42",
+      sourceUrl: "https://fb.me/x",
+      headline: "Rescisão Indireta",
+    });
+  });
+
+  it("leaves referral undefined for an ordinary message with no ad origin", () => {
+    const jobs = parseWebhookPayload(buildPayload({}));
+    expect(jobs[0].referral).toBeUndefined();
+  });
+
   it("ignores status updates (delivery/read receipts) with no messages array", () => {
     const payload = {
       entry: [

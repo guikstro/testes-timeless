@@ -31,6 +31,7 @@ model Organization {
   trackingLinks      TrackingLink[]
   whatsappConnection WhatsAppConnection?
   leads              Lead[]
+  attributions       Attribution[]
 
   @@map("organizations")
 }
@@ -141,11 +142,58 @@ model TrackingClick {
   adsetId    String? @map("adset_id")
   adId       String? @map("ad_id")
 
+  /**
+   * Embedded into the prefilled `text=` of a wa.me redirect (Fase 4) so the
+   * first WhatsApp message can be matched back to this exact click — see
+   * docs/ATTRIBUTION.md. Null for clicks whose destination isn't WhatsApp.
+   */
+  attributionToken String? @unique @map("attribution_token")
+
   trackingLink TrackingLink @relation(fields: [trackingLinkId], references: [id], onDelete: Cascade)
+  attribution  Attribution?
 
   @@index([organizationId])
   @@index([trackingLinkId, clickedAt])
   @@map("tracking_clicks")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4: Attribution — connecting a WhatsApp lead back to its origin
+// ---------------------------------------------------------------------------
+
+enum AttributionMethod {
+  /** Meta's own `referral.ctwa_clid` on a Click-to-WhatsApp ad message — the strongest possible evidence, given directly by Meta. */
+  CTWA_REFERRAL
+  /** Our own reference token, embedded in a wa.me redirect's prefilled text, matched back to a TrackingClick. */
+  TRACKING_LINK
+  /** No usable evidence was present on the lead's first message. Never guessed — see docs/ATTRIBUTION.md. */
+  UNKNOWN
+}
+
+enum AttributionConfidence {
+  HIGH
+  NONE
+}
+
+model Attribution {
+  id              String                @id @default(uuid())
+  organizationId  String                @map("organization_id")
+  /** One row per lead: first-touch, computed once at lead creation, never overwritten by later messages (Section 31). */
+  leadId          String                @unique @map("lead_id")
+  method          AttributionMethod
+  confidence      AttributionConfidence
+  trackingClickId String?               @unique @map("tracking_click_id")
+  /** Raw snapshot of the evidence used, for audit ("why was this lead attributed to this campaign?" — Section 46). */
+  evidence        Json?
+  attributedAt    DateTime              @default(now()) @map("attributed_at")
+  createdAt       DateTime              @default(now()) @map("created_at")
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead          Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  trackingClick TrackingClick? @relation(fields: [trackingClickId], references: [id])
+
+  @@index([organizationId])
+  @@map("attributions")
 }
 
 // ---------------------------------------------------------------------------
@@ -195,6 +243,7 @@ model Lead {
   organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   conversations Conversation[]
   events        LeadEvent[]
+  attribution   Attribution?
 
   @@unique([organizationId, normalizedPhone])
   @@index([organizationId, lastContactAt])

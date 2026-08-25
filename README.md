@@ -5,15 +5,15 @@ anúncio → clique → WhatsApp → lead → qualificação → venda → recei
 Meta Conversions API. Ver o escopo completo e as regras do produto em
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-> **Status atual: Fases 1 (Fundação), 2 (Tracking) e 3 (WhatsApp) concluídas.**
-> Autenticação, organizações, isolamento multi-tenant, links rastreáveis,
-> captura de cliques/UTMs, conexão com WhatsApp Cloud API e ingestão
-> idempotente de mensagens (→ leads/conversas/timeline) estão implementados,
-> testados e rodando via Docker (incluindo o worker, agora com processor
-> real). As demais fases (atribuição, qualificação/venda, Meta Ads/CAPI,
-> analytics) ainda não foram implementadas — ver `docs/FUTURE_IDEAS.md` e os
-> stubs em `docs/ATTRIBUTION.md` e `docs/META_CAPI.md` para o que está
-> planejado em cada uma.
+> **Status atual: Fases 1 (Fundação), 2 (Tracking), 3 (WhatsApp) e 4
+> (Atribuição) concluídas.** Autenticação, organizações, isolamento
+> multi-tenant, links rastreáveis, captura de cliques/UTMs, conexão com
+> WhatsApp Cloud API, ingestão idempotente de mensagens (→
+> leads/conversas/timeline) e o motor de atribuição first-touch (conectando
+> o clique rastreado ao lead do WhatsApp) estão implementados, testados e
+> rodando via Docker. As demais fases (qualificação/venda, Meta Ads/CAPI,
+> analytics) ainda não foram implementadas — ver `docs/FUTURE_IDEAS.md` e o
+> stub em `docs/META_CAPI.md` para o que está planejado.
 
 ## Stack
 
@@ -36,7 +36,8 @@ tintim-clone/
 │   │   │   ├── tracking/           # GET /r/:code — redirecionamento público + captura de clique
 │   │   │   ├── integrations/whatsapp/  # CRUD autenticado da conexão WhatsApp
 │   │   │   ├── whatsapp-webhook/   # POST/GET /whatsapp-webhook — receptor público da Meta
-│   │   │   ├── leads/              # leitura de leads (lista/detalhe com timeline)
+│   │   │   ├── attribution/        # AttributionEngine — clique -> lead (first-touch)
+│   │   │   ├── leads/              # leitura de leads (lista/detalhe com timeline + atribuição)
 │   │   │   ├── health/
 │   │   │   ├── worker/             # entrypoint do processo worker + processors (BullMQ)
 │   │   │   └── common/       # prisma, guards, decorators, filters, logger, encryption, queue
@@ -147,8 +148,9 @@ Em produção/CI: `pnpm --filter api prisma:migrate:deploy`.
 ## Variáveis de ambiente
 
 Ver [`.env.example`](.env.example) para a lista completa e comentada. As
-seções de WhatsApp e Meta Ads/CAPI já estão presentes no arquivo mas
-**não têm efeito ainda** — a integração real chega nas Fases 3, 6 e 7.
+variáveis de WhatsApp (`WHATSAPP_APP_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`)
+já têm efeito (Fase 3). As de Meta Ads/CAPI ainda não — essa integração
+chega nas Fases 6 e 7.
 
 ## Documentação
 

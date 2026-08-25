@@ -24,7 +24,7 @@ describe("TrackingService", () => {
     prisma.trackingLink.findFirst.mockResolvedValue({
       id: "link-1",
       organizationId: "org-1",
-      destinationUrl: "https://wa.me/5585999999999",
+      destinationUrl: "https://example.com/landing",
       defaultSource: null,
       defaultMedium: null,
       defaultCampaign: null,
@@ -44,12 +44,12 @@ describe("TrackingService", () => {
       userAgent: "Mozilla/5.0",
     });
 
-    expect(result.destinationUrl).toBe("https://wa.me/5585999999999");
+    expect(result.destinationUrl).toBe("https://example.com/landing");
     expect(prisma.trackingClick.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         trackingLinkId: "link-1",
         organizationId: "org-1",
-        landingUrl: "https://wa.me/5585999999999",
+        landingUrl: "https://example.com/landing",
         referrer: "https://instagram.com",
         userAgent: "Mozilla/5.0",
         utmSource: "instagram",
@@ -59,6 +59,7 @@ describe("TrackingService", () => {
         campaignId: "camp-1",
         adsetId: "adset-1",
         adId: "ad-1",
+        attributionToken: undefined,
       }),
     });
   });
@@ -68,7 +69,7 @@ describe("TrackingService", () => {
     prisma.trackingLink.findFirst.mockResolvedValue({
       id: "link-1",
       organizationId: "org-1",
-      destinationUrl: "https://wa.me/5585999999999",
+      destinationUrl: "https://example.com/landing",
       defaultSource: "instagram",
       defaultMedium: "bio-link",
       defaultCampaign: "always-on",
@@ -90,7 +91,7 @@ describe("TrackingService", () => {
     prisma.trackingLink.findFirst.mockResolvedValue({
       id: "link-1",
       organizationId: "org-1",
-      destinationUrl: "https://wa.me/5585999999999",
+      destinationUrl: "https://example.com/landing",
       defaultSource: "instagram",
       defaultMedium: "bio-link",
       defaultCampaign: "always-on",
@@ -112,7 +113,7 @@ describe("TrackingService", () => {
     prisma.trackingLink.findFirst.mockResolvedValue({
       id: "link-1",
       organizationId: "org-1",
-      destinationUrl: "https://wa.me/5585999999999",
+      destinationUrl: "https://example.com/landing",
       defaultSource: null,
       defaultMedium: null,
       defaultCampaign: null,
@@ -124,6 +125,48 @@ describe("TrackingService", () => {
 
     expect(prisma.trackingClick.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ utmSource: "first" }),
+    });
+  });
+
+  describe("WhatsApp destinations (Fase 4 attribution token)", () => {
+    it("embeds a reference token into the redirect for a wa.me destination and persists it on the click", async () => {
+      const { service, prisma } = buildService();
+      prisma.trackingLink.findFirst.mockResolvedValue({
+        id: "link-1",
+        organizationId: "org-1",
+        destinationUrl: "https://wa.me/5585999999999",
+        defaultSource: null,
+        defaultMedium: null,
+        defaultCampaign: null,
+      });
+
+      const result = await service.recordClick("abc1234", { query: {} });
+
+      expect(result.destinationUrl).toMatch(/^https:\/\/wa\.me\/5585999999999\?text=/);
+      expect(result.destinationUrl).toContain(encodeURIComponent("[ref:"));
+
+      const createCall = prisma.trackingClick.create.mock.calls[0][0];
+      expect(createCall.data.landingUrl).toBe(result.destinationUrl);
+      expect(createCall.data.attributionToken).toEqual(expect.any(String));
+      expect(result.destinationUrl).toContain(encodeURIComponent(`[ref:${createCall.data.attributionToken}]`));
+    });
+
+    it("never stores an attribution token for a non-WhatsApp destination", async () => {
+      const { service, prisma } = buildService();
+      prisma.trackingLink.findFirst.mockResolvedValue({
+        id: "link-1",
+        organizationId: "org-1",
+        destinationUrl: "https://example.com/landing",
+        defaultSource: null,
+        defaultMedium: null,
+        defaultCampaign: null,
+      });
+
+      await service.recordClick("abc1234", { query: {} });
+
+      expect(prisma.trackingClick.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ attributionToken: undefined }),
+      });
     });
   });
 });

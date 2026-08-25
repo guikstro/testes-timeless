@@ -1,6 +1,8 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { AppException } from "../common/exceptions/app-exception";
+import { generateTrackingCode } from "../common/utils/generate-code";
+import { buildWhatsAppRedirectUrl } from "../common/utils/build-whatsapp-redirect-url";
 import { ClickQuery } from "./click-query.dto";
 
 function firstValue(value: unknown): string | undefined {
@@ -34,11 +36,19 @@ export class TrackingService {
 
     const q = context.query as ClickQuery;
 
+    // Only actually used when the destination is a wa.me/api.whatsapp.com
+    // link (buildWhatsAppRedirectUrl no-ops otherwise) — comparing before/
+    // after tells us whether it was actually embedded, so we don't persist
+    // a token that will never be looked up (Fase 4 — docs/ATTRIBUTION.md).
+    const attributionToken = generateTrackingCode();
+    const redirectUrl = buildWhatsAppRedirectUrl(link.destinationUrl, attributionToken);
+    const tokenWasEmbedded = redirectUrl !== link.destinationUrl;
+
     await this.prisma.trackingClick.create({
       data: {
         trackingLinkId: link.id,
         organizationId: link.organizationId,
-        landingUrl: link.destinationUrl,
+        landingUrl: redirectUrl,
         referrer: context.referrer,
         userAgent: context.userAgent,
         utmSource: firstValue(q.utm_source) ?? link.defaultSource ?? undefined,
@@ -52,9 +62,10 @@ export class TrackingService {
         campaignId: firstValue(q.campaign_id),
         adsetId: firstValue(q.adset_id),
         adId: firstValue(q.ad_id),
+        attributionToken: tokenWasEmbedded ? attributionToken : undefined,
       },
     });
 
-    return { destinationUrl: link.destinationUrl };
+    return { destinationUrl: redirectUrl };
   }
 }

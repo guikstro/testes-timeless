@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
+import { attributionCampaignLabel, attributionSourceLabel, AttributionSummary } from "@/lib/attribution";
 
 interface LeadListItem {
   id: string;
@@ -8,6 +9,7 @@ interface LeadListItem {
   status: string;
   firstContactAt: string;
   lastContactAt: string;
+  attribution: AttributionSummary | null;
 }
 
 interface PaginatedResult<T> {
@@ -33,6 +35,8 @@ export default async function LeadsPage() {
               <tr>
                 <th className="px-4 py-3 font-medium">Nome</th>
                 <th className="px-4 py-3 font-medium">Telefone</th>
+                <th className="px-4 py-3 font-medium">Origem</th>
+                <th className="px-4 py-3 font-medium">Campanha</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Primeiro contato</th>
                 <th className="px-4 py-3 font-medium">Último contato</th>
@@ -47,6 +51,8 @@ export default async function LeadsPage() {
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-slate-600">{lead.normalizedPhone}</td>
+                  <td className="px-4 py-3 text-slate-600">{attributionSourceLabel(lead.attribution)}</td>
+                  <td className="px-4 py-3 text-slate-600">{attributionCampaignLabel(lead.attribution)}</td>
                   <td className="px-4 py-3 text-slate-600">{lead.status}</td>
                   <td className="px-4 py-3 text-slate-500">
                     {new Date(lead.firstContactAt).toLocaleString("pt-BR")}

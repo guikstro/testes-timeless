@@ -1,9 +1,10 @@
 # Tracking (links rastreáveis e captura de origem)
 
-> **Status: implementado (Fase 2).** Este documento descreve o comportamento
-> real do código em `apps/api/src/tracking-links/` e
-> `apps/api/src/tracking/`. A conexão desse clique com um lead do WhatsApp
-> continua não implementada — isso é a Fase 4 (ver `docs/ATTRIBUTION.md`).
+> **Status: implementado (Fase 2, atualizado na Fase 4).** Este documento
+> descreve o comportamento real do código em
+> `apps/api/src/tracking-links/` e `apps/api/src/tracking/`. A conexão desse
+> clique com um lead do WhatsApp está implementada — ver
+> `docs/ATTRIBUTION.md` para os detalhes do motor de atribuição.
 
 ## Como funciona
 
@@ -40,10 +41,11 @@ plataformas de anúncio que não controlamos:
   quando presentes na query string)
 - `referrer` (header `Referer` da requisição)
 - `user-agent`
-- `landingUrl`: o `destinationUrl` do link **no momento do clique** (uma
-  cópia, não uma referência — se o destino do link for editado depois, o
+- `landingUrl`: para onde o clique **de fato** redirecionou (incluindo o
+  token de referência embutido, quando aplicável — ver seção abaixo). Uma
+  cópia, não uma referência: se o destino do link for editado depois, o
   histórico de cliques antigos continua mostrando para onde eles realmente
-  foram).
+  foram.
 
 Parâmetros desconhecidos na query string são ignorados silenciosamente, não
 rejeitados — ver a nota em `apps/api/src/tracking/click-query.dto.ts` sobre
@@ -67,20 +69,25 @@ Isso permite que um link de bio do Instagram, por exemplo, sempre seja
 identificado como `source=instagram` mesmo que ninguém tenha acrescentado
 `?utm_source=instagram` manualmente na hora de compartilhar o link.
 
-## O que NÃO acontece (ainda)
+## A única exceção a "nunca reescrever a destinationUrl"
 
-- O redirecionamento **não** reescreve nem acrescenta parâmetros na
-  `destinationUrl` — ela é usada exatamente como cadastrada. Anexar
-  `fbclid`/UTMs a um link `wa.me/...` não teria efeito útil no WhatsApp, e
-  mexer numa URL de destino arbitrária poderia quebrar query strings que já
-  existiam nela.
-- Não existe cookie de sessão de clique. A correlação clique → conversa do
-  WhatsApp (Fase 3/4) vai depender de evidência determinística que a própria
-  Meta already fornece no payload do webhook do WhatsApp (`ctwa_clid`) ou,
-  na ausência dela, de heurísticas documentadas em `docs/ATTRIBUTION.md`
-  quando essa fase existir — não de um cookie que o navegador do WhatsApp
-  (app nativo) não teria acesso de qualquer forma.
-- Não há limite de taxa (rate limiting) nem filtro de bots neste endpoint.
+O redirecionamento **não** reescreve nem acrescenta parâmetros arbitrários
+na `destinationUrl` — ela é usada como cadastrada, com uma exceção
+deliberada e restrita: quando o destino é um link `wa.me` ou
+`api.whatsapp.com`, um token de referência de 7 caracteres é embutido no
+parâmetro `text=` (o texto pré-preenchido da conversa), via
+`buildWhatsAppRedirectUrl`. Isso não é "anexar UTM às cegas" — é usar um
+recurso que o próprio WhatsApp já suporta para carregar uma referência de
+volta pro clique que a gerou, já que nenhum cookie sobrevive à troca de
+app. Ver `docs/ATTRIBUTION.md` para como esse token é consumido do lado do
+WhatsApp. Qualquer outro destino continua saindo exatamente como cadastrado.
+
+Não existe cookie de sessão de clique — a correlação clique → conversa do
+WhatsApp usa esse token (ou o `referral.ctwa_clid` que a própria Meta
+fornece em anúncios oficiais de Click-to-WhatsApp), nunca um cookie que o
+app nativo do WhatsApp não teria acesso de qualquer forma.
+
+Não há limite de taxa (rate limiting) nem filtro de bots neste endpoint.
 
 ## Multi-tenancy e limpeza
 

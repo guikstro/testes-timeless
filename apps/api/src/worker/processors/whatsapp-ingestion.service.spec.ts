@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { WhatsAppIngestionService } from "./whatsapp-ingestion.service";
 import { PrismaService } from "../../common/prisma/prisma.service";
+import { AttributionEngine } from "../../attribution/attribution-engine";
 import { WhatsAppInboundMessageJob } from "../../common/queue/whatsapp-event.job";
 
 function uniqueConstraintError(): Prisma.PrismaClientKnownRequestError {
@@ -22,6 +23,8 @@ function buildJob(overrides: Partial<WhatsAppInboundMessageJob> = {}): WhatsAppI
     ...overrides,
   };
 }
+
+const UNKNOWN_ATTRIBUTION = { method: "UNKNOWN", confidence: "NONE", trackingClickId: null, evidence: Prisma.JsonNull };
 
 describe("WhatsAppIngestionService", () => {
   function buildPrismaMock() {
@@ -48,13 +51,25 @@ describe("WhatsAppIngestionService", () => {
         update: jest.fn(),
       },
       leadEvent: { create: jest.fn() },
+      attribution: { create: jest.fn() },
     };
+  }
+
+  function buildAttributionEngineMock() {
+    return { resolve: jest.fn().mockResolvedValue(UNKNOWN_ATTRIBUTION) };
+  }
+
+  function buildService(prisma: ReturnType<typeof buildPrismaMock>, attributionEngine = buildAttributionEngineMock()) {
+    return new WhatsAppIngestionService(
+      prisma as unknown as PrismaService,
+      attributionEngine as unknown as AttributionEngine,
+    );
   }
 
   it("skips a message that was already processed (idempotency)", async () => {
     const prisma = buildPrismaMock();
     prisma.message.findUnique.mockResolvedValue({ id: "msg-1", externalId: "wamid.ABC123" });
-    const service = new WhatsAppIngestionService(prisma as unknown as PrismaService);
+    const service = buildService(prisma);
 
     await service.ingest(buildJob());
 
@@ -65,7 +80,7 @@ describe("WhatsAppIngestionService", () => {
   it("drops the event when the phone_number_id doesn't match any connection", async () => {
     const prisma = buildPrismaMock();
     prisma.whatsAppConnection.findUnique.mockResolvedValue(null);
-    const service = new WhatsAppIngestionService(prisma as unknown as PrismaService);
+    const service = buildService(prisma);
 
     await service.ingest(buildJob());
 
@@ -77,7 +92,7 @@ describe("WhatsAppIngestionService", () => {
     const prisma = buildPrismaMock();
     prisma.lead.create.mockResolvedValue({ id: "lead-1", name: null, lastContactAt: new Date(0) });
     prisma.conversation.create.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
-    const service = new WhatsAppIngestionService(prisma as unknown as PrismaService);
+    const service = buildService(prisma);
 
     await service.ingest(buildJob());
 
@@ -119,7 +134,7 @@ describe("WhatsAppIngestionService", () => {
     const existingConversation = { id: "conv-1", lastMessageAt: new Date("2026-01-01T00:00:00Z") };
     prisma.conversation.findFirst.mockResolvedValue(existingConversation);
     prisma.conversation.update.mockResolvedValue(existingConversation);
-    const service = new WhatsAppIngestionService(prisma as unknown as PrismaService);
+    const service = buildService(prisma);
 
     await service.ingest(buildJob({ messageId: "wamid.SECOND", timestampSeconds: 1700000100 }));
 
@@ -136,7 +151,7 @@ describe("WhatsAppIngestionService", () => {
     const raceWinnerLead = { id: "lead-from-race", name: "João", lastContactAt: new Date(0) };
     prisma.lead.findUniqueOrThrow.mockResolvedValue(raceWinnerLead);
     prisma.conversation.create.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
-    const service = new WhatsAppIngestionService(prisma as unknown as PrismaService);
+    const service = buildService(prisma);
 
     await service.ingest(buildJob());
 
@@ -154,7 +169,7 @@ describe("WhatsAppIngestionService", () => {
     prisma.lead.create.mockResolvedValue({ id: "lead-1", name: null, lastContactAt: new Date(0) });
     prisma.conversation.create.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
     prisma.message.create.mockRejectedValue(uniqueConstraintError());
-    const service = new WhatsAppIngestionService(prisma as unknown as PrismaService);
+    const service = buildService(prisma);
 
     await service.ingest(buildJob());
 
@@ -167,12 +182,80 @@ describe("WhatsAppIngestionService", () => {
     const prisma = buildPrismaMock();
     prisma.lead.create.mockResolvedValue({ id: "lead-1", name: null, lastContactAt: new Date(0) });
     prisma.conversation.create.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
-    const service = new WhatsAppIngestionService(prisma as unknown as PrismaService);
+    const service = buildService(prisma);
 
     await service.ingest(buildJob({ type: "other", text: undefined, messageId: "wamid.IMG" }));
 
     expect(prisma.message.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ type: "OTHER", text: undefined }),
+    });
+  });
+
+  describe("attribution (Fase 4)", () => {
+    it("resolves and persists attribution exactly once, only when the lead is newly created", async () => {
+      const prisma = buildPrismaMock();
+      prisma.lead.create.mockResolvedValue({ id: "lead-1", name: null, lastContactAt: new Date(0) });
+      prisma.conversation.create.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
+      const attributionEngine = buildAttributionEngineMock();
+      attributionEngine.resolve.mockResolvedValue({
+        method: "TRACKING_LINK",
+        confidence: "HIGH",
+        trackingClickId: "click-1",
+        evidence: { utmCampaign: "direito-trabalhista" },
+      });
+      const service = buildService(prisma, attributionEngine);
+
+      await service.ingest(buildJob({ text: "oi [ref:AB12CD]" }));
+
+      expect(attributionEngine.resolve).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        messageText: "oi [ref:AB12CD]",
+        referral: undefined,
+      });
+      expect(prisma.attribution.create).toHaveBeenCalledWith({
+        data: {
+          organizationId: "org-1",
+          leadId: "lead-1",
+          method: "TRACKING_LINK",
+          confidence: "HIGH",
+          trackingClickId: "click-1",
+          evidence: { utmCampaign: "direito-trabalhista" },
+        },
+      });
+    });
+
+    it("never resolves or persists attribution for a message from an already-existing lead (first-touch only)", async () => {
+      const prisma = buildPrismaMock();
+      const existingLead = { id: "lead-1", name: "João", lastContactAt: new Date(0) };
+      prisma.lead.findUnique.mockResolvedValue(existingLead);
+      prisma.lead.update.mockResolvedValue(existingLead);
+      const existingConversation = { id: "conv-1", lastMessageAt: new Date(0) };
+      prisma.conversation.findFirst.mockResolvedValue(existingConversation);
+      prisma.conversation.update.mockResolvedValue(existingConversation);
+      const attributionEngine = buildAttributionEngineMock();
+      const service = buildService(prisma, attributionEngine);
+
+      // Even though this later message carries a (different) reference
+      // token, it must never overwrite the lead's first-touch attribution.
+      await service.ingest(buildJob({ messageId: "wamid.SECOND", text: "oi [ref:LATER1]" }));
+
+      expect(attributionEngine.resolve).not.toHaveBeenCalled();
+      expect(prisma.attribution.create).not.toHaveBeenCalled();
+    });
+
+    it("passes the referral block through to the attribution engine untouched", async () => {
+      const prisma = buildPrismaMock();
+      prisma.lead.create.mockResolvedValue({ id: "lead-1", name: null, lastContactAt: new Date(0) });
+      prisma.conversation.create.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
+      const attributionEngine = buildAttributionEngineMock();
+      const service = buildService(prisma, attributionEngine);
+      const referral = { ctwaClid: "ctwa.abc", sourceId: "ad-1" };
+
+      await service.ingest(buildJob({ referral }));
+
+      expect(attributionEngine.resolve).toHaveBeenCalledWith(
+        expect.objectContaining({ referral }),
+      );
     });
   });
 });

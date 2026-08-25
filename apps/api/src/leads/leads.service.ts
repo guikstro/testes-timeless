@@ -14,6 +14,7 @@ export class LeadsService {
     const [items, total] = await Promise.all([
       this.prisma.lead.findMany({
         where: { organizationId },
+        include: { attribution: true },
         orderBy: { lastContactAt: "desc" },
         skip: offset,
         take: limit,
@@ -25,7 +26,10 @@ export class LeadsService {
   }
 
   async findOne(organizationId: string, id: string) {
-    const lead = await this.prisma.lead.findFirst({ where: { id, organizationId } });
+    const lead = await this.prisma.lead.findFirst({
+      where: { id, organizationId },
+      include: { attribution: { include: { trackingClick: { include: { trackingLink: true } } } } },
+    });
     if (!lead) {
       throw new AppException("NOT_FOUND", "Lead não encontrado.", HttpStatus.NOT_FOUND);
     }

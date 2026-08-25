@@ -3,12 +3,16 @@ import { PrismaService } from "../../common/prisma/prisma.service";
 import { normalizePhone } from "../../common/utils/normalize-phone";
 import { isUniqueConstraintError } from "../../common/utils/is-unique-constraint-error";
 import { WhatsAppInboundMessageJob } from "../../common/queue/whatsapp-event.job";
+import { AttributionEngine } from "../../attribution/attribution-engine";
 
 @Injectable()
 export class WhatsAppIngestionService {
   private readonly logger = new Logger(WhatsAppIngestionService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly attributionEngine: AttributionEngine,
+  ) {}
 
   /**
    * Idempotent end-to-end: a message already recorded (by external_id) is a
@@ -51,6 +55,9 @@ export class WhatsAppIngestionService {
       await this.prisma.leadEvent.create({
         data: { organizationId, leadId: lead.id, type: "LEAD_CREATED", occurredAt },
       });
+      // First-touch, computed once from exactly this message's evidence and
+      // never revisited afterward (Section 31) — see AttributionEngine.
+      await this.attributeLead(organizationId, lead.id, job);
     }
 
     const { conversation, wasCreated: conversationWasCreated } = await this.findOrCreateConversation(
@@ -86,6 +93,32 @@ export class WhatsAppIngestionService {
       where: { id: connection.id },
       data: { lastEventAt: new Date() },
     });
+  }
+
+  private async attributeLead(organizationId: string, leadId: string, job: WhatsAppInboundMessageJob): Promise<void> {
+    const result = await this.attributionEngine.resolve({
+      organizationId,
+      messageText: job.text,
+      referral: job.referral,
+    });
+
+    try {
+      await this.prisma.attribution.create({
+        data: {
+          organizationId,
+          leadId,
+          method: result.method,
+          confidence: result.confidence,
+          trackingClickId: result.trackingClickId,
+          evidence: result.evidence,
+        },
+      });
+    } catch (error) {
+      // Defensive only: leadWasCreated is itself race-protected, so this
+      // should never actually fire — but a first-touch attribution must
+      // never be overwritten (Section 31), so if it somehow does, skip.
+      if (!isUniqueConstraintError(error)) throw error;
+    }
   }
 
   private async findOrCreateLead(

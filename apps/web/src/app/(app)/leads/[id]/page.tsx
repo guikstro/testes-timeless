@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { apiFetch, ApiRequestError } from "@/lib/api-client";
+import { attributionCampaignLabel, attributionSourceLabel, AttributionSummary } from "@/lib/attribution";
 
 interface LeadEvent {
   id: string;
@@ -26,6 +27,7 @@ interface LeadDetail {
   lastContactAt: string;
   events: LeadEvent[];
   messages: Message[];
+  attribution: AttributionSummary | null;
 }
 
 const EVENT_LABELS: Record<string, string> = {
@@ -51,6 +53,24 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     <div>
       <h1 className="mb-1 text-2xl font-semibold text-slate-900">{lead.name ?? "Sem nome"}</h1>
       <p className="mb-6 text-sm text-slate-500">{lead.normalizedPhone}</p>
+
+      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6">
+        <h2 className="mb-3 text-sm font-semibold text-slate-900">Origem</h2>
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
+          <div>
+            <dt className="text-slate-400">Origem</dt>
+            <dd className="text-slate-700">{attributionSourceLabel(lead.attribution)}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-400">Campanha</dt>
+            <dd className="text-slate-700">{attributionCampaignLabel(lead.attribution)}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-400">Confiança</dt>
+            <dd className="text-slate-700">{lead.attribution?.confidence === "HIGH" ? "Alta" : "—"}</dd>
+          </div>
+        </dl>
+      </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="rounded-xl border border-slate-200 bg-white p-6">
