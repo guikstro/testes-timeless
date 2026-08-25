@@ -48,7 +48,11 @@ existisse.
 - **Sessão no frontend**: os tokens nunca ficam acessíveis a JavaScript no
   navegador. As rotas `/api/auth/*` do Next.js fazem proxy para o backend e
   gravam os tokens em cookies `httpOnly`; `middleware.ts` protege as rotas
-  autenticadas redirecionando para `/login` quando não há sessão.
+  autenticadas redirecionando para `/login` quando não há sessão nenhuma.
+  Quando o access token (15 min) expirou mas o refresh token (7 dias) ainda
+  é válido, o próprio middleware chama `/auth/refresh`, rotaciona os dois
+  cookies e injeta o novo access token no request corrente — sem isso, o
+  usuário seria deslogado a cada 15 minutos mesmo com uma sessão válida.
 - **Erros**: filtro global (`HttpExceptionFilter`) normaliza toda resposta de
   erro para `{ code, message }`, nunca vaza stack trace ao cliente.
 - **Logs**: `StructuredLoggerService` emite JSON por linha. Convenção: nunca
