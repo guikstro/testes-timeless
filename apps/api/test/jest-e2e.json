@@ -4,6 +4,7 @@
   "testEnvironment": "node",
   "testRegex": "test/.*\\.e2e-spec\\.ts$",
   "globalSetup": "<rootDir>/test/setup-e2e-global.js",
+  "maxWorkers": 1,
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   }

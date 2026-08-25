@@ -5,12 +5,13 @@ anúncio → clique → WhatsApp → lead → qualificação → venda → recei
 Meta Conversions API. Ver o escopo completo e as regras do produto em
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-> **Status atual: Fase 1 (Fundação) concluída.** Autenticação, organizações e
-> isolamento multi-tenant estão implementados, testados e rodando via Docker.
-> As demais fases (tracking, WhatsApp, atribuição, Meta Ads/CAPI, analytics)
-> ainda não foram implementadas — ver `docs/FUTURE_IDEAS.md` e os stubs em
-> `docs/TRACKING.md`, `docs/ATTRIBUTION.md`, `docs/META_CAPI.md`,
-> `docs/WHATSAPP.md` para o que está planejado em cada uma.
+> **Status atual: Fases 1 (Fundação) e 2 (Tracking) concluídas.** Autenticação,
+> organizações, isolamento multi-tenant, links rastreáveis e captura de
+> cliques/UTMs estão implementados, testados e rodando via Docker. As demais
+> fases (WhatsApp, atribuição, Meta Ads/CAPI, analytics) ainda não foram
+> implementadas — ver `docs/FUTURE_IDEAS.md` e os stubs em
+> `docs/ATTRIBUTION.md`, `docs/META_CAPI.md`, `docs/WHATSAPP.md` para o que
+> está planejado em cada uma.
 
 ## Stack
 
@@ -25,16 +26,18 @@ Meta Conversions API. Ver o escopo completo e as regras do produto em
 ```
 tintim-clone/
 ├── apps/
-│   ├── api/          # NestJS: auth, organizations, prisma schema/migrations
+│   ├── api/          # NestJS: auth, organizations, tracking, prisma schema/migrations
 │   │   ├── src/
 │   │   │   ├── auth/
 │   │   │   ├── organizations/
+│   │   │   ├── tracking-links/  # CRUD autenticado de TrackingLink (multi-tenant)
+│   │   │   ├── tracking/        # GET /r/:code — redirecionamento público + captura de clique
 │   │   │   ├── health/
 │   │   │   ├── worker/       # entrypoint do processo worker (BullMQ)
 │   │   │   └── common/       # prisma, guards, decorators, filters, logger
 │   │   ├── prisma/           # schema.prisma, migrations/, seed.ts
 │   │   └── test/             # testes e2e (Jest + Supertest)
-│   └── web/           # Next.js: login/registro, shell autenticado, dashboard
+│   └── web/           # Next.js: login/registro, shell autenticado, dashboard, links
 ├── packages/
 │   └── shared/         # tipos/DTOs compartilhados entre frontend e backend
 ├── docs/                # documentação técnica detalhada por assunto
@@ -74,6 +77,19 @@ docker compose up -d
 
 Sobe Postgres, Redis, API (`:3001`), worker e web (`:3000`). A API roda as
 migrations automaticamente (`prisma migrate deploy`) antes de iniciar.
+
+> **Atenção ao alterar `prisma/schema.prisma` ou dependências:** os
+> containers de dev montam o código do host como volume, mas o
+> `node_modules` (onde o Prisma Client gerado mora) fica num volume anônimo
+> separado para não ser sobrescrito. Um `docker compose down` comum
+> **não remove esse volume**, então o container pode continuar rodando com
+> um Prisma Client desatualizado mesmo depois de reconstruir a imagem. Se
+> isso acontecer (erros de "Property X does not exist on type
+> 'PrismaService'" dentro do container), rode:
+> ```bash
+> docker compose down -v && docker compose up -d --build
+> ```
+> Isso também apaga os dados do Postgres/Redis — rode o seed de novo depois.
 
 ### 2. Opção B — banco/fila em Docker, apps localmente (mais rápido para dev)
 

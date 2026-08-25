@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
-import { ValidationPipe, Logger } from "@nestjs/common";
+import { ValidationPipe, Logger, RequestMethod } from "@nestjs/common";
 import helmet from "helmet";
 import { AppModule } from "./app.module";
 import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
@@ -23,7 +23,9 @@ async function bootstrap() {
   );
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  app.setGlobalPrefix("api", { exclude: ["health"] });
+  app.setGlobalPrefix("api", {
+    exclude: ["health", { path: "r/:code", method: RequestMethod.GET }],
+  });
 
   const port = process.env.PORT ? Number(process.env.PORT) : 3001;
   await app.listen(port);

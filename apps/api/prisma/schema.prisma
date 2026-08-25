@@ -27,7 +27,8 @@ model Organization {
   updatedAt DateTime @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
-  memberships Membership[]
+  memberships   Membership[]
+  trackingLinks TrackingLink[]
 
   @@map("organizations")
 }
@@ -89,4 +90,58 @@ model PasswordResetToken {
 
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: Tracking — trackable links and click capture
+// ---------------------------------------------------------------------------
+
+model TrackingLink {
+  id              String    @id @default(uuid())
+  organizationId  String    @map("organization_id")
+  name            String
+  code            String    @unique
+  destinationUrl  String    @map("destination_url")
+  defaultSource   String?   @map("default_source")
+  defaultMedium   String?   @map("default_medium")
+  defaultCampaign String?   @map("default_campaign")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clicks       TrackingClick[]
+
+  @@index([organizationId])
+  @@map("tracking_links")
+}
+
+model TrackingClick {
+  id             String   @id @default(uuid())
+  trackingLinkId String   @map("tracking_link_id")
+  organizationId String   @map("organization_id")
+  clickedAt      DateTime @default(now()) @map("clicked_at")
+  landingUrl     String   @map("landing_url")
+  referrer       String?
+  userAgent      String?  @map("user_agent")
+
+  utmSource   String? @map("utm_source")
+  utmMedium   String? @map("utm_medium")
+  utmCampaign String? @map("utm_campaign")
+  utmContent  String? @map("utm_content")
+  utmTerm     String? @map("utm_term")
+
+  fbclid   String?
+  ctwaClid String? @map("ctwa_clid")
+  gclid    String?
+
+  campaignId String? @map("campaign_id")
+  adsetId    String? @map("adset_id")
+  adId       String? @map("ad_id")
+
+  trackingLink TrackingLink @relation(fields: [trackingLinkId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([trackingLinkId, clickedAt])
+  @@map("tracking_clicks")
 }

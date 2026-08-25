@@ -1,5 +1,5 @@
 import "./test-env";
-import { INestApplication, ValidationPipe } from "@nestjs/common";
+import { INestApplication, RequestMethod, ValidationPipe } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
@@ -18,7 +18,9 @@ describe("Auth & multi-tenancy (e2e)", () => {
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     app.useGlobalFilters(new HttpExceptionFilter());
-    app.setGlobalPrefix("api", { exclude: ["health"] });
+    app.setGlobalPrefix("api", {
+      exclude: ["health", { path: "r/:code", method: RequestMethod.GET }],
+    });
     await app.init();
 
     prisma = moduleRef.get(PrismaService);
