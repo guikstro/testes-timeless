@@ -10,6 +10,7 @@ import { TrackingModule } from "./tracking/tracking.module";
 import { WhatsAppWebhookModule } from "./whatsapp-webhook/whatsapp-webhook.module";
 import { WhatsAppConnectionsModule } from "./integrations/whatsapp/whatsapp-connections.module";
 import { LeadsModule } from "./leads/leads.module";
+import { ClassificationModule } from "./classification/classification.module";
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { LeadsModule } from "./leads/leads.module";
     WhatsAppWebhookModule,
     WhatsAppConnectionsModule,
     LeadsModule,
+    ClassificationModule,
   ],
 })
 export class AppModule {}

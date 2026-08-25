@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { apiFetch, ApiRequestError } from "@/lib/api-client";
 import { attributionCampaignLabel, attributionSourceLabel, AttributionSummary } from "@/lib/attribution";
+import { formatCentsAsBRL } from "@/lib/currency";
+import { ManualEditForm } from "./manual-edit-form";
 
 interface LeadEvent {
   id: string;
@@ -22,18 +24,30 @@ interface LeadDetail {
   name: string | null;
   normalizedPhone: string;
   rawPhone: string;
-  status: string;
+  status: "NEW" | "QUALIFIED" | "WON";
+  qualifiedAt: string | null;
+  wonAt: string | null;
   firstContactAt: string;
   lastContactAt: string;
   events: LeadEvent[];
   messages: Message[];
   attribution: AttributionSummary | null;
+  sale: { amountCents: number | null } | null;
 }
 
 const EVENT_LABELS: Record<string, string> = {
   LEAD_CREATED: "Lead criado",
   CONVERSATION_STARTED: "Conversa iniciada",
   MESSAGE_RECEIVED: "Mensagem recebida",
+  QUALIFIED: "Lead qualificado",
+  SALE_DETECTED: "Venda detectada",
+  REVENUE_DETECTED: "Receita registrada",
+};
+
+const STATUS_LABELS: Record<LeadDetail["status"], string> = {
+  NEW: "Novo",
+  QUALIFIED: "Qualificado",
+  WON: "Venda",
 };
 
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -70,6 +84,35 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             <dd className="text-slate-700">{lead.attribution?.confidence === "HIGH" ? "Alta" : "—"}</dd>
           </div>
         </dl>
+      </div>
+
+      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6">
+        <h2 className="mb-3 text-sm font-semibold text-slate-900">Status e venda</h2>
+        <dl className="mb-4 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
+          <div>
+            <dt className="text-slate-400">Status</dt>
+            <dd className="text-slate-700">{STATUS_LABELS[lead.status]}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-400">Qualificado em</dt>
+            <dd className="text-slate-700">
+              {lead.qualifiedAt ? new Date(lead.qualifiedAt).toLocaleString("pt-BR") : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-slate-400">Venda em</dt>
+            <dd className="text-slate-700">{lead.wonAt ? new Date(lead.wonAt).toLocaleString("pt-BR") : "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-400">Receita</dt>
+            <dd className="text-slate-700">{formatCentsAsBRL(lead.sale?.amountCents)}</dd>
+          </div>
+        </dl>
+
+        <p className="mb-3 text-xs text-slate-400">
+          Correção manual — use apenas quando o tracking automático não capturou o estágio/valor corretamente.
+        </p>
+        <ManualEditForm leadId={lead.id} status={lead.status} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

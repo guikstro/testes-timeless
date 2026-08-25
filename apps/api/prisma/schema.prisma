@@ -27,11 +27,14 @@ model Organization {
   updatedAt DateTime @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
-  memberships        Membership[]
-  trackingLinks      TrackingLink[]
-  whatsappConnection WhatsAppConnection?
-  leads              Lead[]
-  attributions       Attribution[]
+  memberships         Membership[]
+  trackingLinks       TrackingLink[]
+  whatsappConnection  WhatsAppConnection?
+  leads               Lead[]
+  attributions        Attribution[]
+  classificationRules ClassificationRule[]
+  sales               Sale[]
+  auditLogs           AuditLog[]
 
   @@map("organizations")
 }
@@ -48,6 +51,7 @@ model User {
   memberships          Membership[]
   passwordResetTokens  PasswordResetToken[]
   refreshTokens        RefreshToken[]
+  auditLogs            AuditLog[]
 
   @@map("users")
 }
@@ -226,6 +230,8 @@ model WhatsAppConnection {
 
 enum LeadStatus {
   NEW
+  QUALIFIED
+  WON
 }
 
 model Lead {
@@ -237,6 +243,8 @@ model Lead {
   status          LeadStatus @default(NEW)
   firstContactAt  DateTime   @map("first_contact_at")
   lastContactAt   DateTime   @map("last_contact_at")
+  qualifiedAt     DateTime?  @map("qualified_at")
+  wonAt           DateTime?  @map("won_at")
   createdAt       DateTime   @default(now()) @map("created_at")
   updatedAt       DateTime   @updatedAt @map("updated_at")
 
@@ -244,6 +252,7 @@ model Lead {
   conversations Conversation[]
   events        LeadEvent[]
   attribution   Attribution?
+  sale          Sale?
 
   @@unique([organizationId, normalizedPhone])
   @@index([organizationId, lastContactAt])
@@ -289,6 +298,7 @@ model Message {
   createdAt      DateTime         @default(now()) @map("created_at")
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sales        Sale[]
 
   @@index([conversationId, timestamp])
   @@map("messages")
@@ -298,6 +308,9 @@ enum LeadEventType {
   LEAD_CREATED
   CONVERSATION_STARTED
   MESSAGE_RECEIVED
+  QUALIFIED
+  SALE_DETECTED
+  REVENUE_DETECTED
 }
 
 model LeadEvent {
@@ -313,4 +326,90 @@ model LeadEvent {
 
   @@index([leadId, occurredAt])
   @@map("lead_events")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5: Qualification & Sale — trigger phrases, classifier, revenue,
+// manual corrections with audit trail
+// ---------------------------------------------------------------------------
+
+enum ClassificationTarget {
+  QUALIFIED
+  WON
+}
+
+/**
+ * Deterministic, rule-based classification only (Section 62): a probabilistic
+ * classifier is out of scope for this phase. Matching is case-insensitive,
+ * word-boundary-aware substring — see docs/QUALIFICATION.md for the known
+ * false-positive tradeoff this implies (Section 108) and why operators
+ * should prefer distinctive multi-word phrases.
+ */
+model ClassificationRule {
+  id             String               @id @default(uuid())
+  organizationId String               @map("organization_id")
+  targetStatus   ClassificationTarget @map("target_status")
+  phrase         String
+  createdAt      DateTime             @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("classification_rules")
+}
+
+enum ClassifierType {
+  RULE
+  MANUAL
+}
+
+model Sale {
+  id                String         @id @default(uuid())
+  organizationId    String         @map("organization_id")
+  /** One sale per lead in this phase — a lead is either won or not (Section 16). */
+  leadId            String         @unique @map("lead_id")
+  /** Cents, never float (Section 48). Null until a value can be confirmed — never guessed (Section 109). */
+  amountCents       Int?           @map("amount_cents")
+  classifierType    ClassifierType @map("classifier_type")
+  /** The message whose trigger phrase caused this, when detected automatically. */
+  evidenceMessageId String?        @map("evidence_message_id")
+  detectedAt        DateTime       @map("detected_at")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  deletedAt         DateTime?      @map("deleted_at")
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead            Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  evidenceMessage Message?     @relation(fields: [evidenceMessageId], references: [id])
+
+  @@index([organizationId])
+  @@map("sales")
+}
+
+enum AuditAction {
+  SALE_CREATED
+  SALE_UPDATED
+  SALE_DELETED
+  ATTRIBUTION_CHANGED
+  LEAD_STATUS_CHANGED
+  CONNECTION_CHANGED
+}
+
+/** Section 65 — who changed what, with a before/after snapshot, for any manual correction. */
+model AuditLog {
+  id             String      @id @default(uuid())
+  organizationId String      @map("organization_id")
+  userId         String      @map("user_id")
+  entity         String
+  entityId       String      @map("entity_id")
+  action         AuditAction
+  before         Json?
+  after          Json?
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@map("audit_logs")
 }

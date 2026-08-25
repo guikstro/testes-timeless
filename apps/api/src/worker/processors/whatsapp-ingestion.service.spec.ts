@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { WhatsAppIngestionService } from "./whatsapp-ingestion.service";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { AttributionEngine } from "../../attribution/attribution-engine";
+import { ConversationClassifierService } from "../../classification/conversation-classifier.service";
 import { WhatsAppInboundMessageJob } from "../../common/queue/whatsapp-event.job";
 
 function uniqueConstraintError(): Prisma.PrismaClientKnownRequestError {
@@ -29,7 +30,7 @@ const UNKNOWN_ATTRIBUTION = { method: "UNKNOWN", confidence: "NONE", trackingCli
 describe("WhatsAppIngestionService", () => {
   function buildPrismaMock() {
     return {
-      message: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn() },
+      message: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: "msg-created-1" }) },
       whatsAppConnection: {
         findUnique: jest.fn().mockResolvedValue({
           id: "conn-1",
@@ -59,10 +60,19 @@ describe("WhatsAppIngestionService", () => {
     return { resolve: jest.fn().mockResolvedValue(UNKNOWN_ATTRIBUTION) };
   }
 
-  function buildService(prisma: ReturnType<typeof buildPrismaMock>, attributionEngine = buildAttributionEngineMock()) {
+  function buildClassifierMock() {
+    return { classify: jest.fn().mockResolvedValue(undefined) };
+  }
+
+  function buildService(
+    prisma: ReturnType<typeof buildPrismaMock>,
+    attributionEngine = buildAttributionEngineMock(),
+    classifier = buildClassifierMock(),
+  ) {
     return new WhatsAppIngestionService(
       prisma as unknown as PrismaService,
       attributionEngine as unknown as AttributionEngine,
+      classifier as unknown as ConversationClassifierService,
     );
   }
 
@@ -256,6 +266,56 @@ describe("WhatsAppIngestionService", () => {
       expect(attributionEngine.resolve).toHaveBeenCalledWith(
         expect.objectContaining({ referral }),
       );
+    });
+  });
+
+  describe("classification (Fase 5)", () => {
+    it("classifies every message, not just the first, with the current lead and the created message's internal id", async () => {
+      const prisma = buildPrismaMock();
+      const existingLead = { id: "lead-1", status: "QUALIFIED", name: "João", lastContactAt: new Date(0) };
+      prisma.lead.findUnique.mockResolvedValue(existingLead);
+      prisma.lead.update.mockResolvedValue(existingLead);
+      const existingConversation = { id: "conv-1", lastMessageAt: new Date(0) };
+      prisma.conversation.findFirst.mockResolvedValue(existingConversation);
+      prisma.conversation.update.mockResolvedValue(existingConversation);
+      prisma.message.create.mockResolvedValue({ id: "msg-internal-2" });
+      const classifier = buildClassifierMock();
+      const service = buildService(prisma, buildAttributionEngineMock(), classifier);
+
+      await service.ingest(buildJob({ messageId: "wamid.SECOND", text: "contrato fechado" }));
+
+      expect(classifier.classify).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        lead: existingLead,
+        messageId: "msg-internal-2",
+        messageText: "contrato fechado",
+        occurredAt: expect.any(Date),
+      });
+    });
+
+    it("never classifies a non-text message (nothing to match a phrase against)", async () => {
+      const prisma = buildPrismaMock();
+      prisma.lead.create.mockResolvedValue({ id: "lead-1", name: null, lastContactAt: new Date(0) });
+      prisma.conversation.create.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
+      const classifier = buildClassifierMock();
+      const service = buildService(prisma, buildAttributionEngineMock(), classifier);
+
+      await service.ingest(buildJob({ type: "other", text: undefined }));
+
+      expect(classifier.classify).toHaveBeenCalledWith(expect.objectContaining({ messageText: undefined }));
+    });
+
+    it("never classifies when it lost the message-create race (nothing new happened)", async () => {
+      const prisma = buildPrismaMock();
+      prisma.lead.create.mockResolvedValue({ id: "lead-1", name: null, lastContactAt: new Date(0) });
+      prisma.conversation.create.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
+      prisma.message.create.mockRejectedValue(uniqueConstraintError());
+      const classifier = buildClassifierMock();
+      const service = buildService(prisma, buildAttributionEngineMock(), classifier);
+
+      await service.ingest(buildJob());
+
+      expect(classifier.classify).not.toHaveBeenCalled();
     });
   });
 });

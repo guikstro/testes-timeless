@@ -5,15 +5,16 @@ anúncio → clique → WhatsApp → lead → qualificação → venda → recei
 Meta Conversions API. Ver o escopo completo e as regras do produto em
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-> **Status atual: Fases 1 (Fundação), 2 (Tracking), 3 (WhatsApp) e 4
-> (Atribuição) concluídas.** Autenticação, organizações, isolamento
-> multi-tenant, links rastreáveis, captura de cliques/UTMs, conexão com
-> WhatsApp Cloud API, ingestão idempotente de mensagens (→
-> leads/conversas/timeline) e o motor de atribuição first-touch (conectando
-> o clique rastreado ao lead do WhatsApp) estão implementados, testados e
-> rodando via Docker. As demais fases (qualificação/venda, Meta Ads/CAPI,
-> analytics) ainda não foram implementadas — ver `docs/FUTURE_IDEAS.md` e o
-> stub em `docs/META_CAPI.md` para o que está planejado.
+> **Status atual: Fases 1 (Fundação), 2 (Tracking), 3 (WhatsApp), 4
+> (Atribuição) e 5 (Qualificação e Venda) concluídas.** Autenticação,
+> organizações, isolamento multi-tenant, links rastreáveis, captura de
+> cliques/UTMs, conexão com WhatsApp Cloud API, ingestão idempotente de
+> mensagens, o motor de atribuição first-touch, e gatilhos configuráveis de
+> qualificação/venda (com extração de valor e correção manual auditada)
+> estão implementados, testados e rodando via Docker. As demais fases (Meta
+> Ads/CAPI, analytics) ainda não foram implementadas — ver
+> `docs/FUTURE_IDEAS.md` e o stub em `docs/META_CAPI.md` para o que está
+> planejado.
 
 ## Stack
 
@@ -158,5 +159,6 @@ chega nas Fases 6 e 7.
 - [`docs/TRACKING.md`](docs/TRACKING.md) — links rastreáveis e captura de UTMs/IDs de mídia (Fase 2)
 - [`docs/ATTRIBUTION.md`](docs/ATTRIBUTION.md) — motor de atribuição, regras de precedência (Fase 4)
 - [`docs/WHATSAPP.md`](docs/WHATSAPP.md) — integração com WhatsApp (Fase 3)
+- [`docs/QUALIFICATION.md`](docs/QUALIFICATION.md) — gatilhos, classificador, venda, correção manual (Fase 5)
 - [`docs/META_CAPI.md`](docs/META_CAPI.md) — Meta Ads e Conversions API (Fases 6-7)
 - [`docs/FUTURE_IDEAS.md`](docs/FUTURE_IDEAS.md) — ideias fora do escopo atual, deliberadamente não implementadas

@@ -1,9 +1,11 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { Message } from "@prisma/client";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { normalizePhone } from "../../common/utils/normalize-phone";
 import { isUniqueConstraintError } from "../../common/utils/is-unique-constraint-error";
 import { WhatsAppInboundMessageJob } from "../../common/queue/whatsapp-event.job";
 import { AttributionEngine } from "../../attribution/attribution-engine";
+import { ConversationClassifierService } from "../../classification/conversation-classifier.service";
 
 @Injectable()
 export class WhatsAppIngestionService {
@@ -12,6 +14,7 @@ export class WhatsAppIngestionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly attributionEngine: AttributionEngine,
+    private readonly classifier: ConversationClassifierService,
   ) {}
 
   /**
@@ -73,8 +76,8 @@ export class WhatsAppIngestionService {
       });
     }
 
-    const messageCreated = await this.createMessageIfAbsent(conversation.id, job, occurredAt);
-    if (!messageCreated) {
+    const message = await this.createMessageIfAbsent(conversation.id, job, occurredAt);
+    if (!message) {
       // Lost a race with another concurrent delivery of the same message.
       return;
     }
@@ -87,6 +90,16 @@ export class WhatsAppIngestionService {
         metadata: { messageId: job.messageId },
         occurredAt,
       },
+    });
+
+    // Runs on every message, not just the first — qualification/sale can
+    // happen at any point in the conversation (unlike attribution).
+    await this.classifier.classify({
+      organizationId,
+      lead,
+      messageId: message.id,
+      messageText: job.type === "text" ? job.text : undefined,
+      occurredAt,
     });
 
     await this.prisma.whatsAppConnection.update({
@@ -202,9 +215,9 @@ export class WhatsAppIngestionService {
     conversationId: string,
     job: WhatsAppInboundMessageJob,
     occurredAt: Date,
-  ): Promise<boolean> {
+  ): Promise<Message | null> {
     try {
-      await this.prisma.message.create({
+      return await this.prisma.message.create({
         data: {
           conversationId,
           externalId: job.messageId,
@@ -214,9 +227,8 @@ export class WhatsAppIngestionService {
           timestamp: occurredAt,
         },
       });
-      return true;
     } catch (error) {
-      if (isUniqueConstraintError(error)) return false;
+      if (isUniqueConstraintError(error)) return null;
       throw error;
     }
   }

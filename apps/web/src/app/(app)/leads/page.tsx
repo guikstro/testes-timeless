@@ -1,21 +1,29 @@
 import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
 import { attributionCampaignLabel, attributionSourceLabel, AttributionSummary } from "@/lib/attribution";
+import { formatCentsAsBRL } from "@/lib/currency";
 
 interface LeadListItem {
   id: string;
   name: string | null;
   normalizedPhone: string;
-  status: string;
+  status: "NEW" | "QUALIFIED" | "WON";
   firstContactAt: string;
   lastContactAt: string;
   attribution: AttributionSummary | null;
+  sale: { amountCents: number | null } | null;
 }
 
 interface PaginatedResult<T> {
   items: T[];
   total: number;
 }
+
+const STATUS_LABELS: Record<LeadListItem["status"], string> = {
+  NEW: "Novo",
+  QUALIFIED: "Qualificado",
+  WON: "Venda",
+};
 
 export default async function LeadsPage() {
   const { items } = await apiFetch<PaginatedResult<LeadListItem>>("/leads?limit=50");
@@ -38,6 +46,7 @@ export default async function LeadsPage() {
                 <th className="px-4 py-3 font-medium">Origem</th>
                 <th className="px-4 py-3 font-medium">Campanha</th>
                 <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Receita</th>
                 <th className="px-4 py-3 font-medium">Primeiro contato</th>
                 <th className="px-4 py-3 font-medium">Último contato</th>
               </tr>
@@ -53,7 +62,8 @@ export default async function LeadsPage() {
                   <td className="px-4 py-3 text-slate-600">{lead.normalizedPhone}</td>
                   <td className="px-4 py-3 text-slate-600">{attributionSourceLabel(lead.attribution)}</td>
                   <td className="px-4 py-3 text-slate-600">{attributionCampaignLabel(lead.attribution)}</td>
-                  <td className="px-4 py-3 text-slate-600">{lead.status}</td>
+                  <td className="px-4 py-3 text-slate-600">{STATUS_LABELS[lead.status]}</td>
+                  <td className="px-4 py-3 text-slate-600">{formatCentsAsBRL(lead.sale?.amountCents)}</td>
                   <td className="px-4 py-3 text-slate-500">
                     {new Date(lead.firstContactAt).toLocaleString("pt-BR")}
                   </td>
