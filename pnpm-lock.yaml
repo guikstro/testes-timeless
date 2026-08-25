@@ -58,6 +58,9 @@ importers:
       ioredis:
         specifier: ^5.4.2
         version: 5.11.1(supports-color@8.1.1)
+      libphonenumber-js:
+        specifier: ^1.11.19
+        version: 1.13.11
       nanoid:
         specifier: ^3.3.8
         version: 3.3.18

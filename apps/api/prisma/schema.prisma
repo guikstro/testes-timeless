@@ -27,8 +27,10 @@ model Organization {
   updatedAt DateTime @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
-  memberships   Membership[]
-  trackingLinks TrackingLink[]
+  memberships        Membership[]
+  trackingLinks      TrackingLink[]
+  whatsappConnection WhatsAppConnection?
+  leads              Lead[]
 
   @@map("organizations")
 }
@@ -144,4 +146,122 @@ model TrackingClick {
   @@index([organizationId])
   @@index([trackingLinkId, clickedAt])
   @@map("tracking_clicks")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3: WhatsApp — connection, leads, conversations, messages, timeline
+// ---------------------------------------------------------------------------
+
+enum WhatsAppConnectionStatus {
+  CONNECTED
+  DISCONNECTED
+}
+
+model WhatsAppConnection {
+  id                   String                   @id @default(uuid())
+  organizationId       String                   @unique @map("organization_id")
+  phoneNumberId        String                   @unique @map("phone_number_id")
+  displayPhoneNumber   String                   @map("display_phone_number")
+  accessTokenEncrypted String?                  @map("access_token_encrypted")
+  status               WhatsAppConnectionStatus @default(CONNECTED)
+  connectedAt          DateTime                 @default(now()) @map("connected_at")
+  disconnectedAt       DateTime?                @map("disconnected_at")
+  lastEventAt          DateTime?                @map("last_event_at")
+  createdAt            DateTime                 @default(now()) @map("created_at")
+  updatedAt            DateTime                 @updatedAt @map("updated_at")
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+
+  @@map("whatsapp_connections")
+}
+
+enum LeadStatus {
+  NEW
+}
+
+model Lead {
+  id              String     @id @default(uuid())
+  organizationId  String     @map("organization_id")
+  normalizedPhone String     @map("normalized_phone")
+  rawPhone        String     @map("raw_phone")
+  name            String?
+  status          LeadStatus @default(NEW)
+  firstContactAt  DateTime   @map("first_contact_at")
+  lastContactAt   DateTime   @map("last_contact_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+  events        LeadEvent[]
+
+  @@unique([organizationId, normalizedPhone])
+  @@index([organizationId, lastContactAt])
+  @@map("leads")
+}
+
+model Conversation {
+  id                   String   @id @default(uuid())
+  organizationId       String   @map("organization_id")
+  leadId               String   @map("lead_id")
+  whatsappConnectionId String   @map("whatsapp_connection_id")
+  startedAt            DateTime @default(now()) @map("started_at")
+  lastMessageAt        DateTime @default(now()) @map("last_message_at")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  lead               Lead               @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  whatsappConnection WhatsAppConnection @relation(fields: [whatsappConnectionId], references: [id], onDelete: Cascade)
+  messages           Message[]
+
+  @@index([organizationId])
+  @@index([leadId])
+  @@map("conversations")
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageType {
+  TEXT
+  OTHER
+}
+
+model Message {
+  id             String           @id @default(uuid())
+  conversationId String           @map("conversation_id")
+  externalId     String           @unique @map("external_id")
+  direction      MessageDirection
+  type           MessageType
+  text           String?
+  timestamp      DateTime
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, timestamp])
+  @@map("messages")
+}
+
+enum LeadEventType {
+  LEAD_CREATED
+  CONVERSATION_STARTED
+  MESSAGE_RECEIVED
+}
+
+model LeadEvent {
+  id         String        @id @default(uuid())
+  organizationId String    @map("organization_id")
+  leadId     String        @map("lead_id")
+  type       LeadEventType
+  metadata   Json?
+  occurredAt DateTime      @default(now()) @map("occurred_at")
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, occurredAt])
+  @@map("lead_events")
 }

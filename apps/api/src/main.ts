@@ -6,7 +6,11 @@ import { AppModule } from "./app.module";
 import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  // rawBody: true preserves req.rawBody so the WhatsApp webhook can verify
+  // Meta's HMAC signature over the exact bytes received (see
+  // whatsapp-webhook/verify-signature.ts) — a re-serialized JSON body
+  // wouldn't reliably match byte-for-byte.
+  const app = await NestFactory.create(AppModule, { bufferLogs: true, rawBody: true });
 
   app.use(helmet());
   app.enableCors({
@@ -24,7 +28,12 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
 
   app.setGlobalPrefix("api", {
-    exclude: ["health", { path: "r/:code", method: RequestMethod.GET }],
+    exclude: [
+      "health",
+      { path: "r/:code", method: RequestMethod.GET },
+      { path: "whatsapp-webhook", method: RequestMethod.GET },
+      { path: "whatsapp-webhook", method: RequestMethod.POST },
+    ],
   });
 
   const port = process.env.PORT ? Number(process.env.PORT) : 3001;

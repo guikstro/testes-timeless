@@ -5,20 +5,22 @@ anúncio → clique → WhatsApp → lead → qualificação → venda → recei
 Meta Conversions API. Ver o escopo completo e as regras do produto em
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-> **Status atual: Fases 1 (Fundação) e 2 (Tracking) concluídas.** Autenticação,
-> organizações, isolamento multi-tenant, links rastreáveis e captura de
-> cliques/UTMs estão implementados, testados e rodando via Docker. As demais
-> fases (WhatsApp, atribuição, Meta Ads/CAPI, analytics) ainda não foram
-> implementadas — ver `docs/FUTURE_IDEAS.md` e os stubs em
-> `docs/ATTRIBUTION.md`, `docs/META_CAPI.md`, `docs/WHATSAPP.md` para o que
-> está planejado em cada uma.
+> **Status atual: Fases 1 (Fundação), 2 (Tracking) e 3 (WhatsApp) concluídas.**
+> Autenticação, organizações, isolamento multi-tenant, links rastreáveis,
+> captura de cliques/UTMs, conexão com WhatsApp Cloud API e ingestão
+> idempotente de mensagens (→ leads/conversas/timeline) estão implementados,
+> testados e rodando via Docker (incluindo o worker, agora com processor
+> real). As demais fases (atribuição, qualificação/venda, Meta Ads/CAPI,
+> analytics) ainda não foram implementadas — ver `docs/FUTURE_IDEAS.md` e os
+> stubs em `docs/ATTRIBUTION.md` e `docs/META_CAPI.md` para o que está
+> planejado em cada uma.
 
 ## Stack
 
 - **Frontend**: Next.js 15 (App Router) + TypeScript + Tailwind CSS
 - **Backend**: NestJS + TypeScript
 - **Banco**: PostgreSQL + Prisma ORM (migrations versionadas)
-- **Fila/cache**: Redis + BullMQ (worker dedicado, ainda sem processors)
+- **Fila/cache**: Redis + BullMQ (worker dedicado — processa eventos do WhatsApp)
 - **Infra local**: Docker Compose
 
 ## Estrutura de pastas
@@ -26,18 +28,21 @@ Meta Conversions API. Ver o escopo completo e as regras do produto em
 ```
 tintim-clone/
 ├── apps/
-│   ├── api/          # NestJS: auth, organizations, tracking, prisma schema/migrations
+│   ├── api/          # NestJS: auth, organizations, tracking, whatsapp, leads
 │   │   ├── src/
 │   │   │   ├── auth/
 │   │   │   ├── organizations/
-│   │   │   ├── tracking-links/  # CRUD autenticado de TrackingLink (multi-tenant)
-│   │   │   ├── tracking/        # GET /r/:code — redirecionamento público + captura de clique
+│   │   │   ├── tracking-links/     # CRUD autenticado de TrackingLink (multi-tenant)
+│   │   │   ├── tracking/           # GET /r/:code — redirecionamento público + captura de clique
+│   │   │   ├── integrations/whatsapp/  # CRUD autenticado da conexão WhatsApp
+│   │   │   ├── whatsapp-webhook/   # POST/GET /whatsapp-webhook — receptor público da Meta
+│   │   │   ├── leads/              # leitura de leads (lista/detalhe com timeline)
 │   │   │   ├── health/
-│   │   │   ├── worker/       # entrypoint do processo worker (BullMQ)
-│   │   │   └── common/       # prisma, guards, decorators, filters, logger
+│   │   │   ├── worker/             # entrypoint do processo worker + processors (BullMQ)
+│   │   │   └── common/       # prisma, guards, decorators, filters, logger, encryption, queue
 │   │   ├── prisma/           # schema.prisma, migrations/, seed.ts
 │   │   └── test/             # testes e2e (Jest + Supertest)
-│   └── web/           # Next.js: login/registro, shell autenticado, dashboard, links
+│   └── web/           # Next.js: login/registro, shell autenticado, dashboard, links, leads, integrações
 ├── packages/
 │   └── shared/         # tipos/DTOs compartilhados entre frontend e backend
 ├── docs/                # documentação técnica detalhada por assunto
