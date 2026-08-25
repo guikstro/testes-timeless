@@ -1,11 +1,10 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, HttpCode, HttpStatus, Post } from "@nestjs/common";
 import { AuthService } from "./auth.service";
 import { RegisterDto } from "./dto/register.dto";
 import { LoginDto } from "./dto/login.dto";
 import { RefreshTokenDto } from "./dto/refresh-token.dto";
 import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
-import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 
 @Controller("auth")
 export class AuthController {
@@ -28,9 +27,13 @@ export class AuthController {
     return this.authService.refresh(dto.refreshToken);
   }
 
+  /**
+   * Deliberately not behind JwtAuthGuard: logout must still revoke the
+   * refresh token even when the (short-lived) access token has already
+   * expired — the DTO's refresh token is itself the only thing it acts on.
+   */
   @Post("logout")
   @HttpCode(HttpStatus.NO_CONTENT)
-  @UseGuards(JwtAuthGuard)
   async logout(@Body() dto: RefreshTokenDto): Promise<void> {
     await this.authService.logout(dto.refreshToken);
   }

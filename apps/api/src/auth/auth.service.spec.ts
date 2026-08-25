@@ -1,8 +1,19 @@
 import { JwtService } from "@nestjs/jwt";
+import { Prisma } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import { AuthService } from "./auth.service";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { AppException } from "../common/exceptions/app-exception";
+
+// bcrypt's native binding exports non-configurable properties, so
+// jest.spyOn(bcrypt, "compare") fails with "Cannot redefine property".
+// Wrapping the real implementation in jest.fn() via jest.mock keeps actual
+// hashing/comparison behavior (needed by the other tests below) while still
+// letting us assert on call counts.
+jest.mock("bcrypt", () => {
+  const actual = jest.requireActual("bcrypt");
+  return { ...actual, compare: jest.fn(actual.compare) };
+});
 
 type MockPrisma = {
   user: Record<string, jest.Mock>;
@@ -88,6 +99,28 @@ describe("AuthService", () => {
         }),
       ).rejects.toThrow(AppException);
     });
+
+    it("converts a race-condition unique-constraint violation into a clean 409 instead of a raw 500", async () => {
+      // The pre-check (findUnique) and the transaction's create() are not
+      // atomic, so two concurrent identical requests can both pass the
+      // pre-check and then collide on the DB's unique constraint.
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.$transaction.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+          code: "P2002",
+          clientVersion: "test",
+        }),
+      );
+
+      await expect(
+        service.register({
+          name: "Ana",
+          email: "ana@example.com",
+          password: "password123",
+          organizationName: "Acme",
+        }),
+      ).rejects.toMatchObject({ response: { code: "EMAIL_ALREADY_IN_USE" } });
+    });
   });
 
   describe("login", () => {
@@ -97,6 +130,21 @@ describe("AuthService", () => {
       await expect(service.login({ email: "nobody@example.com", password: "whatever" })).rejects.toMatchObject({
         response: { code: "INVALID_CREDENTIALS" },
       });
+    });
+
+    it("still pays the bcrypt cost for an unknown e-mail (no timing side-channel to enumerate accounts)", async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      const compareMock = bcrypt.compare as unknown as jest.Mock;
+      compareMock.mockClear();
+
+      await expect(service.login({ email: "nobody@example.com", password: "whatever" })).rejects.toBeInstanceOf(
+        AppException,
+      );
+
+      // Unknown-user and wrong-password paths must do the same amount of
+      // work; a short-circuit that skips bcrypt.compare for unknown users
+      // makes the two cases distinguishable by response time.
+      expect(compareMock).toHaveBeenCalledTimes(1);
     });
 
     it("rejects a wrong password", async () => {

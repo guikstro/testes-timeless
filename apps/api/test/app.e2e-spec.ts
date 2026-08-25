@@ -137,6 +137,26 @@ describe("Auth & multi-tenancy (e2e)", () => {
     expect(reuse.body.code).toBe("INVALID_REFRESH_TOKEN");
   });
 
+  it("revokes the refresh token on logout even with no access token at all (must not require a live session)", async () => {
+    const login = await request(app.getHttpServer())
+      .post("/api/auth/login")
+      .send({ email: orgAUser.email, password: orgAUser.password })
+      .expect(200);
+
+    // No Authorization header — this is the case that used to 401 before the
+    // refresh token could ever be revoked, leaving it valid for up to 7 days.
+    await request(app.getHttpServer())
+      .post("/api/auth/logout")
+      .send({ refreshToken: login.body.refreshToken })
+      .expect(204);
+
+    const reuse = await request(app.getHttpServer())
+      .post("/api/auth/refresh")
+      .send({ refreshToken: login.body.refreshToken })
+      .expect(401);
+    expect(reuse.body.code).toBe("INVALID_REFRESH_TOKEN");
+  });
+
   it("a duplicated registration webhook-like retry never creates two organizations", async () => {
     const duplicate = {
       name: "Usuário C",

@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
+import { Prisma } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import * as crypto from "crypto";
 import { PrismaService } from "../common/prisma/prisma.service";
@@ -16,6 +17,11 @@ const ACCESS_TOKEN_TTL = "15m";
 const REFRESH_TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 const RESET_TOKEN_TTL_MS = 1000 * 60 * 60; // 1 hour
 const BCRYPT_ROUNDS = 12;
+
+// Compared against on every login with an unknown e-mail so the bcrypt cost
+// is paid regardless — otherwise response time leaks whether an account
+// exists (real accounts take ~bcrypt-compare-time longer to reject).
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync("not-a-real-password", BCRYPT_ROUNDS);
 
 interface TokenPair {
   accessToken: string;
@@ -38,31 +44,43 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
     const baseSlug = slugify(dto.organizationName) || "org";
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      let slug = baseSlug;
-      let suffix = 0;
+    // The findUnique-then-create checks above and below are not atomic, so
+    // two identical requests can race past both checks; the unique
+    // constraints are the real source of truth and P2002 here is expected,
+    // not exceptional — without this catch it surfaced as a raw 500.
+    let result: { user: { id: string }; membership: { organizationId: string; role: JwtPayload["role"] } };
+    try {
+      result = await this.prisma.$transaction(async (tx) => {
+        let slug = baseSlug;
+        let suffix = 0;
 
-      for (;;) {
-        const collision = await tx.organization.findUnique({ where: { slug } });
-        if (!collision) break;
-        suffix += 1;
-        slug = `${baseSlug}-${suffix}`;
+        for (;;) {
+          const collision = await tx.organization.findUnique({ where: { slug } });
+          if (!collision) break;
+          suffix += 1;
+          slug = `${baseSlug}-${suffix}`;
+        }
+
+        const organization = await tx.organization.create({
+          data: { name: dto.organizationName, slug },
+        });
+
+        const user = await tx.user.create({
+          data: { name: dto.name, email: dto.email, passwordHash },
+        });
+
+        const membership = await tx.membership.create({
+          data: { organizationId: organization.id, userId: user.id, role: "OWNER" },
+        });
+
+        return { user, membership };
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        throw new AppException("EMAIL_ALREADY_IN_USE", "Este e-mail já está em uso.", HttpStatus.CONFLICT);
       }
-
-      const organization = await tx.organization.create({
-        data: { name: dto.organizationName, slug },
-      });
-
-      const user = await tx.user.create({
-        data: { name: dto.name, email: dto.email, passwordHash },
-      });
-
-      const membership = await tx.membership.create({
-        data: { organizationId: organization.id, userId: user.id, role: "OWNER" },
-      });
-
-      return { user, membership };
-    });
+      throw error;
+    }
 
     return this.issueTokenPair(result.user.id, result.membership.organizationId, result.membership.role);
   }
@@ -73,7 +91,8 @@ export class AuthService {
       include: { memberships: true },
     });
 
-    if (!user || !(await bcrypt.compare(dto.password, user.passwordHash))) {
+    const passwordMatches = await bcrypt.compare(dto.password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
+    if (!user || !passwordMatches) {
       throw new AppException("INVALID_CREDENTIALS", "E-mail ou senha inválidos.", HttpStatus.UNAUTHORIZED);
     }
 

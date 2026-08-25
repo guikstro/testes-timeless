@@ -86,7 +86,10 @@ services:
     env_file:
       - .env
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:3001/api
+      # Server-side only (route handlers / Server Components run inside this
+      # container), so this must resolve on the Docker network, not the host —
+      # "localhost" here would point at the web container itself, not the api one.
+      NEXT_PUBLIC_API_URL: http://api:3001/api
       PORT: 3000
     ports:
       - "3000:3000"
