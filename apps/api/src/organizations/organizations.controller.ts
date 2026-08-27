@@ -19,4 +19,10 @@ export class OrganizationsController {
   updateCurrent(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateOrganizationDto) {
     return this.organizationsService.updateCurrent(user.organizationId, dto);
   }
+
+  /** Quem da equipe da plataforma entrou nesta conta — visível para o próprio cliente. */
+  @Get("current/support-accesses")
+  listSupportAccesses(@CurrentUser() user: AuthenticatedUser) {
+    return this.organizationsService.listSupportAccesses(user.organizationId);
+  }
 }

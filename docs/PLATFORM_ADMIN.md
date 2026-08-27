@@ -79,6 +79,42 @@ mantém isso sob controle não é um papel reduzido, e sim:
 - **Todo acesso registrado**, sem exceção, visível em `/admin/acessos`.
 - **A auditoria é gravada antes do token ser emitido**: se o registro falhar,
   o acesso não acontece. Um acesso sem rastro é pior que um acesso negado.
+- **A visita expira em 30 minutos** (`IMPERSONATION_TTL_SECONDS`), prazo
+  absoluto que o refresh não estende.
+- **O próprio cliente enxerga quem entrou**, em Configurações → "Acessos do
+  suporte à sua conta".
+
+## Prazo da visita
+
+O caso de uso é dar suporte, não trabalhar dentro da conta alheia por horas.
+Passado o prazo é só entrar de novo pela administração — o que gera um novo
+registro, deixando visível quanto tempo alguém realmente passou lá dentro em
+vez de uma única entrada aberta indefinidamente.
+
+O prazo (`impersonationExpiresAt`, em segundos desde a época) viaja no token
+e é verificado em **dois** lugares, de propósito:
+
+- **`JwtStrategy.validate`**, ou seja, em toda requisição autenticada. Só
+  checar no refresh não bastaria: um access token já emitido continuaria
+  valendo até o próprio vencimento dele (até 15 min), mantendo a sessão viva
+  dentro do cliente depois do prazo.
+- **No refresh**, que recusa uma visita vencida e, quando ela ainda vale,
+  **carrega adiante o mesmo prazo original** em vez de criar um novo.
+
+Um token marcado como impersonação **sem** prazo é tratado como já vencido —
+a ausência do campo nunca significa "acesso ilimitado".
+
+## Transparência para o cliente
+
+`GET /organizations/current/support-accesses` devolve, escopado pela própria
+organização, quem da plataforma entrou na conta e quando. Aparece em
+Configurações.
+
+Isto existe porque um acesso aos dados de alguém que só quem acessou
+consegue revisar não é transparência de verdade. Não há notificação por
+e-mail: o projeto não tem infraestrutura de envio (a recuperação de senha
+devolve o token direto em dev), e um aviso que não é enviado de verdade seria
+só fachada.
 
 ## Detalhes de segurança que não são óbvios
 
@@ -100,13 +136,19 @@ mantém isso sob controle não é um papel reduzido, e sim:
 
 ## Limitações conhecidas (deliberadas)
 
-- **Não há fim de sessão de impersonação por tempo.** Ela dura o que durar a
-  sessão normal. Um limite curto (ex.: 30 min) seria uma melhoria natural.
 - **A auditoria registra a entrada, não cada ação feita lá dentro.** As ações
   em si já são auditadas pelos mecanismos das fases anteriores (venda,
   status de lead), e ficam atribuídas ao operador — mas ações sem auditoria
   própria não ganham uma só por serem feitas em impersonação.
-- **Não há aviso ao cliente** de que alguém entrou na conta dele. Vários
-  produtos notificam; aqui a transparência é interna.
+- **Sem notificação ativa ao cliente.** Ele consegue ver os acessos, mas não
+  é avisado quando um acontece. Depende de infraestrutura de e-mail, que o
+  projeto ainda não tem.
 - **Só um nível de operador.** Não há distinção entre suporte, faturamento e
-  engenharia — quem é operador vê e faz tudo.
+  engenharia — quem é operador vê e faz tudo. Não implementado por ser
+  especulativo enquanto a operação é de uma pessoa só: uma hierarquia de
+  permissões que ninguém usa é complexidade sem contrapartida. O dia em que
+  houver equipe, o lugar natural é trocar o booleano `isPlatformAdmin` por
+  um enum de papel.
+- **O aviso de expiração não aparece na tela.** A sessão simplesmente para de
+  valer aos 30 minutos e a próxima ação cai no login; não há contagem
+  regressiva avisando que o prazo está acabando.

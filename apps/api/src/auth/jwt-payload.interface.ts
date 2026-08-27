@@ -16,6 +16,13 @@ export interface JwtPayload {
    * e a rastreabilidade de quem estava lá dentro.
    */
   impersonating?: true;
+  /**
+   * Prazo absoluto da impersonação, em segundos desde a época. Anda junto
+   * com `impersonating` e **não** é estendido pelo refresh — é o que impede
+   * uma visita a um cliente de virar acesso permanente só porque o operador
+   * deixou a aba aberta.
+   */
+  impersonationExpiresAt?: number;
   /** Unique per issuance — guarantees access/refresh tokens never collide even when minted in the same second. */
   jti: string;
 }

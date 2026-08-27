@@ -52,10 +52,22 @@ export class LeadsService {
     }
 
     const [events, messages] = await Promise.all([
-      this.prisma.leadEvent.findMany({ where: { leadId: id }, orderBy: { occurredAt: "asc" } }),
+      // `sequence` desempata: vários eventos de uma mesma mensagem
+      // compartilham o `occurredAt` dela (que vem do WhatsApp, não do nosso
+      // relógio) e frequentemente o `createdAt` também, que só tem precisão
+      // de milissegundos. Sem um contador monotônico, o Postgres devolvia
+      // ordem arbitrária e a tela chegava a mostrar a venda antes da
+      // mensagem que a originou.
+      this.prisma.leadEvent.findMany({
+        where: { leadId: id },
+        orderBy: [{ occurredAt: "asc" }, { sequence: "asc" }],
+        // Detalhe interno de ordenação, e um BigInt que o JSON.stringify do
+        // Nest não sabe serializar — nunca deve sair na resposta.
+        omit: { sequence: true },
+      }),
       this.prisma.message.findMany({
         where: { conversation: { leadId: id } },
-        orderBy: { timestamp: "asc" },
+        orderBy: [{ timestamp: "asc" }, { createdAt: "asc" }],
       }),
     ]);
 

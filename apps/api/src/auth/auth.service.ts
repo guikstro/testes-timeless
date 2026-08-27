@@ -139,13 +139,22 @@ export class AuthService {
       data: { revokedAt: new Date() },
     });
 
-    // Preserva a marca de impersonação — ver a nota em issueTokenPair.
-    return this.issueTokenPair(
-      payload.sub,
-      payload.organizationId,
-      payload.role,
-      payload.impersonating === true,
-    );
+    // Preserva a impersonação, mas **nunca** estende o prazo dela: renovar
+    // carrega adiante o mesmo `impersonationExpiresAt` original. É o que
+    // impede uma visita a um cliente de virar acesso indefinido.
+    const impersonation = payload.impersonating
+      ? { expiresAt: payload.impersonationExpiresAt ?? 0 }
+      : undefined;
+
+    if (impersonation && impersonation.expiresAt <= Math.floor(Date.now() / 1000)) {
+      throw new AppException(
+        "IMPERSONATION_EXPIRED",
+        "A sessão dentro do cliente expirou. Entre novamente pela administração.",
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
+    return this.issueTokenPair(payload.sub, payload.organizationId, payload.role, impersonation);
   }
 
   async logout(refreshToken: string): Promise<void> {
@@ -234,10 +243,14 @@ export class AuthService {
   }
 
   /**
-   * `impersonating` é propagado por todo caminho que emite tokens, inclusive
-   * o refresh: se ele se perdesse na renovação, um operador da plataforma
+   * A impersonação é propagada por todo caminho que emite tokens, inclusive
+   * o refresh: se ela se perdesse na renovação, um operador da plataforma
    * acabaria com uma sessão comum dentro do cliente — sem o aviso na tela e
    * sem rastro de que aquilo era uma impersonação.
+   *
+   * O prazo vem junto num objeto só (em vez de um booleano solto + uma data
+   * opcional) porque impersonar **sem** prazo não é um estado válido: seria
+   * exatamente o acesso permanente que o prazo existe para evitar.
    *
    * Público (não privado) porque o módulo de administração precisa emitir o
    * par de tokens da organização em que o operador está entrando.
@@ -246,13 +259,15 @@ export class AuthService {
     userId: string,
     organizationId: string,
     role: JwtPayload["role"],
-    impersonating = false,
+    impersonation?: { expiresAt: number },
   ): Promise<TokenPair> {
     const claims = {
       sub: userId,
       organizationId,
       role,
-      ...(impersonating ? { impersonating: true as const } : {}),
+      ...(impersonation
+        ? { impersonating: true as const, impersonationExpiresAt: impersonation.expiresAt }
+        : {}),
     };
 
     const accessToken = await this.jwt.signAsync(

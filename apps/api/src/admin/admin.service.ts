@@ -6,6 +6,15 @@ import { PaginatedResult, PaginationQueryDto } from "../common/dto/pagination.dt
 import { AuthService } from "../auth/auth.service";
 
 /**
+ * Prazo absoluto de uma visita a um cliente. Curto de propósito: o caso de
+ * uso é dar suporte, não trabalhar dentro da conta alheia por horas. Passado
+ * o prazo, é só entrar de novo pela administração — o que gera um novo
+ * registro de acesso, deixando visível quanto tempo alguém realmente passou
+ * lá dentro em vez de uma única entrada aberta indefinidamente.
+ */
+const IMPERSONATION_TTL_SECONDS = 30 * 60;
+
+/**
  * Painel do operador da plataforma (Fase 9). Este é o único serviço do
  * sistema que atravessa organizações de propósito — todo o resto é
  * estritamente escopado por `organizationId`. Por isso ele fica isolado num
@@ -125,11 +134,16 @@ export class AdminService {
     );
 
     // OWNER porque o operador precisa poder consertar o que o cliente pediu;
-    // o que o mantém seguro é o registro em auditoria e o aviso permanente
-    // na tela, não um papel reduzido.
-    const tokens = await this.auth.issueTokenPair(adminUserId, organizationId, "OWNER", true);
+    // o que o mantém seguro é o registro em auditoria, o aviso permanente na
+    // tela e o prazo abaixo — não um papel reduzido.
+    const expiresAt = Math.floor(Date.now() / 1000) + IMPERSONATION_TTL_SECONDS;
+    const tokens = await this.auth.issueTokenPair(adminUserId, organizationId, "OWNER", { expiresAt });
 
-    return { ...tokens, organization: { id: organization.id, name: organization.name } };
+    return {
+      ...tokens,
+      organization: { id: organization.id, name: organization.name },
+      expiresAt,
+    };
   }
 
   /** Histórico de entradas em clientes, para o operador auditar a si mesmo. */

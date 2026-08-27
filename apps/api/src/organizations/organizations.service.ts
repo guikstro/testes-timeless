@@ -29,4 +29,26 @@ export class OrganizationsService {
       data: dto,
     });
   }
+
+  /**
+   * Acessos da equipe da plataforma a ESTA organização (Fase 9).
+   *
+   * Deliberadamente visível para o próprio cliente, e não só no painel
+   * interno: um acesso aos dados de alguém que só quem acessou consegue
+   * revisar não é transparência de verdade. Escopado por `organizationId`
+   * como todo o resto — um cliente nunca enxerga os acessos de outro.
+   */
+  async listSupportAccesses(organizationId: string) {
+    return this.prisma.auditLog.findMany({
+      where: { organizationId, action: "IMPERSONATION_STARTED" },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: {
+        id: true,
+        createdAt: true,
+        // Nome e e-mail de quem entrou; nunca o id interno do operador.
+        user: { select: { name: true, email: true } },
+      },
+    });
+  }
 }

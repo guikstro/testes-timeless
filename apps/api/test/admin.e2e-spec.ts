@@ -1,4 +1,6 @@
 import "./test-env";
+import { createHash } from "crypto";
+import { JwtService } from "@nestjs/jwt";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import request from "supertest";
@@ -13,6 +15,8 @@ function decodeJwt(accessToken: string): { sub: string; organizationId: string; 
 describe("Administração da plataforma (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  /** Assina tokens forjados nos testes de prazo, usando a mesma chave da aplicação. */
+  let jwtService: JwtService;
 
   let adminToken: string;
   let adminUserId: string;
@@ -29,6 +33,7 @@ describe("Administração da plataforma (e2e)", () => {
     await app.init();
 
     prisma = moduleRef.get(PrismaService);
+    jwtService = moduleRef.get(JwtService);
 
     await prisma.organization.deleteMany({ where: { name: { contains: "Admin E2E" } } });
     await prisma.user.deleteMany({ where: { email: { contains: "admin-e2e" } } });
@@ -197,6 +202,123 @@ describe("Administração da plataforma (e2e)", () => {
         .post("/api/admin/organizations/00000000-0000-4000-8000-000000000000/impersonate")
         .set("Authorization", `Bearer ${adminToken}`)
         .expect(404);
+    });
+
+    describe("prazo da visita", () => {
+      it("devolve um prazo de 30 minutos ao entrar", async () => {
+        const response = await request(app.getHttpServer())
+          .post(`/api/admin/organizations/${clientOrgId}/impersonate`)
+          .set("Authorization", `Bearer ${adminToken}`)
+          .expect(201);
+
+        const now = Math.floor(Date.now() / 1000);
+        expect(response.body.expiresAt).toBeGreaterThan(now + 29 * 60);
+        expect(response.body.expiresAt).toBeLessThanOrEqual(now + 30 * 60 + 5);
+      });
+
+      /**
+       * Um token de impersonação vencido precisa parar de valer em qualquer
+       * rota, não só no refresh — senão a sessão continuaria viva dentro do
+       * cliente até o access token expirar sozinho.
+       */
+      it("recusa um token de impersonação já vencido em qualquer rota autenticada", async () => {
+        const expired = await jwtService.signAsync(
+          {
+            sub: adminUserId,
+            organizationId: clientOrgId,
+            role: "OWNER",
+            impersonating: true,
+            impersonationExpiresAt: Math.floor(Date.now() / 1000) - 60,
+            jti: "expired-test",
+          },
+          { expiresIn: "15m" },
+        );
+
+        const response = await request(app.getHttpServer())
+          .get("/api/auth/session")
+          .set("Authorization", `Bearer ${expired}`)
+          .expect(401);
+
+        expect(response.body.code).toBe("IMPERSONATION_EXPIRED");
+      });
+
+      it("o refresh não estende o prazo original da visita", async () => {
+        const impersonation = await request(app.getHttpServer())
+          .post(`/api/admin/organizations/${clientOrgId}/impersonate`)
+          .set("Authorization", `Bearer ${adminToken}`)
+          .expect(201);
+
+        const refreshed = await request(app.getHttpServer())
+          .post("/api/auth/refresh")
+          .send({ refreshToken: impersonation.body.refreshToken })
+          .expect(200);
+
+        const payload = decodeJwt(refreshed.body.accessToken) as { impersonationExpiresAt?: number };
+        expect(payload.impersonationExpiresAt).toBe(impersonation.body.expiresAt);
+      });
+
+      it("o refresh recusa uma visita já vencida em vez de emitir um token novo", async () => {
+        const expiredRefresh = await jwtService.signAsync(
+          {
+            sub: adminUserId,
+            organizationId: clientOrgId,
+            role: "OWNER",
+            impersonating: true,
+            impersonationExpiresAt: Math.floor(Date.now() / 1000) - 60,
+            jti: "expired-refresh-test",
+          },
+          { expiresIn: "7d" },
+        );
+
+        // O refresh exige que o token exista e esteja ativo no banco.
+        await prisma.refreshToken.create({
+          data: {
+            userId: adminUserId,
+            tokenHash: createHash("sha256").update(expiredRefresh).digest("hex"),
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          },
+        });
+
+        const response = await request(app.getHttpServer())
+          .post("/api/auth/refresh")
+          .send({ refreshToken: expiredRefresh })
+          .expect(401);
+
+        expect(response.body.code).toBe("IMPERSONATION_EXPIRED");
+      });
+    });
+
+    describe("transparência para o cliente", () => {
+      it("o cliente enxerga, na própria conta, quem do suporte entrou nela", async () => {
+        await request(app.getHttpServer())
+          .post(`/api/admin/organizations/${clientOrgId}/impersonate`)
+          .set("Authorization", `Bearer ${adminToken}`)
+          .expect(201);
+
+        const response = await request(app.getHttpServer())
+          .get("/api/organizations/current/support-accesses")
+          .set("Authorization", `Bearer ${clientToken}`)
+          .expect(200);
+
+        expect(response.body.length).toBeGreaterThan(0);
+        expect(response.body[0].user.email).toBe("operador@admin-e2e.local");
+      });
+
+      it("um cliente nunca enxerga os acessos feitos a outro cliente", async () => {
+        const outra = await request(app.getHttpServer()).post("/api/auth/register").send({
+          name: "Terceiro",
+          email: "terceiro@admin-e2e.local",
+          password: "password123",
+          organizationName: "Admin E2E Terceiro",
+        });
+
+        const response = await request(app.getHttpServer())
+          .get("/api/organizations/current/support-accesses")
+          .set("Authorization", `Bearer ${outra.body.accessToken}`)
+          .expect(200);
+
+        expect(response.body).toEqual([]);
+      });
     });
   });
 });

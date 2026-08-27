@@ -86,12 +86,31 @@ describe("AdminService", () => {
 
       const result = await service.impersonate("admin-1", "org-1");
 
-      // sub = operador (não alguém do cliente), org = alvo, impersonating = true.
-      expect(auth.issueTokenPair).toHaveBeenCalledWith("admin-1", "org-1", "OWNER", true);
+      // sub = operador (não alguém do cliente), org = alvo, com prazo.
+      expect(auth.issueTokenPair).toHaveBeenCalledWith(
+        "admin-1",
+        "org-1",
+        "OWNER",
+        { expiresAt: expect.any(Number) },
+      );
       expect(result).toMatchObject({
         accessToken: "access",
         organization: { id: "org-1", name: "Cliente A" },
       });
+    });
+
+    it("caps the visit at 30 minutes from now", async () => {
+      const { service, prisma, auth } = buildService();
+      prisma.organization.findFirst.mockResolvedValue({ id: "org-1", name: "Cliente A" });
+
+      const before = Math.floor(Date.now() / 1000);
+      const result = await service.impersonate("admin-1", "org-1");
+
+      const { expiresAt } = auth.issueTokenPair.mock.calls[0][3];
+      expect(expiresAt).toBeGreaterThanOrEqual(before + 30 * 60);
+      expect(expiresAt).toBeLessThanOrEqual(before + 30 * 60 + 5);
+      // Devolvido também para a UI poder avisar antes de expirar.
+      expect(result.expiresAt).toBe(expiresAt);
     });
 
     it("records the access in the audit log", async () => {
