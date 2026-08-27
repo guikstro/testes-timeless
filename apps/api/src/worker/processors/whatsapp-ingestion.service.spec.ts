@@ -15,7 +15,8 @@ function uniqueConstraintError(): Prisma.PrismaClientKnownRequestError {
 
 function buildJob(overrides: Partial<WhatsAppInboundMessageJob> = {}): WhatsAppInboundMessageJob {
   return {
-    phoneNumberId: "phone-1",
+    provider: "CLOUD_API",
+    routingKey: "phone-1",
     waId: "5585999999999",
     profileName: "João",
     messageId: "wamid.ABC123",

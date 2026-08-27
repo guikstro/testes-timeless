@@ -42,13 +42,15 @@ describe("parseWebhookPayload", () => {
 
     expect(jobs).toEqual([
       {
-        phoneNumberId: "phone-1",
+        provider: "CLOUD_API",
+        routingKey: "phone-1",
         waId: "5585999999999",
         profileName: "João",
         messageId: "wamid.ABC123",
         type: "text",
         text: "Fui demitido e não recebi tudo",
         timestampSeconds: 1700000000,
+        referral: undefined,
       },
     ]);
   });
@@ -135,6 +137,7 @@ describe("parseWebhookPayload", () => {
 
     const jobs = parseWebhookPayload(payload);
     expect(jobs).toHaveLength(2);
-    expect(jobs.map((j) => j.phoneNumberId)).toEqual(["phone-1", "phone-2"]);
+    expect(jobs.map((j) => j.routingKey)).toEqual(["phone-1", "phone-2"]);
+    expect(jobs.every((j) => j.provider === "CLOUD_API")).toBe(true);
   });
 });

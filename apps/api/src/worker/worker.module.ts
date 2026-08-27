@@ -4,7 +4,12 @@ import { BullModule } from "@nestjs/bullmq";
 import { PrismaModule } from "../common/prisma/prisma.module";
 import { EncryptionModule } from "../common/encryption/encryption.module";
 import { getRedisConnectionOptions } from "../common/queue/redis-connection";
-import { META_CONVERSIONS_QUEUE, META_SYNC_QUEUE, WHATSAPP_EVENTS_QUEUE } from "../common/queue/queue.constants";
+import {
+  META_CONVERSIONS_QUEUE,
+  META_SYNC_QUEUE,
+  WHATSAPP_EVENTS_QUEUE,
+  WHATSAPP_SEND_QUEUE,
+} from "../common/queue/queue.constants";
 import { AttributionModule } from "../attribution/attribution.module";
 import { ClassificationModule } from "../classification/classification.module";
 import { ConversionEventsModule } from "../integrations/meta/conversion-events.module";
@@ -14,7 +19,10 @@ import { MetaSyncProcessor } from "./processors/meta-sync.processor";
 import { MetaSyncService } from "./processors/meta-sync.service";
 import { MetaConversionSendProcessor } from "./processors/meta-conversion-send.processor";
 import { MetaConversionSendService } from "./processors/meta-conversion-send.service";
+import { WhatsAppSendProcessor } from "./processors/whatsapp-send.processor";
+import { WhatsAppSendService } from "./processors/whatsapp-send.service";
 import { MetaGraphClient } from "../integrations/meta/meta-graph-client";
+import { EvolutionClient } from "../integrations/whatsapp/evolution-client";
 
 @Module({
   imports: [
@@ -25,16 +33,24 @@ import { MetaGraphClient } from "../integrations/meta/meta-graph-client";
     ClassificationModule,
     ConversionEventsModule,
     BullModule.forRoot({ connection: getRedisConnectionOptions() }),
-    BullModule.registerQueue({ name: WHATSAPP_EVENTS_QUEUE }, { name: META_SYNC_QUEUE }, { name: META_CONVERSIONS_QUEUE }),
+    BullModule.registerQueue(
+      { name: WHATSAPP_EVENTS_QUEUE },
+      { name: WHATSAPP_SEND_QUEUE },
+      { name: META_SYNC_QUEUE },
+      { name: META_CONVERSIONS_QUEUE },
+    ),
   ],
   providers: [
     WhatsAppEventProcessor,
     WhatsAppIngestionService,
+    WhatsAppSendProcessor,
+    WhatsAppSendService,
     MetaSyncProcessor,
     MetaSyncService,
     MetaConversionSendProcessor,
     MetaConversionSendService,
     MetaGraphClient,
+    EvolutionClient,
   ],
 })
 export class WorkerModule {}

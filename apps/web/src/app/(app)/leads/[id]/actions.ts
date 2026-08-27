@@ -42,3 +42,32 @@ export async function updateLead(
   revalidatePath("/leads");
   return {};
 }
+
+export interface SendMessageState {
+  error?: string;
+  /** Sinaliza sucesso para o formulário limpar o campo — `{}` também é o estado inicial. */
+  sentAt?: number;
+}
+
+export async function sendMessage(
+  leadId: string,
+  _prevState: SendMessageState,
+  formData: FormData,
+): Promise<SendMessageState> {
+  const text = String(formData.get("text") ?? "").trim();
+  if (!text) {
+    return { error: "Escreva uma mensagem." };
+  }
+
+  try {
+    await apiFetch(`/leads/${leadId}/messages`, { method: "POST", body: JSON.stringify({ text }) });
+  } catch (error) {
+    if (error instanceof ApiRequestError) {
+      return { error: error.body.message };
+    }
+    return { error: "Não foi possível enviar a mensagem." };
+  }
+
+  revalidatePath(`/leads/${leadId}`);
+  return { sentAt: Date.now() };
+}

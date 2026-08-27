@@ -33,6 +33,10 @@ async function bootstrap() {
       { path: "r/:code", method: RequestMethod.GET },
       { path: "whatsapp-webhook", method: RequestMethod.GET },
       { path: "whatsapp-webhook", method: RequestMethod.POST },
+      // Receptor da Evolution API (Fase 8). Mesmo motivo dos dois acima: é um
+      // webhook chamado por um sistema externo e autenticado pelo segredo no
+      // path, não pela sessão — logo fica fora do prefixo /api do app.
+      { path: "whatsapp-webhook/evolution/:token", method: RequestMethod.POST },
     ],
   });
 

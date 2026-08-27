@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { WhatsAppConnectionsService } from "./whatsapp-connections.service";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { EncryptionService } from "../../common/encryption/encryption.service";
+import { EvolutionClient } from "./evolution-client";
 import { AppException } from "../../common/exceptions/app-exception";
 
 function uniqueConstraintError(): Prisma.PrismaClientKnownRequestError {
@@ -17,11 +18,21 @@ describe("WhatsAppConnectionsService", () => {
       encrypt: jest.fn((value: string) => `encrypted(${value})`),
       decrypt: jest.fn(),
     };
+    const evolution = {
+      createInstance: jest.fn(),
+      getQrCode: jest.fn().mockResolvedValue({ base64: "data:image/png;base64,QR", code: "code" }),
+      getConnectionState: jest.fn().mockResolvedValue("connecting"),
+      getConnectedNumber: jest.fn().mockResolvedValue(null),
+      sendText: jest.fn(),
+      logout: jest.fn(),
+      deleteInstance: jest.fn(),
+    };
     const service = new WhatsAppConnectionsService(
       prisma as unknown as PrismaService,
       encryption as unknown as EncryptionService,
+      evolution as unknown as EvolutionClient,
     );
-    return { service, prisma, encryption };
+    return { service, prisma, encryption, evolution };
   }
 
   it("never returns the encrypted access token — only whether one is set", async () => {

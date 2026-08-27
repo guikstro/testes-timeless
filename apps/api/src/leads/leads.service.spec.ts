@@ -8,17 +8,24 @@ describe("LeadsService", () => {
     const prisma = {
       lead: { findMany: jest.fn(), count: jest.fn(), findFirst: jest.fn(), update: jest.fn() },
       leadEvent: { findMany: jest.fn().mockResolvedValue([]), create: jest.fn() },
-      message: { findMany: jest.fn().mockResolvedValue([]) },
+      message: { findMany: jest.fn().mockResolvedValue([]), create: jest.fn() },
       sale: { create: jest.fn(), update: jest.fn() },
       auditLog: { create: jest.fn() },
+      whatsAppConnection: { findUnique: jest.fn() },
+      conversation: { findFirst: jest.fn(), update: jest.fn() },
     };
     const conversionEvents = {
       recordLead: jest.fn(),
       recordQualifiedLead: jest.fn(),
       recordPurchase: jest.fn(),
     };
-    const service = new LeadsService(prisma as unknown as PrismaService, conversionEvents as unknown as ConversionEventsService);
-    return { service, prisma, conversionEvents };
+    const sendQueue = { add: jest.fn() };
+    const service = new LeadsService(
+      prisma as unknown as PrismaService,
+      conversionEvents as unknown as ConversionEventsService,
+      sendQueue as never,
+    );
+    return { service, prisma, conversionEvents, sendQueue };
   }
 
   it("scopes the list query to the caller's organization", async () => {

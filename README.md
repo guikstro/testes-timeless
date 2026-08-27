@@ -7,9 +7,11 @@ Meta Conversions API. Ver o escopo completo e as regras do produto em
 
 > **Status atual: as 7 fases do escopo concluídas — Fundação, Tracking,
 > WhatsApp, Atribuição, Qualificação e Venda, Meta Ads e Meta Conversions
-> API.** Autenticação, organizações, isolamento multi-tenant, links
-> rastreáveis, captura de cliques/UTMs, conexão com WhatsApp Cloud API,
-> ingestão idempotente de mensagens, o motor de atribuição first-touch,
+> API — mais a Fase 8, que reformulou a integração de WhatsApp.**
+> Autenticação, organizações, isolamento multi-tenant, links rastreáveis,
+> captura de cliques/UTMs, conexão com WhatsApp **por QR Code ou pela Cloud
+> API oficial** com **envio e recebimento** de mensagens, ingestão
+> idempotente, o motor de atribuição first-touch,
 > gatilhos configuráveis de qualificação/venda (com extração de valor e
 > correção manual auditada), a sincronização de campanhas/ad sets/anúncios e
 > gasto da Meta Ads (com tratamento de token expirado e rate limit), e o
@@ -26,6 +28,7 @@ Meta Conversions API. Ver o escopo completo e as regras do produto em
 - **Backend**: NestJS + TypeScript
 - **Banco**: PostgreSQL + Prisma ORM (migrations versionadas)
 - **Fila/cache**: Redis + BullMQ (worker dedicado — processa eventos do WhatsApp)
+- **WhatsApp (QR Code)**: [Evolution API](https://doc.evolution-api.com) em container próprio
 - **Infra local**: Docker Compose
 
 ## Estrutura de pastas
@@ -86,8 +89,9 @@ precisa duplicar nada.
 docker compose up -d
 ```
 
-Sobe Postgres, Redis, API (`:3001`), worker e web (`:3000`). A API roda as
-migrations automaticamente (`prisma migrate deploy`) antes de iniciar.
+Sobe Postgres, Redis, Evolution API (`:8080`, motor do WhatsApp por QR Code),
+API (`:3001`), worker e web (`:3000`). A API roda as migrations
+automaticamente (`prisma migrate deploy`) antes de iniciar.
 
 > **Atenção ao alterar `prisma/schema.prisma` ou dependências:** os
 > containers de dev montam o código do host como volume, mas o
@@ -119,8 +123,8 @@ Usuário de demonstração criado pelo seed:
 ### Portas
 
 Por padrão a API/Postgres/Redis deste projeto usam `3001` / `5433` / `6380`
-(host) para não colidir com outros stacks locais. Ajuste em `docker-compose.yml`
-e `.env` se preferir as portas padrão.
+(host) para não colidir com outros stacks locais; a Evolution API usa `8080`.
+Ajuste em `docker-compose.yml` e `.env` se preferir as portas padrão.
 
 ## Testes
 

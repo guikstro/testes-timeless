@@ -1,6 +1,7 @@
 import * as crypto from "crypto";
 import { Queue } from "bullmq";
 import { WhatsAppWebhookService } from "./whatsapp-webhook.service";
+import { WhatsAppConnectionsService } from "../integrations/whatsapp/whatsapp-connections.service";
 
 describe("WhatsAppWebhookService", () => {
   const originalSecret = process.env.WHATSAPP_APP_SECRET;
@@ -18,8 +19,12 @@ describe("WhatsAppWebhookService", () => {
 
   function buildService() {
     const queue = { add: jest.fn() };
-    const service = new WhatsAppWebhookService(queue as unknown as Queue);
-    return { service, queue };
+    const connections = { syncEvolutionState: jest.fn() };
+    const service = new WhatsAppWebhookService(
+      queue as unknown as Queue,
+      connections as unknown as WhatsAppConnectionsService,
+    );
+    return { service, queue, connections };
   }
 
   describe("verifyHandshake", () => {

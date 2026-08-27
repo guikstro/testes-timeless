@@ -207,23 +207,53 @@ model Attribution {
 // Phase 3: WhatsApp — connection, leads, conversations, messages, timeline
 // ---------------------------------------------------------------------------
 
+/**
+ * Fase 8: o transporte do WhatsApp virou plugável. O pipeline de ingestão a
+ * jusante (lead -> atribuição -> qualificação -> Conversions API) é
+ * idêntico para os dois — só muda como a mensagem chega e como ela sai.
+ */
+enum WhatsAppProvider {
+  /** WhatsApp Business Cloud API oficial da Meta (Fase 3). Sem risco de banimento, exige verificação de negócio. */
+  CLOUD_API
+  /** Evolution API (QR Code, protocolo do WhatsApp Web). Conecta em minutos, mas é não-oficial — ver docs/WHATSAPP.md. */
+  EVOLUTION
+}
+
 enum WhatsAppConnectionStatus {
+  /** Só EVOLUTION: instância criada, aguardando o usuário ler o QR Code. */
+  PENDING_QR
   CONNECTED
   DISCONNECTED
 }
 
 model WhatsAppConnection {
-  id                   String                   @id @default(uuid())
-  organizationId       String                   @unique @map("organization_id")
-  phoneNumberId        String                   @unique @map("phone_number_id")
-  displayPhoneNumber   String                   @map("display_phone_number")
-  accessTokenEncrypted String?                  @map("access_token_encrypted")
-  status               WhatsAppConnectionStatus @default(CONNECTED)
-  connectedAt          DateTime                 @default(now()) @map("connected_at")
-  disconnectedAt       DateTime?                @map("disconnected_at")
-  lastEventAt          DateTime?                @map("last_event_at")
-  createdAt            DateTime                 @default(now()) @map("created_at")
-  updatedAt            DateTime                 @updatedAt @map("updated_at")
+  id             String                   @id @default(uuid())
+  organizationId String                   @unique @map("organization_id")
+  provider       WhatsAppProvider         @default(CLOUD_API)
+  status         WhatsAppConnectionStatus @default(CONNECTED)
+
+  /**
+   * Chave de roteamento multi-tenant do provider CLOUD_API: todo evento do
+   * webhook da Meta carrega `value.metadata.phone_number_id`. Null para
+   * conexões EVOLUTION, que roteiam por `instanceName`.
+   */
+  phoneNumberId String? @unique @map("phone_number_id")
+
+  /**
+   * Chave de roteamento multi-tenant do provider EVOLUTION: todo evento do
+   * webhook da Evolution carrega `instance`. Null para conexões CLOUD_API.
+   */
+  instanceName String? @unique @map("instance_name")
+
+  /** Desconhecido até o QR ser lido (EVOLUTION), por isso nullable — a Meta já informa no ato da conexão. */
+  displayPhoneNumber   String? @map("display_phone_number")
+  accessTokenEncrypted String? @map("access_token_encrypted")
+
+  connectedAt    DateTime  @default(now()) @map("connected_at")
+  disconnectedAt DateTime? @map("disconnected_at")
+  lastEventAt    DateTime? @map("last_event_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   conversations Conversation[]
@@ -291,14 +321,32 @@ enum MessageType {
   OTHER
 }
 
+/** Só faz sentido para OUTBOUND — uma mensagem INBOUND, por definição, já chegou. */
+enum OutboundStatus {
+  /** Persistida e enfileirada, ainda não aceita pelo provider. */
+  PENDING
+  /** O provider aceitou e devolveu o id externo real. */
+  SENT
+  /** Todas as tentativas de envio falharam — `sendError` guarda o motivo real. */
+  FAILED
+}
+
 model Message {
   id             String           @id @default(uuid())
   conversationId String           @map("conversation_id")
-  externalId     String           @unique @map("external_id")
+  /**
+   * O id do provider. Null enquanto uma mensagem OUTBOUND não foi aceita
+   * (só existe depois do envio) — para INBOUND é sempre preenchido, e é a
+   * chave de idempotência contra reentregas do webhook. Postgres permite
+   * múltiplos NULLs num índice único, então isso não colide.
+   */
+  externalId     String?          @unique @map("external_id")
   direction      MessageDirection
   type           MessageType
   text           String?
   timestamp      DateTime
+  outboundStatus OutboundStatus?  @map("outbound_status")
+  sendError      String?          @map("send_error")
   createdAt      DateTime         @default(now()) @map("created_at")
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)

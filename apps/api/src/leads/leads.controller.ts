@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { PaginationQueryDto } from "../common/dto/pagination.dto";
 import { LeadsService } from "./leads.service";
 import { UpdateLeadDto } from "./dto/update-lead.dto";
+import { SendMessageDto } from "./dto/send-message.dto";
 
 @Controller("leads")
 @UseGuards(JwtAuthGuard)
@@ -28,5 +29,14 @@ export class LeadsController {
     @Body() dto: UpdateLeadDto,
   ) {
     return this.leadsService.update(user.organizationId, id, user.userId, dto);
+  }
+
+  @Post(":id/messages")
+  sendMessage(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: SendMessageDto,
+  ) {
+    return this.leadsService.sendMessage(user.organizationId, id, dto);
   }
 }

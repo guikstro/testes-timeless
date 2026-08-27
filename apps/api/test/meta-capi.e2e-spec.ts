@@ -104,7 +104,11 @@ function decodeJwtOrganizationId(accessToken: string): string {
   return payload.organizationId;
 }
 
-async function waitFor<T>(fn: () => Promise<T | null | undefined>, timeoutMs = 5000, intervalMs = 100): Promise<T> {
+// 15s (não 5s): o worker roda no mesmo processo e concorre com as outras
+// suítes; sob carga, 5s estourava de forma intermitente. Como a função
+// retorna assim que a condição é satisfeita, um teto maior não deixa
+// nenhum teste que passa mais lento — só evita a falha falsa.
+async function waitFor<T>(fn: () => Promise<T | null | undefined>, timeoutMs = 15000, intervalMs = 100): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const result = await fn();

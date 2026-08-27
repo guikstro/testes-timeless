@@ -1,10 +1,15 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { LeadStatus, Prisma } from "@prisma/client";
+import { InjectQueue } from "@nestjs/bullmq";
+import { Queue } from "bullmq";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { AppException } from "../common/exceptions/app-exception";
 import { PaginatedResult, PaginationQueryDto } from "../common/dto/pagination.dto";
 import { ConversionEventsService } from "../integrations/meta/conversion-events.service";
+import { WHATSAPP_SEND_QUEUE } from "../common/queue/queue.constants";
+import { WhatsAppSendJob } from "../common/queue/whatsapp-send.job";
 import { UpdateLeadDto } from "./dto/update-lead.dto";
+import { SendMessageDto } from "./dto/send-message.dto";
 
 const STATUS_ORDER: Record<LeadStatus, number> = { NEW: 0, QUALIFIED: 1, WON: 2 };
 
@@ -13,6 +18,7 @@ export class LeadsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly conversionEvents: ConversionEventsService,
+    @InjectQueue(WHATSAPP_SEND_QUEUE) private readonly sendQueue: Queue<WhatsAppSendJob>,
   ) {}
 
   async list(organizationId: string, pagination: PaginationQueryDto): Promise<PaginatedResult<unknown>> {
@@ -199,6 +205,75 @@ export class LeadsService {
     }
 
     return this.findOne(organizationId, id);
+  }
+
+  /**
+   * Envia uma mensagem para o lead pelo WhatsApp (Fase 8).
+   *
+   * A mensagem é persistida como OUTBOUND/PENDING *antes* de ser enfileirada,
+   * nunca depois: assim ela aparece na conversa imediatamente e, se o envio
+   * falhar, existe uma linha concreta para marcar como FAILED e mostrar o
+   * motivo — em vez de a mensagem simplesmente sumir.
+   */
+  async sendMessage(organizationId: string, leadId: string, dto: SendMessageDto) {
+    const lead = await this.prisma.lead.findFirst({ where: { id: leadId, organizationId } });
+    if (!lead) {
+      throw new AppException("NOT_FOUND", "Lead não encontrado.", HttpStatus.NOT_FOUND);
+    }
+
+    const connection = await this.prisma.whatsAppConnection.findUnique({ where: { organizationId } });
+    if (!connection || connection.status !== "CONNECTED") {
+      throw new AppException(
+        "NOT_CONNECTED",
+        "Conecte um número de WhatsApp antes de enviar mensagens.",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // A conversa já existe sempre que o lead mandou ao menos uma mensagem —
+    // que é a única forma de um lead nascer neste produto.
+    const conversation = await this.prisma.conversation.findFirst({
+      where: { leadId, whatsappConnectionId: connection.id },
+    });
+    if (!conversation) {
+      throw new AppException(
+        "NO_CONVERSATION",
+        "Ainda não há uma conversa com este lead neste número.",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const now = new Date();
+    const message = await this.prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        direction: "OUTBOUND",
+        type: "TEXT",
+        text: dto.text,
+        timestamp: now,
+        outboundStatus: "PENDING",
+        // externalId fica null até o provider aceitar e devolver o id real.
+      },
+    });
+
+    await this.prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { lastMessageAt: now },
+    });
+
+    await this.sendQueue.add(
+      "send",
+      { messageId: message.id },
+      {
+        jobId: message.id,
+        attempts: 3,
+        backoff: { type: "exponential", delay: 3000 },
+        removeOnComplete: true,
+        removeOnFail: 50,
+      },
+    );
+
+    return message;
   }
 
   private assertForwardTransition(current: LeadStatus, target: "QUALIFIED" | "WON"): void {

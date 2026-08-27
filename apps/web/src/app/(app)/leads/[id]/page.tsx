@@ -3,6 +3,30 @@ import { apiFetch, ApiRequestError } from "@/lib/api-client";
 import { attributionCampaignLabel, attributionSourceLabel, AttributionSummary } from "@/lib/attribution";
 import { formatCentsAsBRL } from "@/lib/currency";
 import { ManualEditForm } from "./manual-edit-form";
+import { ReplyBox } from "./reply-box";
+
+interface WhatsAppConnectionSummary {
+  provider: "CLOUD_API" | "EVOLUTION";
+  status: "PENDING_QR" | "CONNECTED" | "DISCONNECTED";
+}
+
+/**
+ * Responder exige uma conexão por QR Code ativa. Explicar o porquê na própria
+ * caixa evita o usuário digitar uma resposta e só então descobrir que ela não
+ * pode sair.
+ */
+function replyDisabledReasonFor(connection: WhatsAppConnectionSummary | null): string | null {
+  if (!connection || connection.status === "DISCONNECTED") {
+    return "Conecte um número de WhatsApp para responder por aqui.";
+  }
+  if (connection.status === "PENDING_QR") {
+    return "Leia o QR Code na tela de integrações para ativar a conexão.";
+  }
+  if (connection.provider !== "EVOLUTION") {
+    return "Responder pela plataforma está disponível apenas na conexão por QR Code.";
+  }
+  return null;
+}
 
 interface LeadEvent {
   id: string;
@@ -17,6 +41,8 @@ interface Message {
   type: "TEXT" | "OTHER";
   text: string | null;
   timestamp: string;
+  outboundStatus: "PENDING" | "SENT" | "FAILED" | null;
+  sendError: string | null;
 }
 
 interface LeadDetail {
@@ -62,6 +88,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     }
     throw error;
   }
+
+  const connection = await apiFetch<WhatsAppConnectionSummary | null>("/integrations/whatsapp");
+  const replyDisabledReason = replyDisabledReasonFor(connection);
 
   return (
     <div>
@@ -132,16 +161,34 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         <div className="rounded-xl border border-slate-200 bg-white p-6">
           <h2 className="mb-4 text-sm font-semibold text-slate-900">Conversa</h2>
           <ol className="space-y-3">
-            {lead.messages.map((message) => (
-              <li key={message.id} className="text-sm">
-                <span className="text-slate-400">{new Date(message.timestamp).toLocaleString("pt-BR")}</span>{" "}
-                <span className="text-slate-700">
-                  — {message.type === "TEXT" ? message.text : "[mensagem não textual]"}
-                </span>
-              </li>
-            ))}
+            {lead.messages.map((message) => {
+              const isOutbound = message.direction === "OUTBOUND";
+              return (
+                <li key={message.id} className={isOutbound ? "flex justify-end" : "flex justify-start"}>
+                  <div
+                    className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                      isOutbound ? "bg-emerald-50 text-emerald-900" : "bg-slate-100 text-slate-800"
+                    }`}
+                  >
+                    <p className="whitespace-pre-wrap break-words">
+                      {message.type === "TEXT" ? message.text : "[mensagem não textual]"}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {new Date(message.timestamp).toLocaleString("pt-BR")}
+                      {isOutbound && message.outboundStatus === "PENDING" ? " · enviando..." : null}
+                      {isOutbound && message.outboundStatus === "SENT" ? " · enviada" : null}
+                    </p>
+                    {isOutbound && message.outboundStatus === "FAILED" ? (
+                      <p className="mt-1 text-xs text-red-600">Falha no envio: {message.sendError}</p>
+                    ) : null}
+                  </div>
+                </li>
+              );
+            })}
             {lead.messages.length === 0 ? <li className="text-sm text-slate-400">Sem mensagens ainda.</li> : null}
           </ol>
+
+          <ReplyBox leadId={lead.id} disabledReason={replyDisabledReason} />
         </div>
       </div>
     </div>

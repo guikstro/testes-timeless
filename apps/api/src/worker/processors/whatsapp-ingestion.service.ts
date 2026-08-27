@@ -31,15 +31,27 @@ export class WhatsAppIngestionService {
       return;
     }
 
+    // A chave de roteamento multi-tenant depende do transporte: a Cloud API
+    // roteia pelo `phone_number_id` da Meta, a Evolution pelo nome da
+    // instância. Ambas são colunas únicas, então nenhuma das duas pode
+    // apontar para duas organizações.
     const connection = await this.prisma.whatsAppConnection.findUnique({
-      where: { phoneNumberId: job.phoneNumberId },
+      where:
+        job.provider === "CLOUD_API"
+          ? { phoneNumberId: job.routingKey }
+          : { instanceName: job.routingKey },
     });
     if (!connection) {
       // We genuinely don't know which tenant this belongs to — there is
       // nothing safe to do but drop it. This should only happen for a
-      // phone_number_id that was never connected in this app.
+      // routing key that was never connected in this app.
       this.logger.warn(
-        JSON.stringify({ event: "unknown_phone_number_id", phoneNumberId: job.phoneNumberId, messageId: job.messageId }),
+        JSON.stringify({
+          event: "unknown_routing_key",
+          provider: job.provider,
+          routingKey: job.routingKey,
+          messageId: job.messageId,
+        }),
       );
       return;
     }

@@ -43,3 +43,37 @@ export async function disconnectWhatsApp(): Promise<void> {
   await apiFetch("/integrations/whatsapp/disconnect", { method: "POST" });
   revalidatePath("/integrations/whatsapp");
 }
+
+export interface QrCodeState {
+  status: "PENDING_QR" | "CONNECTED";
+  qrCodeBase64: string | null;
+  displayPhoneNumber: string | null;
+}
+
+/** Inicia a conexão por QR Code e devolve o primeiro código para leitura. */
+export async function startQrCodeConnection(): Promise<QrCodeState | { error: string }> {
+  try {
+    return await apiFetch<QrCodeState>("/integrations/whatsapp/qr/connect", { method: "POST" });
+  } catch (error) {
+    if (error instanceof ApiRequestError) return { error: error.body.message };
+    return { error: "Não foi possível iniciar a conexão." };
+  }
+}
+
+/**
+ * Busca o QR atual. Chamado em intervalos pela tela enquanto o status for
+ * PENDING_QR, porque a Evolution rotaciona o código a cada ~30s.
+ */
+export async function pollQrCode(): Promise<QrCodeState | { error: string }> {
+  try {
+    return await apiFetch<QrCodeState>("/integrations/whatsapp/qr");
+  } catch (error) {
+    if (error instanceof ApiRequestError) return { error: error.body.message };
+    return { error: "Não foi possível atualizar o QR Code." };
+  }
+}
+
+/** Chamado assim que o QR é lido, para a tela refletir o número conectado. */
+export async function refreshWhatsAppPage(): Promise<void> {
+  revalidatePath("/integrations/whatsapp");
+}

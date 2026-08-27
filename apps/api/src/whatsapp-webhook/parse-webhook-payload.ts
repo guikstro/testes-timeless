@@ -56,7 +56,8 @@ export function parseWebhookPayload(payload: unknown): WhatsAppInboundMessageJob
         if (!message.id || !message.from || !message.timestamp) continue;
 
         jobs.push({
-          phoneNumberId,
+          provider: "CLOUD_API",
+          routingKey: phoneNumberId,
           waId: message.from,
           profileName,
           messageId: message.id,

@@ -30,6 +30,21 @@ export class WhatsAppConnectionsController {
     return this.whatsappConnectionsService.connect(user.organizationId, dto);
   }
 
+  /** Fase 8: inicia (ou reinicia) uma conexão por QR Code e já devolve o primeiro QR. */
+  @Post("qr/connect")
+  connectViaQrCode(@CurrentUser() user: AuthenticatedUser) {
+    return this.whatsappConnectionsService.connectViaQrCode(user.organizationId);
+  }
+
+  /**
+   * QR atual + status. A UI chama isto em intervalos enquanto o status for
+   * PENDING_QR, porque a Evolution rotaciona o código a cada ~30s.
+   */
+  @Get("qr")
+  getQrCode(@CurrentUser() user: AuthenticatedUser) {
+    return this.whatsappConnectionsService.getQrCode(user.organizationId);
+  }
+
   @Post("disconnect")
   @HttpCode(HttpStatus.NO_CONTENT)
   async disconnect(@CurrentUser() user: AuthenticatedUser): Promise<void> {
