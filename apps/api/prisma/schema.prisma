@@ -17,6 +17,20 @@ enum MembershipRole {
   MEMBER
 }
 
+/**
+ * Níveis do operador da plataforma (Fase 9.2). Ordenados por poder: tudo que
+ * o SUPPORT faz, o ADMIN também faz.
+ *
+ * Não confundir com `MembershipRole`: aquele é o papel de alguém DENTRO de
+ * uma organização cliente; este é o papel de quem opera a plataforma.
+ */
+enum PlatformRole {
+  /** Atendimento: lista os clientes e entra nas contas para dar suporte. */
+  SUPPORT
+  /** Tudo do SUPPORT, mais promover, rebaixar e revogar outros operadores. */
+  ADMIN
+}
+
 model Organization {
   id        String   @id @default(uuid())
   name      String
@@ -48,13 +62,15 @@ model User {
   passwordHash String   @map("password_hash")
   name         String
   /**
-   * Fase 9: operador da plataforma (nós), não do cliente. É um nível ACIMA
-   * de `MembershipRole`, que só vale dentro de uma organização — um platform
-   * admin pode listar todas as organizações e entrar em qualquer uma, mesmo
-   * sem ter Membership nenhuma. Nunca é concedido por cadastro público: só
-   * por seed/script ou por outro platform admin.
+   * Fase 9: nível do operador da plataforma (nós), não do cliente. É um eixo
+   * ACIMA de `MembershipRole`, que só vale dentro de uma organização — um
+   * operador enxerga todas as organizações e entra em qualquer uma, mesmo
+   * sem ter Membership nenhuma.
+   *
+   * `null` significa "usuário comum", que é o caso da esmagadora maioria:
+   * ser operador é a exceção, e nunca é concedido por cadastro público.
    */
-  isPlatformAdmin Boolean @default(false) @map("is_platform_admin")
+  platformRole PlatformRole? @map("platform_role")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
   deletedAt    DateTime? @map("deleted_at")

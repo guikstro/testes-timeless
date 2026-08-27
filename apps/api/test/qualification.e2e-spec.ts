@@ -158,7 +158,7 @@ describe("Qualification & Sale — trigger phrases end to end (e2e)", () => {
     const sale = await prisma.sale.findUnique({ where: { leadId: lead.id } });
     expect(sale).toMatchObject({ amountCents: 200000, classifierType: "RULE" });
 
-    const events = await prisma.leadEvent.findMany({ where: { leadId: lead.id }, orderBy: { occurredAt: "asc" } });
+    const events = await prisma.leadEvent.findMany({ where: { leadId: lead.id }, orderBy: [{ occurredAt: "asc" }, { sequence: "asc" }] });
     expect(events.map((e) => e.type)).toEqual([
       "LEAD_CREATED",
       "CONVERSATION_STARTED",

@@ -9,6 +9,12 @@ describe("AdminService", () => {
       organization: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0), findFirst: jest.fn() },
       sale: { groupBy: jest.fn().mockResolvedValue([]) },
       auditLog: { create: jest.fn(), findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
+      user: {
+        findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        update: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
+      },
     };
     const auth = {
       issueTokenPair: jest.fn().mockResolvedValue({ accessToken: "access", refreshToken: "refresh" }),
@@ -139,6 +145,136 @@ describe("AdminService", () => {
 
       await expect(service.impersonate("admin-1", "org-1")).rejects.toThrow("db down");
       expect(auth.issueTokenPair).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("gestão de operadores", () => {
+    it("recusa promover um e-mail sem conta — promover não cria usuário", async () => {
+      const { service, prisma } = buildService();
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.upsertOperator("admin-1", { email: "ninguem@x.com", role: "SUPPORT" }),
+      ).rejects.toMatchObject({ response: { code: "USER_NOT_FOUND" } });
+    });
+
+    it("recusa promover um usuário já removido", async () => {
+      const { service, prisma } = buildService();
+      prisma.user.findUnique.mockResolvedValue({ id: "u-1", platformRole: null, deletedAt: new Date() });
+
+      await expect(
+        service.upsertOperator("admin-1", { email: "removido@x.com", role: "SUPPORT" }),
+      ).rejects.toMatchObject({ response: { code: "USER_NOT_FOUND" } });
+    });
+
+    it("normaliza o e-mail antes de procurar", async () => {
+      const { service, prisma } = buildService();
+      prisma.user.findUnique.mockResolvedValue({ id: "u-1", platformRole: null, deletedAt: null });
+      prisma.user.update.mockResolvedValue({ id: "u-1", platformRole: "SUPPORT" });
+
+      await service.upsertOperator("admin-1", { email: "  Pessoa@Empresa.COM ", role: "SUPPORT" });
+
+      expect(prisma.user.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { email: "pessoa@empresa.com" } }),
+      );
+    });
+
+    it("impede que um administrador rebaixe a si mesmo", async () => {
+      const { service, prisma } = buildService();
+      prisma.user.findUnique.mockResolvedValue({ id: "admin-1", platformRole: "ADMIN", deletedAt: null });
+
+      await expect(
+        service.upsertOperator("admin-1", { email: "eu@x.com", role: "SUPPORT" }),
+      ).rejects.toMatchObject({ response: { code: "CANNOT_DEMOTE_SELF" } });
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it("impede que um administrador revogue a si mesmo", async () => {
+      const { service, prisma } = buildService();
+
+      await expect(service.revokeOperator("admin-1", "admin-1")).rejects.toMatchObject({
+        response: { code: "CANNOT_REVOKE_SELF" },
+      });
+      expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Ficar sem nenhum ADMIN trancaria todo mundo para fora da gestão de
+     * operadores — só um acesso direto ao banco resolveria.
+     */
+    it("impede rebaixar o último administrador", async () => {
+      const { service, prisma } = buildService();
+      prisma.user.findUnique.mockResolvedValue({ id: "outro", platformRole: "ADMIN", deletedAt: null });
+      prisma.user.count.mockResolvedValue(0);
+
+      await expect(
+        service.upsertOperator("admin-1", { email: "outro@x.com", role: "SUPPORT" }),
+      ).rejects.toMatchObject({ response: { code: "LAST_ADMIN" } });
+    });
+
+    it("impede revogar o último administrador", async () => {
+      const { service, prisma } = buildService();
+      prisma.user.findUnique.mockResolvedValue({ id: "outro", platformRole: "ADMIN" });
+      prisma.user.count.mockResolvedValue(0);
+
+      await expect(service.revokeOperator("admin-1", "outro")).rejects.toMatchObject({
+        response: { code: "LAST_ADMIN" },
+      });
+    });
+
+    it("permite rebaixar um administrador quando existe outro", async () => {
+      const { service, prisma } = buildService();
+      prisma.user.findUnique.mockResolvedValue({ id: "outro", platformRole: "ADMIN", deletedAt: null });
+      prisma.user.count.mockResolvedValue(1);
+      prisma.user.update.mockResolvedValue({ id: "outro", platformRole: "SUPPORT" });
+
+      await expect(
+        service.upsertOperator("admin-1", { email: "outro@x.com", role: "SUPPORT" }),
+      ).resolves.toMatchObject({ platformRole: "SUPPORT" });
+    });
+
+    it("não checa 'último admin' ao mexer em quem não é admin", async () => {
+      const { service, prisma } = buildService();
+      prisma.user.findUnique.mockResolvedValue({ id: "u-1", platformRole: "SUPPORT", deletedAt: null });
+      prisma.user.update.mockResolvedValue({ id: "u-1", platformRole: "ADMIN" });
+
+      await service.upsertOperator("admin-1", { email: "u1@x.com", role: "ADMIN" });
+
+      expect(prisma.user.count).not.toHaveBeenCalled();
+    });
+
+    it("revogar zera o nível sem apagar a conta", async () => {
+      const { service, prisma } = buildService();
+      prisma.user.findUnique.mockResolvedValue({ id: "u-1", platformRole: "SUPPORT" });
+
+      await service.revokeOperator("admin-1", "u-1");
+
+      // Só zera o nível: a linha do usuário permanece, então ele volta a ser
+      // um cliente comum em vez de sumir do sistema.
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "u-1" },
+        data: { platformRole: null },
+      });
+    });
+
+    it("recusa revogar quem não é operador", async () => {
+      const { service, prisma } = buildService();
+      prisma.user.findUnique.mockResolvedValue({ id: "u-1", platformRole: null });
+
+      await expect(service.revokeOperator("admin-1", "u-1")).rejects.toMatchObject({
+        response: { code: "NOT_FOUND" },
+      });
+    });
+
+    it("lista apenas operadores ativos", async () => {
+      const { service, prisma } = buildService();
+      prisma.user.findMany.mockResolvedValue([]);
+
+      await service.listOperators();
+
+      expect(prisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { platformRole: { not: null }, deletedAt: null } }),
+      );
     });
   });
 

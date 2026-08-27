@@ -4,6 +4,7 @@ import { PrismaService } from "../common/prisma/prisma.service";
 import { AppException } from "../common/exceptions/app-exception";
 import { PaginatedResult, PaginationQueryDto } from "../common/dto/pagination.dto";
 import { AuthService } from "../auth/auth.service";
+import { UpsertOperatorDto } from "./dto/upsert-operator.dto";
 
 /**
  * Prazo absoluto de uma visita a um cliente. Curto de propósito: o caso de
@@ -144,6 +145,118 @@ export class AdminService {
       organization: { id: organization.id, name: organization.name },
       expiresAt,
     };
+  }
+
+  /** Operadores da plataforma e seus níveis (rota exclusiva de ADMIN). */
+  async listOperators() {
+    return this.prisma.user.findMany({
+      where: { platformRole: { not: null }, deletedAt: null },
+      orderBy: [{ platformRole: "desc" }, { name: "asc" }],
+      select: { id: true, name: true, email: true, platformRole: true },
+    });
+  }
+
+  /**
+   * Promove um usuário existente a operador, ou muda o nível de quem já é.
+   *
+   * Não cria conta nem define senha de propósito: a pessoa precisa já ter um
+   * cadastro. Criar usuários por aqui misturaria "gerenciar acesso interno"
+   * com "cadastrar gente", e abriria um caminho de criação de conta que não
+   * passa pelo fluxo normal.
+   */
+  async upsertOperator(actingUserId: string, dto: UpsertOperatorDto) {
+    const target = await this.prisma.user.findUnique({
+      where: { email: dto.email.trim().toLowerCase() },
+      select: { id: true, platformRole: true, deletedAt: true },
+    });
+
+    if (!target || target.deletedAt) {
+      throw new AppException(
+        "USER_NOT_FOUND",
+        "Nenhum usuário com este e-mail. A pessoa precisa criar a conta antes de virar operador.",
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // Rebaixar a si mesmo é a mesma armadilha de se auto-revogar: quem faz
+    // isso perde o acesso na mesma hora e pode deixar a plataforma sem ADMIN.
+    if (target.id === actingUserId && dto.role !== "ADMIN") {
+      throw new AppException(
+        "CANNOT_DEMOTE_SELF",
+        "Você não pode rebaixar o seu próprio acesso. Peça a outro administrador.",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (target.platformRole === "ADMIN" && dto.role !== "ADMIN") {
+      await this.assertNotLastAdmin(target.id);
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: target.id },
+      data: { platformRole: dto.role },
+      select: { id: true, name: true, email: true, platformRole: true },
+    });
+
+    this.logger.warn(
+      JSON.stringify({
+        event: "platform_operator_changed",
+        actingUserId,
+        targetUserId: updated.id,
+        role: dto.role,
+      }),
+    );
+
+    return updated;
+  }
+
+  /** Revoga o acesso de operador. O usuário continua existindo como cliente. */
+  async revokeOperator(actingUserId: string, targetUserId: string): Promise<void> {
+    if (targetUserId === actingUserId) {
+      throw new AppException(
+        "CANNOT_REVOKE_SELF",
+        "Você não pode revogar o seu próprio acesso. Peça a outro administrador.",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const target = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, platformRole: true },
+    });
+
+    if (!target?.platformRole) {
+      throw new AppException("NOT_FOUND", "Este usuário não é um operador.", HttpStatus.NOT_FOUND);
+    }
+
+    if (target.platformRole === "ADMIN") {
+      await this.assertNotLastAdmin(target.id);
+    }
+
+    await this.prisma.user.update({ where: { id: targetUserId }, data: { platformRole: null } });
+
+    this.logger.warn(
+      JSON.stringify({ event: "platform_operator_revoked", actingUserId, targetUserId }),
+    );
+  }
+
+  /**
+   * Ficar sem nenhum ADMIN trancaria todo mundo para fora da gestão de
+   * operadores — só um acesso direto ao banco resolveria. Barrar aqui é mais
+   * barato que esse resgate.
+   */
+  private async assertNotLastAdmin(targetUserId: string): Promise<void> {
+    const otherAdmins = await this.prisma.user.count({
+      where: { platformRole: "ADMIN", deletedAt: null, id: { not: targetUserId } },
+    });
+
+    if (otherAdmins === 0) {
+      throw new AppException(
+        "LAST_ADMIN",
+        "Este é o último administrador da plataforma. Promova outro antes de remover este.",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 
   /** Histórico de entradas em clientes, para o operador auditar a si mesmo. */

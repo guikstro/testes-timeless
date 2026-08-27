@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { apiFetch, ApiRequestError } from "@/lib/api-client";
 
 interface SessionContext {
-  user: { id: string; name: string; email: string; isPlatformAdmin: boolean };
+  user: { id: string; name: string; email: string; platformRole: "SUPPORT" | "ADMIN" | null };
   impersonating: boolean;
 }
 
@@ -25,7 +25,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   // A API já barra estas rotas pelo PlatformAdminGuard; esconder a tela é
   // só para não exibir um shell vazio a quem não pode usá-lo.
-  if (!session.user.isPlatformAdmin) {
+  if (!session.user.platformRole) {
     redirect("/dashboard");
   }
 
@@ -35,7 +35,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div>
             <p className="text-sm font-semibold text-white">Administração da plataforma</p>
-            <p className="text-xs text-slate-400">{session.user.email}</p>
+            <p className="text-xs text-slate-400">
+              {session.user.email} · {session.user.platformRole === "ADMIN" ? "Administrador" : "Suporte"}
+            </p>
           </div>
           <nav className="flex items-center gap-4 text-sm">
             <Link href="/admin" className="text-slate-300 hover:text-white">
@@ -44,6 +46,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/admin/acessos" className="text-slate-300 hover:text-white">
               Acessos
             </Link>
+            {/* Gestão de operadores é exclusiva de ADMIN — a API também
+                barra, isto só evita oferecer um link que daria 403. */}
+            {session.user.platformRole === "ADMIN" ? (
+              <Link href="/admin/operadores" className="text-slate-300 hover:text-white">
+                Operadores
+              </Link>
+            ) : null}
             <Link href="/dashboard" className="text-slate-300 hover:text-white">
               Minha organização
             </Link>

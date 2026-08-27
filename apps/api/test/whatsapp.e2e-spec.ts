@@ -168,7 +168,7 @@ describe("WhatsApp webhook → queue → worker → lead (e2e)", () => {
     const conversations = await prisma.conversation.findMany({ where: { leadId: lead!.id } });
     expect(conversations).toHaveLength(1);
 
-    const events = await prisma.leadEvent.findMany({ where: { leadId: lead!.id }, orderBy: { occurredAt: "asc" } });
+    const events = await prisma.leadEvent.findMany({ where: { leadId: lead!.id }, orderBy: [{ occurredAt: "asc" }, { sequence: "asc" }] });
     expect(events.map((e) => e.type)).toEqual(["LEAD_CREATED", "CONVERSATION_STARTED", "MESSAGE_RECEIVED"]);
   });
 

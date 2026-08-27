@@ -83,9 +83,9 @@ describe("Administração da plataforma (e2e)", () => {
 
   describe("depois de receber o acesso de operador", () => {
     beforeAll(async () => {
-      // Concedido direto no banco de propósito: não existe rota HTTP capaz
-      // de promover alguém a operador da plataforma.
-      await prisma.user.update({ where: { id: adminUserId }, data: { isPlatformAdmin: true } });
+      // Direto no banco porque este é o bootstrap: o primeiro ADMIN não tem
+      // quem o promova pela API (as rotas de gestão exigem já ser ADMIN).
+      await prisma.user.update({ where: { id: adminUserId }, data: { platformRole: "ADMIN" } });
     });
 
     it("lista as organizações com as métricas do painel", async () => {
@@ -187,14 +187,14 @@ describe("Administração da plataforma (e2e)", () => {
     });
 
     it("revogar o acesso de operador tem efeito imediato, sem esperar o token expirar", async () => {
-      await prisma.user.update({ where: { id: adminUserId }, data: { isPlatformAdmin: false } });
+      await prisma.user.update({ where: { id: adminUserId }, data: { platformRole: null } });
 
       await request(app.getHttpServer())
         .get("/api/admin/organizations")
         .set("Authorization", `Bearer ${adminToken}`)
         .expect(403);
 
-      await prisma.user.update({ where: { id: adminUserId }, data: { isPlatformAdmin: true } });
+      await prisma.user.update({ where: { id: adminUserId }, data: { platformRole: "ADMIN" } });
     });
 
     it("recusa uma organização inexistente", async () => {
@@ -285,6 +285,137 @@ describe("Administração da plataforma (e2e)", () => {
           .expect(401);
 
         expect(response.body.code).toBe("IMPERSONATION_EXPIRED");
+      });
+    });
+
+    describe("níveis de operador", () => {
+      let supportToken: string;
+      let supportUserId: string;
+
+      beforeAll(async () => {
+        const registration = await request(app.getHttpServer()).post("/api/auth/register").send({
+          name: "Atendente",
+          email: "atendente@admin-e2e.local",
+          password: "password123",
+          organizationName: "Admin E2E Suporte",
+        });
+        supportToken = registration.body.accessToken;
+        supportUserId = decodeJwt(supportToken).sub;
+      });
+
+      it("um ADMIN promove alguém a SUPPORT", async () => {
+        const response = await request(app.getHttpServer())
+          .put("/api/admin/operators")
+          .set("Authorization", `Bearer ${adminToken}`)
+          .send({ email: "atendente@admin-e2e.local", role: "SUPPORT" })
+          .expect(200);
+
+        expect(response.body).toMatchObject({ id: supportUserId, platformRole: "SUPPORT" });
+      });
+
+      it("o SUPPORT enxerga os clientes e entra neles — é o trabalho dele", async () => {
+        await request(app.getHttpServer())
+          .get("/api/admin/organizations")
+          .set("Authorization", `Bearer ${supportToken}`)
+          .expect(200);
+
+        await request(app.getHttpServer())
+          .post(`/api/admin/organizations/${clientOrgId}/impersonate`)
+          .set("Authorization", `Bearer ${supportToken}`)
+          .expect(201);
+      });
+
+      it("o SUPPORT não consegue listar nem alterar operadores", async () => {
+        const listagem = await request(app.getHttpServer())
+          .get("/api/admin/operators")
+          .set("Authorization", `Bearer ${supportToken}`)
+          .expect(403);
+        expect(listagem.body.code).toBe("INSUFFICIENT_PLATFORM_ROLE");
+
+        await request(app.getHttpServer())
+          .put("/api/admin/operators")
+          .set("Authorization", `Bearer ${supportToken}`)
+          .send({ email: "atendente@admin-e2e.local", role: "ADMIN" })
+          .expect(403);
+
+        await request(app.getHttpServer())
+          .delete(`/api/admin/operators/${adminUserId}`)
+          .set("Authorization", `Bearer ${supportToken}`)
+          .expect(403);
+      });
+
+      it("recusa promover um e-mail que não tem conta — promover não cria usuário", async () => {
+        const response = await request(app.getHttpServer())
+          .put("/api/admin/operators")
+          .set("Authorization", `Bearer ${adminToken}`)
+          .send({ email: "ninguem@admin-e2e.local", role: "SUPPORT" })
+          .expect(404);
+
+        expect(response.body.code).toBe("USER_NOT_FOUND");
+      });
+
+      /**
+       * Sem esta trava a plataforma poderia ficar sem nenhum ADMIN, e aí só
+       * um acesso direto ao banco devolveria a gestão de operadores.
+       */
+      it("impede remover ou rebaixar o último administrador", async () => {
+        const rebaixar = await request(app.getHttpServer())
+          .put("/api/admin/operators")
+          .set("Authorization", `Bearer ${adminToken}`)
+          .send({ email: "operador@admin-e2e.local", role: "SUPPORT" })
+          .expect(400);
+        // Auto-rebaixamento é barrado antes mesmo da checagem de último admin.
+        expect(rebaixar.body.code).toBe("CANNOT_DEMOTE_SELF");
+
+        await request(app.getHttpServer())
+          .delete(`/api/admin/operators/${adminUserId}`)
+          .set("Authorization", `Bearer ${adminToken}`)
+          .expect(400);
+      });
+
+      it("com dois administradores, um consegue rebaixar o outro", async () => {
+        await request(app.getHttpServer())
+          .put("/api/admin/operators")
+          .set("Authorization", `Bearer ${adminToken}`)
+          .send({ email: "atendente@admin-e2e.local", role: "ADMIN" })
+          .expect(200);
+
+        // Agora o atendente é ADMIN e consegue rebaixar o outro.
+        const response = await request(app.getHttpServer())
+          .put("/api/admin/operators")
+          .set("Authorization", `Bearer ${supportToken}`)
+          .send({ email: "operador@admin-e2e.local", role: "SUPPORT" })
+          .expect(200);
+        expect(response.body.platformRole).toBe("SUPPORT");
+
+        // Restaura o estado para os testes seguintes.
+        await prisma.user.update({ where: { id: adminUserId }, data: { platformRole: "ADMIN" } });
+        await prisma.user.update({ where: { id: supportUserId }, data: { platformRole: "SUPPORT" } });
+      });
+
+      it("revogar devolve a pessoa à condição de usuário comum, sem apagar a conta", async () => {
+        await request(app.getHttpServer())
+          .delete(`/api/admin/operators/${supportUserId}`)
+          .set("Authorization", `Bearer ${adminToken}`)
+          .expect(204);
+
+        const user = await prisma.user.findUnique({ where: { id: supportUserId } });
+        expect(user).not.toBeNull();
+        expect(user?.platformRole).toBeNull();
+
+        await request(app.getHttpServer())
+          .get("/api/admin/organizations")
+          .set("Authorization", `Bearer ${supportToken}`)
+          .expect(403);
+      });
+
+      it("a sessão informa o nível, para a interface saber o que mostrar", async () => {
+        const response = await request(app.getHttpServer())
+          .get("/api/auth/session")
+          .set("Authorization", `Bearer ${adminToken}`)
+          .expect(200);
+
+        expect(response.body.user.platformRole).toBe("ADMIN");
       });
     });
 

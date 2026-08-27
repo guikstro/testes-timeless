@@ -17,28 +17,60 @@ enfraqueceria o isolamento em todo lugar), a travessia entre organizações
 fica **isolada num único módulo**, atrás de um guard próprio. Nenhum outro
 serviço do sistema sabe que operadores existem.
 
-## Dois níveis de permissão, não um
+## Dois eixos de permissão, não um
 
-| | `MembershipRole` (OWNER/ADMIN/MEMBER) | `User.isPlatformAdmin` |
+| | `MembershipRole` (OWNER/ADMIN/MEMBER) | `User.platformRole` |
 |---|---|---|
 | Escopo | Dentro de **uma** organização | A plataforma inteira |
-| Quem concede | O dono da organização | Só por script no servidor |
+| Quem concede | O dono da organização | Um ADMIN da plataforma (ou o script) |
 | Permite | Agir na própria organização | Listar e entrar em **qualquer** cliente |
 
 São eixos independentes: um operador da plataforma pode não ter Membership
-nenhuma, e um OWNER de organização não vira operador por isso.
+nenhuma, e um OWNER de organização não vira operador por isso. `platformRole`
+nulo — o caso da esmagadora maioria — significa "usuário comum".
+
+## Níveis de operador
+
+| Nível | Vê os clientes | Entra nas contas | Gerencia operadores |
+|---|---|---|---|
+| `SUPPORT` | sim | sim | não |
+| `ADMIN` | sim | sim | sim |
+
+Hierárquicos: tudo que o SUPPORT faz, o ADMIN também faz. Por isso o guard
+compara um **posto** (`ROLE_RANK`) em vez de casar uma lista de permissões —
+se um dia existir um nível que pode X mas não Y, aí sim vira um mapa de
+capacidades, mas inventar isso antes da necessidade seria complexidade sem
+contrapartida.
+
+O nível mínimo de cada rota é declarado por `@RequiresPlatformRole`. **Sem o
+decorator, a rota exige o nível menos privilegiado** — assim esquecer o
+decorator nunca abre uma rota por acidente: no máximo deixa passar um SUPPORT
+onde só ADMIN deveria entrar, e por isso as rotas de gestão de operadores o
+declaram explicitamente.
 
 ## Como alguém vira operador
 
+Pela interface, em `/admin/operadores` (só ADMIN). Promover **não cria conta
+nem define senha**: a pessoa precisa já ter cadastro. Criar usuários por ali
+misturaria "gerenciar acesso interno" com "cadastrar gente" e abriria um
+caminho de criação de conta fora do fluxo normal.
+
+Pelo servidor, que é o **bootstrap** — o primeiro ADMIN não tem quem o
+promova pela interface:
+
 ```bash
-pnpm --filter api grant:admin email@da.pessoa
-pnpm --filter api grant:admin email@da.pessoa --revoke
+pnpm --filter api grant:admin email@da.pessoa            # ADMIN
+pnpm --filter api grant:admin email@da.pessoa --support  # SUPPORT
+pnpm --filter api grant:admin email@da.pessoa --revoke   # remove
 ```
 
-Deliberadamente **não existe rota HTTP** que promova alguém a operador — nem
-uma protegida. Virar operador dá acesso aos dados de todos os clientes, então
-a única porta é ter acesso ao servidor, que quem faz isso já tem de qualquer
-forma.
+### Trava do último administrador
+
+Ficar sem nenhum ADMIN trancaria todo mundo para fora da gestão de
+operadores — só um acesso direto ao banco devolveria o controle. Por isso
+tanto a API quanto o script recusam rebaixar ou revogar o último ADMIN. Um
+ADMIN também não pode rebaixar nem revogar **a si mesmo**: é a mesma
+armadilha, com o agravante de o efeito ser imediato.
 
 ## Entrar num cliente
 
@@ -143,12 +175,16 @@ só fachada.
 - **Sem notificação ativa ao cliente.** Ele consegue ver os acessos, mas não
   é avisado quando um acontece. Depende de infraestrutura de e-mail, que o
   projeto ainda não tem.
-- **Só um nível de operador.** Não há distinção entre suporte, faturamento e
-  engenharia — quem é operador vê e faz tudo. Não implementado por ser
-  especulativo enquanto a operação é de uma pessoa só: uma hierarquia de
-  permissões que ninguém usa é complexidade sem contrapartida. O dia em que
-  houver equipe, o lugar natural é trocar o booleano `isPlatformAdmin` por
-  um enum de papel.
+- **Não há um nível "só leitura".** Todo operador entra nas contas dos
+  clientes; a separação existente é sobre *gerenciar a equipe*, não sobre
+  *ver dados*. Um nível que enxerga a lista e o faturamento mas não entra em
+  conta nenhuma (útil para financeiro/comercial) seria o próximo corte
+  natural — `ROLE_RANK` já suporta, bastaria acrescentá-lo abaixo do
+  SUPPORT e exigir SUPPORT explicitamente na rota de impersonação.
+- **Revogar não encerra sessões já abertas.** O `platformRole` é lido do
+  banco a cada requisição, então o acesso à administração cai na hora; mas
+  se a pessoa já estava dentro de um cliente, aquele token vale até o prazo
+  de 30 minutos acabar.
 - **O aviso de expiração não aparece na tela.** A sessão simplesmente para de
   valer aos 30 minutos e a próxima ação cai no login; não há contagem
   regressiva avisando que o prazo está acabando.

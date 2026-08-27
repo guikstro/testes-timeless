@@ -1,24 +1,26 @@
-import { PrismaClient } from "@prisma/client";
+import { PlatformRole, PrismaClient } from "@prisma/client";
 
 /**
- * Concede (ou revoga) o acesso de operador da plataforma a um usuário já
+ * Concede, muda ou revoga o nível de operador da plataforma de um usuário já
  * existente.
  *
- * Deliberadamente um script de linha de comando, e não um endpoint: virar
- * operador dá acesso a TODOS os clientes, então não deve ser alcançável por
- * nenhuma rota HTTP — nem sequer por uma protegida. Quem consegue rodar isto
- * já tem acesso ao banco de produção de qualquer forma.
+ * Continua existindo como script mesmo depois de a Fase 9.2 ter criado as
+ * rotas de gestão de operadores, porque é o **bootstrap**: o primeiro ADMIN
+ * não tem quem o promova pela interface. Depois dele, o caminho normal é a
+ * tela `/admin/operadores`.
  *
  * Uso:
- *   pnpm --filter api grant:admin <email>
- *   pnpm --filter api grant:admin <email> --revoke
+ *   pnpm --filter api grant:admin <email>            # ADMIN (padrão)
+ *   pnpm --filter api grant:admin <email> --support  # SUPPORT
+ *   pnpm --filter api grant:admin <email> --revoke   # remove o acesso
  */
 async function main(): Promise<void> {
   const email = process.argv[2]?.trim().toLowerCase();
   const revoke = process.argv.includes("--revoke");
+  const role: PlatformRole = process.argv.includes("--support") ? "SUPPORT" : "ADMIN";
 
   if (!email) {
-    console.error("Uso: pnpm --filter api grant:admin <email> [--revoke]");
+    console.error("Uso: pnpm --filter api grant:admin <email> [--support | --revoke]");
     process.exitCode = 1;
     return;
   }
@@ -32,15 +34,28 @@ async function main(): Promise<void> {
       return;
     }
 
+    // Mesma proteção da API: ficar sem nenhum ADMIN trancaria todo mundo
+    // para fora da gestão de operadores.
+    if (user.platformRole === "ADMIN" && (revoke || role !== "ADMIN")) {
+      const otherAdmins = await prisma.user.count({
+        where: { platformRole: "ADMIN", deletedAt: null, id: { not: user.id } },
+      });
+      if (otherAdmins === 0) {
+        console.error("Este é o último administrador da plataforma. Promova outro antes de remover este.");
+        process.exitCode = 1;
+        return;
+      }
+    }
+
     const updated = await prisma.user.update({
       where: { email },
-      data: { isPlatformAdmin: !revoke },
-      select: { name: true, email: true, isPlatformAdmin: true },
+      data: { platformRole: revoke ? null : role },
+      select: { name: true, email: true, platformRole: true },
     });
 
     console.log(
-      updated.isPlatformAdmin
-        ? `✔ ${updated.name} <${updated.email}> agora é operador da plataforma.`
+      updated.platformRole
+        ? `✔ ${updated.name} <${updated.email}> agora é operador da plataforma (${updated.platformRole}).`
         : `✔ ${updated.name} <${updated.email}> não é mais operador da plataforma.`,
     );
   } finally {

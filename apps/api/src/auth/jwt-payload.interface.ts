@@ -1,4 +1,4 @@
-import { MembershipRole } from "@prisma/client";
+import { MembershipRole, PlatformRole } from "@prisma/client";
 
 export interface JwtPayload {
   /**
@@ -33,4 +33,10 @@ export interface AuthenticatedUser {
   role: MembershipRole;
   /** True quando esta sessão é um operador da plataforma agindo dentro de um cliente. */
   impersonating: boolean;
+  /**
+   * Preenchido pelo `PlatformAdminGuard` a partir do banco, nunca do token —
+   * só existe nas rotas de administração, e evita uma segunda consulta no
+   * controller. Ausente em toda rota comum.
+   */
+  platformRole?: PlatformRole;
 }

@@ -222,7 +222,7 @@ export class AuthService {
     const [record, organization] = await Promise.all([
       this.prisma.user.findUnique({
         where: { id: user.userId },
-        select: { id: true, name: true, email: true, isPlatformAdmin: true },
+        select: { id: true, name: true, email: true, platformRole: true },
       }),
       this.prisma.organization.findFirst({
         where: { id: user.organizationId, deletedAt: null },
