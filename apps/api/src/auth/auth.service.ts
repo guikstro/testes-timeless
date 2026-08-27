@@ -11,7 +11,7 @@ import { RegisterDto } from "./dto/register.dto";
 import { LoginDto } from "./dto/login.dto";
 import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
-import { JwtPayload } from "./jwt-payload.interface";
+import { AuthenticatedUser, JwtPayload } from "./jwt-payload.interface";
 
 const ACCESS_TOKEN_TTL = "15m";
 const REFRESH_TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
@@ -139,7 +139,13 @@ export class AuthService {
       data: { revokedAt: new Date() },
     });
 
-    return this.issueTokenPair(payload.sub, payload.organizationId, payload.role);
+    // Preserva a marca de impersonação — ver a nota em issueTokenPair.
+    return this.issueTokenPair(
+      payload.sub,
+      payload.organizationId,
+      payload.role,
+      payload.impersonating === true,
+    );
   }
 
   async logout(refreshToken: string): Promise<void> {
@@ -202,17 +208,59 @@ export class AuthService {
     ]);
   }
 
-  private async issueTokenPair(
+  /** Contexto da sessão para o shell da aplicação — ver `AuthController.session`. */
+  async getSession(user: AuthenticatedUser) {
+    const [record, organization] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: user.userId },
+        select: { id: true, name: true, email: true, isPlatformAdmin: true },
+      }),
+      this.prisma.organization.findFirst({
+        where: { id: user.organizationId, deletedAt: null },
+        select: { id: true, name: true },
+      }),
+    ]);
+
+    if (!record || !organization) {
+      throw new AppException("UNAUTHORIZED", "Sessão inválida.", HttpStatus.UNAUTHORIZED);
+    }
+
+    return {
+      user: record,
+      organization,
+      role: user.role,
+      impersonating: user.impersonating,
+    };
+  }
+
+  /**
+   * `impersonating` é propagado por todo caminho que emite tokens, inclusive
+   * o refresh: se ele se perdesse na renovação, um operador da plataforma
+   * acabaria com uma sessão comum dentro do cliente — sem o aviso na tela e
+   * sem rastro de que aquilo era uma impersonação.
+   *
+   * Público (não privado) porque o módulo de administração precisa emitir o
+   * par de tokens da organização em que o operador está entrando.
+   */
+  async issueTokenPair(
     userId: string,
     organizationId: string,
     role: JwtPayload["role"],
+    impersonating = false,
   ): Promise<TokenPair> {
+    const claims = {
+      sub: userId,
+      organizationId,
+      role,
+      ...(impersonating ? { impersonating: true as const } : {}),
+    };
+
     const accessToken = await this.jwt.signAsync(
-      { sub: userId, organizationId, role, jti: crypto.randomUUID() },
+      { ...claims, jti: crypto.randomUUID() },
       { expiresIn: ACCESS_TOKEN_TTL },
     );
     const refreshToken = await this.jwt.signAsync(
-      { sub: userId, organizationId, role, jti: crypto.randomUUID() },
+      { ...claims, jti: crypto.randomUUID() },
       { expiresIn: Math.floor(REFRESH_TOKEN_TTL_MS / 1000) },
     );
 

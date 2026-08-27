@@ -1,6 +1,16 @@
 export const ACCESS_TOKEN_COOKIE = "access_token";
 export const REFRESH_TOKEN_COOKIE = "refresh_token";
 
+/**
+ * Guardam a sessão própria do operador da plataforma enquanto ele está
+ * dentro de um cliente (Fase 9). Sem isso, "sair do cliente" exigiria login
+ * de novo: os cookies principais foram sobrescritos pelos tokens da
+ * organização visitada, e eles são httpOnly — o navegador não consegue
+ * recuperá-los por conta própria.
+ */
+export const ADMIN_ACCESS_TOKEN_COOKIE = "admin_access_token";
+export const ADMIN_REFRESH_TOKEN_COOKIE = "admin_refresh_token";
+
 export const SESSION_COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",

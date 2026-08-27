@@ -1,0 +1,202 @@
+import "./test-env";
+import { INestApplication, ValidationPipe } from "@nestjs/common";
+import { Test, TestingModule } from "@nestjs/testing";
+import request from "supertest";
+import { AppModule } from "../src/app.module";
+import { PrismaService } from "../src/common/prisma/prisma.service";
+import { HttpExceptionFilter } from "../src/common/filters/http-exception.filter";
+
+function decodeJwt(accessToken: string): { sub: string; organizationId: string; impersonating?: true } {
+  return JSON.parse(Buffer.from(accessToken.split(".")[1], "base64").toString("utf8"));
+}
+
+describe("Administração da plataforma (e2e)", () => {
+  let app: INestApplication;
+  let prisma: PrismaService;
+
+  let adminToken: string;
+  let adminUserId: string;
+  let clientToken: string;
+  let clientOrgId: string;
+
+  beforeAll(async () => {
+    const moduleRef: TestingModule = await Test.createTestingModule({ imports: [AppModule] }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    app.useGlobalFilters(new HttpExceptionFilter());
+    app.setGlobalPrefix("api", { exclude: ["health"] });
+    await app.init();
+
+    prisma = moduleRef.get(PrismaService);
+
+    await prisma.organization.deleteMany({ where: { name: { contains: "Admin E2E" } } });
+    await prisma.user.deleteMany({ where: { email: { contains: "admin-e2e" } } });
+
+    const adminRegistration = await request(app.getHttpServer()).post("/api/auth/register").send({
+      name: "Operador",
+      email: "operador@admin-e2e.local",
+      password: "password123",
+      organizationName: "Admin E2E Plataforma",
+    });
+    adminToken = adminRegistration.body.accessToken;
+    adminUserId = decodeJwt(adminToken).sub;
+
+    const clientRegistration = await request(app.getHttpServer()).post("/api/auth/register").send({
+      name: "Cliente",
+      email: "cliente@admin-e2e.local",
+      password: "password123",
+      organizationName: "Admin E2E Cliente",
+    });
+    clientToken = clientRegistration.body.accessToken;
+    clientOrgId = decodeJwt(clientToken).organizationId;
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  describe("antes de receber o acesso de operador", () => {
+    it("não deixa um usuário comum listar as organizações", async () => {
+      await request(app.getHttpServer())
+        .get("/api/admin/organizations")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .expect(403);
+    });
+
+    it("não deixa um usuário comum entrar em outra organização", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/admin/organizations/${clientOrgId}/impersonate`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .expect(403);
+    });
+
+    it("exige autenticação", async () => {
+      await request(app.getHttpServer()).get("/api/admin/organizations").expect(401);
+    });
+  });
+
+  describe("depois de receber o acesso de operador", () => {
+    beforeAll(async () => {
+      // Concedido direto no banco de propósito: não existe rota HTTP capaz
+      // de promover alguém a operador da plataforma.
+      await prisma.user.update({ where: { id: adminUserId }, data: { isPlatformAdmin: true } });
+    });
+
+    it("lista as organizações com as métricas do painel", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/admin/organizations?search=Admin E2E Cliente")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body.items).toHaveLength(1);
+      expect(response.body.items[0]).toMatchObject({
+        id: clientOrgId,
+        name: "Admin E2E Cliente",
+        leadCount: 0,
+        saleCount: 0,
+        revenueCents: 0,
+      });
+      expect(response.body.items[0].owner.email).toBe("cliente@admin-e2e.local");
+    });
+
+    it("continua sem permitir que o cliente acesse a administração", async () => {
+      await request(app.getHttpServer())
+        .get("/api/admin/organizations")
+        .set("Authorization", `Bearer ${clientToken}`)
+        .expect(403);
+    });
+
+    it("entra no cliente emitindo um token do operador dentro da organização dele", async () => {
+      const response = await request(app.getHttpServer())
+        .post(`/api/admin/organizations/${clientOrgId}/impersonate`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .expect(201);
+
+      const payload = decodeJwt(response.body.accessToken);
+      expect(payload.organizationId).toBe(clientOrgId);
+      // O dono do token continua sendo o operador — é o que faz a auditoria
+      // apontar para quem realmente agiu.
+      expect(payload.sub).toBe(adminUserId);
+      expect(payload.impersonating).toBe(true);
+    });
+
+    it("registra o acesso em auditoria", async () => {
+      const entries = await prisma.auditLog.findMany({
+        where: { organizationId: clientOrgId, action: "IMPERSONATION_STARTED" },
+      });
+
+      expect(entries.length).toBeGreaterThan(0);
+      expect(entries[0].userId).toBe(adminUserId);
+    });
+
+    it("o token de impersonação enxerga os dados do cliente, e não os do operador", async () => {
+      const impersonation = await request(app.getHttpServer())
+        .post(`/api/admin/organizations/${clientOrgId}/impersonate`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .expect(201);
+
+      const session = await request(app.getHttpServer())
+        .get("/api/auth/session")
+        .set("Authorization", `Bearer ${impersonation.body.accessToken}`)
+        .expect(200);
+
+      expect(session.body.organization.id).toBe(clientOrgId);
+      expect(session.body.impersonating).toBe(true);
+      expect(session.body.user.email).toBe("operador@admin-e2e.local");
+    });
+
+    it("uma sessão de impersonação não consegue voltar à administração nem pular para outro cliente", async () => {
+      const impersonation = await request(app.getHttpServer())
+        .post(`/api/admin/organizations/${clientOrgId}/impersonate`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .expect(201);
+
+      const response = await request(app.getHttpServer())
+        .get("/api/admin/organizations")
+        .set("Authorization", `Bearer ${impersonation.body.accessToken}`)
+        .expect(403);
+
+      expect(response.body.code).toBe("ALREADY_IMPERSONATING");
+    });
+
+    /**
+     * Se a marca se perdesse na renovação, o operador acabaria com uma sessão
+     * comum dentro do cliente — sem aviso na tela e sem rastreabilidade.
+     */
+    it("a marca de impersonação sobrevive ao refresh do token", async () => {
+      const impersonation = await request(app.getHttpServer())
+        .post(`/api/admin/organizations/${clientOrgId}/impersonate`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .expect(201);
+
+      const refreshed = await request(app.getHttpServer())
+        .post("/api/auth/refresh")
+        .send({ refreshToken: impersonation.body.refreshToken })
+        .expect(200);
+
+      const payload = decodeJwt(refreshed.body.accessToken);
+      expect(payload.impersonating).toBe(true);
+      expect(payload.organizationId).toBe(clientOrgId);
+      expect(payload.sub).toBe(adminUserId);
+    });
+
+    it("revogar o acesso de operador tem efeito imediato, sem esperar o token expirar", async () => {
+      await prisma.user.update({ where: { id: adminUserId }, data: { isPlatformAdmin: false } });
+
+      await request(app.getHttpServer())
+        .get("/api/admin/organizations")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .expect(403);
+
+      await prisma.user.update({ where: { id: adminUserId }, data: { isPlatformAdmin: true } });
+    });
+
+    it("recusa uma organização inexistente", async () => {
+      await request(app.getHttpServer())
+        .post("/api/admin/organizations/00000000-0000-4000-8000-000000000000/impersonate")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .expect(404);
+    });
+  });
+});

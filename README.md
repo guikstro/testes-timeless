@@ -7,7 +7,8 @@ Meta Conversions API. Ver o escopo completo e as regras do produto em
 
 > **Status atual: as 7 fases do escopo concluídas — Fundação, Tracking,
 > WhatsApp, Atribuição, Qualificação e Venda, Meta Ads e Meta Conversions
-> API — mais a Fase 8, que reformulou a integração de WhatsApp.**
+> API — mais a Fase 8, que reformulou a integração de WhatsApp, e a Fase 9,
+> que adicionou o painel do operador da plataforma.**
 > Autenticação, organizações, isolamento multi-tenant, links rastreáveis,
 > captura de cliques/UTMs, conexão com WhatsApp **por QR Code ou pela Cloud
 > API oficial** com **envio e recebimento** de mensagens, ingestão
@@ -170,7 +171,8 @@ dessas variáveis; elas servem para testes locais/seed.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — arquitetura geral, decisões técnicas, observabilidade, segurança
 - [`docs/TRACKING.md`](docs/TRACKING.md) — links rastreáveis e captura de UTMs/IDs de mídia (Fase 2)
 - [`docs/ATTRIBUTION.md`](docs/ATTRIBUTION.md) — motor de atribuição, regras de precedência (Fase 4)
-- [`docs/WHATSAPP.md`](docs/WHATSAPP.md) — integração com WhatsApp (Fase 3)
+- [`docs/WHATSAPP.md`](docs/WHATSAPP.md) — integração com WhatsApp: QR Code e Cloud API, envio e recebimento (Fases 3 e 8)
+- [`docs/PLATFORM_ADMIN.md`](docs/PLATFORM_ADMIN.md) — painel do operador: listar clientes e entrar em cada um (Fase 9)
 - [`docs/QUALIFICATION.md`](docs/QUALIFICATION.md) — gatilhos, classificador, venda, correção manual (Fase 5)
 - [`docs/META_ADS.md`](docs/META_ADS.md) — sincronização de campanhas, ad sets, anúncios e gasto da Meta Ads (Fase 6)
 - [`docs/META_CAPI.md`](docs/META_CAPI.md) — envio de eventos de Lead/Lead qualificado/Venda para a Meta Conversions API (Fase 7)

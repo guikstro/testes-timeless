@@ -47,6 +47,14 @@ model User {
   email        String   @unique
   passwordHash String   @map("password_hash")
   name         String
+  /**
+   * Fase 9: operador da plataforma (nós), não do cliente. É um nível ACIMA
+   * de `MembershipRole`, que só vale dentro de uma organização — um platform
+   * admin pode listar todas as organizações e entrar em qualquer uma, mesmo
+   * sem ter Membership nenhuma. Nunca é concedido por cadastro público: só
+   * por seed/script ou por outro platform admin.
+   */
+  isPlatformAdmin Boolean @default(false) @map("is_platform_admin")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
   deletedAt    DateTime? @map("deleted_at")
@@ -445,6 +453,8 @@ enum AuditAction {
   ATTRIBUTION_CHANGED
   LEAD_STATUS_CHANGED
   CONNECTION_CHANGED
+  /** Um operador da plataforma entrou na organização (Fase 9). Registrado sempre, sem exceção. */
+  IMPERSONATION_STARTED
 }
 
 /** Section 65 — who changed what, with a before/after snapshot, for any manual correction. */

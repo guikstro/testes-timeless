@@ -7,7 +7,10 @@ import {
   SESSION_COOKIE_OPTIONS,
 } from "@/lib/session";
 
-const PROTECTED_PREFIXES = ["/dashboard", "/leads", "/links", "/integrations", "/webhooks", "/settings"];
+// "/webhooks" saiu: a tela nunca existiu e o link quebrado no menu foi
+// removido na Fase 9. "/admin" entrou para a renovação silenciosa de sessão
+// abaixo também valer no painel do operador da plataforma.
+const PROTECTED_PREFIXES = ["/dashboard", "/leads", "/links", "/integrations", "/settings", "/admin"];
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
 
 export async function middleware(request: NextRequest) {
@@ -64,5 +67,12 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/leads/:path*", "/links/:path*", "/integrations/:path*", "/webhooks/:path*", "/settings/:path*"],
+  matcher: [
+    "/dashboard/:path*",
+    "/leads/:path*",
+    "/links/:path*",
+    "/integrations/:path*",
+    "/settings/:path*",
+    "/admin/:path*",
+  ],
 };

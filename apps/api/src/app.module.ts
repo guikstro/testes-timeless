@@ -13,6 +13,7 @@ import { LeadsModule } from "./leads/leads.module";
 import { ClassificationModule } from "./classification/classification.module";
 import { MetaConnectionsModule } from "./integrations/meta/meta-connections.module";
 import { CampaignsModule } from "./campaigns/campaigns.module";
+import { AdminModule } from "./admin/admin.module";
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { CampaignsModule } from "./campaigns/campaigns.module";
     ClassificationModule,
     MetaConnectionsModule,
     CampaignsModule,
+    AdminModule,
   ],
 })
 export class AppModule {}
