@@ -120,7 +120,7 @@ export default async function MetaIntegrationPage() {
             ) : null}
             {connection.status === "TOKEN_EXPIRED" ? (
               <p className="text-sm text-slate-500">
-                A conexão com a Meta precisa ser renovada — reconecte com um access token válido abaixo.
+                A conexão com a Meta precisa ser renovada. Reconecte com um access token válido abaixo.
               </p>
             ) : null}
             <ConnectionActions />
@@ -152,11 +152,11 @@ export default async function MetaIntegrationPage() {
                   {campaign.adSets.map((adSet) => (
                     <div key={adSet.id} className="ml-4 mt-2 border-l border-slate-100 pl-4">
                       <p className="text-sm text-slate-700">
-                        {adSet.name} <span className="text-slate-400">— {adSet.status}</span>
+                        {adSet.name} <span className="text-slate-400">{adSet.status}</span>
                       </p>
                       {adSet.ads.map((ad) => (
                         <p key={ad.id} className="ml-4 text-xs text-slate-500">
-                          {ad.name} — {ad.status}
+                          {ad.name} · {ad.status}
                         </p>
                       ))}
                     </div>
@@ -174,7 +174,7 @@ export default async function MetaIntegrationPage() {
           <div className="mb-4 rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-700">
             {connection.hasCapiAccessToken ? (
               <p>
-                <span className="font-medium">Configurado</span> — Pixel ID {connection.pixelId} · enviando eventos de
+                <span className="font-medium">Configurado</span> · Pixel ID {connection.pixelId} · enviando eventos de
                 Lead, Lead qualificado e Venda automaticamente.
               </p>
             ) : (

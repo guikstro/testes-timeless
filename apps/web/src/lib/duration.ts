@@ -4,7 +4,7 @@
  * primeiro.
  */
 export function formatDuration(seconds: number | null | undefined): string {
-  if (seconds === null || seconds === undefined) return "—";
+  if (seconds === null || seconds === undefined) return "Sem dado";
   if (seconds < 60) return `${seconds}s`;
 
   const minutes = Math.floor(seconds / 60);

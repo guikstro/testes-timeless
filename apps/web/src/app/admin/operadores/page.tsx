@@ -64,7 +64,7 @@ export default async function OperatorsPage() {
 
       {adminCount === 1 ? (
         <p className="mt-3 text-xs text-slate-500">
-          Há apenas um administrador. Ele não pode ser removido nem rebaixado até que outro seja promovido — do
+          Há apenas um administrador. Ele não pode ser removido nem rebaixado até que outro seja promovido, do
           contrário, ninguém conseguiria mais gerenciar operadores.
         </p>
       ) : null}

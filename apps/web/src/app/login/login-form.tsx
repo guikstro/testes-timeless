@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -81,22 +80,15 @@ export function LoginForm() {
       </div>
 
       <header className="relative z-10 flex items-center justify-between">
-        <Image
-          src="/brand/wordmark-light.png"
-          alt="Timeless"
-          width={1400}
-          height={261}
-          priority
-          className="h-6 w-auto dark:hidden"
-        />
-        <Image
-          src="/brand/wordmark-dark.png"
-          alt="Timeless"
-          width={1400}
-          height={261}
-          priority
-          className="hidden h-6 w-auto dark:block"
-        />
+        {/*
+          Sem logotipo enquanto o produto não tem nome. A tagline sustenta a
+          identidade sozinha: um marcador de posição com nome falso envelhece
+          pior que a ausência dele.
+        */}
+        <p className="flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-mute">
+          <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+          Built to last
+        </p>
         <ThemeToggle />
       </header>
 
@@ -104,7 +96,7 @@ export function LoginForm() {
         <div className="animate-rise-in w-full max-w-[30rem]">
           {/*
             Caixa alta e pesada, como os títulos do material da marca. É o
-            gesto tipográfico da Timeless — sem ele a tela seria genérica,
+            gesto tipográfico da marca. Sem ele a tela seria genérica,
             por mais bem espaçada que estivesse.
           */}
           <h1 className="font-display text-[clamp(2.6rem,7vw,3.9rem)] font-extrabold uppercase leading-[0.92] tracking-[-0.03em] text-ink">
@@ -113,7 +105,7 @@ export function LoginForm() {
             de volta
           </h1>
           <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-ink-soft">
-            Cada lead, do anúncio à venda — com a origem provada, nunca deduzida.
+            Cada lead, do anúncio à venda, com a origem provada, nunca deduzida.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-10 flex flex-col gap-7">
@@ -209,7 +201,9 @@ export function LoginForm() {
         </div>
       </main>
 
-      <footer className="relative z-10 text-[11px] uppercase tracking-[0.18em] text-ink-mute">Built to last</footer>
+      <footer className="relative z-10 text-[11px] text-ink-mute">
+        Tracking e atribuição de conversões
+      </footer>
     </div>
   );
 }

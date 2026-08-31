@@ -24,7 +24,7 @@ export default async function ImpersonationLogPage() {
     <div>
       <h1 className="text-2xl font-semibold text-slate-900">Acessos a clientes</h1>
       <p className="mb-6 mt-1 text-sm text-slate-500">
-        Toda vez que um operador entra em um cliente, o acesso é registrado aqui — sem exceção.
+        Toda vez que um operador entra em um cliente, o acesso é registrado aqui, sem exceção.
       </p>
 
       {data.items.length === 0 ? (
@@ -48,10 +48,10 @@ export default async function ImpersonationLogPage() {
                     {new Date(entry.createdAt).toLocaleString("pt-BR")}
                   </td>
                   <td className="px-4 py-3 text-slate-700">
-                    {entry.user?.name ?? "—"}
+                    {entry.user?.name ?? "Operador removido"}
                     <span className="block text-xs text-slate-400">{entry.user?.email}</span>
                   </td>
-                  <td className="px-4 py-3 text-slate-700">{entry.organization?.name ?? "—"}</td>
+                  <td className="px-4 py-3 text-slate-700">{entry.organization?.name ?? "Organização removida"}</td>
                 </tr>
               ))}
             </tbody>

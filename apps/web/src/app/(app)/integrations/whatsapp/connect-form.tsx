@@ -41,7 +41,7 @@ export function ConnectWhatsAppForm() {
           id="accessToken"
           name="accessToken"
           type="password"
-          placeholder="Necessário apenas para enviar mensagens — não usado nesta fase"
+          placeholder="Necessário apenas para enviar mensagens, não usado nesta fase"
           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
         />
       </div>

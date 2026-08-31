@@ -41,7 +41,7 @@ export function CreateRuleForm() {
       */}
       {target === "MEETING_SCHEDULED" ? (
         <p className="text-xs text-slate-500 sm:col-span-3">
-          Esta é a única regra que também lê as mensagens que <strong>sua equipe</strong> envia — normalmente é o
+          Esta é a única regra que também lê as mensagens que <strong>sua equipe</strong> envia. Normalmente é o
           atendente quem diz que agendou. Prefira frases que só apareçam ao confirmar um horário.
         </p>
       ) : null}

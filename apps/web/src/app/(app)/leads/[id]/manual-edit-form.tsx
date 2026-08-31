@@ -74,7 +74,7 @@ export function DisqualifyForm({
       <form action={formAction} className="flex flex-wrap items-center gap-3">
         <p className="text-sm text-slate-600">
           Desqualificado em {new Date(disqualifiedAt).toLocaleString("pt-BR")}
-          {disqualifiedReason ? ` — ${disqualifiedReason}` : ""}
+          {disqualifiedReason ? `. Motivo: ${disqualifiedReason}` : ""}
         </p>
         <button
           type="submit"

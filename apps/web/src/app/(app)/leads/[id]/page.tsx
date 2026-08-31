@@ -160,12 +160,12 @@ const CONVERSION_STATUS_CLASSES: Record<ConversionEvent["status"], string> = {
 };
 
 function formatDateTime(value: string | null | undefined): string {
-  return value ? new Date(value).toLocaleString("pt-BR") : "—";
+  return value ? new Date(value).toLocaleString("pt-BR") : "Sem data";
 }
 
 /** Sem nome sincronizado, o id cru ainda diz mais do que um campo vazio. */
 function adReferenceLabel(reference: AdReference | null): string {
-  if (!reference) return "—";
+  if (!reference) return "Sem anúncio";
   return reference.name ?? reference.externalId;
 }
 
@@ -182,7 +182,7 @@ function Field({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="min-w-0">
       <dt className="text-slate-400">{label}</dt>
-      <dd className="break-words text-slate-700">{value || "—"}</dd>
+      <dd className="break-words text-slate-700">{value || "Sem dado"}</dd>
     </div>
   );
 }
@@ -302,7 +302,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         ) : (
           <p className="mt-4 text-xs text-slate-400">
             {attribution?.method === "CTWA_REFERRAL"
-              ? "A Meta identificou o anúncio diretamente no referral da mensagem — não há clique rastreado por nós."
+              ? "A Meta identificou o anúncio diretamente no referral da mensagem, sem clique rastreado por nós."
               : "Sem clique rastreado para este lead."}
           </p>
         )}
@@ -316,18 +316,18 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           <Field label="Receita" value={formatCentsAsBRL(lead.sale?.amountCents)} />
           <Field
             label="Registro da venda"
-            value={lead.sale ? (lead.sale.classifierType === "MANUAL" ? "Manual" : "Automático") : "—"}
+            value={lead.sale ? (lead.sale.classifierType === "MANUAL" ? "Manual" : "Automático") : "Sem venda"}
           />
         </dl>
 
         <p className="mb-3 text-xs text-slate-400">
-          Correção manual — use apenas quando o tracking automático não capturou o estágio/valor corretamente.
+          Correção manual. Use apenas quando o tracking automático não capturou o estágio/valor corretamente.
         </p>
         <ManualEditForm leadId={lead.id} status={lead.status} />
 
         <div className="mt-5 border-t border-slate-100 pt-5">
           <p className="mb-3 text-xs text-slate-400">
-            Desqualificar retira o lead das taxas de conversão sem apagar o histórico — para quem
+            Desqualificar retira o lead das taxas de conversão sem apagar o histórico, para quem
             nunca foi oportunidade. O estágio a que ele chegou é preservado.
           </p>
           <DisqualifyForm
@@ -341,7 +341,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
       {/*
         Sem isto o cliente não tem como saber se a conversão voltou para a
-        Meta — ou seja, se o algoritmo que ele paga para otimizar chegou a
+        Meta, ou seja, se o algoritmo que ele paga para otimizar chegou a
         receber o resultado que ele está vendo nesta tela.
       */}
       <Card title="Conversões enviadas à Meta">
@@ -375,7 +375,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             {lead.events.map((event) => (
               <li key={event.id} className="text-sm">
                 <span className="text-slate-400">{formatDateTime(event.occurredAt)}</span>{" "}
-                <span className="text-slate-700">— {EVENT_LABELS[event.type] ?? event.type}</span>
+                <span className="text-slate-700">{EVENT_LABELS[event.type] ?? event.type}</span>
               </li>
             ))}
             {lead.events.length === 0 ? <li className="text-sm text-slate-400">Sem eventos ainda.</li> : null}

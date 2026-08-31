@@ -45,6 +45,7 @@ const config: Config = {
         sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
         display: ["var(--font-display)", "var(--font-sans)", "ui-sans-serif", "sans-serif"],
       },
+      height: { 13: "3.25rem" },
       borderRadius: {
         // Raios generosos e contínuos: cantos apertados endurecem a interface.
         lg: "0.625rem",

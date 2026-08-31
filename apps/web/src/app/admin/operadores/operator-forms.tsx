@@ -37,8 +37,8 @@ export function AddOperatorForm() {
             defaultValue="SUPPORT"
             className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
           >
-            <option value="SUPPORT">Suporte — entra nos clientes</option>
-            <option value="ADMIN">Administrador — também gerencia operadores</option>
+            <option value="SUPPORT">Suporte (entra nos clientes)</option>
+            <option value="ADMIN">Administrador (também gerencia operadores)</option>
           </select>
         </div>
         <button

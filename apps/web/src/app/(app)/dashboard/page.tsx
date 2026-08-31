@@ -36,7 +36,7 @@ const PERIODS = [7, 30, 90];
 
 function formatRate(rate: number | null): string {
   // Null é "não houve base para calcular" — 0% afirmaria que ninguém converteu.
-  if (rate === null) return "—";
+  if (rate === null) return "Sem base";
   return `${Math.round(rate * 100)}%`;
 }
 
@@ -198,7 +198,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <div className="rounded-xl border border-slate-200 bg-white p-6">
           <h2 className="text-sm font-semibold text-slate-900">De onde vieram</h2>
           {/*
-            Todo lead deste produto nasce de uma mensagem no WhatsApp — é o
+            Todo lead deste produto nasce de uma mensagem no WhatsApp. É o
             único caminho de criação. Por isso a quebra não é por canal, e sim
             por origem: o que muda é a evidência de onde a pessoa veio.
           */}
@@ -242,7 +242,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <p className="font-medium">A maior parte dos leads está sem origem identificada.</p>
           <p className="mt-1 text-amber-800">
             A origem só é registrada quando a pessoa chega por um anúncio Click-to-WhatsApp ou por um link
-            rastreável. Quem manda mensagem direto para o número não carrega essa evidência — e ela nunca é
+            rastreável. Quem manda mensagem direto para o número não carrega essa evidência, e ela nunca é
             deduzida por aproximação.
           </p>
           <ul className="mt-2 space-y-1 text-amber-800">

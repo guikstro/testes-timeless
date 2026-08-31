@@ -14,17 +14,17 @@ export function attributionSourceLabel(attribution: AttributionSummary | null | 
 
 /** Human-readable "Campanha". */
 export function attributionCampaignLabel(attribution: AttributionSummary | null | undefined): string {
-  if (!attribution) return "—";
+  if (!attribution) return "Sem campanha";
   if (attribution.method === "CTWA_REFERRAL") {
     const headline = attribution.evidence?.headline;
     const adId = attribution.evidence?.adId;
-    return (typeof headline === "string" && headline) || (typeof adId === "string" && adId) || "—";
+    return (typeof headline === "string" && headline) || (typeof adId === "string" && adId) || "Sem campanha";
   }
   if (attribution.method === "TRACKING_LINK") {
     const utmCampaign = attribution.evidence?.utmCampaign;
-    return typeof utmCampaign === "string" && utmCampaign ? utmCampaign : "—";
+    return typeof utmCampaign === "string" && utmCampaign ? utmCampaign : "Sem campanha";
   }
-  return "—";
+  return "Sem campanha";
 }
 
 /** Como a origem foi provada — ver docs/ATTRIBUTION.md. */
@@ -42,7 +42,7 @@ export function attributionMethodLabel(method: AttributionSummary["method"] | un
  * para uma precisão que ninguém vai usar nesta tela.
  */
 export function deviceLabel(userAgent: string | null | undefined): string {
-  if (!userAgent) return "—";
+  if (!userAgent) return "Não identificado";
   const ua = userAgent.toLowerCase();
   if (ua.includes("iphone")) return "iPhone";
   if (ua.includes("ipad")) return "iPad";

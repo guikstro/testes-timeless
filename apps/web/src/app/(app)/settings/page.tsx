@@ -58,7 +58,7 @@ export default async function SettingsPage() {
       <h2 className="mb-3 text-sm font-semibold text-slate-900">Gatilhos de qualificação e venda</h2>
       <p className="mb-4 text-sm text-slate-500">
         Quando uma mensagem recebida contiver a frase exata (sem diferenciar maiúsculas/minúsculas), o lead muda de
-        estágio automaticamente. Prefira frases distintas e específicas — frases genéricas podem gerar falsos
+        estágio automaticamente. Prefira frases distintas e específicas. Frases genéricas podem gerar falsos
         positivos.
       </p>
 
@@ -120,7 +120,7 @@ export default async function SettingsPage() {
                     {new Date(access.createdAt).toLocaleString("pt-BR")}
                   </td>
                   <td className="px-4 py-3 text-slate-700">
-                    {access.user?.name ?? "—"}
+                    {access.user?.name ?? "Usuário removido"}
                     <span className="block text-xs text-slate-400">{access.user?.email}</span>
                   </td>
                 </tr>

@@ -52,7 +52,7 @@ export default async function WhatsAppIntegrationPage() {
               <span className="font-medium">Forma de conexão:</span> {PROVIDER_LABELS[connection.provider]}
             </p>
             <p>
-              <span className="font-medium">Número:</span> {connection.displayPhoneNumber ?? "—"}
+              <span className="font-medium">Número:</span> {connection.displayPhoneNumber ?? "Aguardando leitura do QR"}
             </p>
             <p>
               <span className="font-medium">Última mensagem recebida:</span>{" "}
@@ -79,7 +79,7 @@ export default async function WhatsAppIntegrationPage() {
             </summary>
             <p className="mb-4 mt-2 text-sm text-slate-500">
               Alternativa sem risco de bloqueio, mas exige um número já verificado no Meta for Developers e a
-              configuração manual do webhook. Só recebe mensagens — o envio pela plataforma está disponível apenas na
+              configuração manual do webhook. Só recebe mensagens. O envio pela plataforma está disponível apenas na
               conexão por QR Code.
             </p>
             <ConnectWhatsAppForm />
