@@ -26,7 +26,13 @@ export class OrganizationsService {
     await this.getCurrent(organizationId);
     return this.prisma.organization.update({
       where: { id: organizationId },
-      data: dto,
+      data: {
+        ...dto,
+        // String vazia é "remover", não "gravar vazio": é assim que o campo
+        // volta ao padrão depois de ter sido preenchido.
+        ...(dto.logoUrl === "" ? { logoUrl: null } : {}),
+        ...(dto.brandColor === "" ? { brandColor: null } : {}),
+      },
     });
   }
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode, useState } from "react";
+import { OrgLogo } from "@/components/ui/logo";
 import { LogoutButton } from "./logout-button";
 
 /**
@@ -116,7 +117,15 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function AppNav({ organizationName, showAdmin }: { organizationName: string; showAdmin: boolean }) {
+export function AppNav({
+  organizationName,
+  logoUrl,
+  showAdmin,
+}: {
+  organizationName: string;
+  logoUrl?: string | null;
+  showAdmin: boolean;
+}) {
   const [pinned, setPinned] = useState(false);
   const pathname = usePathname();
 
@@ -134,10 +143,17 @@ export function AppNav({ organizationName, showAdmin }: { organizationName: stri
         href={item.href}
         aria-current={active ? "page" : undefined}
         title={item.label}
-        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
-          active ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+        className={`focus-ring group/item relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 ease-soft active:scale-[0.98] ${
+          active
+            ? "bg-brand-soft font-medium text-brand-ink"
+            : "text-slate-600 hover:bg-slate-100/80 hover:text-slate-900"
         } ${extraClasses}`}
       >
+        {/* Barra na borda esquerda marca a página atual mesmo recolhida, onde
+            o rótulo não existe e só a cor do ícone não basta. */}
+        {active ? (
+          <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-brand" />
+        ) : null}
         {item.icon}
         <span className={label}>{item.label}</span>
       </Link>
@@ -149,14 +165,13 @@ export function AppNav({ organizationName, showAdmin }: { organizationName: stri
     <div className="w-16 shrink-0">
       <aside
         data-pinned={pinned}
-        className="group fixed bottom-0 left-0 top-0 z-30 flex w-16 flex-col overflow-hidden border-r border-slate-200 bg-white px-3 py-5 transition-[width] duration-200 ease-out hover:w-60 has-[:focus-visible]:w-60 data-[pinned=true]:w-60 motion-reduce:transition-none"
+        className="group fixed bottom-0 left-0 top-0 z-30 flex w-16 flex-col overflow-hidden border-r border-slate-200/70 bg-white/80 px-3 py-5 backdrop-blur-xl transition-[width,box-shadow] duration-300 ease-soft hover:w-60 hover:shadow-lifted has-[:focus-visible]:w-60 data-[pinned=true]:w-60 data-[pinned=true]:shadow-none motion-reduce:transition-none"
       >
-        <div className="mb-6 flex items-center gap-3 px-1">
-          {/* Inicial da organização: a âncora visual que sobra quando recolhida. */}
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-sm font-semibold text-white">
-            {organizationName.trim().charAt(0).toUpperCase() || "?"}
+        <div className="mb-6 flex items-center gap-3 px-0.5">
+          <OrgLogo name={organizationName} logoUrl={logoUrl} />
+          <span className={`font-display text-sm font-semibold tracking-tight text-slate-900 ${label}`}>
+            {organizationName}
           </span>
-          <span className={`text-sm font-semibold text-slate-900 ${label}`}>{organizationName}</span>
         </div>
 
         <nav className="flex flex-1 flex-col gap-1">{NAV_ITEMS.map((item) => renderItem(item))}</nav>
@@ -169,7 +184,7 @@ export function AppNav({ organizationName, showAdmin }: { organizationName: stri
             onClick={() => setPinned((current) => !current)}
             aria-pressed={pinned}
             title={pinned ? "Soltar o menu" : "Manter o menu aberto"}
-            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+            className="focus-ring flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-500 transition-all duration-200 ease-soft hover:bg-slate-100/80 hover:text-slate-900 active:scale-[0.98]"
           >
             <svg {...ICON_PROPS}>
               {pinned ? (

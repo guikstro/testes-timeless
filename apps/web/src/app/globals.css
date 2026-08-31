@@ -2,10 +2,65 @@
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * Identidade visual do produto.
+ *
+ * O acento é uma variável e não uma cor fixa porque cada organização define a
+ * sua (ver BrandProvider). Tudo o que é "a cor da marca" na interface aponta
+ * para cá — trocar a marca é trocar três números, não caçar classes.
+ */
 :root {
   color-scheme: light;
+
+  --brand: 37 99 235;
+  --brand-soft: 239 246 255;
+  --brand-ink: 30 64 175;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Manrope", var(--font-sans);
 }
 
 body {
   @apply bg-slate-50 text-slate-900 antialiased;
+  font-feature-settings: "cv02", "cv03", "cv04", "ss01";
+}
+
+/* Números em colunas precisam alinhar; texto corrido, não. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+@layer components {
+  /**
+   * Superfície padrão. Borda quase invisível + sombra em camadas: a separação
+   * vem da profundidade, não de um traço forte em volta de tudo.
+   */
+  .surface {
+    @apply rounded-2xl border border-slate-200/70 bg-white shadow-card;
+  }
+
+  /* Vidro: usado onde algo se sobrepõe ao conteúdo e precisa deixá-lo entrever. */
+  .glass {
+    @apply border border-white/40 bg-white/70 shadow-lifted backdrop-blur-xl backdrop-saturate-150;
+  }
+
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+  }
+}
+
+/**
+ * Quem pediu menos movimento recebe menos movimento — inclusive nas animações
+ * de entrada, que são justamente as que incomodam quem tem sensibilidade
+ * vestibular. Não desligar tudo: transições de cor não causam desconforto.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

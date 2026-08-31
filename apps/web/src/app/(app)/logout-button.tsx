@@ -21,7 +21,7 @@ export function LogoutButton({ collapsedLabelClassName = "" }: { collapsedLabelC
     <button
       onClick={handleLogout}
       title="Sair"
-      className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+      className="focus-ring flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-600 transition-all duration-200 ease-soft hover:bg-slate-100/80 hover:text-slate-900 active:scale-[0.98]"
     >
       <svg
         viewBox="0 0 24 24"

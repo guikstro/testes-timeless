@@ -226,7 +226,7 @@ export class AuthService {
       }),
       this.prisma.organization.findFirst({
         where: { id: user.organizationId, deletedAt: null },
-        select: { id: true, name: true },
+        select: { id: true, name: true, logoUrl: true, brandColor: true },
       }),
     ]);
 

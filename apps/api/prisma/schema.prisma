@@ -37,6 +37,15 @@ model Organization {
   slug      String   @unique
   timezone  String   @default("America/Fortaleza")
   currency  String   @default("BRL")
+
+  /**
+   * Marca da organização na interface (Fase 12). Guardamos a URL, não o
+   * arquivo: hospedar upload exige armazenamento, limites e varredura de
+   * conteúdo — e o ganho para o cliente é o mesmo.
+   */
+  logoUrl    String? @map("logo_url")
+  /** Cor de acento em hex (#RRGGBB). Null usa o acento padrão do produto. */
+  brandColor String? @map("brand_color")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")

@@ -1,4 +1,6 @@
 import { apiFetch } from "@/lib/api-client";
+import { Card, CardHeader } from "@/components/ui/card";
+import { BrandForm } from "./brand-form";
 import { CreateRuleForm } from "./create-rule-form";
 import { DeleteRuleButton } from "./delete-rule-button";
 
@@ -21,16 +23,37 @@ interface SupportAccess {
   user: { name: string; email: string } | null;
 }
 
+interface Organization {
+  name: string;
+  logoUrl: string | null;
+  brandColor: string | null;
+}
+
 export default async function SettingsPage() {
   // Independentes: buscados em paralelo em vez de um depois do outro.
-  const [rules, supportAccesses] = await Promise.all([
+  const [rules, supportAccesses, organization] = await Promise.all([
     apiFetch<ClassificationRule[]>("/classification-rules"),
     apiFetch<SupportAccess[]>("/organizations/current/support-accesses"),
+    apiFetch<Organization>("/organizations/current"),
   ]);
 
   return (
-    <div>
-      <h1 className="mb-6 text-2xl font-semibold text-slate-900">Configurações</h1>
+    <div className="mx-auto max-w-5xl">
+      <h1 className="font-display text-2xl font-semibold tracking-tight text-slate-900">Configurações</h1>
+      <p className="mb-8 mt-1 text-sm text-slate-500">Identidade visual, gatilhos e acessos.</p>
+
+      <Card className="mb-8 p-6">
+        <CardHeader
+          title="Identidade da empresa"
+          description="A logo e a cor aparecem no menu, nos botões e nos destaques da plataforma."
+          className="mb-6"
+        />
+        <BrandForm
+          organizationName={organization.name}
+          logoUrl={organization.logoUrl}
+          brandColor={organization.brandColor}
+        />
+      </Card>
 
       <h2 className="mb-3 text-sm font-semibold text-slate-900">Gatilhos de qualificação e venda</h2>
       <p className="mb-4 text-sm text-slate-500">
