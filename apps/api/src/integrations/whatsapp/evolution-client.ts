@@ -50,7 +50,12 @@ export class EvolutionClient {
       webhook: {
         url: webhookUrl,
         byEvents: false,
-        base64: true,
+        // O parser lê texto, chave, timestamp e o contexto do anúncio — nunca
+        // a mídia. Pedir base64 embutia a imagem/áudio inteiros em todo
+        // payload, estourando o limite do body parser e fazendo a API rejeitar
+        // a mensagem com 413: a conversa se perdia por causa de um anexo que
+        // não usamos.
+        base64: false,
         // Só o que o pipeline consome: mensagem nova e mudança de conexão.
         // Presença/typing/contatos gerariam tráfego constante sem uso.
         events: ["MESSAGES_UPSERT", "CONNECTION_UPDATE"],
