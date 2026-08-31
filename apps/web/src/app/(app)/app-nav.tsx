@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode, useState } from "react";
 import { OrgLogo } from "@/components/ui/logo";
+import { LeaveClientButton } from "./impersonation-banner";
 import { LogoutButton } from "./logout-button";
 
 /**
@@ -121,10 +122,12 @@ export function AppNav({
   organizationName,
   logoUrl,
   showAdmin,
+  impersonating = false,
 }: {
   organizationName: string;
   logoUrl?: string | null;
   showAdmin: boolean;
+  impersonating?: boolean;
 }) {
   const [pinned, setPinned] = useState(false);
   const pathname = usePathname();
@@ -165,12 +168,26 @@ export function AppNav({
     <div className="w-16 shrink-0">
       <aside
         data-pinned={pinned}
-        className="group fixed bottom-0 left-0 top-[var(--chrome-top,0px)] z-30 flex w-16 flex-col overflow-hidden border-r border-line/70 bg-panel/80 px-3 py-5 backdrop-blur-xl transition-[width,box-shadow] duration-300 ease-soft hover:w-60 hover:shadow-lifted has-[:focus-visible]:w-60 data-[pinned=true]:w-60 data-[pinned=true]:shadow-none motion-reduce:transition-none"
+        className="group fixed bottom-0 left-0 top-0 z-30 flex w-16 flex-col overflow-hidden border-r border-line/70 bg-panel/80 px-3 py-5 backdrop-blur-xl transition-[width,box-shadow] duration-300 ease-soft hover:w-60 hover:shadow-lifted has-[:focus-visible]:w-60 data-[pinned=true]:w-60 data-[pinned=true]:shadow-none motion-reduce:transition-none"
       >
+        {/*
+          Segundo sinal: a identidade no topo do menu passa a ser a do cliente,
+          com anel âmbar. É para cá que o olho vai quando a pergunta é "onde eu
+          estou", então é aqui que a resposta precisa estar.
+        */}
         <div className="mb-6 flex items-center gap-3 px-0.5">
-          <OrgLogo name={organizationName} logoUrl={logoUrl} />
-          <span className={`font-display text-sm font-semibold tracking-tight text-ink ${label}`}>
-            {organizationName}
+          <span className={impersonating ? "rounded-[14px] ring-2 ring-amber-500 ring-offset-2 ring-offset-panel" : undefined}>
+            <OrgLogo name={organizationName} logoUrl={logoUrl} />
+          </span>
+          <span className={`min-w-0 ${label}`}>
+            {impersonating ? (
+              <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700 dark:text-amber-400">
+                Dentro do cliente
+              </span>
+            ) : null}
+            <span className="block truncate font-display text-sm font-semibold tracking-tight text-ink">
+              {organizationName}
+            </span>
           </span>
         </div>
 
@@ -195,6 +212,9 @@ export function AppNav({
             </svg>
             <span className={label}>{pinned ? "Soltar menu" : "Fixar menu"}</span>
           </button>
+
+          {/* Terceiro sinal: a saída vive junto dos controles de sessão. */}
+          {impersonating ? <LeaveClientButton collapsedLabelClassName={label} /> : null}
 
           <div className="px-1 pt-1">
             <LogoutButton collapsedLabelClassName={label} />

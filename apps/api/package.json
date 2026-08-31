@@ -21,7 +21,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:seed": "ts-node prisma/seed.ts",
-    "grant:admin": "ts-node prisma/grant-platform-admin.ts"
+    "grant:admin": "ts-node prisma/grant-platform-admin.ts",
+    "seed:demo": "ts-node prisma/seed-demo.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

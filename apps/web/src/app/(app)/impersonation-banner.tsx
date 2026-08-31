@@ -1,20 +1,35 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 
 /**
- * Aviso permanente de que o operador está agindo DENTRO de um cliente.
+ * Sinal de que o operador está agindo DENTRO de um cliente.
  *
- * Fica no topo de todas as telas e não pode ser fechado: a proteção contra
- * editar os dados do cliente achando que são os seus é justamente ele estar
- * sempre visível.
+ * Era uma faixa de 56 pixels no topo. Virou três sinais discretos, distribuídos
+ * onde o olho já passa, porque uma barra de cor forte no topo é justamente o
+ * tipo de elemento que se aprende a ignorar depois de dez minutos.
  *
- * O tom âmbar é deliberado e não decorativo. Verde diria "tudo certo", e
- * vermelho diria "erro"; o que precisa ser dito é "atenção, você não está na
- * sua conta", que é exatamente o que âmbar comunica.
+ * Este é o primeiro sinal: um fio colado na borda superior da janela. Não
+ * ocupa espaço do conteúdo e fica na visão periférica o tempo todo. Os outros
+ * dois vivem na barra lateral (identidade trocada e botão de saída).
+ *
+ * O âmbar é escolha, não enfeite: verde diria "tudo certo" e vermelho diria
+ * "erro", quando o que precisa ser dito é "atenção, esta não é a sua conta".
  */
-export function ImpersonationBanner({ organizationName }: { organizationName: string }) {
+export function ImpersonationHairline() {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none fixed inset-x-0 top-0 z-50 h-[3px] bg-gradient-to-r from-amber-500/50 via-amber-400 to-amber-500/50"
+    />
+  );
+}
+
+/**
+ * Botão de saída, no rodapé da barra lateral junto dos outros controles de
+ * sessão. É onde a pessoa já procura por "sair", em vez de flutuar numa faixa.
+ */
+export function LeaveClientButton({ collapsedLabelClassName = "" }: { collapsedLabelClassName?: string }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,7 +47,7 @@ export function ImpersonationBanner({ organizationName }: { organizationName: st
         window.location.href = "/login";
         return;
       }
-      setError("Não foi possível sair. Recarregue a página.");
+      setError("Não foi possível sair.");
       setPending(false);
       return;
     }
@@ -43,31 +58,21 @@ export function ImpersonationBanner({ organizationName }: { organizationName: st
   }
 
   return (
-    <div className="relative z-40 flex h-14 shrink-0 items-center gap-4 border-b border-amber-500/25 bg-amber-50 px-5 dark:bg-amber-950/40">
-      <span className="flex items-center gap-2.5 text-amber-900 dark:text-amber-200">
-        {/* Ponto pulsante: o estado é contínuo, e algo vivo lembra disso melhor
-            que um ícone parado que o olho aprende a ignorar. */}
-        <span className="relative flex h-2 w-2 shrink-0">
-          <span className="absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-60 motion-safe:animate-ping" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
-        </span>
-      </span>
-
-      <p className="min-w-0 flex-1 truncate text-[13px] text-amber-900 dark:text-amber-100">
-        Você está dentro de <span className="font-semibold">{organizationName}</span> como operador.
-        <span className="hidden sm:inline"> Tudo o que fizer aqui altera os dados desse cliente.</span>
-      </p>
-
-      {error ? <span className="hidden text-xs text-red-700 dark:text-red-300 sm:inline">{error}</span> : null}
-
-      <Button
+    <>
+      <button
+        type="button"
         onClick={() => void leave()}
-        loading={pending}
-        size="sm"
-        className="shrink-0 border border-amber-600/30 bg-amber-500 text-amber-950 hover:brightness-105"
+        disabled={pending}
+        title="Sair do cliente"
+        aria-busy={pending || undefined}
+        className="focus-ring flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-amber-700 transition-all duration-200 ease-soft hover:bg-amber-500/10 active:scale-[0.98] disabled:opacity-50 dark:text-amber-400"
       >
-        {pending ? "Saindo" : "Sair do cliente"}
-      </Button>
-    </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0" aria-hidden>
+          <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
+        </svg>
+        <span className={collapsedLabelClassName}>{pending ? "Saindo" : "Sair do cliente"}</span>
+      </button>
+      {error ? <p className={`px-3 text-xs text-red-600 ${collapsedLabelClassName}`}>{error}</p> : null}
+    </>
   );
 }
