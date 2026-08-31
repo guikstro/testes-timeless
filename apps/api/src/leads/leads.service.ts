@@ -10,6 +10,8 @@ import { WHATSAPP_SEND_QUEUE } from "../common/queue/queue.constants";
 import { WhatsAppSendJob } from "../common/queue/whatsapp-send.job";
 import { UpdateLeadDto } from "./dto/update-lead.dto";
 import { SendMessageDto } from "./dto/send-message.dto";
+import { computeLeadMetrics } from "./lead-metrics";
+import { AdIds, AdReferences, extractAdIds } from "./ad-references";
 
 const STATUS_ORDER: Record<LeadStatus, number> = { NEW: 0, QUALIFIED: 1, WON: 2 };
 
@@ -45,6 +47,10 @@ export class LeadsService {
       include: {
         attribution: { include: { trackingClick: { include: { trackingLink: true } } } },
         sale: true,
+        // O sinal que voltou para a Meta faz parte da ficha do lead: sem ele
+        // não há como saber se a conversão chegou ao algoritmo que o cliente
+        // está pagando para otimizar.
+        conversionEvents: { orderBy: { occurredAt: "asc" } },
       },
     });
     if (!lead) {
@@ -71,7 +77,55 @@ export class LeadsService {
       }),
     ]);
 
-    return { ...lead, events, messages };
+    const adReferences = await this.resolveAdReferences(organizationId, extractAdIds(lead.attribution));
+    const metrics = computeLeadMetrics(lead, messages, lead.attribution?.trackingClick?.clickedAt ?? null);
+
+    return { ...lead, events, messages, metrics, adReferences };
+  }
+
+  /**
+   * Um clique guarda só os ids numéricos da Meta. Os nomes vivem nas tabelas
+   * que a integração sincroniza — e podem não existir, porque sincronizar é
+   * opcional e um anúncio criado depois da última sincronização ainda não tem
+   * linha aqui. Quando o nome falta devolvemos o id cru: pior que um nome,
+   * muito melhor que um campo vazio na tela.
+   *
+   * A partir do `adId` a hierarquia inteira sai numa consulta só; a campanha
+   * é tentada à parte para o caso de o anúncio específico não ter sido
+   * capturado mas a campanha sim.
+   */
+  private async resolveAdReferences(organizationId: string, ids: AdIds): Promise<AdReferences> {
+    const rawIds: AdReferences = {
+      campaign: ids.campaignId ? { externalId: ids.campaignId, name: null } : null,
+      adSet: ids.adsetId ? { externalId: ids.adsetId, name: null } : null,
+      ad: ids.adId ? { externalId: ids.adId, name: null } : null,
+    };
+
+    if (ids.adId) {
+      const ad = await this.prisma.ad.findUnique({
+        where: { externalId: ids.adId },
+        include: { adSet: { include: { campaign: true } } },
+      });
+      // Ad e AdSet não carregam organizationId — o vínculo com a organização
+      // existe só na campanha. Verificar aqui é o que impede um id de outra
+      // conta de revelar o nome do anúncio dela.
+      if (ad && ad.adSet.campaign.organizationId === organizationId) {
+        return {
+          campaign: { externalId: ad.adSet.campaign.externalId, name: ad.adSet.campaign.name },
+          adSet: { externalId: ad.adSet.externalId, name: ad.adSet.name },
+          ad: { externalId: ad.externalId, name: ad.name },
+        };
+      }
+    }
+
+    if (ids.campaignId) {
+      const campaign = await this.prisma.campaign.findUnique({ where: { externalId: ids.campaignId } });
+      if (campaign && campaign.organizationId === organizationId) {
+        return { ...rawIds, campaign: { externalId: campaign.externalId, name: campaign.name } };
+      }
+    }
+
+    return rawIds;
   }
 
   /**

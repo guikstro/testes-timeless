@@ -13,6 +13,8 @@ describe("LeadsService", () => {
       auditLog: { create: jest.fn() },
       whatsAppConnection: { findUnique: jest.fn() },
       conversation: { findFirst: jest.fn(), update: jest.fn() },
+      ad: { findUnique: jest.fn() },
+      campaign: { findUnique: jest.fn() },
     };
     const conversionEvents = {
       recordLead: jest.fn(),
@@ -78,11 +80,134 @@ describe("LeadsService", () => {
         include: {
           attribution: { include: { trackingClick: { include: { trackingLink: true } } } },
           sale: true,
+          conversionEvents: { orderBy: { occurredAt: "asc" } },
         },
       }),
     );
     expect(result.attribution).toMatchObject({ method: "TRACKING_LINK" });
     expect(result.sale).toMatchObject({ amountCents: 200000 });
+  });
+
+  describe("ficha do lead (Fase 10)", () => {
+    const firstContactAt = new Date("2026-01-10T10:00:00.000Z");
+
+    it("calcula as métricas de atendimento junto do detalhe", async () => {
+      const { service, prisma } = buildService();
+      prisma.lead.findFirst.mockResolvedValue({
+        id: "lead-1",
+        organizationId: "org-1",
+        firstContactAt,
+        qualifiedAt: null,
+        wonAt: null,
+      });
+      prisma.message.findMany.mockResolvedValue([
+        { direction: "INBOUND", timestamp: firstContactAt, outboundStatus: null },
+        {
+          direction: "OUTBOUND",
+          timestamp: new Date(firstContactAt.getTime() + 90_000),
+          outboundStatus: "SENT",
+        },
+      ]);
+
+      const result = await service.findOne("org-1", "lead-1");
+
+      expect(result.metrics).toMatchObject({
+        firstResponseSeconds: 90,
+        inboundCount: 1,
+        outboundCount: 1,
+        awaitingReply: false,
+      });
+    });
+
+    it("resolve a hierarquia inteira do anúncio a partir do id do clique", async () => {
+      const { service, prisma } = buildService();
+      prisma.lead.findFirst.mockResolvedValue({
+        id: "lead-1",
+        organizationId: "org-1",
+        firstContactAt,
+        attribution: { evidence: null, trackingClick: { campaignId: null, adsetId: null, adId: "ad-ext" } },
+      });
+      prisma.ad.findUnique.mockResolvedValue({
+        externalId: "ad-ext",
+        name: "Criativo Vídeo 15s",
+        adSet: {
+          externalId: "set-ext",
+          name: "Público Frio",
+          campaign: { externalId: "camp-ext", name: "Campanha Agosto", organizationId: "org-1" },
+        },
+      });
+
+      const result = await service.findOne("org-1", "lead-1");
+
+      // Uma consulta só entrega anúncio, conjunto e campanha.
+      expect(prisma.ad.findUnique).toHaveBeenCalledTimes(1);
+      expect(result.adReferences).toEqual({
+        ad: { externalId: "ad-ext", name: "Criativo Vídeo 15s" },
+        adSet: { externalId: "set-ext", name: "Público Frio" },
+        campaign: { externalId: "camp-ext", name: "Campanha Agosto" },
+      });
+    });
+
+    /**
+     * Ad e AdSet não carregam organizationId — o vínculo está só na campanha.
+     * Sem esta verificação, um id de outra conta revelaria o nome do anúncio
+     * dela.
+     */
+    it("não revela o nome de um anúncio de outra organização", async () => {
+      const { service, prisma } = buildService();
+      prisma.lead.findFirst.mockResolvedValue({
+        id: "lead-1",
+        organizationId: "org-1",
+        firstContactAt,
+        attribution: { evidence: null, trackingClick: { campaignId: null, adsetId: null, adId: "ad-ext" } },
+      });
+      prisma.ad.findUnique.mockResolvedValue({
+        externalId: "ad-ext",
+        name: "Criativo do concorrente",
+        adSet: {
+          externalId: "set-ext",
+          name: "Não deveria aparecer",
+          campaign: { externalId: "camp-ext", name: "Nem isto", organizationId: "outra-org" },
+        },
+      });
+
+      const result = await service.findOne("org-1", "lead-1");
+
+      expect(result.adReferences.ad).toEqual({ externalId: "ad-ext", name: null });
+      expect(result.adReferences.adSet).toBeNull();
+      expect(result.adReferences.campaign).toBeNull();
+    });
+
+    /** Sincronizar com a Meta é opcional: sem nome, o id cru ainda informa. */
+    it("devolve o id cru quando o anúncio não foi sincronizado", async () => {
+      const { service, prisma } = buildService();
+      prisma.lead.findFirst.mockResolvedValue({
+        id: "lead-1",
+        organizationId: "org-1",
+        firstContactAt,
+        attribution: { evidence: { adId: "ad-nunca-sincronizado" }, trackingClick: null },
+      });
+      prisma.ad.findUnique.mockResolvedValue(null);
+
+      const result = await service.findOne("org-1", "lead-1");
+
+      expect(result.adReferences.ad).toEqual({ externalId: "ad-nunca-sincronizado", name: null });
+    });
+
+    it("não consulta anúncio nenhum para um lead sem atribuição", async () => {
+      const { service, prisma } = buildService();
+      prisma.lead.findFirst.mockResolvedValue({
+        id: "lead-1",
+        organizationId: "org-1",
+        firstContactAt,
+        attribution: null,
+      });
+
+      await service.findOne("org-1", "lead-1");
+
+      expect(prisma.ad.findUnique).not.toHaveBeenCalled();
+      expect(prisma.campaign.findUnique).not.toHaveBeenCalled();
+    });
   });
 
   it("includes attribution and sale on each item of the list, for the Origem/Campanha/Receita columns", async () => {
