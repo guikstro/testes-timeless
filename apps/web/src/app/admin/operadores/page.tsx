@@ -1,5 +1,7 @@
 import { apiFetch } from "@/lib/api-client";
 import { AddOperatorForm, RevokeOperatorButton } from "./operator-forms";
+import { LeaveClientNotice } from "../leave-client-notice";
+import { estaDentroDeCliente } from "../guard";
 
 interface Operator {
   id: string;
@@ -19,6 +21,10 @@ const ROLE_DESCRIPTIONS: Record<Operator["platformRole"], string> = {
 };
 
 export default async function OperatorsPage() {
+  if (await estaDentroDeCliente()) {
+    return <LeaveClientNotice />;
+  }
+
   const operators = await apiFetch<Operator[]>("/admin/operators");
   const adminCount = operators.filter((operator) => operator.platformRole === "ADMIN").length;
 

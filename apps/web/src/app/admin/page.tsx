@@ -2,6 +2,8 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
 import { formatCentsAsBRL } from "@/lib/currency";
 import { EnterClientButton } from "./enter-client-button";
+import { LeaveClientNotice } from "./leave-client-notice";
+import { estaDentroDeCliente } from "./guard";
 
 interface AdminOrganization {
   id: string;
@@ -42,6 +44,10 @@ export default async function AdminOrganizationsPage({
 
   const query = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
   if (search) query.set("search", search);
+
+  if (await estaDentroDeCliente()) {
+    return <LeaveClientNotice />;
+  }
 
   const data = await apiFetch<Paginated<AdminOrganization>>(`/admin/organizations?${query.toString()}`);
   const lastPage = Math.max(1, Math.ceil(data.total / PAGE_SIZE));
