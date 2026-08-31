@@ -20,6 +20,12 @@ import { LogoutButton } from "./logout-button";
  *    nada. Por isso ela também abre no foco do teclado e tem um botão de
  *    fixar, que é o caminho de quem usa toque.
  *
+ *    A abertura por teclado usa `:has(:focus-visible)`, e não `:focus-within`.
+ *    A diferença não é cosmética: `:focus-within` também casa depois de um
+ *    clique de mouse, porque clicar dá foco ao elemento — a barra ficava presa
+ *    aberta ao tirar o mouse, até se clicar em outro lugar. `:focus-visible` é
+ *    justamente o estado que o navegador reserva para foco por teclado.
+ *
  * 3. **Recolhida, só sobram ícones** — então sem marcar a página atual a
  *    pessoa se perde. O destaque do item ativo deixa de ser enfeite e vira
  *    parte do que faz a barra funcionar.
@@ -118,7 +124,7 @@ export function AppNav({ organizationName, showAdmin }: { organizationName: stri
   // o texto não reposicionar durante a transição.
   const label =
     "min-w-0 truncate opacity-0 transition-opacity duration-150 group-hover:opacity-100 " +
-    "group-focus-within:opacity-100 group-data-[pinned=true]:opacity-100";
+    "group-has-[:focus-visible]:opacity-100 group-data-[pinned=true]:opacity-100";
 
   function renderItem(item: NavItem, extraClasses = "") {
     const active = isActive(pathname, item.href);
@@ -143,7 +149,7 @@ export function AppNav({ organizationName, showAdmin }: { organizationName: stri
     <div className="w-16 shrink-0">
       <aside
         data-pinned={pinned}
-        className="group fixed bottom-0 left-0 top-0 z-30 flex w-16 flex-col overflow-hidden border-r border-slate-200 bg-white px-3 py-5 transition-[width] duration-200 ease-out hover:w-60 focus-within:w-60 data-[pinned=true]:w-60 motion-reduce:transition-none"
+        className="group fixed bottom-0 left-0 top-0 z-30 flex w-16 flex-col overflow-hidden border-r border-slate-200 bg-white px-3 py-5 transition-[width] duration-200 ease-out hover:w-60 has-[:focus-visible]:w-60 data-[pinned=true]:w-60 motion-reduce:transition-none"
       >
         <div className="mb-6 flex items-center gap-3 px-1">
           {/* Inicial da organização: a âncora visual que sobra quando recolhida. */}
