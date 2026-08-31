@@ -52,12 +52,25 @@ const config: Config = {
           to: { opacity: "1", transform: "none" },
         },
         shimmer: { from: { backgroundPosition: "200% 0" }, to: { backgroundPosition: "-200% 0" } },
+        /* Corrente percorrendo o caminho da atribuição: o produto em movimento. */
+        flow: { from: { strokeDashoffset: "220" }, to: { strokeDashoffset: "0" } },
+        "pulse-node": {
+          "0%, 100%": { opacity: "0.35", transform: "scale(1)" },
+          "50%": { opacity: "1", transform: "scale(1.15)" },
+        },
+        drift: {
+          "0%, 100%": { transform: "translate3d(0,0,0) scale(1)" },
+          "50%": { transform: "translate3d(2%, -3%, 0) scale(1.06)" },
+        },
       },
       animation: {
         "rise-in": "rise-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both",
         "fade-in": "fade-in 0.4s ease-out both",
         "pop-in": "pop-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both",
         shimmer: "shimmer 1.6s linear infinite",
+        flow: "flow 3.2s linear infinite",
+        "pulse-node": "pulse-node 3.2s ease-in-out infinite",
+        drift: "drift 18s ease-in-out infinite",
       },
     },
   },
