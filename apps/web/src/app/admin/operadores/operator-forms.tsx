@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useTransition } from "react";
 import { OperatorFormState, revokeOperator, upsertOperator } from "./actions";
+import { Button } from "@/components/ui/button";
 
 const initialState: OperatorFormState = {};
 
@@ -41,13 +42,7 @@ export function AddOperatorForm() {
             <option value="ADMIN">Administrador (também gerencia operadores)</option>
           </select>
         </div>
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-canvas hover:bg-ink disabled:opacity-50"
-        >
-          {pending ? "Salvando..." : "Salvar"}
-        </button>
+        <Button type="submit" loading={pending}>{pending ? "Salvando..." : "Salvar"}</Button>
       </div>
       {state.error ? <p className="mt-2 text-sm text-red-600">{state.error}</p> : null}
     </form>

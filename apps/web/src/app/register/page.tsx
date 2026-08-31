@@ -104,7 +104,7 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-md bg-ink px-3 py-2 text-sm font-medium text-canvas hover:bg-ink disabled:opacity-50"
+            className="focus-ring inline-flex h-11 w-full items-center justify-center rounded-full bg-ink text-sm font-medium text-canvas shadow-subtle transition-all duration-300 ease-soft hover:shadow-card active:scale-[0.97] disabled:opacity-50"
           >
             {loading ? "Criando..." : "Criar organização"}
           </button>

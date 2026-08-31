@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 /* eslint-disable @next/next/no-img-element -- o QR vem como data URI do provider, não é um asset local que o next/image possa otimizar. */
 import { pollQrCode, refreshWhatsAppPage, startQrCodeConnection, QrCodeState } from "./actions";
+import { Button } from "@/components/ui/button";
 
 /** A Evolution rotaciona o QR a cada ~30s; buscar a cada 5s garante um código sempre válido na tela. */
 const POLL_INTERVAL_MS = 5000;
@@ -82,12 +83,9 @@ export function QrConnect({ alreadyPending }: { alreadyPending: boolean }) {
       </p>
 
       {phase === "idle" ? (
-        <button
-          onClick={() => void start()}
-          className="mt-4 rounded-md bg-ink px-4 py-2 text-sm font-medium text-canvas hover:bg-ink"
-        >
+        <Button onClick={() => void start()} className="mt-4">
           Gerar QR Code
-        </button>
+        </Button>
       ) : null}
 
       {phase === "starting" ? <p className="mt-4 text-sm text-ink-mute">Preparando a conexão...</p> : null}

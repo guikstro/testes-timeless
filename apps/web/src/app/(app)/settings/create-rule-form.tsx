@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { createClassificationRule, CreateRuleState } from "./actions";
+import { Button } from "@/components/ui/button";
 
 const initialState: CreateRuleState = {};
 
@@ -47,13 +48,7 @@ export function CreateRuleForm() {
       ) : null}
 
       <div className="flex items-center gap-3 sm:col-span-3">
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-canvas hover:bg-ink disabled:opacity-50"
-        >
-          {pending ? "Adicionando..." : "Adicionar gatilho"}
-        </button>
+        <Button type="submit" loading={pending}>{pending ? "Adicionando..." : "Adicionar gatilho"}</Button>
         {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
       </div>
     </form>

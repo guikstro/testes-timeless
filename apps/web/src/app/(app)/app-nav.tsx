@@ -165,7 +165,7 @@ export function AppNav({
     <div className="w-16 shrink-0">
       <aside
         data-pinned={pinned}
-        className="group fixed bottom-0 left-0 top-0 z-30 flex w-16 flex-col overflow-hidden border-r border-line/70 bg-panel/80 px-3 py-5 backdrop-blur-xl transition-[width,box-shadow] duration-300 ease-soft hover:w-60 hover:shadow-lifted has-[:focus-visible]:w-60 data-[pinned=true]:w-60 data-[pinned=true]:shadow-none motion-reduce:transition-none"
+        className="group fixed bottom-0 left-0 top-[var(--chrome-top,0px)] z-30 flex w-16 flex-col overflow-hidden border-r border-line/70 bg-panel/80 px-3 py-5 backdrop-blur-xl transition-[width,box-shadow] duration-300 ease-soft hover:w-60 hover:shadow-lifted has-[:focus-visible]:w-60 data-[pinned=true]:w-60 data-[pinned=true]:shadow-none motion-reduce:transition-none"
       >
         <div className="mb-6 flex items-center gap-3 px-0.5">
           <OrgLogo name={organizationName} logoUrl={logoUrl} />

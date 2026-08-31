@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { connectWhatsApp, ConnectWhatsAppState } from "./actions";
+import { Button } from "@/components/ui/button";
 
 const initialState: ConnectWhatsAppState = {};
 
@@ -46,13 +47,7 @@ export function ConnectWhatsAppForm() {
         />
       </div>
       <div className="flex items-center gap-3 sm:col-span-2">
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-canvas hover:bg-ink disabled:opacity-50"
-        >
-          {pending ? "Conectando..." : "Conectar"}
-        </button>
+        <Button type="submit" loading={pending}>{pending ? "Conectando..." : "Conectar"}</Button>
         {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
       </div>
     </form>

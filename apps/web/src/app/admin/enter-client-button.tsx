@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 /**
  * Entra no cliente. A troca de sessão acontece num route handler
@@ -38,14 +39,9 @@ export function EnterClientButton({ organizationId, organizationName }: { organi
 
   return (
     <div className="text-right">
-      <button
-        onClick={() => void enter()}
-        disabled={pending}
-        title={`Entrar em ${organizationName}`}
-        className="rounded-md bg-ink px-3 py-1.5 text-sm font-medium text-canvas hover:bg-ink disabled:opacity-50"
-      >
-        {pending ? "Entrando..." : "Entrar"}
-      </button>
+      <Button onClick={() => void enter()} loading={pending} size="sm" title={`Entrar em ${organizationName}`}>
+        {pending ? "Entrando" : "Entrar"}
+      </Button>
       {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
     </div>
   );

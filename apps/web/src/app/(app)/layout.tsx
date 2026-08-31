@@ -22,7 +22,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    /*
+      A altura da faixa vira variável para a barra lateral saber onde começar.
+      Ela é fixa no topo, então sem esse deslocamento passa por cima do aviso
+      e come as primeiras palavras dele.
+    */
+    <div
+      className="flex min-h-screen flex-col"
+      style={session.impersonating ? ({ "--chrome-top": "3.5rem" } as React.CSSProperties) : undefined}
+    >
       {session.impersonating ? <ImpersonationBanner organizationName={session.organization.name} /> : null}
 
       <BrandStyle brandColor={session.organization.brandColor} />

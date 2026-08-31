@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { disconnectMeta, triggerMetaSync } from "./actions";
+import { Button } from "@/components/ui/button";
 
 export function ConnectionActions() {
   const [disconnecting, startDisconnect] = useTransition();
@@ -9,13 +10,9 @@ export function ConnectionActions() {
 
   return (
     <div className="flex gap-3 pt-2">
-      <button
-        onClick={() => startSync(() => triggerMetaSync())}
-        disabled={syncing}
-        className="rounded-md bg-ink px-3 py-1.5 text-sm font-medium text-canvas hover:bg-ink disabled:opacity-50"
-      >
-        {syncing ? "Sincronizando..." : "Sincronizar agora"}
-      </button>
+      <Button onClick={() => startSync(() => triggerMetaSync())} loading={syncing} size="sm">
+        {syncing ? "Sincronizando" : "Sincronizar agora"}
+      </Button>
       <button
         onClick={() => startDisconnect(() => disconnectMeta())}
         disabled={disconnecting}

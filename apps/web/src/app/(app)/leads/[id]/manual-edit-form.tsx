@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { DisqualifyState, setDisqualified, updateLead, UpdateLeadState } from "./actions";
+import { Button } from "@/components/ui/button";
 
 const initialState: UpdateLeadState = {};
 const initialDisqualifyState: DisqualifyState = {};
@@ -37,13 +38,7 @@ export function ManualEditForm({ leadId, status }: { leadId: string; status: Lea
         inputMode="decimal"
         className="rounded-md border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
       />
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-canvas hover:bg-ink disabled:opacity-50"
-      >
-        {pending ? "Salvando..." : "Salvar correção"}
-      </button>
+      <Button type="submit" loading={pending}>{pending ? "Salvando..." : "Salvar correção"}</Button>
       {state.error ? <p className="text-sm text-red-600 sm:col-span-3">{state.error}</p> : null}
     </form>
   );
