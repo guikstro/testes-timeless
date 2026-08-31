@@ -26,3 +26,29 @@ export function attributionCampaignLabel(attribution: AttributionSummary | null 
   }
   return "—";
 }
+
+/** Como a origem foi provada — ver docs/ATTRIBUTION.md. */
+export function attributionMethodLabel(method: AttributionSummary["method"] | undefined): string {
+  if (method === "CTWA_REFERRAL") return "Referral da Meta (Click-to-WhatsApp)";
+  if (method === "TRACKING_LINK") return "Link rastreável";
+  return "Sem evidência";
+}
+
+/**
+ * Rótulo grosseiro de dispositivo a partir do user agent.
+ *
+ * Deliberadamente simples: o que importa aqui é "veio do celular ou do
+ * computador", e um parser completo de user agent seria uma dependência nova
+ * para uma precisão que ninguém vai usar nesta tela.
+ */
+export function deviceLabel(userAgent: string | null | undefined): string {
+  if (!userAgent) return "—";
+  const ua = userAgent.toLowerCase();
+  if (ua.includes("iphone")) return "iPhone";
+  if (ua.includes("ipad")) return "iPad";
+  if (ua.includes("android")) return "Android";
+  if (ua.includes("windows")) return "Windows";
+  if (ua.includes("mac os") || ua.includes("macintosh")) return "Mac";
+  if (ua.includes("linux")) return "Linux";
+  return "Outro";
+}
