@@ -30,8 +30,21 @@ probabilística nesta fase — só regras determinísticas (Seção 62).
 ## Máquina de estados (só avança, nunca volta)
 
 ```
-NEW -> QUALIFIED -> WON
+NEW -> QUALIFIED -> MEETING_SCHEDULED -> WON
+
+                    (fora da linha)
+                    disqualifiedAt  <- pode ser marcado e desfeito
 ```
+
+`MEETING_SCHEDULED` entra entre qualificar e vender (Fase 11): existe horário
+combinado com o lead. Não é obrigatório — vender sem reunião é comum, e por
+isso marcar `WON` **não** preenche `meetingScheduledAt`. A assimetria é
+deliberada: qualificação é pressuposto de uma venda, reunião não é.
+
+A ordem do funil vive em `STATUS_ORDER`, no `LeadsService`, e não na ordem do
+enum no Postgres — `ALTER TYPE ... ADD VALUE` acrescenta ao fim do tipo, então
+`MEETING_SCHEDULED` aparece depois de `WON` lá. Nada consulta ordenando por
+status no banco.
 
 - Rodada em **toda mensagem inbound**, não só na primeira (ao contrário da
   atribuição, que é first-touch) — qualificação/venda pode acontecer a
@@ -47,6 +60,33 @@ NEW -> QUALIFIED -> WON
   com `metadata.implicitFromSale = true` — mantém o funil
   Leads → Qualificados → Vendas consistente para os relatórios futuros
   (Fase 8), sem inventar uma mensagem que não existiu.
+
+## Desqualificação (Fase 11)
+
+Desqualificar **não é um estágio do funil** — é uma saída lateral, gravada em
+`disqualifiedAt` / `disqualifiedReason`, não em `status`.
+
+Isso é o que permite distinguir duas coisas que antes se confundiam em "Novo":
+alguém que *ainda não* qualificou (conversa viva, pode fechar amanhã) e alguém
+que *não vai* qualificar (sem perfil, sem verba, era engano).
+
+Consequências do desenho:
+
+- O lead **preserva o estágio a que chegou**. "Estava qualificado quando
+  desistiu" diz mais do que só "descartado".
+- **Não se desqualifica quem comprou** (`CANNOT_DISQUALIFY_WON`): uma venda
+  registrada contradiz "não era oportunidade".
+- **Avançar o funil reativa automaticamente.** Se a pessoa voltou e comprou,
+  exigir dois passos seria atrito sem ganho — a intenção de quem clicou já é
+  inequívoca. O evento `REACTIVATED` registra que foi por avanço.
+- No dashboard, **desqualificados saem do denominador** das taxas. Mantê-los
+  ali faria a conversão parecer pior do que foi, como se leads impossíveis
+  fossem negócios perdidos. O total e a base aparecem lado a lado para a conta
+  ser conferível.
+
+Por enquanto só existe marcação manual: nenhuma frase-gatilho desqualifica,
+porque "esse não serve" é um julgamento de quem vende, não algo que uma
+mensagem do lead declare.
 
 ## Matching de frase — o que é seguro e o que não é
 

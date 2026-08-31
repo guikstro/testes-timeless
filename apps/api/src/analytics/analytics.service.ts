@@ -37,6 +37,8 @@ export class AnalyticsService {
         select: {
           status: true,
           firstContactAt: true,
+          meetingScheduledAt: true,
+          disqualifiedAt: true,
           sale: { select: { amountCents: true } },
           attribution: {
             select: {

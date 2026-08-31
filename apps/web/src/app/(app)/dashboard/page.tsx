@@ -7,6 +7,7 @@ interface OriginBucket {
   label: string;
   leads: number;
   qualified: number;
+  meetings: number;
   won: number;
   revenueCents: number;
 }
@@ -21,7 +22,10 @@ interface Overview {
   period: { days: number; from: string; to: string };
   totals: {
     leads: number;
+    disqualified: number;
+    workable: number;
     qualified: number;
+    meetings: number;
     won: number;
     revenueCents: number;
     qualificationRate: number | null;
@@ -91,12 +95,31 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Leads" value={String(totals.leads)} hint={`nos últimos ${days} dias`} />
+      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <Stat
+          label="Leads"
+          value={String(totals.leads)}
+          hint={
+            totals.disqualified > 0
+              ? `${totals.disqualified} desqualificado(s)`
+              : `nos últimos ${days} dias`
+          }
+        />
+        {/*
+          A taxa é sobre os aproveitáveis, não sobre o total: um lead descartado
+          nunca foi oportunidade, e mantê-lo no denominador faria a conversão
+          parecer pior do que foi. A base fica escrita no rodapé do número para
+          a conta ser conferível.
+        */}
         <Stat
           label="Qualificados"
           value={String(totals.qualified)}
-          hint={`${formatRate(totals.qualificationRate)} dos leads`}
+          hint={`${formatRate(totals.qualificationRate)} de ${totals.workable} aproveitáveis`}
+        />
+        <Stat
+          label="Reuniões"
+          value={String(totals.meetings)}
+          hint={totals.qualified > 0 ? `${formatRate(totals.meetings / totals.qualified)} dos qualificados` : "—"}
         />
         <Stat label="Vendas" value={String(totals.won)} hint={`${formatRate(totals.closeRate)} dos qualificados`} />
         <Stat label="Receita" value={formatCentsAsBRL(totals.revenueCents)} />
@@ -122,6 +145,7 @@ export default async function DashboardPage({
                   <th className="py-2 pr-4 font-medium">Origem</th>
                   <th className="py-2 pr-4 font-medium">Leads</th>
                   <th className="py-2 pr-4 font-medium">Qualificados</th>
+                  <th className="py-2 pr-4 font-medium">Reuniões</th>
                   <th className="py-2 pr-4 font-medium">Vendas</th>
                   <th className="py-2 font-medium">Receita</th>
                 </tr>
@@ -132,6 +156,7 @@ export default async function DashboardPage({
                     <td className="py-2 pr-4 text-slate-800">{bucket.label}</td>
                     <td className="py-2 pr-4 text-slate-700">{bucket.leads}</td>
                     <td className="py-2 pr-4 text-slate-700">{bucket.qualified}</td>
+                    <td className="py-2 pr-4 text-slate-700">{bucket.meetings}</td>
                     <td className="py-2 pr-4 text-slate-700">{bucket.won}</td>
                     <td className="py-2 text-slate-700">{formatCentsAsBRL(bucket.revenueCents)}</td>
                   </tr>

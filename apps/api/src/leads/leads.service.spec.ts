@@ -228,8 +228,13 @@ describe("LeadsService", () => {
         id: "lead-1",
         organizationId: "org-1",
         status: "NEW",
+        // Obrigatório no schema — todo lead nasce de uma mensagem.
+        firstContactAt: new Date("2026-01-10T10:00:00Z"),
         qualifiedAt: null,
+        meetingScheduledAt: null,
         wonAt: null,
+        disqualifiedAt: null,
+        disqualifiedReason: null,
         sale: null,
         ...overrides,
       };
@@ -360,6 +365,147 @@ describe("LeadsService", () => {
       // ConversionEventsService itself dedupes on (leadId, type) — calling
       // this again for an already-sent Purchase is safe and a no-op there.
       expect(conversionEvents.recordPurchase).toHaveBeenCalledWith("org-1", "lead-1", expect.any(Date), 250000);
+    });
+
+    describe("reunião marcada e desqualificação (Fase 11)", () => {
+      function updateData(prisma: { lead: { update: jest.Mock } }) {
+        return prisma.lead.update.mock.calls[0][0].data;
+      }
+
+      it("registra a data ao marcar reunião", async () => {
+        const { service, prisma } = buildService();
+        prisma.lead.findFirst.mockResolvedValue(existingLead({ status: "QUALIFIED", qualifiedAt: new Date() }));
+
+        await service.update("org-1", "lead-1", "user-1", { status: "MEETING_SCHEDULED" });
+
+        expect(updateData(prisma)).toMatchObject({
+          status: "MEETING_SCHEDULED",
+          meetingScheduledAt: expect.any(Date),
+        });
+      });
+
+      /** Combinar horário pressupõe ter qualificado, mesmo sem mensagem de qualificação. */
+      it("qualifica implicitamente ao marcar reunião de um lead novo", async () => {
+        const { service, prisma } = buildService();
+        prisma.lead.findFirst.mockResolvedValue(existingLead({ status: "NEW" }));
+
+        await service.update("org-1", "lead-1", "user-1", { status: "MEETING_SCHEDULED" });
+
+        expect(updateData(prisma).qualifiedAt).toEqual(expect.any(Date));
+      });
+
+      /**
+       * A assimetria importa: qualificação é pressuposto de uma venda, reunião
+       * não é. Vender sem reunião é comum, e inventar uma falsearia o funil.
+       */
+      it("não inventa uma reunião ao marcar venda", async () => {
+        const { service, prisma } = buildService();
+        prisma.lead.findFirst.mockResolvedValue(existingLead({ status: "QUALIFIED", qualifiedAt: new Date() }));
+        prisma.sale.create.mockResolvedValue({ id: "sale-1", amountCents: null });
+
+        await service.update("org-1", "lead-1", "user-1", { status: "WON" });
+
+        expect(updateData(prisma).meetingScheduledAt).toBeUndefined();
+      });
+
+      it("recusa voltar de venda para reunião", async () => {
+        const { service, prisma } = buildService();
+        prisma.lead.findFirst.mockResolvedValue(existingLead({ status: "WON" }));
+
+        await expect(
+          service.update("org-1", "lead-1", "user-1", { status: "MEETING_SCHEDULED" }),
+        ).rejects.toMatchObject({ response: { code: "INVALID_STATUS_TRANSITION" } });
+      });
+
+      it("desqualifica guardando o motivo, sem espaços em volta", async () => {
+        const { service, prisma } = buildService();
+        prisma.lead.findFirst.mockResolvedValue(existingLead());
+
+        await service.update("org-1", "lead-1", "user-1", {
+          disqualified: true,
+          disqualifiedReason: "  Sem verba  ",
+        });
+
+        expect(updateData(prisma)).toMatchObject({
+          disqualifiedAt: expect.any(Date),
+          disqualifiedReason: "Sem verba",
+        });
+      });
+
+      /** Saída lateral do funil: o lead preserva o estágio a que chegou. */
+      it("não mexe no status ao desqualificar", async () => {
+        const { service, prisma } = buildService();
+        prisma.lead.findFirst.mockResolvedValue(existingLead({ status: "QUALIFIED", qualifiedAt: new Date() }));
+
+        await service.update("org-1", "lead-1", "user-1", { disqualified: true });
+
+        expect(updateData(prisma).status).toBeUndefined();
+      });
+
+      it("recusa desqualificar quem já comprou", async () => {
+        const { service, prisma } = buildService();
+        prisma.lead.findFirst.mockResolvedValue(existingLead({ status: "WON" }));
+
+        await expect(
+          service.update("org-1", "lead-1", "user-1", { disqualified: true }),
+        ).rejects.toMatchObject({ response: { code: "CANNOT_DISQUALIFY_WON" } });
+      });
+
+      it("recusa desqualificar e vender na mesma chamada", async () => {
+        const { service, prisma } = buildService();
+        prisma.lead.findFirst.mockResolvedValue(existingLead({ status: "QUALIFIED", qualifiedAt: new Date() }));
+
+        await expect(
+          service.update("org-1", "lead-1", "user-1", { status: "WON", disqualified: true }),
+        ).rejects.toMatchObject({ response: { code: "CANNOT_DISQUALIFY_WON" } });
+      });
+
+      it("reativa limpando data e motivo", async () => {
+        const { service, prisma } = buildService();
+        prisma.lead.findFirst.mockResolvedValue(
+          existingLead({ disqualifiedAt: new Date(), disqualifiedReason: "Sem verba" }),
+        );
+
+        await service.update("org-1", "lead-1", "user-1", { disqualified: false });
+
+        expect(updateData(prisma)).toMatchObject({ disqualifiedAt: null, disqualifiedReason: null });
+      });
+
+      /** Se a pessoa voltou e avançou, exigir dois passos seria atrito sem ganho. */
+      it("reativa sozinho quando o lead volta a avançar", async () => {
+        const { service, prisma } = buildService();
+        prisma.lead.findFirst.mockResolvedValue(
+          existingLead({ status: "NEW", disqualifiedAt: new Date(), disqualifiedReason: "Sem verba" }),
+        );
+
+        await service.update("org-1", "lead-1", "user-1", { status: "QUALIFIED" });
+
+        expect(updateData(prisma)).toMatchObject({ status: "QUALIFIED", disqualifiedAt: null });
+      });
+
+      it("registra a desqualificação na auditoria e na timeline", async () => {
+        const { service, prisma } = buildService();
+        prisma.lead.findFirst.mockResolvedValue(existingLead());
+
+        await service.update("org-1", "lead-1", "user-1", { disqualified: true, disqualifiedReason: "Engano" });
+
+        expect(prisma.leadEvent.create).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ type: "DISQUALIFIED" }) }),
+        );
+        expect(prisma.auditLog.create).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ action: "LEAD_DISQUALIFIED" }) }),
+        );
+      });
+
+      it("não redesqualifica um lead já desqualificado", async () => {
+        const { service, prisma } = buildService();
+        prisma.lead.findFirst.mockResolvedValue(existingLead({ disqualifiedAt: new Date("2026-01-01") }));
+
+        await service.update("org-1", "lead-1", "user-1", { disqualified: true });
+
+        // Sem nada novo para gravar, a data original é preservada.
+        expect(prisma.lead.update).not.toHaveBeenCalled();
+      });
     });
   });
 });

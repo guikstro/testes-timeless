@@ -288,6 +288,8 @@ model WhatsAppConnection {
 enum LeadStatus {
   NEW
   QUALIFIED
+  /** Entre qualificar e vender: existe horário combinado com o lead (Fase 11). */
+  MEETING_SCHEDULED
   WON
 }
 
@@ -301,7 +303,19 @@ model Lead {
   firstContactAt  DateTime   @map("first_contact_at")
   lastContactAt   DateTime   @map("last_contact_at")
   qualifiedAt     DateTime?  @map("qualified_at")
+  meetingScheduledAt DateTime? @map("meeting_scheduled_at")
   wonAt           DateTime?  @map("won_at")
+
+  /**
+   * Desqualificação é uma saída lateral do funil, não mais um degrau nele —
+   * por isso um campo próprio, e não um valor de `status` (Fase 11).
+   *
+   * Assim o lead preserva o estágio até onde chegou antes de ser descartado
+   * ("estava qualificado quando desistiu" é diferente de "nunca engajou"), e
+   * a desqualificação pode ser desfeita se a pessoa voltar.
+   */
+  disqualifiedAt     DateTime? @map("disqualified_at")
+  disqualifiedReason String?   @map("disqualified_reason")
   createdAt       DateTime   @default(now()) @map("created_at")
   updatedAt       DateTime   @updatedAt @map("updated_at")
 
@@ -385,8 +399,12 @@ enum LeadEventType {
   CONVERSATION_STARTED
   MESSAGE_RECEIVED
   QUALIFIED
+  MEETING_SCHEDULED
   SALE_DETECTED
   REVENUE_DETECTED
+  DISQUALIFIED
+  /** Um lead desqualificado voltou a andar no funil (Fase 11). */
+  REACTIVATED
 }
 
 model LeadEvent {
@@ -477,6 +495,8 @@ enum AuditAction {
   SALE_DELETED
   ATTRIBUTION_CHANGED
   LEAD_STATUS_CHANGED
+  LEAD_DISQUALIFIED
+  LEAD_REACTIVATED
   CONNECTION_CHANGED
   /** Um operador da plataforma entrou na organização (Fase 9). Registrado sempre, sem exceção. */
   IMPERSONATION_STARTED

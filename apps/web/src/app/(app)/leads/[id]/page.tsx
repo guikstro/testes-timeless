@@ -10,7 +10,7 @@ import {
 } from "@/lib/attribution";
 import { formatCentsAsBRL } from "@/lib/currency";
 import { formatDuration, responseSpeedTone, SPEED_TONE_CLASSES } from "@/lib/duration";
-import { ManualEditForm } from "./manual-edit-form";
+import { DisqualifyForm, ManualEditForm } from "./manual-edit-form";
 import { ReplyBox } from "./reply-box";
 
 interface WhatsAppConnectionSummary {
@@ -96,9 +96,12 @@ interface LeadDetail {
   id: string;
   name: string | null;
   normalizedPhone: string;
-  status: "NEW" | "QUALIFIED" | "WON";
+  status: "NEW" | "QUALIFIED" | "MEETING_SCHEDULED" | "WON";
   qualifiedAt: string | null;
+  meetingScheduledAt: string | null;
   wonAt: string | null;
+  disqualifiedAt: string | null;
+  disqualifiedReason: string | null;
   firstContactAt: string;
   lastContactAt: string;
   events: LeadEvent[];
@@ -115,6 +118,9 @@ const EVENT_LABELS: Record<string, string> = {
   CONVERSATION_STARTED: "Conversa iniciada",
   MESSAGE_RECEIVED: "Mensagem recebida",
   QUALIFIED: "Lead qualificado",
+  MEETING_SCHEDULED: "Reunião marcada",
+  DISQUALIFIED: "Lead desqualificado",
+  REACTIVATED: "Lead reativado",
   SALE_DETECTED: "Venda detectada",
   REVENUE_DETECTED: "Receita registrada",
 };
@@ -122,12 +128,14 @@ const EVENT_LABELS: Record<string, string> = {
 const STATUS_LABELS: Record<LeadDetail["status"], string> = {
   NEW: "Novo",
   QUALIFIED: "Qualificado",
+  MEETING_SCHEDULED: "Reunião marcada",
   WON: "Venda",
 };
 
 const STATUS_CLASSES: Record<LeadDetail["status"], string> = {
   NEW: "bg-slate-100 text-slate-700",
   QUALIFIED: "bg-blue-50 text-blue-700",
+  MEETING_SCHEDULED: "bg-violet-50 text-violet-700",
   WON: "bg-emerald-50 text-emerald-700",
 };
 
@@ -229,6 +237,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           O dado mais acionável da tela: se a última mensagem é do lead, alguém
           precisa responder agora. Fica ao lado do nome, não escondido num card.
         */}
+        {lead.disqualifiedAt ? (
+          <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-medium text-slate-700">
+            Desqualificado
+          </span>
+        ) : null}
         {metrics.awaitingReply ? (
           <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
             Aguardando resposta desde {formatDateTime(metrics.lastMessageAt)}
@@ -298,6 +311,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       <Card title="Status e venda">
         <dl className="mb-4 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
           <Field label="Qualificado em" value={formatDateTime(lead.qualifiedAt)} />
+          <Field label="Reunião marcada em" value={formatDateTime(lead.meetingScheduledAt)} />
           <Field label="Venda em" value={formatDateTime(lead.wonAt)} />
           <Field label="Receita" value={formatCentsAsBRL(lead.sale?.amountCents)} />
           <Field
@@ -310,6 +324,19 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           Correção manual — use apenas quando o tracking automático não capturou o estágio/valor corretamente.
         </p>
         <ManualEditForm leadId={lead.id} status={lead.status} />
+
+        <div className="mt-5 border-t border-slate-100 pt-5">
+          <p className="mb-3 text-xs text-slate-400">
+            Desqualificar retira o lead das taxas de conversão sem apagar o histórico — para quem
+            nunca foi oportunidade. O estágio a que ele chegou é preservado.
+          </p>
+          <DisqualifyForm
+            leadId={lead.id}
+            disqualifiedAt={lead.disqualifiedAt}
+            disqualifiedReason={lead.disqualifiedReason}
+            isWon={lead.status === "WON"}
+          />
+        </div>
       </Card>
 
       {/*

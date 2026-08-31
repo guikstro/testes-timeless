@@ -13,7 +13,17 @@ import { SendMessageDto } from "./dto/send-message.dto";
 import { computeLeadMetrics } from "./lead-metrics";
 import { AdIds, AdReferences, extractAdIds } from "./ad-references";
 
-const STATUS_ORDER: Record<LeadStatus, number> = { NEW: 0, QUALIFIED: 1, WON: 2 };
+/**
+ * A ordem do funil vive aqui, não na ordem do enum no Postgres: `ADD VALUE`
+ * acrescenta ao fim do tipo, então MEETING_SCHEDULED aparece depois de WON lá.
+ * Nada consulta ordenando por status no banco — quem decide avanço é este mapa.
+ */
+const STATUS_ORDER: Record<LeadStatus, number> = {
+  NEW: 0,
+  QUALIFIED: 1,
+  MEETING_SCHEDULED: 2,
+  WON: 3,
+};
 
 @Injectable()
 export class LeadsService {
@@ -143,6 +153,15 @@ export class LeadsService {
     if (dto.status) {
       this.assertForwardTransition(lead.status, dto.status);
     }
+    // Uma venda registrada contradiz "não era oportunidade". Bloquear aqui
+    // evita um lead que aparece como vendido e descartado ao mesmo tempo.
+    if (dto.disqualified === true && (lead.status === "WON" || dto.status === "WON")) {
+      throw new AppException(
+        "CANNOT_DISQUALIFY_WON",
+        "Não é possível desqualificar um lead que já comprou.",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
     if (dto.revenueCents !== undefined && dto.status !== "WON" && lead.status !== "WON") {
       throw new AppException(
         "NO_SALE",
@@ -156,11 +175,24 @@ export class LeadsService {
     const data: Prisma.LeadUpdateInput = {};
     let becameQualified = false;
     let becameWon = false;
+    let scheduledMeeting = false;
 
     if (dto.status === "QUALIFIED" && lead.status === "NEW") {
       data.status = "QUALIFIED";
       data.qualifiedAt = lead.qualifiedAt ?? now;
       becameQualified = true;
+    }
+
+    if (dto.status === "MEETING_SCHEDULED" && STATUS_ORDER[lead.status] < STATUS_ORDER.MEETING_SCHEDULED) {
+      data.status = "MEETING_SCHEDULED";
+      data.meetingScheduledAt = now;
+      scheduledMeeting = true;
+      // Combinar horário com alguém pressupõe tê-lo qualificado, mesmo que
+      // nenhuma mensagem de qualificação tenha sido registrada antes.
+      if (!lead.qualifiedAt) {
+        data.qualifiedAt = now;
+        becameQualified = true;
+      }
     }
 
     if (dto.status === "WON" && lead.status !== "WON") {
@@ -170,11 +202,88 @@ export class LeadsService {
         data.qualifiedAt = now;
         becameQualified = true;
       }
+      // `meetingScheduledAt` de propósito não é preenchido aqui: qualificação
+      // é pressuposto de uma venda, reunião não é. Vender sem reunião é comum,
+      // e inventar uma falsearia o funil de reuniões.
       becameWon = true;
+    }
+
+    // Avançar no funil desfaz a desqualificação: se a pessoa voltou e comprou,
+    // exigir dois passos ("reative, depois marque") seria atrito sem ganho —
+    // a intenção de quem clicou já é inequívoca.
+    const reactivatedByProgress = Boolean(data.status) && Boolean(lead.disqualifiedAt);
+    if (reactivatedByProgress) {
+      data.disqualifiedAt = null;
+      data.disqualifiedReason = null;
+    }
+
+    if (dto.disqualified === true && !lead.disqualifiedAt) {
+      data.disqualifiedAt = now;
+      data.disqualifiedReason = dto.disqualifiedReason?.trim() || null;
+    }
+    if (dto.disqualified === false && lead.disqualifiedAt) {
+      data.disqualifiedAt = null;
+      data.disqualifiedReason = null;
     }
 
     if (Object.keys(data).length > 0) {
       await this.prisma.lead.update({ where: { id }, data });
+    }
+
+    if (scheduledMeeting) {
+      await this.prisma.leadEvent.create({
+        data: {
+          organizationId,
+          leadId: id,
+          type: "MEETING_SCHEDULED",
+          occurredAt: now,
+          metadata: { classifierType: "MANUAL", userId },
+        },
+      });
+    }
+
+    if (data.disqualifiedAt instanceof Date) {
+      await this.prisma.leadEvent.create({
+        data: {
+          organizationId,
+          leadId: id,
+          type: "DISQUALIFIED",
+          occurredAt: now,
+          metadata: { userId, reason: data.disqualifiedReason ?? null },
+        },
+      });
+      await this.prisma.auditLog.create({
+        data: {
+          organizationId,
+          userId,
+          entity: "Lead",
+          entityId: id,
+          action: "LEAD_DISQUALIFIED",
+          after: { reason: data.disqualifiedReason ?? null },
+        },
+      });
+    }
+
+    if (data.disqualifiedAt === null && lead.disqualifiedAt) {
+      await this.prisma.leadEvent.create({
+        data: {
+          organizationId,
+          leadId: id,
+          type: "REACTIVATED",
+          occurredAt: now,
+          metadata: { userId, byProgress: reactivatedByProgress },
+        },
+      });
+      await this.prisma.auditLog.create({
+        data: {
+          organizationId,
+          userId,
+          entity: "Lead",
+          entityId: id,
+          action: "LEAD_REACTIVATED",
+          before: { reason: lead.disqualifiedReason },
+        },
+      });
     }
 
     if (becameQualified) {
@@ -342,7 +451,7 @@ export class LeadsService {
     return message;
   }
 
-  private assertForwardTransition(current: LeadStatus, target: "QUALIFIED" | "WON"): void {
+  private assertForwardTransition(current: LeadStatus, target: LeadStatus): void {
     if (STATUS_ORDER[target] <= STATUS_ORDER[current]) {
       throw new AppException(
         "INVALID_STATUS_TRANSITION",

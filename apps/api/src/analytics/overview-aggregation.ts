@@ -12,6 +12,9 @@ import { AttributionMethod, LeadStatus } from "@prisma/client";
 export interface AggregationLead {
   status: LeadStatus;
   firstContactAt: Date;
+  /** Fonte da verdade para "teve reunião": o status avança para WON depois, mas a data fica. */
+  meetingScheduledAt: Date | null;
+  disqualifiedAt: Date | null;
   attribution: {
     method: AttributionMethod;
     trackingClick: { utmSource: string | null; trackingLink: { name: string } | null } | null;
@@ -24,7 +27,9 @@ export interface OriginBucket {
   label: string;
   leads: number;
   qualified: number;
+  meetings: number;
   won: number;
+  disqualified: number;
   revenueCents: number;
 }
 
@@ -36,10 +41,15 @@ export interface DailyPoint {
 
 export interface OverviewTotals {
   leads: number;
+  /** Descartados como não-oportunidade. Saem do denominador das taxas. */
+  disqualified: number;
+  /** Leads menos descartados: a base sobre a qual as taxas fazem sentido. */
+  workable: number;
   qualified: number;
+  meetings: number;
   won: number;
   revenueCents: number;
-  /** Null sem leads no período: 0% diria que ninguém converteu, o que é diferente de "não houve ninguém". */
+  /** Null sem base para calcular: 0% diria que ninguém converteu, o que é diferente de "não houve ninguém". */
   qualificationRate: number | null;
   /** Sobre os qualificados, não sobre o total — é essa a pergunta de quem vende. */
   closeRate: number | null;
@@ -71,16 +81,26 @@ export function classifyOrigin(lead: AggregationLead): { key: string; label: str
 }
 
 export function aggregateTotals(leads: AggregationLead[]): OverviewTotals {
+  const disqualified = leads.filter((lead) => lead.disqualifiedAt !== null).length;
   const qualified = leads.filter((lead) => lead.status !== "NEW").length;
+  const meetings = leads.filter((lead) => lead.meetingScheduledAt !== null).length;
   const won = leads.filter((lead) => lead.status === "WON").length;
   const revenueCents = leads.reduce((sum, lead) => sum + (lead.sale?.amountCents ?? 0), 0);
 
+  // Leads descartados saem do denominador: eles nunca foram oportunidade, e
+  // mantê-los ali faria a taxa de qualificação cair como se fossem negócios
+  // perdidos. O total continua exposto ao lado para a conta ser conferível.
+  const workable = leads.length - disqualified;
+
   return {
     leads: leads.length,
+    disqualified,
+    workable,
     qualified,
+    meetings,
     won,
     revenueCents,
-    qualificationRate: leads.length > 0 ? qualified / leads.length : null,
+    qualificationRate: workable > 0 ? qualified / workable : null,
     closeRate: qualified > 0 ? won / qualified : null,
   };
 }
@@ -90,13 +110,24 @@ export function aggregateByOrigin(leads: AggregationLead[]): OriginBucket[] {
 
   for (const lead of leads) {
     const { key, label } = classifyOrigin(lead);
-    const bucket = buckets.get(key) ?? { key, label, leads: 0, qualified: 0, won: 0, revenueCents: 0 };
+    const bucket = buckets.get(key) ?? {
+      key,
+      label,
+      leads: 0,
+      qualified: 0,
+      meetings: 0,
+      won: 0,
+      disqualified: 0,
+      revenueCents: 0,
+    };
 
     bucket.leads += 1;
-    // QUALIFIED e WON contam como qualificados: quem comprou passou por lá,
-    // mesmo que o status tenha pulado direto para WON numa correção manual.
+    // Qualquer estágio além de NEW conta como qualificado: quem comprou ou
+    // marcou reunião passou por lá, mesmo que o status tenha pulado direto.
     if (lead.status !== "NEW") bucket.qualified += 1;
+    if (lead.meetingScheduledAt !== null) bucket.meetings += 1;
     if (lead.status === "WON") bucket.won += 1;
+    if (lead.disqualifiedAt !== null) bucket.disqualified += 1;
     bucket.revenueCents += lead.sale?.amountCents ?? 0;
 
     buckets.set(key, bucket);

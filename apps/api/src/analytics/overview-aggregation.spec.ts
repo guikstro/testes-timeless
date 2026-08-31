@@ -11,6 +11,8 @@ describe("agregação do dashboard", () => {
     return {
       status: "NEW",
       firstContactAt: new Date("2026-01-10T12:00:00"),
+      meetingScheduledAt: null,
+      disqualifiedAt: null,
       attribution: null,
       sale: null,
       ...overrides,
@@ -103,6 +105,45 @@ describe("agregação do dashboard", () => {
 
       expect(totals.won).toBe(1);
       expect(totals.revenueCents).toBe(0);
+    });
+
+    /**
+     * O ponto de existir a desqualificação: um lead descartado nunca foi
+     * oportunidade, e mantê-lo no denominador faria a taxa cair como se fosse
+     * negócio perdido.
+     */
+    it("tira os desqualificados do denominador da taxa de qualificação", () => {
+      const totals = aggregateTotals([
+        lead({ status: "QUALIFIED" }),
+        lead({ status: "NEW" }),
+        lead({ status: "NEW", disqualifiedAt: new Date() }),
+        lead({ status: "NEW", disqualifiedAt: new Date() }),
+      ]);
+
+      // 1 qualificado sobre 2 aproveitáveis — não sobre os 4 leads.
+      expect(totals.leads).toBe(4);
+      expect(totals.disqualified).toBe(2);
+      expect(totals.workable).toBe(2);
+      expect(totals.qualificationRate).toBeCloseTo(0.5);
+    });
+
+    it("devolve null quando todos os leads foram desqualificados", () => {
+      const totals = aggregateTotals([lead({ disqualifiedAt: new Date() })]);
+
+      expect(totals.workable).toBe(0);
+      expect(totals.qualificationRate).toBeNull();
+    });
+
+    /** A data da reunião persiste depois da venda — é ela que conta, não o status. */
+    it("conta reuniões pela data, não pelo status atual", () => {
+      const totals = aggregateTotals([
+        lead({ status: "WON", meetingScheduledAt: new Date() }),
+        lead({ status: "MEETING_SCHEDULED", meetingScheduledAt: new Date() }),
+        lead({ status: "WON" }),
+      ]);
+
+      expect(totals.meetings).toBe(2);
+      expect(totals.won).toBe(2);
     });
   });
 

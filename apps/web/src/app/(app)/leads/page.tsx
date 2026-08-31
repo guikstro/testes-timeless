@@ -7,7 +7,8 @@ interface LeadListItem {
   id: string;
   name: string | null;
   normalizedPhone: string;
-  status: "NEW" | "QUALIFIED" | "WON";
+  status: "NEW" | "QUALIFIED" | "MEETING_SCHEDULED" | "WON";
+  disqualifiedAt: string | null;
   firstContactAt: string;
   lastContactAt: string;
   attribution: AttributionSummary | null;
@@ -22,6 +23,7 @@ interface PaginatedResult<T> {
 const STATUS_LABELS: Record<LeadListItem["status"], string> = {
   NEW: "Novo",
   QUALIFIED: "Qualificado",
+  MEETING_SCHEDULED: "Reunião marcada",
   WON: "Venda",
 };
 
@@ -62,7 +64,16 @@ export default async function LeadsPage() {
                   <td className="px-4 py-3 text-slate-600">{lead.normalizedPhone}</td>
                   <td className="px-4 py-3 text-slate-600">{attributionSourceLabel(lead.attribution)}</td>
                   <td className="px-4 py-3 text-slate-600">{attributionCampaignLabel(lead.attribution)}</td>
-                  <td className="px-4 py-3 text-slate-600">{STATUS_LABELS[lead.status]}</td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {STATUS_LABELS[lead.status]}
+                    {/* Desqualificado não substitui o estágio: mostra os dois, porque
+                        "estava qualificado quando desistiu" diz mais que só "descartado". */}
+                    {lead.disqualifiedAt ? (
+                      <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">
+                        desqualificado
+                      </span>
+                    ) : null}
+                  </td>
                   <td className="px-4 py-3 text-slate-600">{formatCentsAsBRL(lead.sale?.amountCents)}</td>
                   <td className="px-4 py-3 text-slate-500">
                     {new Date(lead.firstContactAt).toLocaleString("pt-BR")}
