@@ -14,6 +14,7 @@ import { ClassificationModule } from "./classification/classification.module";
 import { MetaConnectionsModule } from "./integrations/meta/meta-connections.module";
 import { CampaignsModule } from "./campaigns/campaigns.module";
 import { AdminModule } from "./admin/admin.module";
+import { AnalyticsModule } from "./analytics/analytics.module";
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { AdminModule } from "./admin/admin.module";
     MetaConnectionsModule,
     CampaignsModule,
     AdminModule,
+    AnalyticsModule,
   ],
 })
 export class AppModule {}
