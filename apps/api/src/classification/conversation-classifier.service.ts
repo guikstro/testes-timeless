@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Lead } from "@prisma/client";
+import { Lead, LeadStatus, MessageDirection } from "@prisma/client";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { matchesTriggerPhrase } from "../common/utils/matches-trigger-phrase";
 import { extractRevenueCents } from "../common/utils/extract-revenue-cents";
@@ -12,7 +12,16 @@ export interface ClassifyInput {
   messageId: string;
   messageText: string | undefined;
   occurredAt: Date;
+  direction: MessageDirection;
 }
+
+/** Mesma ordem do funil usada pelo LeadsService — só avança. */
+const STATUS_ORDER: Record<LeadStatus, number> = {
+  NEW: 0,
+  QUALIFIED: 1,
+  MEETING_SCHEDULED: 2,
+  WON: 3,
+};
 
 /**
  * Deterministic, rule-based only (Section 62) — no probabilistic/AI
@@ -37,22 +46,95 @@ export class ConversationClassifierService {
       where: { organizationId: input.organizationId },
     });
 
-    const wonRule = rules.find(
-      (rule) => rule.targetStatus === "WON" && matchesTriggerPhrase(input.messageText!, rule.phrase),
-    );
-    if (wonRule) {
-      await this.markWon(input, wonRule.id, wonRule.phrase);
-      return;
+    const text = input.messageText;
+    const match = (target: "QUALIFIED" | "MEETING_SCHEDULED" | "WON") =>
+      rules.find((rule) => rule.targetStatus === target && matchesTriggerPhrase(text, rule.phrase));
+
+    // Uma mensagem NOSSA nunca prova qualificação nem venda. Um atendente
+    // escrevendo "fechado, te espero" criaria uma venda que não aconteceu, e
+    // "vamos marcar sua consulta" qualificaria quem só recebeu uma abordagem.
+    // Reunião é a exceção porque quem agenda é justamente o atendente.
+    const isOutbound = input.direction === "OUTBOUND";
+
+    if (!isOutbound) {
+      const wonRule = match("WON");
+      if (wonRule) {
+        await this.markWon(input, wonRule.id, wonRule.phrase);
+        return;
+      }
     }
 
-    if (input.lead.status === "NEW") {
-      const qualifiedRule = rules.find(
-        (rule) => rule.targetStatus === "QUALIFIED" && matchesTriggerPhrase(input.messageText!, rule.phrase),
-      );
+    // Antes de qualificação, como WON vem antes das duas: entre dois gatilhos
+    // na mesma mensagem, vence o estágio mais avançado.
+    if (STATUS_ORDER[input.lead.status] < STATUS_ORDER.MEETING_SCHEDULED) {
+      const meetingRule = match("MEETING_SCHEDULED");
+      if (meetingRule) {
+        await this.markMeetingScheduled(input, meetingRule.id, meetingRule.phrase);
+        return;
+      }
+    }
+
+    if (!isOutbound && input.lead.status === "NEW") {
+      const qualifiedRule = match("QUALIFIED");
       if (qualifiedRule) {
         await this.markQualified(input, qualifiedRule.id, qualifiedRule.phrase);
       }
     }
+  }
+
+  /**
+   * Espelha a marcação manual do LeadsService: qualifica implicitamente
+   * (combinar horário pressupõe ter qualificado) e desfaz a desqualificação,
+   * para automático e manual não divergirem no mesmo funil.
+   */
+  private async markMeetingScheduled(input: ClassifyInput, ruleId: string, phrase: string): Promise<void> {
+    const needsQualification = !input.lead.qualifiedAt;
+    const wasDisqualified = Boolean(input.lead.disqualifiedAt);
+
+    await this.prisma.lead.update({
+      where: { id: input.lead.id },
+      data: {
+        status: "MEETING_SCHEDULED",
+        meetingScheduledAt: input.occurredAt,
+        ...(needsQualification ? { qualifiedAt: input.occurredAt } : {}),
+        ...(wasDisqualified ? { disqualifiedAt: null, disqualifiedReason: null } : {}),
+      },
+    });
+
+    if (needsQualification) {
+      await this.prisma.leadEvent.create({
+        data: {
+          organizationId: input.organizationId,
+          leadId: input.lead.id,
+          type: "QUALIFIED",
+          occurredAt: input.occurredAt,
+          metadata: { classifierType: "RULE", implicitFromMeeting: true },
+        },
+      });
+      await this.conversionEvents.recordQualifiedLead(input.organizationId, input.lead.id, input.occurredAt);
+    }
+
+    if (wasDisqualified) {
+      await this.prisma.leadEvent.create({
+        data: {
+          organizationId: input.organizationId,
+          leadId: input.lead.id,
+          type: "REACTIVATED",
+          occurredAt: input.occurredAt,
+          metadata: { classifierType: "RULE", byProgress: true },
+        },
+      });
+    }
+
+    await this.prisma.leadEvent.create({
+      data: {
+        organizationId: input.organizationId,
+        leadId: input.lead.id,
+        type: "MEETING_SCHEDULED",
+        occurredAt: input.occurredAt,
+        metadata: { classifierType: "RULE", ruleId, phrase, messageId: input.messageId, direction: input.direction },
+      },
+    });
   }
 
   private async markQualified(input: ClassifyInput, ruleId: string, phrase: string): Promise<void> {

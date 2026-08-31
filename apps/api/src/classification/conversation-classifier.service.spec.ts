@@ -18,7 +18,10 @@ function buildLead(overrides: Partial<Lead> = {}): Lead {
     firstContactAt: new Date(0),
     lastContactAt: new Date(0),
     qualifiedAt: null,
+    meetingScheduledAt: null,
     wonAt: null,
+    disqualifiedAt: null,
+    disqualifiedReason: null,
     createdAt: new Date(0),
     updatedAt: new Date(0),
     ...overrides,
@@ -47,7 +50,7 @@ describe("ConversationClassifierService", () => {
 
   it("does nothing when the message has no text (e.g. media message)", async () => {
     const { service, prisma } = buildService();
-    await service.classify({ organizationId: "org-1", lead: buildLead(), messageId: "msg-1", messageText: undefined, occurredAt: new Date() });
+    await service.classify({ organizationId: "org-1", lead: buildLead(), messageId: "msg-1", messageText: undefined, occurredAt: new Date(), direction: "INBOUND" });
     expect(prisma.classificationRule.findMany).not.toHaveBeenCalled();
   });
 
@@ -58,6 +61,7 @@ describe("ConversationClassifierService", () => {
       lead: buildLead({ status: "WON" }),
       messageId: "msg-1",
       messageText: "contrato fechado",
+      direction: "INBOUND",
       occurredAt: new Date(),
     });
     expect(prisma.classificationRule.findMany).not.toHaveBeenCalled();
@@ -74,6 +78,7 @@ describe("ConversationClassifierService", () => {
       lead: buildLead(),
       messageId: "msg-1",
       messageText: "beleza, vamos marcar sua consulta amanhã",
+      direction: "INBOUND",
       occurredAt: new Date("2026-01-01T00:00:00Z"),
     });
 
@@ -98,6 +103,7 @@ describe("ConversationClassifierService", () => {
       lead: buildLead({ status: "QUALIFIED" }),
       messageId: "msg-1",
       messageText: "vamos marcar sua consulta de novo?",
+      direction: "INBOUND",
       occurredAt: new Date(),
     });
 
@@ -115,6 +121,7 @@ describe("ConversationClassifierService", () => {
       lead: buildLead({ status: "QUALIFIED", qualifiedAt: new Date(0) }),
       messageId: "msg-2",
       messageText: "contrato fechado! Fechamos por 2 mil",
+      direction: "INBOUND",
       occurredAt: new Date("2026-01-02T00:00:00Z"),
     });
 
@@ -150,6 +157,7 @@ describe("ConversationClassifierService", () => {
       lead: buildLead({ status: "QUALIFIED" }),
       messageId: "msg-2",
       messageText: "contrato fechado, muito obrigado!",
+      direction: "INBOUND",
       occurredAt: new Date(),
     });
 
@@ -173,6 +181,7 @@ describe("ConversationClassifierService", () => {
       lead: buildLead({ status: "NEW" }),
       messageId: "msg-2",
       messageText: "contrato fechado!",
+      direction: "INBOUND",
       occurredAt: new Date("2026-01-03T00:00:00Z"),
     });
 
@@ -199,6 +208,7 @@ describe("ConversationClassifierService", () => {
       lead: buildLead(),
       messageId: "msg-1",
       messageText: "vamos marcar? ah não precisa, contrato fechado já",
+      direction: "INBOUND",
       occurredAt: new Date(),
     });
 
@@ -218,6 +228,7 @@ describe("ConversationClassifierService", () => {
         lead: buildLead({ status: "QUALIFIED" }),
         messageId: "msg-2",
         messageText: "fechado!",
+        direction: "INBOUND",
         occurredAt: new Date(),
       }),
     ).resolves.not.toThrow();
@@ -225,5 +236,157 @@ describe("ConversationClassifierService", () => {
     const eventTypes = prisma.leadEvent.create.mock.calls.map((c) => c[0].data.type);
     expect(eventTypes).not.toContain("SALE_DETECTED");
     expect(conversionEvents.recordPurchase).not.toHaveBeenCalled();
+  });
+
+  describe("reunião marcada (Fase 11)", () => {
+    const meetingRule = { id: "rule-m", targetStatus: "MEETING_SCHEDULED", phrase: "agendei para" };
+
+    function classify(service: ConversationClassifierService, direction: "INBOUND" | "OUTBOUND", lead = buildLead()) {
+      return service.classify({
+        organizationId: "org-1",
+        lead,
+        messageId: "msg-1",
+        messageText: "agendei para terça às 15h",
+        occurredAt: new Date("2026-01-05T12:00:00Z"),
+        direction,
+      });
+    }
+
+    it("marca reunião a partir de uma mensagem do lead", async () => {
+      const { service, prisma } = buildService();
+      prisma.classificationRule.findMany.mockResolvedValue([meetingRule]);
+
+      await classify(service, "INBOUND");
+
+      expect(prisma.lead.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: "MEETING_SCHEDULED", meetingScheduledAt: expect.any(Date) }),
+        }),
+      );
+    });
+
+    /** O caso que motivou a mudança: quem agenda é o atendente, não o lead. */
+    it("marca reunião a partir de uma mensagem da equipe", async () => {
+      const { service, prisma } = buildService();
+      prisma.classificationRule.findMany.mockResolvedValue([meetingRule]);
+
+      await classify(service, "OUTBOUND");
+
+      expect(prisma.lead.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: "MEETING_SCHEDULED" }) }),
+      );
+    });
+
+    /**
+     * A trava que torna seguro ler as mensagens da própria equipe: um atendente
+     * escrevendo "contrato fechado" criaria uma venda que não aconteceu.
+     */
+    it("nunca registra venda a partir de uma mensagem da equipe", async () => {
+      const { service, prisma } = buildService();
+      prisma.classificationRule.findMany.mockResolvedValue([
+        { id: "rule-w", targetStatus: "WON", phrase: "contrato fechado" },
+      ]);
+
+      await service.classify({
+        organizationId: "org-1",
+        lead: buildLead(),
+        messageId: "msg-1",
+        messageText: "assim que sair o contrato fechado eu te aviso",
+        occurredAt: new Date(),
+        direction: "OUTBOUND",
+      });
+
+      expect(prisma.sale.create).not.toHaveBeenCalled();
+      expect(prisma.lead.update).not.toHaveBeenCalled();
+    });
+
+    it("nunca qualifica a partir de uma mensagem da equipe", async () => {
+      const { service, prisma } = buildService();
+      prisma.classificationRule.findMany.mockResolvedValue([
+        { id: "rule-q", targetStatus: "QUALIFIED", phrase: "quero contratar" },
+      ]);
+
+      await service.classify({
+        organizationId: "org-1",
+        lead: buildLead(),
+        messageId: "msg-1",
+        messageText: "se você quero contratar é só avisar",
+        occurredAt: new Date(),
+        direction: "OUTBOUND",
+      });
+
+      expect(prisma.lead.update).not.toHaveBeenCalled();
+    });
+
+    it("qualifica implicitamente ao marcar reunião de um lead novo", async () => {
+      const { service, prisma, conversionEvents } = buildService();
+      prisma.classificationRule.findMany.mockResolvedValue([meetingRule]);
+
+      await classify(service, "INBOUND");
+
+      expect(prisma.lead.update.mock.calls[0][0].data.qualifiedAt).toEqual(expect.any(Date));
+      expect(conversionEvents.recordQualifiedLead).toHaveBeenCalled();
+    });
+
+    it("não requalifica um lead que já estava qualificado", async () => {
+      const { service, prisma, conversionEvents } = buildService();
+      prisma.classificationRule.findMany.mockResolvedValue([meetingRule]);
+
+      await classify(service, "INBOUND", buildLead({ status: "QUALIFIED", qualifiedAt: new Date(0) }));
+
+      expect(prisma.lead.update.mock.calls[0][0].data.qualifiedAt).toBeUndefined();
+      expect(conversionEvents.recordQualifiedLead).not.toHaveBeenCalled();
+    });
+
+    /** Só avança: quem já tem reunião não a remarca por outra frase igual. */
+    it("ignora o gatilho quando o lead já está em reunião marcada", async () => {
+      const { service, prisma } = buildService();
+      prisma.classificationRule.findMany.mockResolvedValue([meetingRule]);
+
+      await classify(service, "INBOUND", buildLead({ status: "MEETING_SCHEDULED" }));
+
+      expect(prisma.lead.update).not.toHaveBeenCalled();
+    });
+
+    /** Entre dois gatilhos na mesma mensagem, vence o estágio mais avançado. */
+    it("dá prioridade à venda sobre a reunião numa mensagem do lead", async () => {
+      const { service, prisma } = buildService();
+      prisma.classificationRule.findMany.mockResolvedValue([
+        meetingRule,
+        { id: "rule-w", targetStatus: "WON", phrase: "agendei para" },
+      ]);
+
+      await classify(service, "INBOUND");
+
+      expect(prisma.sale.create).toHaveBeenCalled();
+      expect(prisma.lead.update.mock.calls[0][0].data.status).toBe("WON");
+    });
+
+    /** Automático e manual não podem divergir no mesmo funil. */
+    it("reativa um lead desqualificado ao marcar reunião", async () => {
+      const { service, prisma } = buildService();
+      prisma.classificationRule.findMany.mockResolvedValue([meetingRule]);
+
+      await classify(service, "INBOUND", buildLead({ disqualifiedAt: new Date(0), disqualifiedReason: "Sem verba" }));
+
+      expect(prisma.lead.update.mock.calls[0][0].data).toMatchObject({
+        disqualifiedAt: null,
+        disqualifiedReason: null,
+      });
+      const eventTypes = prisma.leadEvent.create.mock.calls.map((c) => c[0].data.type);
+      expect(eventTypes).toContain("REACTIVATED");
+    });
+
+    it("registra na timeline de qual lado veio o gatilho", async () => {
+      const { service, prisma } = buildService();
+      prisma.classificationRule.findMany.mockResolvedValue([meetingRule]);
+
+      await classify(service, "OUTBOUND");
+
+      const meetingEvent = prisma.leadEvent.create.mock.calls
+        .map((c) => c[0].data)
+        .find((data) => data.type === "MEETING_SCHEDULED");
+      expect(meetingEvent.metadata).toMatchObject({ direction: "OUTBOUND", phrase: "agendei para" });
+    });
   });
 });

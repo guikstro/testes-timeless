@@ -329,6 +329,8 @@ describe("WhatsAppIngestionService", () => {
         messageId: "msg-internal-2",
         messageText: "contrato fechado",
         occurredAt: expect.any(Date),
+        // A ingestão nunca vê mensagem nossa: o parser descarta `fromMe`.
+        direction: "INBOUND",
       });
     });
 

@@ -438,6 +438,11 @@ model LeadEvent {
 
 enum ClassificationTarget {
   QUALIFIED
+  /**
+   * Único alvo que também aceita mensagem OUTBOUND (Fase 11): quem marca
+   * reunião costuma ser o atendente, não o lead.
+   */
+  MEETING_SCHEDULED
   WON
 }
 

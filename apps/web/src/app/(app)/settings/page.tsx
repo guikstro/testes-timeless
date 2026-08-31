@@ -4,13 +4,14 @@ import { DeleteRuleButton } from "./delete-rule-button";
 
 interface ClassificationRule {
   id: string;
-  targetStatus: "QUALIFIED" | "WON";
+  targetStatus: "QUALIFIED" | "MEETING_SCHEDULED" | "WON";
   phrase: string;
   createdAt: string;
 }
 
 const TARGET_LABELS: Record<ClassificationRule["targetStatus"], string> = {
   QUALIFIED: "Qualifica o lead",
+  MEETING_SCHEDULED: "Marca reunião agendada",
   WON: "Marca como venda",
 };
 

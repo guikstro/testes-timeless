@@ -61,6 +61,36 @@ status no banco.
   Leads → Qualificados → Vendas consistente para os relatórios futuros
   (Fase 8), sem inventar uma mensagem que não existiu.
 
+## Reunião por frase-gatilho, e o lado de quem fala (Fase 11)
+
+`MEETING_SCHEDULED` é o **único alvo de regra que também lê mensagens
+OUTBOUND** — as que a própria equipe envia. É o caso real: quem diz "agendei
+para terça às 15h" é o atendente, não o lead.
+
+A trava que torna isso seguro é por alvo, não por regra:
+
+| Alvo | Mensagem do lead | Mensagem da equipe |
+|---|---|---|
+| `QUALIFIED` | dispara | **ignorada** |
+| `MEETING_SCHEDULED` | dispara | dispara |
+| `WON` | dispara | **ignorada** |
+
+Sem essa separação, um atendente escrevendo "assim que sair o contrato fechado
+eu te aviso" criaria uma venda que não aconteceu.
+
+**Quando a classificação da OUTBOUND acontece:** depois do envio confirmado
+(`WhatsAppSendService`), não no momento em que a mensagem é criada. Uma
+mensagem que falhou no envio não combinou horário com ninguém — é a mesma
+regra que já exclui uma OUTBOUND falhada do tempo de resposta.
+
+**Limitação conhecida:** só valem as mensagens enviadas *pela plataforma*. As
+que a equipe manda pelo celular são descartadas no parser (`fromMe`) e nunca
+entram no sistema. Ingeri-las exigiria resolver a deduplicação com o eco das
+mensagens que nós mesmos enviamos, que voltam pelo webhook com o mesmo id.
+
+O evento na timeline grava `metadata.direction`, então é sempre possível saber
+de qual lado veio o gatilho.
+
 ## Desqualificação (Fase 11)
 
 Desqualificar **não é um estágio do funil** — é uma saída lateral, gravada em

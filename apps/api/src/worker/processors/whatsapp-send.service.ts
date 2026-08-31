@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { EvolutionClient } from "../../integrations/whatsapp/evolution-client";
+import { ConversationClassifierService } from "../../classification/conversation-classifier.service";
 
 /**
  * Entrega uma mensagem OUTBOUND já persistida ao provider. Relê o estado
@@ -15,6 +16,7 @@ export class WhatsAppSendService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly evolution: EvolutionClient,
+    private readonly classifier: ConversationClassifierService,
   ) {}
 
   async send(messageId: string, isLastAttempt: boolean): Promise<void> {
@@ -58,6 +60,21 @@ export class WhatsAppSendService {
       await this.prisma.message.update({
         where: { id: messageId },
         data: { outboundStatus: "SENT", externalId: result.externalId, sendError: null },
+      });
+
+      // Classificar aqui, e não ao criar a mensagem, é o que garante que uma
+      // reunião só é marcada por uma frase que o lead realmente recebeu: uma
+      // mensagem que falhou no envio não combinou horário com ninguém.
+      //
+      // Só o alvo "reunião" reage a uma mensagem nossa — o classificador
+      // recusa venda e qualificação vindas de OUTBOUND.
+      await this.classifier.classify({
+        organizationId: message.conversation.lead.organizationId,
+        lead: message.conversation.lead,
+        messageId: message.id,
+        messageText: message.text ?? undefined,
+        occurredAt: message.timestamp,
+        direction: "OUTBOUND",
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Erro desconhecido ao enviar.";

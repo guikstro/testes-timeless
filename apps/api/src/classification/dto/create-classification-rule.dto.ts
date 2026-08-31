@@ -2,6 +2,7 @@ import { IsEnum, IsString, MinLength } from "class-validator";
 
 export enum ClassificationTargetDto {
   QUALIFIED = "QUALIFIED",
+  MEETING_SCHEDULED = "MEETING_SCHEDULED",
   WON = "WON",
 }
 

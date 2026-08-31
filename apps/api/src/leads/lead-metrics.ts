@@ -55,9 +55,11 @@ function secondsBetween(from: Date, to: Date): number | null {
  * - `FAILED` nunca saiu — tratá-la como resposta esconderia justamente o
  *   caso em que o cliente ficou sem atendimento.
  * - `PENDING` ainda não saiu.
- * - `null` vem da ingestão do webhook, ou seja, a equipe respondeu pelo
- *   próprio celular em vez de pela plataforma. Isso é uma resposta real e
- *   precisa contar, senão a métrica pune quem atende pelo WhatsApp comum.
+ * - `null` é uma OUTBOUND que não passou pela fila de envio. Hoje isso não
+ *   acontece: o parser descarta as mensagens `fromMe` do webhook, então toda
+ *   OUTBOUND nasce em `sendMessage` já com status. Se um dia essas mensagens
+ *   forem ingeridas, elas são respostas reais e precisam contar — não contá-las
+ *   puniria quem atende pelo celular.
  */
 function reachedTheLead(message: MetricsMessage): boolean {
   return message.outboundStatus === null || message.outboundStatus === "SENT";

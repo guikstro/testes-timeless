@@ -14,7 +14,8 @@ export async function createClassificationRule(
   const targetStatus = String(formData.get("targetStatus") ?? "");
   const phrase = String(formData.get("phrase") ?? "").trim();
 
-  if (!phrase || (targetStatus !== "QUALIFIED" && targetStatus !== "WON")) {
+  const validTargets = ["QUALIFIED", "MEETING_SCHEDULED", "WON"];
+  if (!phrase || !validTargets.includes(targetStatus)) {
     return { error: "Escolha o tipo de gatilho e informe a frase." };
   }
 

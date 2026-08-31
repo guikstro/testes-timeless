@@ -115,6 +115,11 @@ describe("Qualification & Sale — trigger phrases end to end (e2e)", () => {
       .set("Authorization", `Bearer ${orgToken}`)
       .send({ targetStatus: "WON", phrase: "contrato fechado" })
       .expect(201);
+    await request(app.getHttpServer())
+      .post("/api/classification-rules")
+      .set("Authorization", `Bearer ${orgToken}`)
+      .send({ targetStatus: "MEETING_SCHEDULED", phrase: "confirmo o horário" })
+      .expect(201);
   });
 
   afterAll(async () => {
@@ -309,4 +314,60 @@ describe("Qualification & Sale — trigger phrases end to end (e2e)", () => {
       .send({ status: "QUALIFIED" })
       .expect(404);
   });
+
+  // Timeout generoso pelo mesmo motivo do `waitFor` acima: o worker roda no
+  // mesmo processo e concorre com as outras suítes. Passando, custa nada.
+  it("marca reunião pela frase-gatilho, atravessando webhook, fila e classificador", async () => {
+    const from = "5585912121212";
+
+    await sendMessage(from, "wamid.MEETING-1", "oi, vi seu anúncio", 1700200000);
+    const created = await waitFor(() =>
+      prisma.lead.findUnique({
+        where: { organizationId_normalizedPhone: { organizationId: orgId, normalizedPhone: `+${from}` } },
+      }),
+    );
+
+    await sendMessage(from, "wamid.MEETING-2", "confirmo o horário de terça", 1700200100);
+    const lead = await waitFor(async () => {
+      const current = await prisma.lead.findUnique({ where: { id: created.id } });
+      return current?.status === "MEETING_SCHEDULED" ? current : null;
+    });
+
+    expect(lead.meetingScheduledAt).not.toBeNull();
+    // Combinar horário pressupõe ter qualificado, mesmo sem gatilho de qualificação.
+    expect(lead.qualifiedAt).not.toBeNull();
+
+    const events = await prisma.leadEvent.findMany({
+      where: { leadId: lead.id },
+      orderBy: [{ occurredAt: "asc" }, { sequence: "asc" }],
+    });
+    const types = events.map((event) => event.type);
+    expect(types).toContain("MEETING_SCHEDULED");
+    expect(types).toContain("QUALIFIED");
+  }, 30000);
+
+  /** Vender depois da reunião preserva a data dela — o funil precisa dos dois. */
+  it("mantém a data da reunião depois da venda", async () => {
+    const from = "5585913131313";
+
+    await sendMessage(from, "wamid.MEETING-SALE-1", "confirmo o horário", 1700300000);
+    const created = await waitFor(() =>
+      prisma.lead.findUnique({
+        where: { organizationId_normalizedPhone: { organizationId: orgId, normalizedPhone: `+${from}` } },
+      }),
+    );
+    await waitFor(async () => {
+      const current = await prisma.lead.findUnique({ where: { id: created.id } });
+      return current?.meetingScheduledAt ? current : null;
+    });
+
+    await sendMessage(from, "wamid.MEETING-SALE-2", "contrato fechado por 1500", 1700300100);
+    const lead = await waitFor(async () => {
+      const current = await prisma.lead.findUnique({ where: { id: created.id } });
+      return current?.status === "WON" ? current : null;
+    });
+
+    expect(lead.meetingScheduledAt).not.toBeNull();
+    expect(lead.wonAt).not.toBeNull();
+  }, 30000);
 });

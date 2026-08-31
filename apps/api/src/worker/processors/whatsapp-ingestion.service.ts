@@ -117,6 +117,8 @@ export class WhatsAppIngestionService {
       messageId: message.id,
       messageText: job.type === "text" ? job.text : undefined,
       occurredAt,
+      // A ingestão só recebe mensagens do lead: o parser descarta `fromMe`.
+      direction: "INBOUND",
     });
 
     await this.prisma.whatsAppConnection.update({
