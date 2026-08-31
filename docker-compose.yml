@@ -91,7 +91,13 @@ services:
       - ./packages:/app/packages
       - /app/apps/api/node_modules
       - /app/node_modules
-    command: sh -c "pnpm --filter api prisma:migrate:deploy && pnpm --filter api start:dev"
+    # `prisma:generate` antes de tudo: /app/node_modules é um volume anônimo,
+    # então cada container carrega a sua própria cópia do Prisma Client. Sem
+    # isto, uma alteração no schema deixa o client de um container obsoleto
+    # enquanto o outro está em dia, e o sintoma não parece um problema de
+    # build — a API falha ao compilar, passa a responder vazio, e o front
+    # quebra ao tentar ler JSON de uma resposta sem corpo.
+    command: sh -c "pnpm --filter api prisma:generate && pnpm --filter api prisma:migrate:deploy && pnpm --filter api start:dev"
 
   worker:
     build:
@@ -114,7 +120,8 @@ services:
       - ./packages:/app/packages
       - /app/apps/api/node_modules
       - /app/node_modules
-    command: sh -c "pnpm --filter api start:worker:dev"
+    # Mesmo motivo do serviço `api` acima: volume anônimo, client próprio.
+    command: sh -c "pnpm --filter api prisma:generate && pnpm --filter api start:worker:dev"
 
   web:
     build:
