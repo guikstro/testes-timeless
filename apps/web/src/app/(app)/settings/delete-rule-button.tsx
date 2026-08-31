@@ -10,7 +10,7 @@ export function DeleteRuleButton({ id }: { id: string }) {
     <button
       onClick={() => startTransition(() => deleteClassificationRule(id))}
       disabled={pending}
-      className="text-sm text-slate-400 hover:text-red-600 disabled:opacity-50"
+      className="text-sm text-ink-mute hover:text-red-600 disabled:opacity-50"
     >
       Remover
     </button>

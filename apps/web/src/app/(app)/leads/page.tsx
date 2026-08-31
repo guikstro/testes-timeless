@@ -32,16 +32,16 @@ export default async function LeadsPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-slate-900">Leads</h1>
+      <h1 className="mb-6 text-2xl font-semibold text-ink">Leads</h1>
 
       {items.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600">
+        <div className="rounded-xl border border-dashed border-line bg-panel p-8 text-center text-sm text-ink-soft">
           Nenhum lead ainda. Conecte o WhatsApp em Integrações para começar a capturar conversas.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <div className="overflow-x-auto rounded-xl border border-line bg-panel">
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-200 text-slate-500">
+            <thead className="border-b border-line text-ink-mute">
               <tr>
                 <th className="px-4 py-3 font-medium">Nome</th>
                 <th className="px-4 py-3 font-medium">Telefone</th>
@@ -55,30 +55,30 @@ export default async function LeadsPage() {
             </thead>
             <tbody>
               {items.map((lead) => (
-                <tr key={lead.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                <tr key={lead.id} className="border-b border-line/60 last:border-0 hover:bg-panel-soft">
                   <td className="px-4 py-3">
-                    <Link href={`/leads/${lead.id}`} className="font-medium text-slate-900 hover:underline">
+                    <Link href={`/leads/${lead.id}`} className="font-medium text-ink hover:underline">
                       {lead.name ?? "Sem nome"}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{lead.normalizedPhone}</td>
-                  <td className="px-4 py-3 text-slate-600">{attributionSourceLabel(lead.attribution)}</td>
-                  <td className="px-4 py-3 text-slate-600">{attributionCampaignLabel(lead.attribution)}</td>
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="px-4 py-3 text-ink-soft">{lead.normalizedPhone}</td>
+                  <td className="px-4 py-3 text-ink-soft">{attributionSourceLabel(lead.attribution)}</td>
+                  <td className="px-4 py-3 text-ink-soft">{attributionCampaignLabel(lead.attribution)}</td>
+                  <td className="px-4 py-3 text-ink-soft">
                     {STATUS_LABELS[lead.status]}
                     {/* Desqualificado não substitui o estágio: mostra os dois, porque
                         "estava qualificado quando desistiu" diz mais que só "descartado". */}
                     {lead.disqualifiedAt ? (
-                      <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">
+                      <span className="ml-2 rounded bg-panel-soft px-1.5 py-0.5 text-xs text-ink-mute">
                         desqualificado
                       </span>
                     ) : null}
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{formatCentsAsBRL(lead.sale?.amountCents)}</td>
-                  <td className="px-4 py-3 text-slate-500">
+                  <td className="px-4 py-3 text-ink-soft">{formatCentsAsBRL(lead.sale?.amountCents)}</td>
+                  <td className="px-4 py-3 text-ink-mute">
                     {new Date(lead.firstContactAt).toLocaleString("pt-BR")}
                   </td>
-                  <td className="px-4 py-3 text-slate-500">{new Date(lead.lastContactAt).toLocaleString("pt-BR")}</td>
+                  <td className="px-4 py-3 text-ink-mute">{new Date(lead.lastContactAt).toLocaleString("pt-BR")}</td>
                 </tr>
               ))}
             </tbody>

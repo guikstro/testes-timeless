@@ -37,7 +37,7 @@ export function OrgLogo({
     <span
       aria-hidden
       className={cn(
-        "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand font-display text-sm font-bold text-white shadow-subtle",
+        "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand font-display text-sm font-bold text-canvas shadow-subtle",
         className,
       )}
     >

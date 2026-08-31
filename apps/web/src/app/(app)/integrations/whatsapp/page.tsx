@@ -25,7 +25,7 @@ const STATUS_LABELS: Record<WhatsAppConnection["status"], string> = {
 const STATUS_COLORS: Record<WhatsAppConnection["status"], string> = {
   PENDING_QR: "text-amber-600",
   CONNECTED: "text-emerald-600",
-  DISCONNECTED: "text-slate-500",
+  DISCONNECTED: "text-ink-mute",
 };
 
 const PROVIDER_LABELS: Record<WhatsAppConnection["provider"], string> = {
@@ -39,11 +39,11 @@ export default async function WhatsAppIntegrationPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-slate-900">WhatsApp</h1>
+      <h1 className="mb-6 text-2xl font-semibold text-ink">WhatsApp</h1>
 
-      <div className="mb-8 rounded-xl border border-slate-200 bg-white p-6">
+      <div className="mb-8 rounded-xl border border-line bg-panel p-6">
         {connection ? (
-          <div className="space-y-2 text-sm text-slate-700">
+          <div className="space-y-2 text-sm text-ink-soft">
             <p>
               <span className="font-medium">Status:</span>{" "}
               <span className={STATUS_COLORS[connection.status]}>{STATUS_LABELS[connection.status]}</span>
@@ -65,7 +65,7 @@ export default async function WhatsAppIntegrationPage() {
             ) : null}
           </div>
         ) : (
-          <p className="text-sm text-slate-600">Nenhum número conectado ainda.</p>
+          <p className="text-sm text-ink-soft">Nenhum número conectado ainda.</p>
         )}
       </div>
 
@@ -73,11 +73,11 @@ export default async function WhatsAppIntegrationPage() {
         <div className="space-y-6">
           <QrConnect alreadyPending={connection?.status === "PENDING_QR"} />
 
-          <details className="rounded-xl border border-slate-200 bg-white p-6">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-900">
+          <details className="rounded-xl border border-line bg-panel p-6">
+            <summary className="cursor-pointer text-sm font-semibold text-ink">
               Conectar pela Cloud API oficial da Meta
             </summary>
-            <p className="mb-4 mt-2 text-sm text-slate-500">
+            <p className="mb-4 mt-2 text-sm text-ink-mute">
               Alternativa sem risco de bloqueio, mas exige um número já verificado no Meta for Developers e a
               configuração manual do webhook. Só recebe mensagens. O envio pela plataforma está disponível apenas na
               conexão por QR Code.

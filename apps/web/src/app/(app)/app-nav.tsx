@@ -146,7 +146,7 @@ export function AppNav({
         className={`focus-ring group/item relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 ease-soft active:scale-[0.98] ${
           active
             ? "bg-brand-soft font-medium text-brand-ink"
-            : "text-slate-600 hover:bg-slate-100/80 hover:text-slate-900"
+            : "text-ink-soft hover:bg-panel-soft/80 hover:text-ink"
         } ${extraClasses}`}
       >
         {/* Barra na borda esquerda marca a página atual mesmo recolhida, onde
@@ -165,11 +165,11 @@ export function AppNav({
     <div className="w-16 shrink-0">
       <aside
         data-pinned={pinned}
-        className="group fixed bottom-0 left-0 top-0 z-30 flex w-16 flex-col overflow-hidden border-r border-slate-200/70 bg-white/80 px-3 py-5 backdrop-blur-xl transition-[width,box-shadow] duration-300 ease-soft hover:w-60 hover:shadow-lifted has-[:focus-visible]:w-60 data-[pinned=true]:w-60 data-[pinned=true]:shadow-none motion-reduce:transition-none"
+        className="group fixed bottom-0 left-0 top-0 z-30 flex w-16 flex-col overflow-hidden border-r border-line/70 bg-panel/80 px-3 py-5 backdrop-blur-xl transition-[width,box-shadow] duration-300 ease-soft hover:w-60 hover:shadow-lifted has-[:focus-visible]:w-60 data-[pinned=true]:w-60 data-[pinned=true]:shadow-none motion-reduce:transition-none"
       >
         <div className="mb-6 flex items-center gap-3 px-0.5">
           <OrgLogo name={organizationName} logoUrl={logoUrl} />
-          <span className={`font-display text-sm font-semibold tracking-tight text-slate-900 ${label}`}>
+          <span className={`font-display text-sm font-semibold tracking-tight text-ink ${label}`}>
             {organizationName}
           </span>
         </div>
@@ -184,7 +184,7 @@ export function AppNav({
             onClick={() => setPinned((current) => !current)}
             aria-pressed={pinned}
             title={pinned ? "Soltar o menu" : "Manter o menu aberto"}
-            className="focus-ring flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-500 transition-all duration-200 ease-soft hover:bg-slate-100/80 hover:text-slate-900 active:scale-[0.98]"
+            className="focus-ring flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-ink-mute transition-all duration-200 ease-soft hover:bg-panel-soft/80 hover:text-ink active:scale-[0.98]"
           >
             <svg {...ICON_PROPS}>
               {pinned ? (

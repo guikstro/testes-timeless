@@ -46,7 +46,7 @@ const EVENT_STATUS_LABELS: Record<ConversionEventStatus, string> = {
 };
 
 const EVENT_STATUS_COLORS: Record<ConversionEventStatus, string> = {
-  PENDING: "text-slate-500",
+  PENDING: "text-ink-mute",
   SENT: "text-emerald-600",
   RETRYING: "text-amber-600",
   FAILED: "text-red-600",
@@ -83,7 +83,7 @@ const STATUS_LABELS: Record<MetaConnection["status"], string> = {
 
 const STATUS_COLORS: Record<MetaConnection["status"], string> = {
   CONNECTED: "text-emerald-600",
-  DISCONNECTED: "text-slate-500",
+  DISCONNECTED: "text-ink-mute",
   TOKEN_EXPIRED: "text-red-600",
   SYNC_FAILED: "text-red-600",
 };
@@ -97,11 +97,11 @@ export default async function MetaIntegrationPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-slate-900">Meta Ads</h1>
+      <h1 className="mb-6 text-2xl font-semibold text-ink">Meta Ads</h1>
 
-      <div className="mb-8 rounded-xl border border-slate-200 bg-white p-6">
+      <div className="mb-8 rounded-xl border border-line bg-panel p-6">
         {connection ? (
-          <div className="space-y-2 text-sm text-slate-700">
+          <div className="space-y-2 text-sm text-ink-soft">
             <p>
               <span className="font-medium">Status:</span>{" "}
               <span className={STATUS_COLORS[connection.status]}>{STATUS_LABELS[connection.status]}</span>
@@ -119,14 +119,14 @@ export default async function MetaIntegrationPage() {
               </p>
             ) : null}
             {connection.status === "TOKEN_EXPIRED" ? (
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-ink-mute">
                 A conexão com a Meta precisa ser renovada. Reconecte com um access token válido abaixo.
               </p>
             ) : null}
             <ConnectionActions />
           </div>
         ) : (
-          <p className="text-sm text-slate-600">Nenhuma conta de anúncio conectada ainda.</p>
+          <p className="text-sm text-ink-soft">Nenhuma conta de anúncio conectada ainda.</p>
         )}
       </div>
 
@@ -134,28 +134,28 @@ export default async function MetaIntegrationPage() {
 
       {connection ? (
         <div className="mt-8">
-          <h2 className="mb-3 text-sm font-semibold text-slate-900">Campanhas sincronizadas</h2>
+          <h2 className="mb-3 text-sm font-semibold text-ink">Campanhas sincronizadas</h2>
           {campaigns.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600">
+            <div className="rounded-xl border border-dashed border-line bg-panel p-8 text-center text-sm text-ink-soft">
               Nenhuma campanha sincronizada ainda. Clique em &quot;Sincronizar agora&quot;.
             </div>
           ) : (
             <div className="space-y-4">
               {campaigns.map((campaign) => (
-                <div key={campaign.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                <div key={campaign.id} className="rounded-xl border border-line bg-panel p-4">
                   <div className="mb-2 flex items-center justify-between">
-                    <p className="font-medium text-slate-900">{campaign.name}</p>
-                    <p className="text-sm text-slate-500">
+                    <p className="font-medium text-ink">{campaign.name}</p>
+                    <p className="text-sm text-ink-mute">
                       {campaign.status} · Investimento (30d): {formatCentsAsBRL(campaign.totalSpendCents)}
                     </p>
                   </div>
                   {campaign.adSets.map((adSet) => (
-                    <div key={adSet.id} className="ml-4 mt-2 border-l border-slate-100 pl-4">
-                      <p className="text-sm text-slate-700">
-                        {adSet.name} <span className="text-slate-400">{adSet.status}</span>
+                    <div key={adSet.id} className="ml-4 mt-2 border-l border-line/60 pl-4">
+                      <p className="text-sm text-ink-soft">
+                        {adSet.name} <span className="text-ink-mute">{adSet.status}</span>
                       </p>
                       {adSet.ads.map((ad) => (
-                        <p key={ad.id} className="ml-4 text-xs text-slate-500">
+                        <p key={ad.id} className="ml-4 text-xs text-ink-mute">
                           {ad.name} · {ad.status}
                         </p>
                       ))}
@@ -170,15 +170,15 @@ export default async function MetaIntegrationPage() {
 
       {connection ? (
         <div className="mt-10">
-          <h2 className="mb-3 text-sm font-semibold text-slate-900">Meta Conversions API</h2>
-          <div className="mb-4 rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-700">
+          <h2 className="mb-3 text-sm font-semibold text-ink">Meta Conversions API</h2>
+          <div className="mb-4 rounded-xl border border-line bg-panel p-6 text-sm text-ink-soft">
             {connection.hasCapiAccessToken ? (
               <p>
                 <span className="font-medium">Configurado</span> · Pixel ID {connection.pixelId} · enviando eventos de
                 Lead, Lead qualificado e Venda automaticamente.
               </p>
             ) : (
-              <p className="text-slate-600">
+              <p className="text-ink-soft">
                 Ainda não configurado. Informe o Pixel ID e o access token do Conversions API para começar a enviar
                 eventos de Lead, Lead qualificado e Venda de volta para a Meta.
               </p>
@@ -187,15 +187,15 @@ export default async function MetaIntegrationPage() {
           <ConnectMetaCapiForm />
 
           <div className="mt-6">
-            <h3 className="mb-3 text-sm font-semibold text-slate-900">Eventos enviados</h3>
+            <h3 className="mb-3 text-sm font-semibold text-ink">Eventos enviados</h3>
             {conversionEvents.items.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600">
+              <div className="rounded-xl border border-dashed border-line bg-panel p-8 text-center text-sm text-ink-soft">
                 Nenhum evento registrado ainda.
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+              <div className="overflow-x-auto rounded-xl border border-line bg-panel">
                 <table className="w-full text-left text-sm">
-                  <thead className="border-b border-slate-200 text-xs uppercase text-slate-500">
+                  <thead className="border-b border-line text-xs uppercase text-ink-mute">
                     <tr>
                       <th className="px-4 py-2">Lead</th>
                       <th className="px-4 py-2">Evento</th>
@@ -206,15 +206,15 @@ export default async function MetaIntegrationPage() {
                   </thead>
                   <tbody>
                     {conversionEvents.items.map((event) => (
-                      <tr key={event.id} className="border-b border-slate-100 last:border-0">
+                      <tr key={event.id} className="border-b border-line/60 last:border-0">
                         <td className="px-4 py-2">{event.lead.name ?? event.lead.normalizedPhone}</td>
                         <td className="px-4 py-2">{EVENT_TYPE_LABELS[event.type]}</td>
                         <td className="px-4 py-2">{formatCentsAsBRL(event.valueCents)}</td>
                         <td className={`px-4 py-2 ${EVENT_STATUS_COLORS[event.status]}`}>
                           {EVENT_STATUS_LABELS[event.status]}
-                          {event.lastError ? <span className="block text-xs text-slate-400">{event.lastError}</span> : null}
+                          {event.lastError ? <span className="block text-xs text-ink-mute">{event.lastError}</span> : null}
                         </td>
-                        <td className="px-4 py-2 text-slate-500">{new Date(event.occurredAt).toLocaleString("pt-BR")}</td>
+                        <td className="px-4 py-2 text-ink-mute">{new Date(event.occurredAt).toLocaleString("pt-BR")}</td>
                       </tr>
                     ))}
                   </tbody>

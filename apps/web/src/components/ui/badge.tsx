@@ -8,7 +8,7 @@ import { cn } from "@/lib/cn";
 type Tone = "neutral" | "info" | "success" | "warning" | "danger" | "brand";
 
 const TONES: Record<Tone, string> = {
-  neutral: "bg-slate-100 text-slate-700 ring-slate-200/60",
+  neutral: "bg-panel-soft text-ink-soft ring-line/60",
   info: "bg-blue-50 text-blue-700 ring-blue-200/60",
   success: "bg-emerald-50 text-emerald-700 ring-emerald-200/60",
   warning: "bg-amber-50 text-amber-800 ring-amber-200/60",

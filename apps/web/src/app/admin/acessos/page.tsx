@@ -22,19 +22,19 @@ export default async function ImpersonationLogPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-slate-900">Acessos a clientes</h1>
-      <p className="mb-6 mt-1 text-sm text-slate-500">
+      <h1 className="text-2xl font-semibold text-ink">Acessos a clientes</h1>
+      <p className="mb-6 mt-1 text-sm text-ink-mute">
         Toda vez que um operador entra em um cliente, o acesso é registrado aqui, sem exceção.
       </p>
 
       {data.items.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-600">
+        <div className="rounded-xl border border-dashed border-line bg-panel p-10 text-center text-sm text-ink-soft">
           Nenhum acesso registrado ainda.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <div className="overflow-x-auto rounded-xl border border-line bg-panel">
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-200 text-xs uppercase text-slate-500">
+            <thead className="border-b border-line text-xs uppercase text-ink-mute">
               <tr>
                 <th className="px-4 py-3 font-medium">Quando</th>
                 <th className="px-4 py-3 font-medium">Operador</th>
@@ -43,15 +43,15 @@ export default async function ImpersonationLogPage() {
             </thead>
             <tbody>
               {data.items.map((entry) => (
-                <tr key={entry.id} className="border-b border-slate-100 last:border-0">
-                  <td className="px-4 py-3 text-slate-500">
+                <tr key={entry.id} className="border-b border-line/60 last:border-0">
+                  <td className="px-4 py-3 text-ink-mute">
                     {new Date(entry.createdAt).toLocaleString("pt-BR")}
                   </td>
-                  <td className="px-4 py-3 text-slate-700">
+                  <td className="px-4 py-3 text-ink-soft">
                     {entry.user?.name ?? "Operador removido"}
-                    <span className="block text-xs text-slate-400">{entry.user?.email}</span>
+                    <span className="block text-xs text-ink-mute">{entry.user?.email}</span>
                   </td>
-                  <td className="px-4 py-3 text-slate-700">{entry.organization?.name ?? "Organização removida"}</td>
+                  <td className="px-4 py-3 text-ink-soft">{entry.organization?.name ?? "Organização removida"}</td>
                 </tr>
               ))}
             </tbody>

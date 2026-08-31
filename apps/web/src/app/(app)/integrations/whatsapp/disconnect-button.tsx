@@ -10,7 +10,7 @@ export function DisconnectButton() {
     <button
       onClick={() => startTransition(() => disconnectWhatsApp())}
       disabled={pending}
-      className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+      className="rounded-md border border-line px-3 py-1.5 text-sm text-ink-soft hover:bg-panel-soft disabled:opacity-50"
     >
       {pending ? "Desconectando..." : "Desconectar"}
     </button>

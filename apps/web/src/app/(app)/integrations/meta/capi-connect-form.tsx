@@ -9,9 +9,9 @@ export function ConnectMetaCapiForm() {
   const [state, formAction, pending] = useActionState(connectMetaCapi, initialState);
 
   return (
-    <form action={formAction} className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2">
+    <form action={formAction} className="grid grid-cols-1 gap-3 rounded-xl border border-line bg-panel p-4 sm:grid-cols-2">
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="pixelId">
+        <label className="mb-1 block text-sm font-medium text-ink-soft" htmlFor="pixelId">
           Pixel ID
         </label>
         <input
@@ -19,11 +19,11 @@ export function ConnectMetaCapiForm() {
           name="pixelId"
           placeholder="1234567890"
           required
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+          className="w-full rounded-md border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="capiAccessToken">
+        <label className="mb-1 block text-sm font-medium text-ink-soft" htmlFor="capiAccessToken">
           Conversions API access token
         </label>
         <input
@@ -31,14 +31,14 @@ export function ConnectMetaCapiForm() {
           name="capiAccessToken"
           type="password"
           required
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+          className="w-full rounded-md border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
         />
       </div>
       <div className="flex items-center gap-3 sm:col-span-2">
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+          className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-canvas hover:bg-ink disabled:opacity-50"
         >
           {pending ? "Salvando..." : "Salvar"}
         </button>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { apiFetch, ApiRequestError } from "@/lib/api-client";
+import { LeaveClientNotice } from "./leave-client-notice";
 
 interface SessionContext {
   user: { id: string; name: string; email: string; platformRole: "SUPPORT" | "ADMIN" | null };
@@ -29,31 +30,38 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     redirect("/dashboard");
   }
 
+  // Estar dentro de um cliente não é erro, é uma situação prevista com saída
+  // conhecida. Deixar a chamada seguinte estourar mostraria uma tela de
+  // exceção para algo que se resolve com um botão.
+  if (session.impersonating) {
+    return <LeaveClientNotice />;
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-800 bg-slate-900">
+    <div className="min-h-screen bg-panel-soft">
+      <header className="border-b border-line bg-ink">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div>
-            <p className="text-sm font-semibold text-white">Administração da plataforma</p>
-            <p className="text-xs text-slate-400">
+            <p className="text-sm font-semibold text-canvas">Administração da plataforma</p>
+            <p className="text-xs text-ink-mute">
               {session.user.email} · {session.user.platformRole === "ADMIN" ? "Administrador" : "Suporte"}
             </p>
           </div>
           <nav className="flex items-center gap-4 text-sm">
-            <Link href="/admin" className="text-slate-300 hover:text-white">
+            <Link href="/admin" className="text-ink-mute hover:text-canvas">
               Clientes
             </Link>
-            <Link href="/admin/acessos" className="text-slate-300 hover:text-white">
+            <Link href="/admin/acessos" className="text-ink-mute hover:text-canvas">
               Acessos
             </Link>
             {/* Gestão de operadores é exclusiva de ADMIN — a API também
                 barra, isto só evita oferecer um link que daria 403. */}
             {session.user.platformRole === "ADMIN" ? (
-              <Link href="/admin/operadores" className="text-slate-300 hover:text-white">
+              <Link href="/admin/operadores" className="text-ink-mute hover:text-canvas">
                 Operadores
               </Link>
             ) : null}
-            <Link href="/dashboard" className="text-slate-300 hover:text-white">
+            <Link href="/dashboard" className="text-ink-mute hover:text-canvas">
               Minha organização
             </Link>
           </nav>

@@ -42,7 +42,7 @@ export function EnterClientButton({ organizationId, organizationName }: { organi
         onClick={() => void enter()}
         disabled={pending}
         title={`Entrar em ${organizationName}`}
-        className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+        className="rounded-md bg-ink px-3 py-1.5 text-sm font-medium text-canvas hover:bg-ink disabled:opacity-50"
       >
         {pending ? "Entrando..." : "Entrar"}
       </button>

@@ -39,13 +39,13 @@ export default function RegisterPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+      <div className="w-full max-w-sm rounded-xl border border-line bg-panel p-8 shadow-sm">
         <h1 className="mb-1 text-xl font-semibold">Criar organização</h1>
-        <p className="mb-6 text-sm text-slate-500">Comece a rastrear suas conversões</p>
+        <p className="mb-6 text-sm text-ink-mute">Comece a rastrear suas conversões</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="organizationName">
+            <label className="mb-1 block text-sm font-medium text-ink-soft" htmlFor="organizationName">
               Nome da organização
             </label>
             <input
@@ -53,12 +53,12 @@ export default function RegisterPage() {
               required
               value={organizationName}
               onChange={(e) => setOrganizationName(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              className="w-full rounded-md border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="name">
+            <label className="mb-1 block text-sm font-medium text-ink-soft" htmlFor="name">
               Seu nome
             </label>
             <input
@@ -66,12 +66,12 @@ export default function RegisterPage() {
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              className="w-full rounded-md border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="email">
+            <label className="mb-1 block text-sm font-medium text-ink-soft" htmlFor="email">
               E-mail
             </label>
             <input
@@ -80,12 +80,12 @@ export default function RegisterPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              className="w-full rounded-md border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="password">
+            <label className="mb-1 block text-sm font-medium text-ink-soft" htmlFor="password">
               Senha
             </label>
             <input
@@ -95,7 +95,7 @@ export default function RegisterPage() {
               minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              className="w-full rounded-md border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
             />
           </div>
 
@@ -104,15 +104,15 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+            className="w-full rounded-md bg-ink px-3 py-2 text-sm font-medium text-canvas hover:bg-ink disabled:opacity-50"
           >
             {loading ? "Criando..." : "Criar organização"}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-slate-500">
+        <p className="mt-6 text-center text-sm text-ink-mute">
           Já tem conta?{" "}
-          <a href="/login" className="font-medium text-slate-900 underline">
+          <a href="/login" className="font-medium text-ink underline">
             Entrar
           </a>
         </p>

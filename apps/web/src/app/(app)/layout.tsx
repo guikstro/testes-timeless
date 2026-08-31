@@ -35,7 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           // caminho de volta é o botão "Sair do cliente".
           showAdmin={Boolean(session.user.platformRole) && !session.impersonating}
         />
-        <main className="min-w-0 flex-1 bg-slate-50">
+        <main className="min-w-0 flex-1 bg-panel-soft">
           {/* `key` na rota faz a entrada tocar a cada navegação, em vez de só
               na primeira montagem do layout. */}
           <div className="animate-rise-in p-6 sm:p-8">{children}</div>

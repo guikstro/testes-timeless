@@ -29,12 +29,12 @@ export function EmptyState({
   return (
     <div className="animate-rise-in flex flex-col items-center justify-center px-6 py-14 text-center">
       {icon ? (
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-panel-soft text-ink-mute">
           {icon}
         </div>
       ) : null}
-      <p className="font-display text-[15px] font-semibold text-slate-900">{title}</p>
-      {description ? <p className="mt-1 max-w-sm text-[13px] text-slate-500">{description}</p> : null}
+      <p className="font-display text-[15px] font-semibold text-ink">{title}</p>
+      {description ? <p className="mt-1 max-w-sm text-[13px] text-ink-mute">{description}</p> : null}
       {action ? <div className="mt-5">{action}</div> : null}
     </div>
   );

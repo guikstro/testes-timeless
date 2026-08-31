@@ -54,7 +54,7 @@ export function BrandForm({
                 type="color"
                 value={color}
                 onChange={(event) => setColor(event.target.value)}
-                className="h-10 w-14 cursor-pointer rounded-xl border border-slate-200 bg-white p-1 shadow-subtle"
+                className="h-10 w-14 cursor-pointer rounded-xl border border-line bg-panel p-1 shadow-subtle"
               />
               {PRESETS.map((preset) => (
                 <button
@@ -64,7 +64,7 @@ export function BrandForm({
                   aria-label={`Usar a cor ${preset}`}
                   aria-pressed={color.toLowerCase() === preset.toLowerCase()}
                   style={{ backgroundColor: preset }}
-                  className="focus-ring h-7 w-7 rounded-lg shadow-subtle transition-transform duration-200 ease-soft hover:scale-110 active:scale-95 aria-pressed:ring-2 aria-pressed:ring-slate-900 aria-pressed:ring-offset-2"
+                  className="focus-ring h-7 w-7 rounded-lg shadow-subtle transition-transform duration-200 ease-soft hover:scale-110 active:scale-95 aria-pressed:ring-2 aria-pressed:ring-ink aria-pressed:ring-offset-2"
                 />
               ))}
             </div>
@@ -86,7 +86,7 @@ export function BrandForm({
 
       {/* Prévia ao vivo, com as variáveis aplicadas só neste bloco. */}
       <div
-        className="flex w-full flex-col items-center justify-center gap-3 rounded-2xl border border-slate-200/70 bg-slate-50 p-6 sm:w-56"
+        className="flex w-full flex-col items-center justify-center gap-3 rounded-2xl border border-line/70 bg-panel-soft p-6 sm:w-56"
         style={
           {
             "--brand": preview.base,
@@ -96,12 +96,12 @@ export function BrandForm({
         }
       >
         <OrgLogo name={organizationName} logoUrl={url || null} className="h-12 w-12" />
-        <p className="font-display text-sm font-semibold text-slate-900">{organizationName}</p>
+        <p className="font-display text-sm font-semibold text-ink">{organizationName}</p>
         <span className="rounded-full bg-brand-soft px-2.5 py-1 text-[11.5px] font-medium text-brand-ink">
           Item ativo
         </span>
         <span className="h-9 w-full rounded-xl bg-brand shadow-subtle" />
-        <p className="text-[11px] text-slate-400">Prévia</p>
+        <p className="text-[11px] text-ink-mute">Prévia</p>
       </div>
     </form>
   );

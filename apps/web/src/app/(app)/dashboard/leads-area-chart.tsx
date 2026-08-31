@@ -22,9 +22,11 @@ export interface DailyPoint {
   won: number;
 }
 
+// A cor sai de variável para o tema escuro receber o seu próprio passo do
+// mesmo tom, em vez de a mesma tinta clareada.
 const SERIES = [
-  { key: "leads" as const, label: "Leads", color: "#2a78d6" },
-  { key: "won" as const, label: "Vendas", color: "#eb6834" },
+  { key: "leads" as const, label: "Leads", color: "rgb(var(--serie-1))" },
+  { key: "won" as const, label: "Vendas", color: "rgb(var(--serie-2))" },
 ];
 
 const HEIGHT = 260;
@@ -167,10 +169,10 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
               x2={PAD.left + innerWidth}
               y1={yAt(tick)}
               y2={yAt(tick)}
-              stroke="#e2e8f0"
+              stroke="rgb(var(--grade))"
               strokeWidth={1}
             />
-            <text x={PAD.left - 8} y={yAt(tick) + 4} textAnchor="end" className="fill-slate-400 text-[11px]">
+            <text x={PAD.left - 8} y={yAt(tick) + 4} textAnchor="end" className="fill-[rgb(var(--ink-mute))] text-[11px]">
               {tick}
             </text>
           </g>
@@ -183,7 +185,7 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
               x={xAt(index)}
               y={HEIGHT - 8}
               textAnchor="middle"
-              className="fill-slate-400 text-[11px]"
+              className="fill-[rgb(var(--ink-mute))] text-[11px]"
             >
               {formatDay(point.date)}
             </text>
@@ -209,7 +211,7 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
               x2={xAt(hovered)}
               y1={PAD.top}
               y2={PAD.top + innerHeight}
-              stroke="#94a3b8"
+              stroke="rgb(var(--guia))"
               strokeWidth={1}
             />
             {SERIES.map((series) => (
@@ -221,7 +223,7 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
                 cy={yAt(data[hovered][series.key])}
                 r={4}
                 fill={series.color}
-                stroke="#ffffff"
+                stroke="rgb(var(--panel))"
                 strokeWidth={2}
               />
             ))}
@@ -231,18 +233,18 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
 
       {active ? (
         <div
-          className="pointer-events-none absolute top-2 z-10 min-w-[132px] rounded-lg border border-slate-200 bg-white p-2.5 shadow-lg"
+          className="pointer-events-none absolute top-2 z-10 min-w-[132px] rounded-lg border border-line bg-panel p-2.5 shadow-lg"
           style={{
             // Vira para o outro lado perto da borda direita, para não sair do card.
             left: Math.min(Math.max(xAt(hovered!) + 12, 8), Math.max(8, width - 148)),
           }}
         >
-          <p className="mb-1.5 text-[11px] font-medium text-slate-500">{formatDay(active.date)}</p>
+          <p className="mb-1.5 text-[11px] font-medium text-ink-mute">{formatDay(active.date)}</p>
           {SERIES.map((series) => (
             <div key={series.key} className="flex items-center gap-2 text-sm">
               <span className="h-0.5 w-3 rounded-full" style={{ backgroundColor: series.color }} />
-              <span className="font-semibold tabular-nums text-slate-900">{active[series.key]}</span>
-              <span className="text-xs text-slate-500">{series.label}</span>
+              <span className="font-semibold tabular-nums text-ink">{active[series.key]}</span>
+              <span className="text-xs text-ink-mute">{series.label}</span>
             </div>
           ))}
         </div>
@@ -250,7 +252,7 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
 
       <div className="mt-3 flex items-center gap-4">
         {SERIES.map((series) => (
-          <span key={series.key} className="flex items-center gap-2 text-xs text-slate-600">
+          <span key={series.key} className="flex items-center gap-2 text-xs text-ink-soft">
             <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: series.color }} />
             {series.label}
           </span>

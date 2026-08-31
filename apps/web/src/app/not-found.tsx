@@ -9,16 +9,16 @@ import Link from "next/link";
  */
 export default function NotFound() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
-      <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 text-center">
-        <p className="text-sm font-medium text-slate-400">404</p>
-        <h1 className="mt-2 text-xl font-semibold text-slate-900">Página não encontrada</h1>
-        <p className="mt-2 text-sm text-slate-500">
+    <main className="flex min-h-screen items-center justify-center bg-panel-soft p-6">
+      <div className="w-full max-w-md rounded-xl border border-line bg-panel p-8 text-center">
+        <p className="text-sm font-medium text-ink-mute">404</p>
+        <h1 className="mt-2 text-xl font-semibold text-ink">Página não encontrada</h1>
+        <p className="mt-2 text-sm text-ink-mute">
           O endereço não existe ou o registro que você procura foi removido.
         </p>
         <Link
           href="/"
-          className="mt-6 inline-block rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+          className="mt-6 inline-block rounded-lg bg-ink px-4 py-2 text-sm font-medium text-canvas hover:opacity-90"
         >
           Voltar ao início
         </Link>

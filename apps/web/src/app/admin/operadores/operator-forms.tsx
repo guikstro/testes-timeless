@@ -9,13 +9,13 @@ export function AddOperatorForm() {
   const [state, formAction, pending] = useActionState(upsertOperator, initialState);
 
   return (
-    <form action={formAction} className="rounded-xl border border-slate-200 bg-white p-4">
-      <p className="mb-3 text-sm text-slate-500">
+    <form action={formAction} className="rounded-xl border border-line bg-panel p-4">
+      <p className="mb-3 text-sm text-ink-mute">
         A pessoa precisa já ter uma conta na plataforma. Promover não cria cadastro nem define senha.
       </p>
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-64 flex-1">
-          <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="email">
+          <label className="mb-1 block text-sm font-medium text-ink-soft" htmlFor="email">
             E-mail
           </label>
           <input
@@ -24,18 +24,18 @@ export function AddOperatorForm() {
             type="email"
             required
             placeholder="pessoa@suaempresa.com"
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+            className="w-full rounded-md border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="role">
+          <label className="mb-1 block text-sm font-medium text-ink-soft" htmlFor="role">
             Nível
           </label>
           <select
             id="role"
             name="role"
             defaultValue="SUPPORT"
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+            className="rounded-md border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
           >
             <option value="SUPPORT">Suporte (entra nos clientes)</option>
             <option value="ADMIN">Administrador (também gerencia operadores)</option>
@@ -44,7 +44,7 @@ export function AddOperatorForm() {
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+          className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-canvas hover:bg-ink disabled:opacity-50"
         >
           {pending ? "Salvando..." : "Salvar"}
         </button>
@@ -70,7 +70,7 @@ export function RevokeOperatorButton({ userId, name }: { userId: string; name: s
         }
         disabled={pending}
         title={`Revogar acesso de ${name}`}
-        className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+        className="rounded-md border border-line px-3 py-1.5 text-sm text-ink-soft hover:bg-panel-soft disabled:opacity-50"
       >
         {pending ? "Revogando..." : "Revogar"}
       </button>

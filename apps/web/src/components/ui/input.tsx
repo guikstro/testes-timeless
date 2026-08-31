@@ -2,10 +2,10 @@ import { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, forwardRef, useId
 import { cn } from "@/lib/cn";
 
 const FIELD =
-  "w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-900 shadow-subtle " +
-  "transition-all duration-200 ease-soft placeholder:text-slate-400 " +
-  "hover:border-slate-300 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/10 " +
-  "disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400";
+  "w-full rounded-xl border border-line bg-panel px-3.5 text-sm text-ink shadow-subtle " +
+  "transition-all duration-200 ease-soft placeholder:text-ink-mute " +
+  "hover:border-line focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/10 " +
+  "disabled:cursor-not-allowed disabled:bg-panel-soft disabled:text-ink-mute";
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input(
   { className, ...props },
@@ -45,14 +45,14 @@ export function Field({
   const id = useId();
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      <label htmlFor={id} className="text-[13px] font-medium text-slate-700">
+      <label htmlFor={id} className="text-[13px] font-medium text-ink-soft">
         {label}
       </label>
       {children(id)}
       {error ? (
         <p className="animate-fade-in text-[12.5px] text-red-600">{error}</p>
       ) : hint ? (
-        <p className="text-[12.5px] text-slate-500">{hint}</p>
+        <p className="text-[12.5px] text-ink-mute">{hint}</p>
       ) : null}
     </div>
   );

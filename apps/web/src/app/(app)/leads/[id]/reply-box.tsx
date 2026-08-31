@@ -18,7 +18,7 @@ export function ReplyBox({ leadId, disabledReason }: { leadId: string; disabledR
 
   if (disabledReason) {
     return (
-      <p className="mt-4 rounded-lg border border-dashed border-slate-300 p-3 text-sm text-slate-500">
+      <p className="mt-4 rounded-lg border border-dashed border-line p-3 text-sm text-ink-mute">
         {disabledReason}
       </p>
     );
@@ -32,13 +32,13 @@ export function ReplyBox({ leadId, disabledReason }: { leadId: string; disabledR
         required
         maxLength={4096}
         placeholder="Escreva uma resposta..."
-        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+        className="w-full rounded-md border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
       />
       <div className="flex items-center gap-3">
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+          className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-canvas hover:bg-ink disabled:opacity-50"
         >
           {pending ? "Enviando..." : "Enviar"}
         </button>

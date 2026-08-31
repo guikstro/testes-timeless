@@ -43,5 +43,5 @@ export const SPEED_TONE_CLASSES: Record<SpeedTone, string> = {
   good: "text-emerald-700",
   warn: "text-amber-700",
   bad: "text-red-700",
-  neutral: "text-slate-700",
+  neutral: "text-ink-soft",
 };

@@ -17,7 +17,7 @@ export function Card({
       className={cn(
         "surface",
         interactive &&
-          "cursor-pointer transition-all duration-300 ease-soft hover:-translate-y-0.5 hover:border-slate-300/70 hover:shadow-lifted",
+          "cursor-pointer transition-all duration-300 ease-soft hover:-translate-y-0.5 hover:border-line/70 hover:shadow-lifted",
         className,
       )}
       {...props}
@@ -39,8 +39,8 @@ export function CardHeader({
   return (
     <div className={cn("flex flex-wrap items-start justify-between gap-3", className)}>
       <div className="min-w-0">
-        <h2 className="font-display text-[15px] font-semibold tracking-tight text-slate-900">{title}</h2>
-        {description ? <p className="mt-0.5 text-[13px] text-slate-500">{description}</p> : null}
+        <h2 className="font-display text-[15px] font-semibold tracking-tight text-ink">{title}</h2>
+        {description ? <p className="mt-0.5 text-[13px] text-ink-mute">{description}</p> : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>

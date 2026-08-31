@@ -24,8 +24,8 @@ export default async function OperatorsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-slate-900">Operadores</h1>
-      <p className="mb-6 mt-1 text-sm text-slate-500">
+      <h1 className="text-2xl font-semibold text-ink">Operadores</h1>
+      <p className="mb-6 mt-1 text-sm text-ink-mute">
         Quem da sua equipe pode acessar a administração da plataforma e entrar nas contas dos clientes.
       </p>
 
@@ -33,9 +33,9 @@ export default async function OperatorsPage() {
         <AddOperatorForm />
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded-xl border border-line bg-panel">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 text-xs uppercase text-slate-500">
+          <thead className="border-b border-line text-xs uppercase text-ink-mute">
             <tr>
               <th className="px-4 py-3 font-medium">Pessoa</th>
               <th className="px-4 py-3 font-medium">Nível</th>
@@ -44,14 +44,14 @@ export default async function OperatorsPage() {
           </thead>
           <tbody>
             {operators.map((operator) => (
-              <tr key={operator.id} className="border-b border-slate-100 last:border-0">
+              <tr key={operator.id} className="border-b border-line/60 last:border-0">
                 <td className="px-4 py-3">
-                  <p className="font-medium text-slate-900">{operator.name}</p>
-                  <p className="text-xs text-slate-500">{operator.email}</p>
+                  <p className="font-medium text-ink">{operator.name}</p>
+                  <p className="text-xs text-ink-mute">{operator.email}</p>
                 </td>
                 <td className="px-4 py-3">
-                  <p className="text-slate-700">{ROLE_LABELS[operator.platformRole]}</p>
-                  <p className="text-xs text-slate-400">{ROLE_DESCRIPTIONS[operator.platformRole]}</p>
+                  <p className="text-ink-soft">{ROLE_LABELS[operator.platformRole]}</p>
+                  <p className="text-xs text-ink-mute">{ROLE_DESCRIPTIONS[operator.platformRole]}</p>
                 </td>
                 <td className="px-4 py-3">
                   <RevokeOperatorButton userId={operator.id} name={operator.name} />
@@ -63,7 +63,7 @@ export default async function OperatorsPage() {
       </div>
 
       {adminCount === 1 ? (
-        <p className="mt-3 text-xs text-slate-500">
+        <p className="mt-3 text-xs text-ink-mute">
           Há apenas um administrador. Ele não pode ser removido nem rebaixado até que outro seja promovido, do
           contrário, ninguém conseguiria mais gerenciar operadores.
         </p>

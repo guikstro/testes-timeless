@@ -25,7 +25,7 @@ const VARIANTS: Record<Variant, string> = {
     "before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-canvas/25",
   accent:
     "bg-accent text-accent-contrast shadow-subtle hover:shadow-card hover:brightness-[1.06] " +
-    "before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-white/30",
+    "before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-panel/30",
   secondary:
     "border border-line bg-panel text-ink shadow-subtle hover:border-ink/25 hover:shadow-card",
   ghost: "text-ink-soft hover:bg-ink/[0.06] hover:text-ink",

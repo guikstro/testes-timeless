@@ -36,6 +36,15 @@
   --brand: 0 125 94;
   --brand-soft: 232 242 238;
   --brand-ink: 0 95 71;
+
+  /**
+   * Séries dos gráficos. Valores validados para daltonismo, com um passo por
+   * tema: a mesma tinta que lê sobre marfim desaparece sobre o preto.
+   */
+  --serie-1: 42 120 214;
+  --serie-2: 235 104 52;
+  --grade: 226 219 205;
+  --guia: 148 141 128;
 }
 
 .dark {
@@ -56,6 +65,11 @@
   --brand: 0 168 123;
   --brand-soft: 10 38 30;
   --brand-ink: 108 226 184;
+
+  --serie-1: 57 135 229;
+  --serie-2: 217 89 38;
+  --grade: 48 47 44;
+  --guia: 130 124 114;
 }
 
 body {

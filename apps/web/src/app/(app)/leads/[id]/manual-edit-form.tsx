@@ -19,7 +19,7 @@ export function ManualEditForm({ leadId, status }: { leadId: string; status: Lea
       <select
         name="status"
         defaultValue=""
-        className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+        className="rounded-md border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
       >
         <option value="">Manter status atual</option>
         {/* O status só avança: oferecer um estágio já passado geraria um erro previsível. */}
@@ -35,12 +35,12 @@ export function ManualEditForm({ leadId, status }: { leadId: string; status: Lea
         name="revenueReais"
         placeholder="Receita em R$ (opcional)"
         inputMode="decimal"
-        className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+        className="rounded-md border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
       />
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+        className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-canvas hover:bg-ink disabled:opacity-50"
       >
         {pending ? "Salvando..." : "Salvar correção"}
       </button>
@@ -72,14 +72,14 @@ export function DisqualifyForm({
   if (disqualifiedAt) {
     return (
       <form action={formAction} className="flex flex-wrap items-center gap-3">
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-ink-soft">
           Desqualificado em {new Date(disqualifiedAt).toLocaleString("pt-BR")}
           {disqualifiedReason ? `. Motivo: ${disqualifiedReason}` : ""}
         </p>
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          className="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-soft hover:bg-panel-soft disabled:opacity-50"
         >
           {pending ? "Reativando..." : "Reativar lead"}
         </button>
@@ -94,12 +94,12 @@ export function DisqualifyForm({
         name="reason"
         placeholder="Motivo (opcional)"
         maxLength={200}
-        className="min-w-[200px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+        className="min-w-[200px] flex-1 rounded-md border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
       />
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+        className="rounded-md border border-line px-3 py-2 text-sm font-medium text-ink-soft hover:bg-panel-soft disabled:opacity-50"
       >
         {pending ? "Salvando..." : "Desqualificar"}
       </button>

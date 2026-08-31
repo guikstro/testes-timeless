@@ -22,18 +22,18 @@ export default async function LinksPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-slate-900">Links rastreáveis</h1>
+      <h1 className="mb-6 text-2xl font-semibold text-ink">Links rastreáveis</h1>
 
       <CreateLinkForm />
 
       {items.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600">
+        <div className="rounded-xl border border-dashed border-line bg-panel p-8 text-center text-sm text-ink-soft">
           Nenhum link criado ainda.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <div className="overflow-x-auto rounded-xl border border-line bg-panel">
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-200 text-slate-500">
+            <thead className="border-b border-line text-ink-mute">
               <tr>
                 <th className="px-4 py-3 font-medium">Nome</th>
                 <th className="px-4 py-3 font-medium">Link</th>
@@ -44,14 +44,14 @@ export default async function LinksPage() {
             </thead>
             <tbody>
               {items.map((item) => (
-                <tr key={item.id} className="border-b border-slate-100 last:border-0">
-                  <td className="px-4 py-3 text-slate-900">{item.name}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-600">
+                <tr key={item.id} className="border-b border-line/60 last:border-0">
+                  <td className="px-4 py-3 text-ink">{item.name}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-ink-soft">
                     {PUBLIC_TRACKING_BASE_URL}/r/{item.code}
                   </td>
-                  <td className="max-w-xs truncate px-4 py-3 text-slate-500">{item.destinationUrl}</td>
-                  <td className="px-4 py-3 text-slate-900">{item._count.clicks}</td>
-                  <td className="px-4 py-3 text-slate-500">
+                  <td className="max-w-xs truncate px-4 py-3 text-ink-mute">{item.destinationUrl}</td>
+                  <td className="px-4 py-3 text-ink">{item._count.clicks}</td>
+                  <td className="px-4 py-3 text-ink-mute">
                     {new Date(item.createdAt).toLocaleDateString("pt-BR")}
                   </td>
                 </tr>
