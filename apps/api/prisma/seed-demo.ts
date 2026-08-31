@@ -39,6 +39,26 @@ const aleatorio = criarAleatorio(20260831);
 const escolher = <T,>(lista: T[]): T => lista[Math.floor(aleatorio() * lista.length)];
 const entre = (min: number, max: number) => min + Math.floor(aleatorio() * (max - min + 1));
 
+/** Falas do lead e da equipe, para a conversa ter cara de conversa. */
+const FALAS_LEAD = [
+  "Oi, vi seu anúncio e queria saber mais",
+  "Bom dia! Vocês atendem minha região?",
+  "Qual o valor do serviço?",
+  "Consigo agendar essa semana?",
+  "Perfeito, era isso que eu procurava",
+  "Vou pensar e te retorno",
+  "Pode me mandar mais detalhes?",
+];
+
+const FALAS_EQUIPE = [
+  "Olá! Claro, posso te explicar tudo",
+  "Bom dia! Atendemos sim, me conta um pouco do seu caso",
+  "Depende do que você precisa, posso te passar as opções",
+  "Consigo sim, tenho horário na terça e na quinta",
+  "Fico à disposição para qualquer dúvida",
+  "Acabei de te mandar por e-mail também",
+];
+
 const NOMES = [
   "Ana Beatriz", "Carlos Eduardo", "Marina Souza", "Rafael Lima", "Juliana Alves",
   "Pedro Henrique", "Camila Ferreira", "Lucas Martins", "Fernanda Rocha", "Bruno Carvalho",
@@ -85,7 +105,11 @@ async function main() {
 
   // Recria só a organização de demonstração. O cascade do schema leva junto
   // leads, conversas, eventos e vendas dela, e nada de mais ninguém.
+  //
+  // O usuário sai à parte: ele não pertence à organização, então o cascade não
+  // o alcança e a segunda execução colidiria no e-mail único.
   await prisma.organization.deleteMany({ where: { slug: SLUG } });
+  await prisma.user.deleteMany({ where: { email: "demo@demonstracao.local" } });
 
   const org = await prisma.organization.create({
     data: {
@@ -213,6 +237,75 @@ async function main() {
               }
             : {}),
         },
+      });
+
+      /*
+        Conversa. Sem ela a ficha do lead nasce vazia e as métricas de
+        atendimento não têm o que medir: o tempo até a primeira resposta sai
+        do intervalo entre a primeira mensagem do lead e a primeira da equipe.
+      */
+      const conversa = await prisma.conversation.create({
+        data: {
+          organizationId: org.id,
+          leadId: lead.id,
+          whatsappConnectionId: org.whatsappConnection!.id,
+          startedAt: contato,
+          lastMessageAt: contato,
+        },
+      });
+
+      // Quem qualifica troca mais mensagens; quem some manda uma e para.
+      const trocas = qualifica ? entre(3, 7) : entre(1, 2);
+      let quando = new Date(contato);
+      const mensagens: {
+        conversationId: string;
+        direction: "INBOUND" | "OUTBOUND";
+        type: "TEXT";
+        text: string;
+        timestamp: Date;
+        outboundStatus: "SENT" | null;
+        externalId: string;
+      }[] = [];
+
+      for (let t = 0; t < trocas; t += 1) {
+        mensagens.push({
+          conversationId: conversa.id,
+          direction: "INBOUND",
+          type: "TEXT",
+          text: escolher(FALAS_LEAD),
+          timestamp: new Date(quando),
+          outboundStatus: null,
+          externalId: `demo-${lead.id}-${t}-in`,
+        });
+
+        // Resposta da equipe: minutos para a maioria, horas de vez em quando.
+        // É essa variação que faz a métrica de atendimento ter o que mostrar.
+        const demora = aleatorio() < 0.75 ? entre(1, 25) : entre(60, 480);
+        quando = new Date(quando.getTime() + demora * 60_000);
+
+        mensagens.push({
+          conversationId: conversa.id,
+          direction: "OUTBOUND",
+          type: "TEXT",
+          text: escolher(FALAS_EQUIPE),
+          timestamp: new Date(quando),
+          outboundStatus: "SENT",
+          externalId: `demo-${lead.id}-${t}-out`,
+        });
+
+        quando = new Date(quando.getTime() + entre(20, 600) * 60_000);
+      }
+
+      // Alguns leads ficam com a bola do nosso lado, para "aguardando
+      // resposta" existir na tela em vez de ser sempre zero.
+      if (!qualifica && aleatorio() < 0.45) {
+        mensagens.pop();
+      }
+
+      await prisma.message.createMany({ data: mensagens });
+      await prisma.conversation.update({
+        where: { id: conversa.id },
+        data: { lastMessageAt: mensagens[mensagens.length - 1].timestamp },
       });
 
       // Eventos de linha do tempo, para a ficha do lead não nascer vazia.

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
 import { formatCentsAsBRL } from "@/lib/currency";
+import { CountUp } from "@/components/ui/count-up";
 import { DailyPoint, LeadsAreaChart } from "./leads-area-chart";
 
 interface OriginBucket {
@@ -40,12 +41,34 @@ function formatRate(rate: number | null): string {
   return `${Math.round(rate * 100)}%`;
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+/**
+ * Cartão de número.
+ *
+ * `numero` faz o valor subir ao entrar na tela; `valor` cobre o que não é
+ * contável. A borda inferior acende no hover: o cartão responde sem se mexer,
+ * porque uma fileira de números que salta a cada passada de mouse cansa.
+ */
+function Stat({
+  label,
+  numero,
+  valor,
+  hint,
+  formato,
+}: {
+  label: string;
+  numero?: number;
+  valor?: string;
+  hint?: string;
+  formato?: "inteiro" | "moeda";
+}) {
   return (
-    <div className="rounded-xl border border-line bg-panel p-5">
-      <p className="text-xs font-medium uppercase tracking-wide text-ink-mute">{label}</p>
-      <p className="mt-1.5 text-2xl font-semibold tabular-nums text-ink">{value}</p>
-      <p className="mt-0.5 text-xs text-ink-mute">{hint ?? " "}</p>
+    <div className="group relative overflow-hidden rounded-2xl border border-line bg-panel p-5 shadow-subtle transition-shadow duration-300 ease-soft hover:shadow-card">
+      <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-ink-mute">{label}</p>
+      <p className="mt-2 text-[28px] font-semibold leading-none tabular-nums text-ink">
+        {numero !== undefined ? <CountUp value={numero} formato={formato} /> : valor}
+      </p>
+      <p className="mt-2 text-xs text-ink-mute">{hint ?? " "}</p>
+      <span className="absolute inset-x-0 bottom-0 h-0.5 origin-left scale-x-0 bg-accent transition-transform duration-500 ease-soft group-hover:scale-x-100" />
     </div>
   );
 }
@@ -125,15 +148,28 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <Stat label="Leads" value={String(totals.leads)} hint={totals.disqualified > 0 ? `${totals.disqualified} desqualificado(s)` : undefined} />
+        <Stat
+          label="Leads"
+          numero={totals.leads}
+          hint={totals.disqualified > 0 ? `${totals.disqualified} desqualificado(s)` : `últimos ${days} dias`}
+        />
         <Stat
           label="Qualificados"
-          value={String(totals.qualified)}
+          numero={totals.qualified}
           hint={`${formatRate(totals.qualificationRate)} de ${totals.workable}`}
         />
-        <Stat label="Reuniões" value={String(totals.meetings)} />
-        <Stat label="Vendas" value={String(totals.won)} hint={`${formatRate(totals.closeRate)} dos qualificados`} />
-        <Stat label="Receita" value={formatCentsAsBRL(totals.revenueCents)} />
+        <Stat
+          label="Reuniões"
+          numero={totals.meetings}
+          hint={totals.qualified > 0 ? `${formatRate(totals.meetings / totals.qualified)} dos qualificados` : undefined}
+        />
+        <Stat label="Vendas" numero={totals.won} hint={`${formatRate(totals.closeRate)} dos qualificados`} />
+        <Stat
+          label="Receita"
+          numero={Math.round(totals.revenueCents / 100)}
+          formato="moeda"
+          hint={totals.won > 0 ? `${formatCentsAsBRL(Math.round(totals.revenueCents / totals.won))} por venda` : undefined}
+        />
       </div>
 
       <div className="mb-6 rounded-xl border border-line bg-panel p-6">

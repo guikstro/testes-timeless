@@ -81,6 +81,7 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(720);
   const [hovered, setHovered] = useState<number | null>(null);
+  const [entrou, setEntrou] = useState(false);
 
   useLayoutEffect(() => {
     const element = containerRef.current;
@@ -103,6 +104,22 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
       observer.disconnect();
       window.removeEventListener("resize", measure);
     };
+  }, []);
+
+  /*
+    A linha se desenha da esquerda para a direita na primeira aparição.
+    Serve ao dado: o traço percorre o eixo do tempo na mesma direção em que a
+    pessoa vai lê-lo, então o movimento ensina a ler o gráfico em vez de só
+    enfeitar. Roda uma vez e para; repetir a cada rolagem viraria distração.
+  */
+  useEffect(() => {
+    const semMovimento = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (semMovimento) {
+      setEntrou(true);
+      return;
+    }
+    const t = window.setTimeout(() => setEntrou(true), 60);
+    return () => window.clearTimeout(t);
   }, []);
 
   useEffect(() => {
@@ -192,14 +209,34 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
           ) : null,
         )}
 
-        {SERIES.map((series) => {
+        {SERIES.map((series, ordem) => {
           const points = data.map((point, index) => ({ x: xAt(index), y: yAt(point[series.key]) }));
           const line = smoothPath(points);
           const baseline = PAD.top + innerHeight;
+          // Comprimento aproximado do traço, suficiente para o tracejado cobrir
+          // a linha inteira antes de ser puxado de volta.
+          const percurso = innerWidth * 2.2;
           return (
             <g key={series.key}>
-              <path d={`${line} L ${xAt(data.length - 1)} ${baseline} L ${xAt(0)} ${baseline} Z`} fill={`url(#fill-${series.key})`} />
-              <path d={line} fill="none" stroke={series.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              <path
+                d={`${line} L ${xAt(data.length - 1)} ${baseline} L ${xAt(0)} ${baseline} Z`}
+                fill={`url(#fill-${series.key})`}
+                className="transition-opacity duration-700 ease-soft"
+                style={{ opacity: entrou ? 1 : 0, transitionDelay: `${ordem * 120 + 260}ms` }}
+              />
+              <path
+                d={line}
+                fill="none"
+                stroke={series.color}
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{
+                  strokeDasharray: percurso,
+                  strokeDashoffset: entrou ? 0 : percurso,
+                  transition: `stroke-dashoffset 1100ms cubic-bezier(0.16,1,0.3,1) ${ordem * 120}ms`,
+                }}
+              />
             </g>
           );
         })}
