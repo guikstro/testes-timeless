@@ -25,7 +25,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(body, { status: backendResponse.status });
   }
 
-  const response = NextResponse.json({ ok: true });
+  // Busca o nome com o token recém-emitido para a tela de entrada poder
+  // cumprimentar quem volta. É aqui, e não num endpoint público que receba um
+  // e-mail: responder "quem é o dono deste e-mail?" antes da senha revelaria
+  // quais e-mails têm conta, que é exatamente o que o login evita hoje ao
+  // comparar contra um hash falso e devolver sempre a mesma mensagem.
+  let firstName: string | null = null;
+  try {
+    const session = await fetch(`${API_URL}/auth/session`, {
+      headers: { Authorization: `Bearer ${body.accessToken}` },
+      cache: "no-store",
+    });
+    if (session.ok) {
+      const data = await session.json();
+      firstName = String(data?.user?.name ?? "").trim().split(/\s+/)[0] || null;
+    }
+  } catch {
+    // Saudação é enfeite: se falhar, o login continua valendo.
+  }
+
+  const response = NextResponse.json({ ok: true, firstName });
   response.cookies.set(ACCESS_TOKEN_COOKIE, body.accessToken, {
     ...SESSION_COOKIE_OPTIONS,
     maxAge: ACCESS_TOKEN_MAX_AGE,

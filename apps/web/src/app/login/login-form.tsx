@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { esquecerUltimoNome, gravarUltimoNome, lerUltimoNome } from "@/lib/last-user";
 
 const FALLBACK = "Não foi possível entrar.";
 
@@ -29,6 +30,12 @@ export function LoginForm() {
   const [revealed, setRevealed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [nome, setNome] = useState<string | null>(null);
+
+  // Depois da montagem, nunca durante a renderização no servidor: o servidor
+  // não tem acesso ao armazenamento do navegador, e ler ali quebraria a
+  // hidratação com um texto diferente do que ele mandou.
+  useEffect(() => setNome(lerUltimoNome()), []);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -46,6 +53,11 @@ export function LoginForm() {
         setError(await readErrorMessage(response));
         return;
       }
+
+      // Só grava depois de a entrada dar certo, então o nome guardado é
+      // sempre de quem provou ser quem diz ser neste navegador.
+      const body = await response.json().catch(() => null);
+      gravarUltimoNome(body?.firstName ?? null);
 
       router.push(searchParams.get("next") ?? "/dashboard");
       router.refresh();
@@ -102,11 +114,36 @@ export function LoginForm() {
           <h1 className="font-display text-[clamp(2.6rem,7vw,3.9rem)] font-extrabold uppercase leading-[0.92] tracking-[-0.03em] text-ink">
             Bem-vindo
             <br />
-            de volta
+            de volta{nome ? "," : ""}
+            {nome ? (
+              <>
+                <br />
+                <span className="text-accent">{nome}</span>
+              </>
+            ) : null}
           </h1>
-          <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-ink-soft">
-            Cada lead, do anúncio à venda, com a origem provada, nunca deduzida.
-          </p>
+
+          {nome ? (
+            /*
+              Saída obrigatória, não cortesia: em computador compartilhado o
+              nome de quem entrou por último fica visível para o próximo, e
+              precisa haver como apagá-lo sem depender de limpar o navegador.
+            */
+            <button
+              type="button"
+              onClick={() => {
+                esquecerUltimoNome();
+                setNome(null);
+              }}
+              className="focus-ring mt-4 rounded text-[13px] text-ink-mute underline decoration-line underline-offset-4 transition-colors hover:text-ink"
+            >
+              Não é você? Entrar com outra conta
+            </button>
+          ) : (
+            <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-ink-soft">
+              Cada lead, do anúncio à venda, com a origem provada, nunca deduzida.
+            </p>
+          )}
 
           <form onSubmit={handleSubmit} className="mt-10 flex flex-col gap-7">
             <div className="relative">
