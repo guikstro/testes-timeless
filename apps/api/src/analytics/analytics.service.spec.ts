@@ -29,9 +29,15 @@ describe("AnalyticsService", () => {
 
     const from = new Date(result.period.from);
     const to = new Date(result.period.to);
+
+    // Compara DATAS, não milissegundos: `to` é o instante atual, então à noite
+    // a diferença em milissegundos passa de 6,5 dias e arredondava para 7,
+    // fazendo o teste falhar conforme a hora em que rodasse.
+    const soData = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const diasDeCalendario = Math.round((soData(to) - soData(from)) / 86_400_000);
+
     // 7 dias incluindo hoje são 6 dias completos para trás.
-    const diffDays = Math.round((to.getTime() - from.getTime()) / 86_400_000);
-    expect(diffDays).toBe(6);
+    expect(diasDeCalendario).toBe(6);
     expect(from.getHours()).toBe(0);
   });
 

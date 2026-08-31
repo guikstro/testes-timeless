@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGua
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
-import { PaginationQueryDto } from "../common/dto/pagination.dto";
+import { ListLeadsDto } from "./dto/list-leads.dto";
 import { LeadsService } from "./leads.service";
 import { UpdateLeadDto } from "./dto/update-lead.dto";
 import { SendMessageDto } from "./dto/send-message.dto";
@@ -13,8 +13,8 @@ export class LeadsController {
   constructor(private readonly leadsService: LeadsService) {}
 
   @Get()
-  list(@CurrentUser() user: AuthenticatedUser, @Query() pagination: PaginationQueryDto) {
-    return this.leadsService.list(user.organizationId, pagination);
+  list(@CurrentUser() user: AuthenticatedUser, @Query() query: ListLeadsDto) {
+    return this.leadsService.list(user.organizationId, query);
   }
 
   @Get(":id")

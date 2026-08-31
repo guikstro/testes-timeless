@@ -10,6 +10,7 @@ import { WHATSAPP_SEND_QUEUE } from "../common/queue/queue.constants";
 import { WhatsAppSendJob } from "../common/queue/whatsapp-send.job";
 import { UpdateLeadDto } from "./dto/update-lead.dto";
 import { SendMessageDto } from "./dto/send-message.dto";
+import { ListLeadsDto } from "./dto/list-leads.dto";
 import { computeLeadMetrics } from "./lead-metrics";
 import { AdIds, AdReferences, extractAdIds } from "./ad-references";
 
@@ -33,19 +34,69 @@ export class LeadsService {
     @InjectQueue(WHATSAPP_SEND_QUEUE) private readonly sendQueue: Queue<WhatsAppSendJob>,
   ) {}
 
-  async list(organizationId: string, pagination: PaginationQueryDto): Promise<PaginatedResult<unknown>> {
-    const offset = pagination.offset ?? 0;
-    const limit = pagination.limit ?? 20;
+  async list(organizationId: string, query: ListLeadsDto): Promise<PaginatedResult<unknown>> {
+    const offset = query.offset ?? 0;
+    const limit = query.limit ?? 20;
+    const termo = query.search?.trim();
+
+    const where: Prisma.LeadWhereInput = { organizationId };
+
+    if (termo) {
+      // Telefone é buscado só pelos dígitos: quem digita "85 99999" espera
+      // achar "+5585999999999", e comparar as duas formas cruas nunca casaria.
+      const digitos = termo.replace(/\D/g, "");
+      where.OR = [
+        { name: { contains: termo, mode: "insensitive" } },
+        ...(digitos ? [{ normalizedPhone: { contains: digitos } }] : []),
+      ];
+    }
+
+    if (query.status === "DISQUALIFIED") {
+      where.disqualifiedAt = { not: null };
+    } else if (query.status && query.status !== "AWAITING") {
+      where.status = query.status;
+      // Um lead descartado não aparece no estágio em que parou: quem filtra
+      // por "Qualificado" quer trabalhar a lista, não revisar o que foi
+      // descartado.
+      where.disqualifiedAt = null;
+    }
+
+    // "Aguardando" depende da ÚLTIMA mensagem de cada conversa, que o Prisma
+    // não sabe comparar num `where`. O caminho é trazer a última de cada uma
+    // e filtrar depois, então ele vive separado para não penalizar os outros
+    // filtros com um include que eles não usam.
+    if (query.status === "AWAITING") {
+      const candidatos = await this.prisma.lead.findMany({
+        where: { ...where, disqualifiedAt: null },
+        include: {
+          attribution: true,
+          sale: true,
+          conversations: { select: { messages: { orderBy: { timestamp: "desc" }, take: 1 } } },
+        },
+        orderBy: { lastContactAt: "desc" },
+      });
+
+      const aguardando = candidatos.filter((lead) =>
+        lead.conversations.some((conversa) => conversa.messages[0]?.direction === "INBOUND"),
+      );
+
+      return {
+        items: aguardando.slice(offset, offset + limit),
+        total: aguardando.length,
+        offset,
+        limit,
+      };
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.lead.findMany({
-        where: { organizationId },
+        where,
         include: { attribution: true, sale: true },
         orderBy: { lastContactAt: "desc" },
         skip: offset,
         take: limit,
       }),
-      this.prisma.lead.count({ where: { organizationId } }),
+      this.prisma.lead.count({ where }),
     ]);
 
     return { items, total, offset, limit };
