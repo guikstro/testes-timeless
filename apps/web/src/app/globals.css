@@ -3,56 +3,87 @@
 @tailwind utilities;
 
 /**
- * Identidade visual do produto.
+ * Identidade Timeless.
  *
- * O acento é uma variável e não uma cor fixa porque cada organização define a
- * sua (ver BrandProvider). Tudo o que é "a cor da marca" na interface aponta
- * para cá — trocar a marca é trocar três números, não caçar classes.
+ * Os valores vêm das artes da marca (Basic Branding), não de escolha minha:
+ * marfim #FFF9ED e quase-preto #030403 são exatamente o fundo claro e o fundo
+ * escuro dos logotipos; #F0EADF é o creme do logotipo sobre escuro.
+ *
+ * Tudo aqui é papel, não tom — `ink` é "a cor do texto", e o que ela vale
+ * muda entre os temas. As telas nunca citam um tom diretamente, então nenhuma
+ * delas precisa saber se está no claro ou no escuro.
  */
 :root {
   color-scheme: light;
 
-  --brand: 37 99 235;
-  --brand-soft: 239 246 255;
-  --brand-ink: 30 64 175;
+  --canvas: 255 249 237;
+  --panel: 255 255 255;
+  --panel-soft: 250 245 235;
+  --line: 226 219 205;
 
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Manrope", var(--font-sans);
+  --ink: 12 11 10;
+  --ink-soft: 82 76 68;
+  --ink-mute: 133 125 113;
+
+  /**
+   * Verde da marca, medido no material do Creative Studio. Cada tema recebe
+   * o seu passo do mesmo tom — não o mesmo valor invertido: o que lê sobre
+   * marfim some sobre o preto, e o que brilha no escuro esmaece no claro.
+   */
+  --accent: 0 125 94;
+  --accent-contrast: 255 255 255;
+
+  --brand: 0 125 94;
+  --brand-soft: 232 242 238;
+  --brand-ink: 0 95 71;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --canvas: 3 4 3;
+  --panel: 20 20 19;
+  --panel-soft: 28 28 26;
+  --line: 48 47 44;
+
+  --ink: 240 234 223;
+  --ink-soft: 176 169 157;
+  --ink-mute: 130 124 114;
+
+  --accent: 0 168 123;
+  --accent-contrast: 3 4 3;
+
+  --brand: 0 168 123;
+  --brand-soft: 10 38 30;
+  --brand-ink: 108 226 184;
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply bg-canvas text-ink antialiased;
   font-feature-settings: "cv02", "cv03", "cv04", "ss01";
 }
 
-/* Números em colunas precisam alinhar; texto corrido, não. */
 .tnum {
   font-variant-numeric: tabular-nums;
 }
 
 @layer components {
-  /**
-   * Superfície padrão. Borda quase invisível + sombra em camadas: a separação
-   * vem da profundidade, não de um traço forte em volta de tudo.
-   */
   .surface {
-    @apply rounded-2xl border border-slate-200/70 bg-white shadow-card;
+    @apply rounded-2xl border border-line/70 bg-panel shadow-card;
   }
 
-  /* Vidro: usado onde algo se sobrepõe ao conteúdo e precisa deixá-lo entrever. */
   .glass {
-    @apply border border-white/40 bg-white/70 shadow-lifted backdrop-blur-xl backdrop-saturate-150;
+    @apply border border-line/50 bg-panel/70 shadow-lifted backdrop-blur-xl backdrop-saturate-150;
   }
 
   .focus-ring {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/40 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas;
   }
 }
 
 /**
  * Quem pediu menos movimento recebe menos movimento — inclusive nas animações
- * de entrada, que são justamente as que incomodam quem tem sensibilidade
- * vestibular. Não desligar tudo: transições de cor não causam desconforto.
+ * de entrada, que são as que incomodam quem tem sensibilidade vestibular.
  */
 @media (prefers-reduced-motion: reduce) {
   *,

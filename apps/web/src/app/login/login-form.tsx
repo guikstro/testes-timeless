@@ -1,24 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ThemeToggle } from "@/components/theme-toggle";
 
-/**
- * Lê a mensagem de erro sem confiar que a resposta tem corpo.
- *
- * Um `response.json()` direto quebra a tela com "Unexpected end of JSON input"
- * quando a API responde vazio — que é o que acontece quando ela está fora do
- * ar. Um erro de rede não pode virar tela branca.
- */
 const FALLBACK = "Não foi possível entrar.";
 
+/**
+ * Lê a mensagem de erro sem confiar que a resposta tem corpo. Um
+ * `response.json()` direto quebra a tela com "Unexpected end of JSON input"
+ * quando a API responde vazio — e um erro de rede não pode virar tela branca.
+ */
 async function readErrorMessage(response: Response): Promise<string> {
   try {
     const body = await response.json();
     return typeof body?.message === "string" ? body.message : FALLBACK;
   } catch {
-    return response.status >= 500 ? "O servidor não respondeu. Tente novamente." : FALLBACK;
+    return response.status >= 500 ? "O servidor não respondeu. Tente de novo." : FALLBACK;
   }
 }
 
@@ -51,64 +51,74 @@ export function LoginForm() {
       router.push(searchParams.get("next") ?? "/dashboard");
       router.refresh();
     } catch {
-      // Sem rede o `fetch` rejeita antes de existir uma resposta.
       setError("Sem conexão com o servidor.");
     } finally {
       setLoading(false);
     }
   }
 
+  /**
+   * Campo com traço embaixo, não caixa fechada.
+   *
+   * O lockup da marca é tipografia sobre vazio; caixas com borda em volta de
+   * tudo brigariam com isso. O traço marca a linha de escrita e some quando
+   * não é necessário — é o mesmo princípio de deixar o conteúdo falar.
+   */
   const field =
-    "h-12 w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 text-[15px] text-white " +
-    "transition-all duration-200 ease-soft placeholder:text-white/30 " +
-    "hover:border-white/20 focus:border-white/30 focus:bg-white/[0.07] focus:outline-none " +
-    "focus:ring-4 focus:ring-white/10";
+    "peer h-12 w-full border-0 border-b border-line bg-transparent px-0 text-[17px] text-ink " +
+    "transition-colors duration-200 placeholder:text-ink-mute/60 " +
+    "focus:border-accent focus:outline-none focus:ring-0";
 
   return (
-    // A entrada é escura de propósito, enquanto o produto é claro: é a
-    // soleira, não uma tela de trabalho — pode ser dramática sem cansar
-    // ninguém, porque se atravessa uma vez.
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#08080A] px-4 py-12">
-      <div aria-hidden className="pointer-events-none absolute inset-0 z-0">
-        {/*
-          A aurora usa o mesmo laranja das séries dos gráficos. Não é uma cor
-          escolhida à toa: é a que o produto já usa, então a entrada e o
-          dashboard falam a mesma língua.
-        */}
-        {/*
-          A aurora sangra pela borda esquerda e sobe até o meio da tela. Um
-          brilho todo dentro do quadro vira "bola no fundo"; cortado pela
-          borda ele lê como luz vindo de fora.
-        */}
-        <div className="absolute left-[-30vw] top-1/2 h-[85vh] w-[70vw] -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(249,134,63,0.85),rgba(235,104,52,0.35)_45%,rgba(235,104,52,0.08)_70%,transparent)] blur-[60px] motion-safe:animate-drift" />
-        <div
-          className="absolute left-[-16vw] top-[42%] h-[46vh] w-[40vw] -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(253,224,160,0.55),rgba(250,204,21,0.14)_55%,transparent)] blur-[70px] motion-safe:animate-drift"
-          style={{ animationDelay: "-7s" }}
-        />
-        <div
-          className="absolute bottom-[-18vh] right-[-14vw] h-[60vh] w-[46vw] rounded-full bg-[radial-gradient(closest-side,rgba(42,120,214,0.30),transparent_72%)] blur-[80px] motion-safe:animate-drift"
-          style={{ animationDelay: "-13s" }}
-        />
-        {/* Textura fina: sem ela o degradê exibe bandas em telas de 8 bits. */}
-        <div className="absolute inset-0 opacity-[0.16] [background-image:radial-gradient(rgba(255,255,255,0.35)_0.5px,transparent_0.5px)] [background-size:3px_3px]" />
+    <div className="relative flex min-h-screen flex-col bg-canvas px-6 py-8">
+      {/*
+        Um único brilho, na cor da marca, atrás do conteúdo. Um só, e discreto:
+        a identidade da Timeless é tipografia sobre vazio, e três manchas
+        coloridas seriam ruído competindo com ela.
+      */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <div className="absolute left-1/2 top-[-30vh] h-[70vh] w-[110vw] -translate-x-1/2 rounded-[50%] bg-[radial-gradient(closest-side,rgb(var(--accent)/0.16),transparent)] blur-[80px] motion-safe:animate-drift" />
       </div>
 
-      <div className="animate-rise-in relative z-10 w-full max-w-[26rem]">
-        <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-8 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.9)] backdrop-blur-2xl">
-          <span className="mb-6 flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#f97a45] to-[#eb6834] shadow-[0_8px_24px_-8px_rgba(235,104,52,0.8)]">
-            <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.1} strokeLinecap="round" className="h-5 w-5" aria-hidden>
-              <path d="M3 13h4v8H3zM10 3h4v18h-4zM17 9h4v12h-4z" />
-            </svg>
-          </span>
+      <header className="relative z-10 flex items-center justify-between">
+        <Image
+          src="/brand/wordmark-light.png"
+          alt="Timeless"
+          width={1400}
+          height={261}
+          priority
+          className="h-6 w-auto dark:hidden"
+        />
+        <Image
+          src="/brand/wordmark-dark.png"
+          alt="Timeless"
+          width={1400}
+          height={261}
+          priority
+          className="hidden h-6 w-auto dark:block"
+        />
+        <ThemeToggle />
+      </header>
 
-          <h1 className="font-display text-[28px] font-semibold leading-tight tracking-tight text-white">
-            Bem-vindo de volta
+      <main className="relative z-10 flex flex-1 items-center justify-center py-10">
+        <div className="animate-rise-in w-full max-w-[30rem]">
+          {/*
+            Caixa alta e pesada, como os títulos do material da marca. É o
+            gesto tipográfico da Timeless — sem ele a tela seria genérica,
+            por mais bem espaçada que estivesse.
+          */}
+          <h1 className="font-display text-[clamp(2.6rem,7vw,3.9rem)] font-extrabold uppercase leading-[0.92] tracking-[-0.03em] text-ink">
+            Bem-vindo
+            <br />
+            de volta
           </h1>
-          <p className="mt-1.5 text-[14px] text-white/50">Acompanhe cada lead do anúncio até a venda.</p>
+          <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-ink-soft">
+            Cada lead, do anúncio à venda — com a origem provada, nunca deduzida.
+          </p>
 
-          <form onSubmit={handleSubmit} className="mt-7 flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <label htmlFor="login-email" className="text-[13px] font-medium text-white/75">
+          <form onSubmit={handleSubmit} className="mt-10 flex flex-col gap-7">
+            <div className="relative">
+              <label htmlFor="login-email" className="mb-1.5 block text-[12px] font-medium uppercase tracking-[0.12em] text-ink-mute">
                 E-mail
               </label>
               <input
@@ -123,8 +133,8 @@ export function LoginForm() {
               />
             </div>
 
-            <div className="flex flex-col gap-2">
-              <label htmlFor="login-password" className="text-[13px] font-medium text-white/75">
+            <div className="relative">
+              <label htmlFor="login-password" className="mb-1.5 block text-[12px] font-medium uppercase tracking-[0.12em] text-ink-mute">
                 Senha
               </label>
               <div className="relative">
@@ -136,18 +146,18 @@ export function LoginForm() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  className={`${field} pr-12`}
+                  className={`${field} pr-11`}
                 />
                 <button
                   type="button"
                   onClick={() => setRevealed((current) => !current)}
-                  // Sem rótulo o leitor de tela anuncia só "botão"; e o estado
-                  // precisa dizer o que a senha está agora, não o que o clique fará.
+                  // O rótulo descreve o estado atual, não o que o clique fará —
+                  // sem ele o leitor de tela anuncia apenas "botão".
                   aria-label={revealed ? "Ocultar senha" : "Mostrar senha"}
                   aria-pressed={revealed}
-                  className="absolute right-1.5 top-1.5 flex h-9 w-9 items-center justify-center rounded-lg text-white/40 transition-colors duration-200 hover:bg-white/10 hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                  className="focus-ring absolute right-0 top-1 flex h-10 w-10 items-center justify-center rounded-full text-ink-mute transition-colors hover:text-ink"
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]" aria-hidden>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]" aria-hidden>
                     {revealed ? (
                       <>
                         <path d="M3 3l18 18M10.6 10.6a3 3 0 004.2 4.2" />
@@ -165,51 +175,41 @@ export function LoginForm() {
             </div>
 
             {error ? (
-              <p
-                role="alert"
-                className="animate-rise-in rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[13px] text-red-200"
-              >
+              <p role="alert" className="animate-rise-in border-l-2 border-red-500 pl-3 text-[13px] text-red-600 dark:text-red-400">
                 {error}
               </p>
             ) : null}
 
-            {/*
-              Texto escuro, não branco: sobre este laranja o branco fica em
-              2.5:1, muito abaixo do mínimo legível. Escurecer o gradiente até
-              o branco passar apagaria o brilho — o marrom profundo mantém a
-              cor viva e chega a 7.3:1.
-            */}
             <button
               type="submit"
               disabled={loading}
               aria-busy={loading || undefined}
-              className="mt-2 inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#f9863f] via-[#f2703a] to-[#e35c2f] text-[15px] font-semibold text-[#2a0e00] shadow-[0_10px_30px_-10px_rgba(235,104,52,0.9)] transition-all duration-200 ease-soft hover:brightness-110 hover:shadow-[0_14px_40px_-10px_rgba(235,104,52,1)] active:scale-[0.985] disabled:pointer-events-none disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08080A]"
+              className="focus-ring group mt-1 inline-flex h-14 items-center justify-between gap-3 rounded-full bg-accent px-7 text-[15px] font-semibold text-accent-contrast transition-all duration-300 ease-soft hover:brightness-110 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60"
             >
+              <span>{loading ? "Entrando" : "Entrar"}</span>
               {loading ? (
-                <>
-                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" className="opacity-30" />
-                    <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-                  </svg>
-                  Entrando
-                </>
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" className="opacity-30" />
+                  <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                </svg>
               ) : (
-                "Entrar"
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px] transition-transform duration-300 ease-soft group-hover:translate-x-1" aria-hidden>
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
               )}
             </button>
           </form>
-        </div>
 
-        <p className="mt-6 text-center text-[13px] text-white/40">
-          Não tem conta?{" "}
-          <Link
-            href="/register"
-            className="rounded font-medium text-white/85 underline decoration-white/30 underline-offset-4 transition-colors hover:text-white hover:decoration-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-          >
-            Criar organização
-          </Link>
-        </p>
-      </div>
+          <p className="mt-8 text-[13px] text-ink-mute">
+            Não tem conta?{" "}
+            <Link href="/register" className="focus-ring rounded font-medium text-ink underline decoration-line underline-offset-4 transition-colors hover:decoration-accent">
+              Criar organização
+            </Link>
+          </p>
+        </div>
+      </main>
+
+      <footer className="relative z-10 text-[11px] uppercase tracking-[0.18em] text-ink-mute">Built to last</footer>
     </div>
   );
 }

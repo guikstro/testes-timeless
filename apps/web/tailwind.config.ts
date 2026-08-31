@@ -9,6 +9,9 @@ import type { Config } from "tailwindcss";
  */
 const config: Config = {
   content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
+  // Classe, não media query: o usuário escolhe o tema e a escolha precisa
+  // vencer a preferência do sistema — com `media` não haveria como.
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
@@ -16,6 +19,26 @@ const config: Config = {
           DEFAULT: "rgb(var(--brand) / <alpha-value>)",
           soft: "rgb(var(--brand-soft) / <alpha-value>)",
           ink: "rgb(var(--brand-ink) / <alpha-value>)",
+        },
+        /**
+         * Paleta Timeless, extraída das artes da marca em Basic Branding:
+         * marfim quente #FFF9ED e quase-preto #030403, com o creme #F0EADF
+         * que o logotipo usa sobre fundo escuro.
+         *
+         * Os papéis (ink, canvas, panel…) trocam de valor entre os temas; as
+         * telas usam o papel e nunca o tom, então nada precisa saber em que
+         * tema está.
+         */
+        ink: "rgb(var(--ink) / <alpha-value>)",
+        "ink-soft": "rgb(var(--ink-soft) / <alpha-value>)",
+        "ink-mute": "rgb(var(--ink-mute) / <alpha-value>)",
+        canvas: "rgb(var(--canvas) / <alpha-value>)",
+        panel: "rgb(var(--panel) / <alpha-value>)",
+        "panel-soft": "rgb(var(--panel-soft) / <alpha-value>)",
+        line: "rgb(var(--line) / <alpha-value>)",
+        accent: {
+          DEFAULT: "rgb(var(--accent) / <alpha-value>)",
+          contrast: "rgb(var(--accent-contrast) / <alpha-value>)",
         },
       },
       fontFamily: {
