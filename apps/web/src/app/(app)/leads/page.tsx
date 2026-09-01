@@ -10,7 +10,12 @@ interface PaginatedResult<T> {
   total: number;
 }
 
-const PAGINA = 200;
+/*
+  100 é o teto que a API impõe, e ele existe para proteger o servidor de uma
+  consulta sem limite. O quadro respeita esse teto e avisa quando há mais,
+  em vez de eu afrouxar a guarda para caber o desenho.
+*/
+const PAGINA = 100;
 
 
 export default async function LeadsPage({
@@ -26,17 +31,8 @@ export default async function LeadsPage({
   if (params.status) consulta.set("status", params.status);
 
   const { items, total } = await apiFetch<PaginatedResult<LeadCartao>>(`/leads?${consulta.toString()}`);
-  const ultimaPagina = Math.max(1, Math.ceil(total / PAGINA));
   const filtrando = Boolean(params.search || params.status);
 
-  function linkPagina(destino: number) {
-    const novos = new URLSearchParams();
-    if (params.search) novos.set("search", params.search);
-    if (params.status) novos.set("status", params.status);
-    if (destino > 1) novos.set("page", String(destino));
-    const query = novos.toString();
-    return query ? `/leads?${query}` : "/leads";
-  }
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -77,31 +73,13 @@ export default async function LeadsPage({
         <>
           <LeadBoard leads={items} />
 
-          {ultimaPagina > 1 ? (
-            <div className="mt-5 flex items-center justify-between">
-              <p className="text-[13px] text-ink-mute">
-                Página {pagina} de {ultimaPagina}
-              </p>
-              <div className="flex gap-2">
-                {pagina > 1 ? (
-                  <Link
-                    href={linkPagina(pagina - 1)}
-                    className="focus-ring inline-flex h-9 items-center rounded-full border border-line bg-panel px-4 text-[13px] font-medium text-ink transition-all duration-200 hover:border-ink/25 active:scale-95"
-                  >
-                    Anterior
-                  </Link>
-                ) : null}
-                {pagina < ultimaPagina ? (
-                  <Link
-                    href={linkPagina(pagina + 1)}
-                    className="focus-ring inline-flex h-9 items-center rounded-full border border-line bg-panel px-4 text-[13px] font-medium text-ink transition-all duration-200 hover:border-ink/25 active:scale-95"
-                  >
-                    Próxima
-                  </Link>
-                ) : null}
-              </div>
-            </div>
+          {total > items.length ? (
+            <p className="mt-4 text-center text-[12.5px] text-ink-mute">
+              Mostrando os {items.length} leads com contato mais recente, de {total} no total. Use a busca ou os
+              filtros para chegar nos outros.
+            </p>
           ) : null}
+
         </>
       )}
     </div>
