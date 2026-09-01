@@ -218,7 +218,9 @@ describe("LeadsService", () => {
     await service.list("org-1", { offset: 0, limit: 20 });
 
     expect(prisma.lead.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ include: { attribution: true, sale: true } }),
+      expect.objectContaining({
+        include: expect.objectContaining({ attribution: true, sale: true }),
+      }),
     );
   });
 
@@ -367,7 +369,58 @@ describe("LeadsService", () => {
       expect(conversionEvents.recordPurchase).toHaveBeenCalledWith("org-1", "lead-1", expect.any(Date), 250000);
     });
 
-    describe("reunião marcada e desqualificação (Fase 11)", () => {
+    it("traz a última mensagem de cada lead na listagem", async () => {
+    const { service, prisma } = buildService();
+    prisma.lead.findMany.mockResolvedValue([
+      {
+        id: "lead-1",
+        conversations: [
+          { messages: [{ direction: "INBOUND", text: "oi", timestamp: new Date("2026-01-02T10:00:00Z") }] },
+        ],
+      },
+    ]);
+    prisma.lead.count.mockResolvedValue(1);
+
+    const resultado = await service.list("org-1", { offset: 0, limit: 20 });
+    const item = resultado.items[0] as { lastMessage: unknown; awaitingReply: boolean; conversations?: unknown };
+
+    expect(item.lastMessage).toMatchObject({ text: "oi", direction: "INBOUND" });
+    // Última mensagem do lead significa que a bola está com a equipe.
+    expect(item.awaitingReply).toBe(true);
+    // A tela não precisa saber que existem conversas; o campo achatado basta.
+    expect(item.conversations).toBeUndefined();
+  });
+
+  it("marca como não aguardando quando a equipe falou por último", async () => {
+    const { service, prisma } = buildService();
+    prisma.lead.findMany.mockResolvedValue([
+      {
+        id: "lead-1",
+        conversations: [
+          { messages: [{ direction: "OUTBOUND", text: "respondido", timestamp: new Date() }] },
+        ],
+      },
+    ]);
+    prisma.lead.count.mockResolvedValue(1);
+
+    const resultado = await service.list("org-1", { offset: 0, limit: 20 });
+
+    expect((resultado.items[0] as { awaitingReply: boolean }).awaitingReply).toBe(false);
+  });
+
+  it("trata um lead sem conversa nenhuma", async () => {
+    const { service, prisma } = buildService();
+    prisma.lead.findMany.mockResolvedValue([{ id: "lead-1", conversations: [] }]);
+    prisma.lead.count.mockResolvedValue(1);
+
+    const resultado = await service.list("org-1", { offset: 0, limit: 20 });
+    const item = resultado.items[0] as { lastMessage: unknown; awaitingReply: boolean };
+
+    expect(item.lastMessage).toBeNull();
+    expect(item.awaitingReply).toBe(false);
+  });
+
+  describe("reunião marcada e desqualificação (Fase 11)", () => {
       function updateData(prisma: { lead: { update: jest.Mock } }) {
         return prisma.lead.update.mock.calls[0][0].data;
       }
