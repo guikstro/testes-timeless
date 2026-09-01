@@ -2,22 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { APARENCIA, Estagio, ORDEM } from "./estagios";
 import { LeadCard, LeadCartao } from "./lead-card";
 import { moverEstagio } from "./actions";
 
-type Estagio = LeadCartao["status"];
 
-/** A ordem do funil. Exportada porque a página busca uma coluna por vez. */
-export const ESTAGIOS = ["NEW", "QUALIFIED", "MEETING_SCHEDULED", "WON"] as const;
-
-const APARENCIA: Record<Estagio, { titulo: string; cor: string }> = {
-  NEW: { titulo: "Novos", cor: "bg-slate-400" },
-  QUALIFIED: { titulo: "Qualificados", cor: "bg-sky-500" },
-  MEETING_SCHEDULED: { titulo: "Reunião marcada", cor: "bg-violet-500" },
-  WON: { titulo: "Vendas", cor: "bg-emerald-500" },
-};
-
-const ORDEM: Record<Estagio, number> = { NEW: 0, QUALIFIED: 1, MEETING_SCHEDULED: 2, WON: 3 };
 
 /**
  * Quadro do funil.

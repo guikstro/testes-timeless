@@ -1,6 +1,7 @@
 import { apiFetch } from "@/lib/api-client";
 import { EmptyState } from "@/components/ui/skeleton";
-import { LeadBoard, ESTAGIOS } from "./lead-board";
+import { ESTAGIOS } from "./estagios";
+import { LeadBoard } from "./lead-board";
 import { LeadCartao } from "./lead-card";
 import { LeadsFilters } from "./leads-filters";
 
