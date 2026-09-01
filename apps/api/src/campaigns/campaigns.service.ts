@@ -35,6 +35,47 @@ export class CampaignsService {
    * ela encontra a linha pelo id real e assume; a linha sem id fica como
    * registro manual, que é o que ela é.
    */
+  /**
+   * Gasto por campanha dentro de uma janela de dias.
+   *
+   * Existe separado de `list()` porque aquela rota traz só as trinta linhas de
+   * gasto mais recentes, o que bastaria para uma tela de acompanhamento mas
+   * truncaria o investimento de um relatório de noventa dias, e um custo por
+   * lead calculado sobre gasto truncado sai baixo demais.
+   */
+  async investimentoNoPeriodo(organizationId: string, dias: number) {
+    // As datas de gasto são gravadas na meia-noite UTC do dia civil, então a
+    // janela é montada no mesmo formato, e não a partir do instante atual.
+    const hoje = new Date();
+    const ate = new Date(Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()));
+    const de = new Date(ate);
+    de.setUTCDate(de.getUTCDate() - (dias - 1));
+
+    const campanhas = await this.prisma.campaign.findMany({
+      where: { organizationId },
+      select: {
+        id: true,
+        name: true,
+        platform: true,
+        spend: {
+          where: { date: { gte: de, lte: ate } },
+          select: { spendCents: true },
+        },
+      },
+      orderBy: { name: "asc" },
+    });
+
+    return campanhas.map((campanha) => ({
+      id: campanha.id,
+      name: campanha.name,
+      platform: campanha.platform,
+      // Dias com gasto registrado, não dias corridos: é o que diz se a
+      // campanha rodou o período inteiro ou só parte dele.
+      diasComGasto: campanha.spend.length,
+      totalCents: campanha.spend.reduce((soma, linha) => soma + linha.spendCents, 0),
+    }));
+  }
+
   async criarManual(organizationId: string, dto: CriarCampanhaManualDto) {
     const externalId = dto.externalId?.trim() || `manual:${organizationId}:${Date.now()}`;
 

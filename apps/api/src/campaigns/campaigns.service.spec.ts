@@ -34,4 +34,47 @@ describe("CampaignsService", () => {
 
     expect(result[0].totalSpendCents).toBe(15000);
   });
+
+  describe("investimentoNoPeriodo", () => {
+    it("pede à base só os gastos dentro da janela pedida", async () => {
+      const { service, prisma } = buildService();
+      prisma.campaign.findMany.mockResolvedValue([]);
+
+      await service.investimentoNoPeriodo("org-1", 30);
+
+      const argumentos = prisma.campaign.findMany.mock.calls[0][0];
+      const janela = argumentos.select.spend.where.date;
+      const dias = Math.round((janela.lte.getTime() - janela.gte.getTime()) / 86_400_000);
+
+      // Trinta dias contados de ponta a ponta são vinte e nove intervalos.
+      expect(dias).toBe(29);
+      expect(argumentos.where).toEqual({ organizationId: "org-1" });
+    });
+
+    it("soma o gasto e conta os dias em que houve gasto", async () => {
+      const { service, prisma } = buildService();
+      prisma.campaign.findMany.mockResolvedValue([
+        {
+          id: "c1",
+          name: "Institucional",
+          platform: "GOOGLE",
+          spend: [{ spendCents: 3000 }, { spendCents: 4500 }],
+        },
+        { id: "c2", name: "Parada", platform: "META", spend: [] },
+      ]);
+
+      const resultado = await service.investimentoNoPeriodo("org-1", 30);
+
+      expect(resultado[0]).toEqual({
+        id: "c1",
+        name: "Institucional",
+        platform: "GOOGLE",
+        diasComGasto: 2,
+        totalCents: 7500,
+      });
+      // Campanha sem gasto volta zerada em vez de sumir: quem decide se ela
+      // entra no relatório é a tela, não a consulta.
+      expect(resultado[1].totalCents).toBe(0);
+    });
+  });
 });

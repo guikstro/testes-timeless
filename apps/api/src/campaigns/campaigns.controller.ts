@@ -21,6 +21,14 @@ export class CampaignsController {
     return this.campaignsService.list(user.organizationId);
   }
 
+  /** Investimento agregado por campanha na janela, para o relatório do cliente. */
+  @Get("investimento")
+  investimento(@CurrentUser() user: AuthenticatedUser, @Query("days") days?: string) {
+    const dias = Number(days);
+    const janela = Number.isInteger(dias) && dias > 0 && dias <= 365 ? dias : 30;
+    return this.campaignsService.investimentoNoPeriodo(user.organizationId, janela);
+  }
+
   @Post("manual")
   criarManual(@CurrentUser() user: AuthenticatedUser, @Body() dto: CriarCampanhaManualDto) {
     return this.campaignsService.criarManual(user.organizationId, dto);
