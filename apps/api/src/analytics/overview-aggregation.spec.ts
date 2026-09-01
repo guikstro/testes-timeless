@@ -1,4 +1,6 @@
 import {
+  compara,
+  medianaPrimeiraResposta,
   aggregateByOrigin,
   aggregateDaily,
   aggregateTotals,
@@ -221,6 +223,46 @@ describe("agregação do dashboard", () => {
 
       expect(daily).toHaveLength(3);
       expect(daily.every((point) => point.leads === 0)).toBe(true);
+    });
+  });
+
+  describe("comparação com o período anterior", () => {
+    it("calcula a variação como fração", () => {
+      expect(compara(115, 100).delta).toBeCloseTo(0.15);
+      expect(compara(80, 100).delta).toBeCloseTo(-0.2);
+    });
+
+    /**
+     * Sair de zero para dez não é crescimento infinito, é começar. Um
+     * percentual ali inventaria uma proporção que não existe.
+     */
+    it("devolve null quando o período anterior foi zero", () => {
+      expect(compara(10, 0).delta).toBeNull();
+      expect(compara(10, 0).anterior).toBe(0);
+    });
+
+    it("trata dois períodos vazios sem quebrar", () => {
+      expect(compara(0, 0).delta).toBeNull();
+    });
+  });
+
+  describe("mediana do tempo de resposta", () => {
+    /** Um lead respondido três dias depois puxaria a média e mentiria sobre o típico. */
+    it("resiste a um valor extremo, ao contrário da média", () => {
+      const tempos = [60, 90, 120, 150, 259200];
+      expect(medianaPrimeiraResposta(tempos)).toBe(120);
+    });
+
+    it("faz a média dos dois centrais numa quantidade par", () => {
+      expect(medianaPrimeiraResposta([100, 200, 300, 400])).toBe(250);
+    });
+
+    it("ignora quem ainda não foi respondido", () => {
+      expect(medianaPrimeiraResposta([null, 100, null, 300])).toBe(200);
+    });
+
+    it("devolve null quando ninguém foi respondido", () => {
+      expect(medianaPrimeiraResposta([null, null])).toBeNull();
     });
   });
 });

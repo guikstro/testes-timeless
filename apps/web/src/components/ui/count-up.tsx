@@ -25,7 +25,8 @@ import { useEffect, useRef, useState } from "react";
  */
 export type FormatoNumero = "inteiro" | "moeda";
 
-function formatar(valor: number, formato: FormatoNumero): string {
+/** Exportada porque o cartão precisa formatar o valor anterior do mesmo jeito. */
+export function formataNumero(valor: number, formato: FormatoNumero): string {
   if (formato === "moeda") {
     return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
   }
@@ -97,9 +98,9 @@ export function CountUp({
       className={className}
       // O valor final fica no DOM para leitor de tela e para busca na página,
       // sem depender de a animação ter terminado.
-      aria-label={pronto ? undefined : formatar(value, formato)}
+      aria-label={pronto ? undefined : formataNumero(value, formato)}
     >
-      {formatar(mostrado, formato)}
+      {formataNumero(mostrado, formato)}
     </span>
   );
 }

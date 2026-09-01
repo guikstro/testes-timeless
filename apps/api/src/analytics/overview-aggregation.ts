@@ -174,3 +174,54 @@ export function aggregateDaily(leads: AggregationLead[], from: Date, to: Date): 
 
   return [...points.values()];
 }
+
+export interface Variacao {
+  /** Fração: 0.15 significa quinze por cento acima do período anterior. */
+  delta: number | null;
+  anterior: number;
+}
+
+/**
+ * Compara um número com o do período anterior.
+ *
+ * Devolve `null` quando o anterior é zero, e isso é deliberado: sair de zero
+ * para dez não é "crescimento infinito", é começar. Mostrar um percentual ali
+ * seria inventar uma proporção que não existe, então a tela mostra apenas o
+ * valor absoluto nesse caso.
+ */
+export function compara(atual: number, anterior: number): Variacao {
+  if (anterior === 0) return { delta: null, anterior };
+  return { delta: (atual - anterior) / anterior, anterior };
+}
+
+export interface ComparacaoTotais {
+  leads: Variacao;
+  qualified: Variacao;
+  meetings: Variacao;
+  won: Variacao;
+  revenueCents: Variacao;
+}
+
+export function comparaTotais(atual: OverviewTotals, anterior: OverviewTotals): ComparacaoTotais {
+  return {
+    leads: compara(atual.leads, anterior.leads),
+    qualified: compara(atual.qualified, anterior.qualified),
+    meetings: compara(atual.meetings, anterior.meetings),
+    won: compara(atual.won, anterior.won),
+    revenueCents: compara(atual.revenueCents, anterior.revenueCents),
+  };
+}
+
+/**
+ * Tempo mediano até a primeira resposta, em segundos.
+ *
+ * Mediana e não média: um único lead respondido três dias depois puxaria a
+ * média para cima e faria uma operação boa parecer ruim. A mediana descreve o
+ * atendimento típico, que é a pergunta real.
+ */
+export function medianaPrimeiraResposta(tempos: (number | null)[]): number | null {
+  const validos = tempos.filter((t): t is number => t !== null).sort((a, b) => a - b);
+  if (validos.length === 0) return null;
+  const meio = Math.floor(validos.length / 2);
+  return validos.length % 2 === 0 ? Math.round((validos[meio - 1] + validos[meio]) / 2) : validos[meio];
+}

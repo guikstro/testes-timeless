@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
 import { formatCentsAsBRL } from "@/lib/currency";
-import { CountUp } from "@/components/ui/count-up";
+import { formatDuration, responseSpeedTone, SPEED_TONE_CLASSES } from "@/lib/duration";
+import { StatCard } from "./stat-card";
 import { DailyPoint, LeadsAreaChart } from "./leads-area-chart";
 
 interface OriginBucket {
@@ -13,6 +14,11 @@ interface OriginBucket {
   won: number;
   disqualified: number;
   revenueCents: number;
+}
+
+interface Variacao {
+  delta: number | null;
+  anterior: number;
 }
 
 interface Overview {
@@ -28,6 +34,19 @@ interface Overview {
     qualificationRate: number | null;
     closeRate: number | null;
   };
+  comparacao: {
+    leads: Variacao;
+    qualified: Variacao;
+    meetings: Variacao;
+    won: Variacao;
+    revenueCents: Variacao;
+  };
+  atendimento: {
+    medianaPrimeiraRespostaSegundos: number | null;
+    respondidos: number;
+    semResposta: number;
+    aguardando: number;
+  };
   byOrigin: OriginBucket[];
   daily: DailyPoint[];
   setup: { whatsappConnected: boolean; metaConnected: boolean; trackingLinkCount: number };
@@ -41,37 +60,6 @@ function formatRate(rate: number | null): string {
   return `${Math.round(rate * 100)}%`;
 }
 
-/**
- * Cartão de número.
- *
- * `numero` faz o valor subir ao entrar na tela; `valor` cobre o que não é
- * contável. A borda inferior acende no hover: o cartão responde sem se mexer,
- * porque uma fileira de números que salta a cada passada de mouse cansa.
- */
-function Stat({
-  label,
-  numero,
-  valor,
-  hint,
-  formato,
-}: {
-  label: string;
-  numero?: number;
-  valor?: string;
-  hint?: string;
-  formato?: "inteiro" | "moeda";
-}) {
-  return (
-    <div className="group relative overflow-hidden rounded-2xl border border-line bg-panel p-5 shadow-subtle transition-shadow duration-300 ease-soft hover:shadow-card">
-      <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-ink-mute">{label}</p>
-      <p className="mt-2 text-[28px] font-semibold leading-none tabular-nums text-ink">
-        {numero !== undefined ? <CountUp value={numero} formato={formato} /> : valor}
-      </p>
-      <p className="mt-2 text-xs text-ink-mute">{hint ?? " "}</p>
-      <span className="absolute inset-x-0 bottom-0 h-0.5 origin-left scale-x-0 bg-accent transition-transform duration-500 ease-soft group-hover:scale-x-100" />
-    </div>
-  );
-}
 
 /**
  * Funil em barras horizontais, com a maior etapa como referência de largura.
@@ -114,7 +102,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const days = PERIODS.includes(Number(rawDays)) ? Number(rawDays) : 30;
 
   const overview = await apiFetch<Overview>(`/analytics/overview?days=${days}`);
-  const { totals, byOrigin, daily, setup } = overview;
+  const { totals, byOrigin, daily, setup, comparacao, atendimento } = overview;
 
   const unattributed = byOrigin.find((bucket) => bucket.key === "unknown");
   const mostlyUnattributed = totals.leads > 0 && (unattributed?.leads ?? 0) / totals.leads >= 0.5;
@@ -148,27 +136,43 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <Stat
-          label="Leads"
+        <StatCard
+          rotulo="Leads"
           numero={totals.leads}
-          hint={totals.disqualified > 0 ? `${totals.disqualified} desqualificado(s)` : `últimos ${days} dias`}
+          delta={comparacao.leads.delta}
+          anterior={comparacao.leads.anterior}
+          serie={daily.map((d) => d.leads)}
+          nota={totals.disqualified > 0 ? `${totals.disqualified} descartado(s)` : undefined}
         />
-        <Stat
-          label="Qualificados"
+        <StatCard
+          rotulo="Qualificados"
           numero={totals.qualified}
-          hint={`${formatRate(totals.qualificationRate)} de ${totals.workable}`}
+          delta={comparacao.qualified.delta}
+          anterior={comparacao.qualified.anterior}
+          nota={`${formatRate(totals.qualificationRate)} de ${totals.workable}`}
         />
-        <Stat
-          label="Reuniões"
+        <StatCard
+          rotulo="Reuniões"
           numero={totals.meetings}
-          hint={totals.qualified > 0 ? `${formatRate(totals.meetings / totals.qualified)} dos qualificados` : undefined}
+          delta={comparacao.meetings.delta}
+          anterior={comparacao.meetings.anterior}
+          nota={totals.qualified > 0 ? `${formatRate(totals.meetings / totals.qualified)} dos qualificados` : undefined}
         />
-        <Stat label="Vendas" numero={totals.won} hint={`${formatRate(totals.closeRate)} dos qualificados`} />
-        <Stat
-          label="Receita"
+        <StatCard
+          rotulo="Vendas"
+          numero={totals.won}
+          delta={comparacao.won.delta}
+          anterior={comparacao.won.anterior}
+          serie={daily.map((d) => d.won)}
+          nota={`${formatRate(totals.closeRate)} dos qualificados`}
+        />
+        <StatCard
+          rotulo="Receita"
           numero={Math.round(totals.revenueCents / 100)}
           formato="moeda"
-          hint={totals.won > 0 ? `${formatCentsAsBRL(Math.round(totals.revenueCents / totals.won))} por venda` : undefined}
+          delta={comparacao.revenueCents.delta}
+          anterior={Math.round(comparacao.revenueCents.anterior / 100)}
+          nota={totals.won > 0 ? `${formatCentsAsBRL(Math.round(totals.revenueCents / totals.won))} por venda` : undefined}
         />
       </div>
 
@@ -222,6 +226,47 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         ) : (
           <p className="py-10 text-center text-sm text-ink-mute">Nenhum lead neste período.</p>
         )}
+      </div>
+
+      {/*
+        Atendimento ganhou painel próprio porque responde a pergunta que mais
+        muda resultado numa operação de WhatsApp: quanto tempo alguém espera
+        para ser atendido. Antes esse número só existia dentro de cada lead.
+      */}
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-line bg-panel p-5 shadow-subtle">
+          <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-ink-mute">Resposta típica</p>
+          <p className={`mt-2 text-[26px] font-semibold leading-none tabular-nums ${SPEED_TONE_CLASSES[responseSpeedTone(atendimento.medianaPrimeiraRespostaSegundos)]}`}>
+            {formatDuration(atendimento.medianaPrimeiraRespostaSegundos)}
+          </p>
+          {/* Mediana e não média: um lead respondido três dias depois puxaria
+              a média e faria uma operação boa parecer ruim. */}
+          <p className="mt-2 text-[11.5px] text-ink-mute">Mediana até a primeira resposta</p>
+        </div>
+
+        <div className="rounded-2xl border border-line bg-panel p-5 shadow-subtle">
+          <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-ink-mute">Aguardando você</p>
+          <p className="mt-2 flex items-baseline gap-2 text-[26px] font-semibold leading-none tabular-nums text-ink">
+            {atendimento.aguardando}
+            {atendimento.aguardando > 0 ? (
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-60 motion-safe:animate-ping" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+              </span>
+            ) : null}
+          </p>
+          <Link href="/leads?aguardando=1" className="focus-ring mt-2 inline-block rounded text-[11.5px] text-ink-mute underline decoration-line underline-offset-4 transition-colors hover:text-ink">
+            Ver na fila
+          </Link>
+        </div>
+
+        <div className="rounded-2xl border border-line bg-panel p-5 shadow-subtle">
+          <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-ink-mute">Sem resposta</p>
+          <p className="mt-2 text-[26px] font-semibold leading-none tabular-nums text-ink">{atendimento.semResposta}</p>
+          <p className="mt-2 text-[11.5px] text-ink-mute">
+            de {atendimento.respondidos + atendimento.semResposta} leads no período
+          </p>
+        </div>
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
