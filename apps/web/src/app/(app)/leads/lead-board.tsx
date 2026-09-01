@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { APARENCIA, Estagio, ORDEM } from "./estagios";
 import { LeadCard, LeadCartao } from "./lead-card";
+import { LiveRefresh } from "./live-refresh";
 import { moverEstagio } from "./actions";
 
 
@@ -31,6 +32,9 @@ export function LeadBoard({ colunas }: { colunas: ColunaDoQuadro[] }) {
   const [arrastando, setArrastando] = useState<string | null>(null);
   const [sobre, setSobre] = useState<Estagio | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  // Alguém digitando uma resposta segura a atualização automática, para o
+  // quadro não recarregar por baixo e apagar o texto.
+  const [ocupado, setOcupado] = useState(false);
   const [pendente, iniciar] = useTransition();
 
   const todos = colunas.flatMap((coluna) => coluna.itens);
@@ -59,6 +63,12 @@ export function LeadBoard({ colunas }: { colunas: ColunaDoQuadro[] }) {
 
   return (
     <div className="relative">
+      <div className="mb-3 flex justify-end">
+        {/* Arrastar ou digitar segura a atualização: recarregar por baixo da
+            mão de quem trabalha é pior que atrasar um minuto. */}
+        <LiveRefresh pausado={ocupado || arrastando !== null || pendente} />
+      </div>
+
       {erro ? (
         <p role="alert" className="mb-3 rounded-xl bg-red-500/10 px-4 py-2.5 text-[13px] text-red-700 dark:text-red-300">
           {erro}
@@ -117,6 +127,7 @@ export function LeadBoard({ colunas }: { colunas: ColunaDoQuadro[] }) {
                     // gesto que nunca dá certo.
                     arrastavel={lead.status !== "WON" && !lead.disqualifiedAt}
                     onArrastar={setArrastando}
+                    onOcupado={setOcupado}
                   />
                 ))}
 

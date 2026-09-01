@@ -4,6 +4,8 @@ import Link from "next/link";
 import { tempoRelativo } from "@/lib/relative-time";
 import { formatCentsAsBRL } from "@/lib/currency";
 import { attributionSourceLabel, AttributionSummary } from "@/lib/attribution";
+import { Estagio } from "./estagios";
+import { QuickActions } from "./quick-actions";
 
 export interface LeadCartao {
   id: string;
@@ -45,11 +47,13 @@ export function LeadCard({
   indice,
   arrastavel,
   onArrastar,
+  onOcupado,
 }: {
   lead: LeadCartao;
   indice: number;
   arrastavel: boolean;
   onArrastar: (id: string) => void;
+  onOcupado: (ocupado: boolean) => void;
 }) {
   const nome = lead.name?.trim() || "Sem nome";
   const inicial = nome.charAt(0).toUpperCase();
@@ -128,6 +132,19 @@ export function LeadCard({
           <span className="ml-auto truncate text-[11px] text-ink-mute">
             {attributionSourceLabel(lead.attribution)}
           </span>
+        </div>
+
+        {/*
+          Dentro do link de propósito: as ações precisam do hover do cartão
+          para aparecer. Cada botão cancela a navegação no próprio clique.
+        */}
+        <div className="relative">
+          <QuickActions
+            leadId={lead.id}
+            status={lead.status as Estagio}
+            nome={nome}
+            onOcupado={onOcupado}
+          />
         </div>
       </Link>
     </li>
