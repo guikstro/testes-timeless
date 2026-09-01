@@ -1,37 +1,17 @@
 import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
-import { attributionSourceLabel, AttributionSummary } from "@/lib/attribution";
-import { formatCentsAsBRL } from "@/lib/currency";
-import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
-import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/skeleton";
+import { LeadBoard } from "./lead-board";
+import { LeadCartao } from "./lead-card";
 import { LeadsFilters } from "./leads-filters";
-
-interface LeadListItem {
-  id: string;
-  name: string | null;
-  normalizedPhone: string;
-  status: "NEW" | "QUALIFIED" | "MEETING_SCHEDULED" | "WON";
-  disqualifiedAt: string | null;
-  firstContactAt: string;
-  lastContactAt: string;
-  attribution: AttributionSummary | null;
-  sale: { amountCents: number | null } | null;
-}
 
 interface PaginatedResult<T> {
   items: T[];
   total: number;
 }
 
-const PAGINA = 25;
+const PAGINA = 200;
 
-const STATUS: Record<LeadListItem["status"], { rotulo: string; tom: "neutral" | "info" | "brand" | "success" }> = {
-  NEW: { rotulo: "Novo", tom: "neutral" },
-  QUALIFIED: { rotulo: "Qualificado", tom: "info" },
-  MEETING_SCHEDULED: { rotulo: "Reunião marcada", tom: "brand" },
-  WON: { rotulo: "Venda", tom: "success" },
-};
 
 export default async function LeadsPage({
   searchParams,
@@ -45,7 +25,7 @@ export default async function LeadsPage({
   if (params.search) consulta.set("search", params.search);
   if (params.status) consulta.set("status", params.status);
 
-  const { items, total } = await apiFetch<PaginatedResult<LeadListItem>>(`/leads?${consulta.toString()}`);
+  const { items, total } = await apiFetch<PaginatedResult<LeadCartao>>(`/leads?${consulta.toString()}`);
   const ultimaPagina = Math.max(1, Math.ceil(total / PAGINA));
   const filtrando = Boolean(params.search || params.status);
 
@@ -95,67 +75,7 @@ export default async function LeadsPage({
         </div>
       ) : (
         <>
-          <div className="surface overflow-hidden">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-line/70">
-                  <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-mute">Lead</th>
-                  <th className="hidden px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-mute sm:table-cell">
-                    Origem
-                  </th>
-                  <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-mute">Estágio</th>
-                  <th className="hidden px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-mute md:table-cell">
-                    Receita
-                  </th>
-                  <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-mute">
-                    Último contato
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((lead) => (
-                  <tr
-                    key={lead.id}
-                    className="group border-b border-line/40 transition-colors last:border-0 hover:bg-ink/[0.025]"
-                  >
-                    <td className="px-5 py-3.5">
-                      {/*
-                        O link cobre a célula inteira, não só o texto do nome:
-                        um alvo de clique do tamanho da palavra obriga mira, e
-                        a linha inteira já parece clicável.
-                      */}
-                      <Link href={`/leads/${lead.id}`} className="focus-ring -m-1 block rounded-lg p-1">
-                        <span className="block font-medium text-ink transition-colors group-hover:text-accent">
-                          {lead.name ?? "Sem nome"}
-                        </span>
-                        <span className="block text-[12.5px] tabular-nums text-ink-mute">{lead.normalizedPhone}</span>
-                      </Link>
-                    </td>
-                    <td className="hidden px-5 py-3.5 text-[13px] text-ink-soft sm:table-cell">
-                      {attributionSourceLabel(lead.attribution)}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <Badge tone={STATUS[lead.status].tom}>{STATUS[lead.status].rotulo}</Badge>
-                        {/* Descartado acompanha o estágio, não o substitui:
-                            "estava qualificado quando desistiu" diz mais. */}
-                        {lead.disqualifiedAt ? <Badge tone="neutral">Descartado</Badge> : null}
-                      </div>
-                    </td>
-                    <td className="hidden px-5 py-3.5 text-right tabular-nums text-ink-soft md:table-cell">
-                      {lead.sale ? formatCentsAsBRL(lead.sale.amountCents) : ""}
-                    </td>
-                    <td
-                      className="px-5 py-3.5 text-right text-[13px] text-ink-mute"
-                      title={dataCompleta(lead.lastContactAt)}
-                    >
-                      {tempoRelativo(lead.lastContactAt)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <LeadBoard leads={items} />
 
           {ultimaPagina > 1 ? (
             <div className="mt-5 flex items-center justify-between">

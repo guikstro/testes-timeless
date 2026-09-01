@@ -19,6 +19,31 @@ import { AdIds, AdReferences, extractAdIds } from "./ad-references";
  * acrescenta ao fim do tipo, então MEETING_SCHEDULED aparece depois de WON lá.
  * Nada consulta ordenando por status no banco — quem decide avanço é este mapa.
  */
+/**
+ * Achata as conversas numa única "última mensagem".
+ *
+ * A tela não precisa saber que um lead pode ter mais de uma conversa; ela
+ * precisa da fala mais recente e de quem a disse. `awaitingReply` sai daí:
+ * se a última é do lead, a bola está com a equipe.
+ */
+type ComConversas = { conversations?: { messages: { direction: string; text: string | null; timestamp: Date }[] }[] };
+
+function comUltimaMensagem<T extends ComConversas>(lead: T) {
+  const ultimas = (lead.conversations ?? [])
+    .map((conversa) => conversa.messages[0])
+    .filter((mensagem): mensagem is NonNullable<typeof mensagem> => Boolean(mensagem))
+    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+  const ultima = ultimas[0] ?? null;
+  const { conversations: _descartado, ...resto } = lead;
+
+  return {
+    ...resto,
+    lastMessage: ultima ? { text: ultima.text, direction: ultima.direction, timestamp: ultima.timestamp } : null,
+    awaitingReply: ultima?.direction === "INBOUND",
+  };
+}
+
 const STATUS_ORDER: Record<LeadStatus, number> = {
   NEW: 0,
   QUALIFIED: 1,
@@ -81,7 +106,7 @@ export class LeadsService {
       );
 
       return {
-        items: aguardando.slice(offset, offset + limit),
+        items: aguardando.slice(offset, offset + limit).map(comUltimaMensagem),
         total: aguardando.length,
         offset,
         limit,
@@ -91,7 +116,16 @@ export class LeadsService {
     const [items, total] = await Promise.all([
       this.prisma.lead.findMany({
         where,
-        include: { attribution: true, sale: true },
+        include: {
+          attribution: true,
+          sale: true,
+          // A última mensagem de cada conversa. É o que faz decidir se vale
+          // abrir o lead, e sem ela a lista obriga a entrar em cada um para
+          // descobrir do que se trata.
+          conversations: {
+            select: { messages: { orderBy: { timestamp: "desc" }, take: 1 } },
+          },
+        },
         orderBy: { lastContactAt: "desc" },
         skip: offset,
         take: limit,
@@ -99,7 +133,7 @@ export class LeadsService {
       this.prisma.lead.count({ where }),
     ]);
 
-    return { items, total, offset, limit };
+    return { items: items.map(comUltimaMensagem), total, offset, limit };
   }
 
   async findOne(organizationId: string, id: string) {
