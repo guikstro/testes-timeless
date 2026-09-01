@@ -2,6 +2,9 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
 import { formatCentsAsBRL } from "@/lib/currency";
 import { formatDuration, responseSpeedTone, SPEED_TONE_CLASSES } from "@/lib/duration";
+import { ArrivalHeatmap } from "./arrival-heatmap";
+import { FunnelChart } from "./funnel-chart";
+import { OriginTable } from "./origin-table";
 import { StatCard } from "./stat-card";
 import { DailyPoint, LeadsAreaChart } from "./leads-area-chart";
 
@@ -49,6 +52,7 @@ interface Overview {
   };
   byOrigin: OriginBucket[];
   daily: DailyPoint[];
+  chegadas: { diaSemana: number; faixa: number; leads: number }[];
   setup: { whatsappConnected: boolean; metaConnected: boolean; trackingLinkCount: number };
 }
 
@@ -61,48 +65,13 @@ function formatRate(rate: number | null): string {
 }
 
 
-/**
- * Funil em barras horizontais, com a maior etapa como referência de largura.
- *
- * Não usei a forma de funil (trapézios que afinam): ela codifica o valor na
- * área, que se lê muito pior que comprimento — duas etapas próximas viram
- * fatias visualmente iguais. Barra a partir de uma linha de base comum é a
- * comparação que o olho faz certo.
- */
-function Funnel({ totals }: { totals: Overview["totals"] }) {
-  const stages = [
-    { label: "Leads", value: totals.workable, hint: "descontando os desqualificados" },
-    { label: "Qualificados", value: totals.qualified, hint: formatRate(totals.qualificationRate) },
-    { label: "Reuniões", value: totals.meetings, hint: "" },
-    { label: "Vendas", value: totals.won, hint: formatRate(totals.closeRate) },
-  ];
-  const widest = Math.max(1, ...stages.map((stage) => stage.value));
-
-  return (
-    <div className="flex flex-col gap-3">
-      {stages.map((stage) => (
-        <div key={stage.label} className="flex items-center gap-3">
-          <span className="w-24 shrink-0 text-xs text-ink-mute">{stage.label}</span>
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <div
-              className="h-5 rounded-r-[4px] bg-accent"
-              style={{ width: `${Math.max(2, (stage.value / widest) * 100)}%` }}
-            />
-            <span className="shrink-0 text-sm font-semibold tabular-nums text-ink">{stage.value}</span>
-            {stage.hint ? <span className="shrink-0 text-xs text-ink-mute">{stage.hint}</span> : null}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ days?: string }> }) {
   const { days: rawDays } = await searchParams;
   const days = PERIODS.includes(Number(rawDays)) ? Number(rawDays) : 30;
 
   const overview = await apiFetch<Overview>(`/analytics/overview?days=${days}`);
-  const { totals, byOrigin, daily, setup, comparacao, atendimento } = overview;
+  const { totals, byOrigin, daily, setup, comparacao, atendimento, chegadas } = overview;
 
   const unattributed = byOrigin.find((bucket) => bucket.key === "unknown");
   const mostlyUnattributed = totals.leads > 0 && (unattributed?.leads ?? 0) / totals.leads >= 0.5;
@@ -269,53 +238,39 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </div>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-line bg-panel p-6">
-          <h2 className="text-sm font-semibold text-ink">Funil</h2>
-          <p className="mb-5 mt-0.5 text-xs text-ink-mute">Onde os leads param de avançar</p>
-          <Funnel totals={totals} />
+      <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <div className="surface p-6">
+          <h2 className="font-display text-[15px] font-semibold tracking-tight text-ink">Onde os leads param</h2>
+          <p className="mb-5 mt-0.5 text-xs text-ink-mute">A queda entre cada etapa do funil</p>
+          <FunnelChart
+            etapas={[
+              { rotulo: "Leads", valor: totals.workable, nota: totals.disqualified > 0 ? `${totals.disqualified} fora` : undefined },
+              { rotulo: "Qualificados", valor: totals.qualified, nota: formatRate(totals.qualificationRate) },
+              { rotulo: "Reuniões", valor: totals.meetings },
+              { rotulo: "Vendas", valor: totals.won, nota: formatRate(totals.closeRate) },
+            ]}
+          />
         </div>
 
-        <div className="rounded-xl border border-line bg-panel p-6">
-          <h2 className="text-sm font-semibold text-ink">De onde vieram</h2>
-          {/*
-            Todo lead deste produto nasce de uma mensagem no WhatsApp. É o
-            único caminho de criação. Por isso a quebra não é por canal, e sim
-            por origem: o que muda é a evidência de onde a pessoa veio.
-          */}
-          <p className="mb-4 mt-0.5 text-xs text-ink-mute">
-            Todo lead chega pelo WhatsApp; o que muda é a origem.
-          </p>
-
+        <div className="surface p-6">
+          <h2 className="font-display text-[15px] font-semibold tracking-tight text-ink">Qual origem fecha melhor</h2>
+          {/* Volume esconde qualidade: a origem que traz mais gente
+              frequentemente não é a que fecha melhor. */}
+          <p className="mb-4 mt-0.5 text-xs text-ink-mute">Clique num título para reordenar</p>
           {byOrigin.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b border-line text-xs uppercase text-ink-mute">
-                  <tr>
-                    <th className="py-2 pr-4 font-medium">Origem</th>
-                    <th className="py-2 pr-3 font-medium">Leads</th>
-                    <th className="py-2 pr-3 font-medium">Reuniões</th>
-                    <th className="py-2 pr-3 font-medium">Vendas</th>
-                    <th className="py-2 font-medium">Receita</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {byOrigin.map((bucket) => (
-                    <tr key={bucket.key} className="border-b border-line/60 last:border-0">
-                      <td className="py-2 pr-4 text-ink">{bucket.label}</td>
-                      <td className="py-2 pr-3 tabular-nums text-ink-soft">{bucket.leads}</td>
-                      <td className="py-2 pr-3 tabular-nums text-ink-soft">{bucket.meetings}</td>
-                      <td className="py-2 pr-3 tabular-nums text-ink-soft">{bucket.won}</td>
-                      <td className="py-2 tabular-nums text-ink-soft">{formatCentsAsBRL(bucket.revenueCents)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <OriginTable origens={byOrigin} />
           ) : (
-            <p className="py-6 text-center text-sm text-ink-mute">Nenhum lead neste período.</p>
+            <p className="py-8 text-center text-sm text-ink-mute">Nenhum lead neste período.</p>
           )}
         </div>
+      </div>
+
+      <div className="surface mb-6 p-6">
+        <h2 className="font-display text-[15px] font-semibold tracking-tight text-ink">Quando os leads chegam</h2>
+        <p className="mb-5 mt-0.5 text-xs text-ink-mute">
+          Por dia da semana e faixa de horário, no fuso deste navegador
+        </p>
+        <ArrivalHeatmap celulas={chegadas} />
       </div>
 
       {mostlyUnattributed ? (

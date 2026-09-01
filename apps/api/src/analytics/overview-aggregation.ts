@@ -225,3 +225,39 @@ export function medianaPrimeiraResposta(tempos: (number | null)[]): number | nul
   const meio = Math.floor(validos.length / 2);
   return validos.length % 2 === 0 ? Math.round((validos[meio - 1] + validos[meio]) / 2) : validos[meio];
 }
+
+export interface CelulaDeChegada {
+  /** 0 = domingo, como no Date do JavaScript. */
+  diaSemana: number;
+  /** Faixa de três horas: 0 representa 00h às 03h. */
+  faixa: number;
+  leads: number;
+}
+
+/**
+ * Quando os leads chegam, por dia da semana e faixa de horário.
+ *
+ * Responde uma pergunta operacional que nenhum outro painel responde: em que
+ * momento vale ter gente pronta para atender. Uma operação que descobre que
+ * metade do movimento cai na noite de terça muda a escala, não a campanha.
+ *
+ * Faixas de três horas e não hora a hora: 168 células seriam ilegíveis numa
+ * grade, e a decisão de escala é por turno, não por minuto.
+ */
+export function agregaChegadas(leads: AggregationLead[]): CelulaDeChegada[] {
+  const grade = new Map<string, number>();
+
+  for (const lead of leads) {
+    const data = lead.firstContactAt;
+    const chave = `${data.getDay()}-${Math.floor(data.getHours() / 3)}`;
+    grade.set(chave, (grade.get(chave) ?? 0) + 1);
+  }
+
+  const celulas: CelulaDeChegada[] = [];
+  for (let diaSemana = 0; diaSemana < 7; diaSemana += 1) {
+    for (let faixa = 0; faixa < 8; faixa += 1) {
+      celulas.push({ diaSemana, faixa, leads: grade.get(`${diaSemana}-${faixa}`) ?? 0 });
+    }
+  }
+  return celulas;
+}

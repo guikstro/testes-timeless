@@ -1,12 +1,14 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../common/prisma/prisma.service";
 import {
+  agregaChegadas,
   aggregateByOrigin,
   aggregateDaily,
   aggregateTotals,
   AggregationLead,
   ComparacaoTotais,
   comparaTotais,
+  CelulaDeChegada,
   DailyPoint,
   medianaPrimeiraResposta,
   OriginBucket,
@@ -21,6 +23,7 @@ export interface Overview {
   comparacao: ComparacaoTotais;
   byOrigin: OriginBucket[];
   daily: DailyPoint[];
+  chegadas: CelulaDeChegada[];
   atendimento: {
     medianaPrimeiraRespostaSegundos: number | null;
     respondidos: number;
@@ -117,6 +120,7 @@ export class AnalyticsService {
       comparacao: comparaTotais(totals, aggregateTotals(anteriores as unknown as AggregationLead[])),
       byOrigin: aggregateByOrigin(aggregationLeads),
       daily: aggregateDaily(aggregationLeads, from, to),
+      chegadas: agregaChegadas(aggregationLeads),
       atendimento: {
         medianaPrimeiraRespostaSegundos: medianaPrimeiraResposta(tempos),
         respondidos,
