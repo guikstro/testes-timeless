@@ -3,16 +3,6 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-const FILTROS = [
-  { valor: "", rotulo: "Todos" },
-  { valor: "AWAITING", rotulo: "Aguardando você" },
-  { valor: "NEW", rotulo: "Novos" },
-  { valor: "QUALIFIED", rotulo: "Qualificados" },
-  { valor: "MEETING_SCHEDULED", rotulo: "Reunião" },
-  { valor: "WON", rotulo: "Vendas" },
-  { valor: "DISQUALIFIED", rotulo: "Descartados" },
-];
-
 /**
  * Busca e filtros da lista.
  *
@@ -26,7 +16,10 @@ export function LeadsFilters({ total }: { total: number }) {
   const params = useSearchParams();
   const [pendente, iniciar] = useTransition();
 
-  const statusAtual = params.get("status") ?? "";
+  // Os chips por estágio saíram: o quadro já mostra os estágios como colunas,
+  // e um filtro que esconde três das quatro desmancharia a leitura do funil.
+  // Sobrou o recorte que o quadro não expressa sozinho.
+  const soAguardando = params.get("aguardando") === "1";
   const [texto, setTexto] = useState(params.get("search") ?? "");
   const primeiraRenderizacao = useRef(true);
 
@@ -50,11 +43,10 @@ export function LeadsFilters({ total }: { total: number }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [texto, pathname, router]);
 
-  function trocarStatus(valor: string) {
+  function alternarAguardando() {
     const novos = new URLSearchParams(params.toString());
-    if (valor) novos.set("status", valor);
-    else novos.delete("status");
-    novos.delete("page");
+    if (soAguardando) novos.delete("aguardando");
+    else novos.set("aguardando", "1");
     iniciar(() => router.replace(`${pathname}?${novos.toString()}`));
   }
 
@@ -91,25 +83,26 @@ export function LeadsFilters({ total }: { total: number }) {
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        {FILTROS.map((filtro) => {
-          const ativo = statusAtual === filtro.valor;
-          return (
-            <button
-              key={filtro.valor || "todos"}
-              type="button"
-              onClick={() => trocarStatus(filtro.valor)}
-              aria-pressed={ativo}
-              className={`focus-ring rounded-full px-3.5 py-1.5 text-[13px] transition-all duration-200 ease-soft active:scale-95 ${
-                ativo
-                  ? "bg-ink text-canvas shadow-subtle"
-                  : "border border-line bg-panel text-ink-soft hover:border-ink/20 hover:text-ink"
-              }`}
-            >
-              {filtro.rotulo}
-            </button>
-          );
-        })}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={alternarAguardando}
+          aria-pressed={soAguardando}
+          className={`focus-ring inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[13px] transition-all duration-200 ease-soft active:scale-95 ${
+            soAguardando
+              ? "bg-amber-500/15 text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-300"
+              : "border border-line bg-panel text-ink-soft hover:border-ink/20 hover:text-ink"
+          }`}
+        >
+          <span className="relative flex h-1.5 w-1.5">
+            {soAguardando ? (
+              <span className="absolute inline-flex h-full w-full rounded-full bg-current opacity-60 motion-safe:animate-ping" />
+            ) : null}
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-500" />
+          </span>
+          Aguardando você
+        </button>
+
         <span className="ml-auto text-[13px] tabular-nums text-ink-mute">
           {total} {total === 1 ? "lead" : "leads"}
         </span>

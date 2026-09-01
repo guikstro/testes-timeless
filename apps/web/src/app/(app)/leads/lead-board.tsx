@@ -7,12 +7,15 @@ import { moverEstagio } from "./actions";
 
 type Estagio = LeadCartao["status"];
 
-const COLUNAS: { estagio: Estagio; titulo: string; cor: string }[] = [
-  { estagio: "NEW", titulo: "Novos", cor: "bg-slate-400" },
-  { estagio: "QUALIFIED", titulo: "Qualificados", cor: "bg-sky-500" },
-  { estagio: "MEETING_SCHEDULED", titulo: "Reunião marcada", cor: "bg-violet-500" },
-  { estagio: "WON", titulo: "Vendas", cor: "bg-emerald-500" },
-];
+/** A ordem do funil. Exportada porque a página busca uma coluna por vez. */
+export const ESTAGIOS = ["NEW", "QUALIFIED", "MEETING_SCHEDULED", "WON"] as const;
+
+const APARENCIA: Record<Estagio, { titulo: string; cor: string }> = {
+  NEW: { titulo: "Novos", cor: "bg-slate-400" },
+  QUALIFIED: { titulo: "Qualificados", cor: "bg-sky-500" },
+  MEETING_SCHEDULED: { titulo: "Reunião marcada", cor: "bg-violet-500" },
+  WON: { titulo: "Vendas", cor: "bg-emerald-500" },
+};
 
 const ORDEM: Record<Estagio, number> = { NEW: 0, QUALIFIED: 1, MEETING_SCHEDULED: 2, WON: 3 };
 
@@ -27,14 +30,22 @@ const ORDEM: Record<Estagio, number> = { NEW: 0, QUALIFIED: 1, MEETING_SCHEDULED
  * recusa visualmente o que não pode receber, em vez de aceitar o gesto e
  * mostrar erro depois.
  */
-export function LeadBoard({ leads }: { leads: LeadCartao[] }) {
+export interface ColunaDoQuadro {
+  estagio: Estagio;
+  itens: LeadCartao[];
+  /** Total no servidor, que pode ser maior que o carregado. */
+  total: number;
+}
+
+export function LeadBoard({ colunas }: { colunas: ColunaDoQuadro[] }) {
   const router = useRouter();
   const [arrastando, setArrastando] = useState<string | null>(null);
   const [sobre, setSobre] = useState<Estagio | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [pendente, iniciar] = useTransition();
 
-  const leadArrastado = leads.find((lead) => lead.id === arrastando) ?? null;
+  const todos = colunas.flatMap((coluna) => coluna.itens);
+  const leadArrastado = todos.find((lead) => lead.id === arrastando) ?? null;
 
   function podeReceber(destino: Estagio): boolean {
     if (!leadArrastado) return false;
@@ -66,8 +77,9 @@ export function LeadBoard({ leads }: { leads: LeadCartao[] }) {
       ) : null}
 
       <div className={`grid grid-cols-1 gap-4 transition-opacity duration-300 sm:grid-cols-2 xl:grid-cols-4 ${pendente ? "opacity-60" : ""}`}>
-        {COLUNAS.map((coluna) => {
-          const daColuna = leads.filter((lead) => lead.status === coluna.estagio);
+        {colunas.map((coluna) => {
+          const { titulo, cor } = APARENCIA[coluna.estagio];
+          const daColuna = coluna.itens;
           const recebe = arrastando !== null && podeReceber(coluna.estagio);
           const recusa = arrastando !== null && !podeReceber(coluna.estagio);
 
@@ -96,10 +108,13 @@ export function LeadBoard({ leads }: { leads: LeadCartao[] }) {
               }`}
             >
               <header className="mb-3 flex items-center gap-2 px-1">
-                <span className={`h-2 w-2 rounded-full ${coluna.cor}`} aria-hidden />
-                <h2 className="text-[12px] font-semibold uppercase tracking-[0.09em] text-ink-soft">{coluna.titulo}</h2>
-                <span className="ml-auto rounded-full bg-panel-soft px-2 py-0.5 text-[11px] tabular-nums text-ink-mute">
-                  {daColuna.length}
+                <span className={`h-2 w-2 rounded-full ${cor}`} aria-hidden />
+                <h2 className="text-[12px] font-semibold uppercase tracking-[0.09em] text-ink-soft">{titulo}</h2>
+                <span
+                  className="ml-auto rounded-full bg-panel-soft px-2 py-0.5 text-[11px] tabular-nums text-ink-mute"
+                  title={coluna.total > daColuna.length ? `${daColuna.length} de ${coluna.total} carregados` : undefined}
+                >
+                  {coluna.total}
                 </span>
               </header>
 
