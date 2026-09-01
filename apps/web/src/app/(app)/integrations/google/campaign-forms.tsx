@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { formatCentsAsBRL } from "@/lib/currency";
 import { criarCampanha, EstadoFormulario, lancarGasto, removerCampanha } from "./actions";
+import { ImportarCsv } from "./csv-import";
 
 const inicial: EstadoFormulario = {};
 
@@ -131,6 +132,14 @@ export function CartaoCampanha({
 
       {aberto ? (
         <div className="animate-rise-in mt-4 border-t border-line/60 pt-4">
+          <ImportarCsv campaignId={id} />
+
+          <div className="my-4 flex items-center gap-3">
+            <span className="h-px flex-1 bg-line/60" />
+            <span className="text-[11px] uppercase tracking-wide text-ink-mute">ou lance um dia</span>
+            <span className="h-px flex-1 bg-line/60" />
+          </div>
+
           <LancarGasto campaignId={id} />
 
           {manual ? (

@@ -5,6 +5,7 @@ import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { CampaignsService } from "./campaigns.service";
 import { CriarCampanhaManualDto, RegistrarGastoDto } from "./dto/manual-campaign.dto";
+import { ImportarCsvDto, PreverCsvDto } from "./dto/importar-csv.dto";
 
 @Controller("campaigns")
 @UseGuards(JwtAuthGuard)
@@ -38,5 +39,21 @@ export class CampaignsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async removerManual(@CurrentUser() user: AuthenticatedUser, @Param("id", ParseUUIDPipe) id: string): Promise<void> {
     await this.campaignsService.removerManual(user.organizationId, id);
+  }
+
+  @Post("csv/preview")
+  @HttpCode(HttpStatus.OK)
+  preverCsv(@Body() dto: PreverCsvDto) {
+    return this.campaignsService.previewCsv(dto.conteudo);
+  }
+
+  @Post(":id/csv")
+  @HttpCode(HttpStatus.OK)
+  importarCsv(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: ImportarCsvDto,
+  ) {
+    return this.campaignsService.importarCsv(user.organizationId, id, dto.conteudo, dto.colunaData, dto.colunaValor);
   }
 }

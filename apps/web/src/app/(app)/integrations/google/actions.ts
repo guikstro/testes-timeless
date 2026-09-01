@@ -65,3 +65,50 @@ export async function removerCampanha(campaignId: string): Promise<{ error?: str
   }
   revalidatePath("/integrations/google");
 }
+
+interface PreviaCsv {
+  cabecalho: string[];
+  sugestaoData: number | null;
+  sugestaoValor: number | null;
+  totalLinhas: number;
+  amostra: string[][];
+}
+
+export async function preverCsv(conteudo: string): Promise<PreviaCsv | { error: string }> {
+  try {
+    return await apiFetch<PreviaCsv>("/campaigns/csv/preview", {
+      method: "POST",
+      body: JSON.stringify({ conteudo }),
+    });
+  } catch (error) {
+    if (error instanceof ApiRequestError) return { error: error.body.message };
+    return { error: "Não foi possível ler o arquivo." };
+  }
+}
+
+interface ResultadoImportacao {
+  importados: number;
+  ignoradas: { linha: number; motivo: string }[];
+  totalIgnoradas: number;
+  periodo: { de: string; ate: string };
+  totalCentavos: number;
+}
+
+export async function importarCsv(
+  campaignId: string,
+  conteudo: string,
+  colunaData: number,
+  colunaValor: number,
+): Promise<ResultadoImportacao | { error: string }> {
+  try {
+    const resultado = await apiFetch<ResultadoImportacao>(`/campaigns/${campaignId}/csv`, {
+      method: "POST",
+      body: JSON.stringify({ conteudo, colunaData, colunaValor }),
+    });
+    revalidatePath("/integrations/google");
+    return resultado;
+  } catch (error) {
+    if (error instanceof ApiRequestError) return { error: error.body.message };
+    return { error: "Não foi possível importar." };
+  }
+}

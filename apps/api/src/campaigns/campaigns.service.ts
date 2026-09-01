@@ -4,6 +4,7 @@ import { AdPlatform } from "@prisma/client";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { AppException } from "../common/exceptions/app-exception";
 import { CriarCampanhaManualDto, RegistrarGastoDto } from "./dto/manual-campaign.dto";
+import { extraiGastos, leCsv } from "./csv-gasto";
 
 @Injectable()
 export class CampaignsService {
@@ -104,5 +105,78 @@ export class CampaignsService {
       include: { spend: { orderBy: { date: "desc" }, take: 90 } },
       orderBy: { name: "asc" },
     });
+  }
+
+  /**
+   * Lê o arquivo e devolve o que encontrou, sem gravar nada.
+   *
+   * A importação acontece em duas etapas de propósito: nenhum relatório de
+   * anúncio é padronizado, e escrever direto significaria descobrir a coluna
+   * errada depois de o dado já estar no banco. A prévia deixa a pessoa
+   * conferir antes.
+   */
+  previewCsv(conteudo: string) {
+    const csv = leCsv(conteudo);
+
+    if (csv.cabecalho.length === 0) {
+      throw new AppException(
+        "CSV_VAZIO",
+        "Não encontrei colunas neste arquivo. Confira se é o relatório exportado da plataforma.",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    return {
+      cabecalho: csv.cabecalho,
+      sugestaoData: csv.sugestaoData,
+      sugestaoValor: csv.sugestaoValor,
+      totalLinhas: csv.linhas.length,
+      amostra: csv.linhas.slice(0, 5),
+    };
+  }
+
+  async importarCsv(
+    organizationId: string,
+    campaignId: string,
+    conteudo: string,
+    colunaData: number,
+    colunaValor: number,
+  ) {
+    const campanha = await this.prisma.campaign.findFirst({ where: { id: campaignId, organizationId } });
+    if (!campanha) {
+      throw new AppException("NOT_FOUND", "Campanha não encontrada.", HttpStatus.NOT_FOUND);
+    }
+
+    const { linhas, ignoradas } = extraiGastos(leCsv(conteudo), colunaData, colunaValor);
+
+    if (linhas.length === 0) {
+      throw new AppException(
+        "NENHUMA_LINHA",
+        "Nenhuma linha pôde ser lida com as colunas escolhidas. Confira quais colunas são a data e o valor.",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Uma transação: importar metade de um relatório e falhar deixaria a
+    // campanha com gasto parcial, que é pior que não importar.
+    await this.prisma.$transaction(
+      linhas.map((linha) =>
+        this.prisma.adSpend.upsert({
+          where: { campaignId_date: { campaignId, date: new Date(`${linha.date}T00:00:00.000Z`) } },
+          create: { campaignId, date: new Date(`${linha.date}T00:00:00.000Z`), spendCents: linha.spendCents },
+          update: { spendCents: linha.spendCents },
+        }),
+      ),
+    );
+
+    return {
+      importados: linhas.length,
+      // Nunca em silêncio: uma linha descartada sem aviso é gasto que não
+      // entrou na conta e ninguém sabe.
+      ignoradas: ignoradas.slice(0, 20),
+      totalIgnoradas: ignoradas.length,
+      periodo: { de: linhas[0].date, ate: linhas[linhas.length - 1].date },
+      totalCentavos: linhas.reduce((soma, linha) => soma + linha.spendCents, 0),
+    };
   }
 }
