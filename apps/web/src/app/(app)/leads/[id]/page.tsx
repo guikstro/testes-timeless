@@ -13,6 +13,7 @@ import { formatCentsAsBRL } from "@/lib/currency";
 import { formatDuration, responseSpeedTone, SPEED_TONE_CLASSES } from "@/lib/duration";
 import { Badge } from "@/components/ui/badge";
 import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
+import { Conversation } from "./conversation";
 import { DisqualifyForm, ManualEditForm } from "./manual-edit-form";
 import { ReplyBox } from "./reply-box";
 
@@ -269,39 +270,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             </span>
           </div>
 
-          <ol className="-mx-1 flex-1 space-y-2.5 overflow-y-auto px-1">
-            {lead.messages.map((message) => {
-              const nossa = message.direction === "OUTBOUND";
-              return (
-                <li key={message.id} className={nossa ? "flex justify-end" : "flex justify-start"}>
-                  <div
-                    className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13.5px] leading-relaxed shadow-subtle ${
-                      nossa
-                        ? "rounded-br-md bg-accent/10 text-ink ring-1 ring-inset ring-accent/20"
-                        : "rounded-bl-md bg-panel-soft text-ink ring-1 ring-inset ring-line/60"
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap break-words">
-                      {message.type === "TEXT" ? message.text : "Mensagem não textual"}
-                    </p>
-                    <p className="mt-1 text-[11px] text-ink-mute" title={dataCompleta(message.timestamp)}>
-                      {tempoRelativo(message.timestamp)}
-                      {nossa && message.outboundStatus === "PENDING" ? " · enviando" : null}
-                      {nossa && message.outboundStatus === "SENT" ? " · enviada" : null}
-                    </p>
-                    {nossa && message.outboundStatus === "FAILED" ? (
-                      <p className="mt-1 text-[11.5px] text-red-600 dark:text-red-400">
-                        Falha no envio: {message.sendError}
-                      </p>
-                    ) : null}
-                  </div>
-                </li>
-              );
-            })}
-            {lead.messages.length === 0 ? (
-              <li className="py-10 text-center text-sm text-ink-mute">Nenhuma mensagem ainda.</li>
-            ) : null}
-          </ol>
+          <Conversation messages={lead.messages} />
 
           <div className="mt-4 border-t border-line/60 pt-4">
             <ReplyBox leadId={lead.id} disabledReason={replyDisabledReason} />
