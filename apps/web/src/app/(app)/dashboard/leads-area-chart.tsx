@@ -29,6 +29,55 @@ const SERIES = [
   { key: "won" as const, label: "Vendas", color: "rgb(var(--serie-2))" },
 ];
 
+/**
+ * Modos de exibição.
+ *
+ * Não são o mesmo dado enfeitado de quatro jeitos: cada um responde melhor a
+ * uma pergunta diferente. Área mostra volume, linha compara as duas séries com
+ * menos ruído, barras deixam o dia isolado legível, e acumulado responde
+ * "quanto já somamos no período", que nenhum dos outros responde.
+ */
+export type ModoGrafico = "area" | "linha" | "barras" | "acumulado";
+
+const MODOS: { modo: ModoGrafico; rotulo: string; icone: React.ReactNode }[] = [
+  {
+    modo: "area",
+    rotulo: "Área",
+    icone: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden>
+        <path d="M3 17l5-6 4 3 5-7 4 4v6H3z" />
+      </svg>
+    ),
+  },
+  {
+    modo: "linha",
+    rotulo: "Linha",
+    icone: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden>
+        <path d="M3 16l5-6 4 3 5-7 4 4" />
+      </svg>
+    ),
+  },
+  {
+    modo: "barras",
+    rotulo: "Barras",
+    icone: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" className="h-3.5 w-3.5" aria-hidden>
+        <path d="M5 20V10M12 20V4M19 20v-7" />
+      </svg>
+    ),
+  },
+  {
+    modo: "acumulado",
+    rotulo: "Acumulado",
+    icone: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden>
+        <path d="M3 19c4 0 6-3 9-8s5-6 9-6" />
+      </svg>
+    ),
+  },
+];
+
 const HEIGHT = 260;
 const PAD = { top: 16, right: 16, bottom: 28, left: 36 };
 
@@ -82,6 +131,7 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
   const [width, setWidth] = useState(720);
   const [hovered, setHovered] = useState<number | null>(null);
   const [entrou, setEntrou] = useState(false);
+  const [modo, setModo] = useState<ModoGrafico>("area");
 
   useLayoutEffect(() => {
     const element = containerRef.current;
@@ -130,12 +180,28 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
     return () => window.removeEventListener("keydown", clear);
   }, []);
 
+  /*
+    No acumulado o valor de cada dia é a soma de tudo até ali. A curva vira
+    monotônica crescente por construção, então ela responde "quanto já
+    somamos" em vez de "quanto veio hoje".
+  */
+  const dados = (() => {
+    if (modo !== "acumulado") return data;
+    let leads = 0;
+    let won = 0;
+    return data.map((ponto) => {
+      leads += ponto.leads;
+      won += ponto.won;
+      return { ...ponto, leads, won };
+    });
+  })();
+
   const innerWidth = Math.max(120, width - PAD.left - PAD.right);
   const innerHeight = HEIGHT - PAD.top - PAD.bottom;
-  const maxValue = niceCeiling(Math.max(1, ...data.flatMap((point) => [point.leads, point.won])));
+  const maxValue = niceCeiling(Math.max(1, ...dados.flatMap((point) => [point.leads, point.won])));
 
   const xAt = (index: number) =>
-    PAD.left + (data.length <= 1 ? innerWidth / 2 : (index / (data.length - 1)) * innerWidth);
+    PAD.left + (dados.length <= 1 ? innerWidth / 2 : (index / (dados.length - 1)) * innerWidth);
   const yAt = (value: number) => PAD.top + innerHeight - (value / maxValue) * innerHeight;
 
   const ticks = [0, 0.5, 1].map((fraction) => Math.round(maxValue * fraction));
@@ -143,22 +209,46 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
   // Poucos rótulos no eixo: um por dia vira borrão em 90 dias. Contando do
   // fim para o começo, o último dia sempre aparece e o espaçamento fica
   // uniforme — marcar múltiplos e depois forçar o último colava os dois.
-  const labelEvery = Math.max(1, Math.ceil(data.length / Math.max(2, Math.floor(innerWidth / 64))));
+  const labelEvery = Math.max(1, Math.ceil(dados.length / Math.max(2, Math.floor(innerWidth / 64))));
   const labelIndexes = new Set<number>();
-  for (let i = data.length - 1; i >= 0; i -= labelEvery) labelIndexes.add(i);
+  for (let i = dados.length - 1; i >= 0; i -= labelEvery) labelIndexes.add(i);
 
   function handleMove(event: React.PointerEvent<SVGSVGElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
     const position = event.clientX - rect.left - PAD.left;
-    const ratio = data.length <= 1 ? 0 : position / innerWidth;
+    const ratio = dados.length <= 1 ? 0 : position / innerWidth;
     // O ponteiro mira uma data, nunca uma linha de 2px: encaixa no mais próximo.
-    setHovered(Math.min(data.length - 1, Math.max(0, Math.round(ratio * (data.length - 1)))));
+    setHovered(Math.min(dados.length - 1, Math.max(0, Math.round(ratio * (dados.length - 1)))));
   }
 
-  const active = hovered === null ? null : data[hovered];
+  const active = hovered === null ? null : dados[hovered];
 
   return (
     <div ref={containerRef} className="relative">
+      {/*
+        Os modos ficam acima do gráfico e não escondidos num menu: são quatro,
+        cabem, e trocar de leitura precisa ser um clique, não uma descoberta.
+      */}
+      <div className="mb-3 flex flex-wrap items-center gap-1 rounded-full border border-line bg-panel-soft/60 p-1 [width:fit-content]">
+        {MODOS.map((opcao) => {
+          const ativo = modo === opcao.modo;
+          return (
+            <button
+              key={opcao.modo}
+              type="button"
+              onClick={() => setModo(opcao.modo)}
+              aria-pressed={ativo}
+              className={`focus-ring inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium transition-all duration-200 ease-soft active:scale-95 ${
+                ativo ? "bg-panel text-ink shadow-subtle" : "text-ink-mute hover:text-ink"
+              }`}
+            >
+              {opcao.icone}
+              {opcao.rotulo}
+            </button>
+          );
+        })}
+      </div>
+
       <svg
         width={width}
         height={HEIGHT}
@@ -195,7 +285,7 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
           </g>
         ))}
 
-        {data.map((point, index) =>
+        {dados.map((point, index) =>
           labelIndexes.has(index) ? (
             <text
               key={point.date}
@@ -210,25 +300,60 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
         )}
 
         {SERIES.map((series, ordem) => {
-          const points = data.map((point, index) => ({ x: xAt(index), y: yAt(point[series.key]) }));
-          const line = smoothPath(points);
+          const points = dados.map((point, index) => ({ x: xAt(index), y: yAt(point[series.key]) }));
           const baseline = PAD.top + innerHeight;
+
+          if (modo === "barras") {
+            // Duas séries lado a lado dentro da fatia do dia, com folga entre
+            // elas: barras encostadas se leem como uma só.
+            const fatia = innerWidth / Math.max(1, dados.length);
+            const largura = Math.max(1.5, Math.min(10, fatia / 2 - 1.5));
+            return (
+              <g key={series.key}>
+                {dados.map((point, index) => {
+                  const valor = point[series.key];
+                  const altura = baseline - yAt(valor);
+                  if (valor === 0) return null;
+                  return (
+                    <rect
+                      key={point.date}
+                      x={xAt(index) - (ordem === 0 ? largura + 0.75 : -0.75)}
+                      y={entrou ? yAt(valor) : baseline}
+                      width={largura}
+                      height={entrou ? Math.max(1, altura) : 0}
+                      rx={2}
+                      fill={series.color}
+                      style={{
+                        transition: `y 700ms cubic-bezier(0.16,1,0.3,1) ${index * 8}ms, height 700ms cubic-bezier(0.16,1,0.3,1) ${index * 8}ms`,
+                      }}
+                    />
+                  );
+                })}
+              </g>
+            );
+          }
+
+          const line = smoothPath(points);
           // Comprimento aproximado do traço, suficiente para o tracejado cobrir
           // a linha inteira antes de ser puxado de volta.
           const percurso = innerWidth * 2.2;
+          const comArea = modo === "area" || modo === "acumulado";
+
           return (
             <g key={series.key}>
-              <path
-                d={`${line} L ${xAt(data.length - 1)} ${baseline} L ${xAt(0)} ${baseline} Z`}
-                fill={`url(#fill-${series.key})`}
-                className="transition-opacity duration-700 ease-soft"
-                style={{ opacity: entrou ? 1 : 0, transitionDelay: `${ordem * 120 + 260}ms` }}
-              />
+              {comArea ? (
+                <path
+                  d={`${line} L ${xAt(dados.length - 1)} ${baseline} L ${xAt(0)} ${baseline} Z`}
+                  fill={`url(#fill-${series.key})`}
+                  className="transition-opacity duration-700 ease-soft"
+                  style={{ opacity: entrou ? 1 : 0, transitionDelay: `${ordem * 120 + 260}ms` }}
+                />
+              ) : null}
               <path
                 d={line}
                 fill="none"
                 stroke={series.color}
-                strokeWidth={2}
+                strokeWidth={modo === "linha" ? 2.25 : 2}
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 style={{
@@ -241,7 +366,7 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
           );
         })}
 
-        {hovered !== null ? (
+        {hovered !== null && modo !== "barras" ? (
           <g>
             <line
               x1={xAt(hovered)}
@@ -276,7 +401,10 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
             left: Math.min(Math.max(xAt(hovered!) + 12, 8), Math.max(8, width - 148)),
           }}
         >
-          <p className="mb-1.5 text-[11px] font-medium text-ink-mute">{formatDay(active.date)}</p>
+          <p className="mb-1.5 text-[11px] font-medium text-ink-mute">
+            {formatDay(active.date)}
+            {modo === "acumulado" ? " · acumulado" : ""}
+          </p>
           {SERIES.map((series) => (
             <div key={series.key} className="flex items-center gap-2 text-sm">
               <span className="h-0.5 w-3 rounded-full" style={{ backgroundColor: series.color }} />
