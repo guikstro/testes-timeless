@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { apiFetch, ApiRequestError } from "@/lib/api-client";
 import {
@@ -10,6 +11,8 @@ import {
 } from "@/lib/attribution";
 import { formatCentsAsBRL } from "@/lib/currency";
 import { formatDuration, responseSpeedTone, SPEED_TONE_CLASSES } from "@/lib/duration";
+import { Badge } from "@/components/ui/badge";
+import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
 import { DisqualifyForm, ManualEditForm } from "./manual-edit-form";
 import { ReplyBox } from "./reply-box";
 
@@ -125,73 +128,54 @@ const EVENT_LABELS: Record<string, string> = {
   REVENUE_DETECTED: "Receita registrada",
 };
 
-const STATUS_LABELS: Record<LeadDetail["status"], string> = {
-  NEW: "Novo",
-  QUALIFIED: "Qualificado",
-  MEETING_SCHEDULED: "Reunião marcada",
-  WON: "Venda",
+const STATUS: Record<LeadDetail["status"], { rotulo: string; tom: "neutral" | "info" | "brand" | "success" }> = {
+  NEW: { rotulo: "Novo", tom: "neutral" },
+  QUALIFIED: { rotulo: "Qualificado", tom: "info" },
+  MEETING_SCHEDULED: { rotulo: "Reunião marcada", tom: "brand" },
+  WON: { rotulo: "Venda", tom: "success" },
 };
 
-const STATUS_CLASSES: Record<LeadDetail["status"], string> = {
-  NEW: "bg-panel-soft text-ink-soft",
-  QUALIFIED: "bg-blue-50 text-blue-700",
-  MEETING_SCHEDULED: "bg-violet-50 text-violet-700",
-  WON: "bg-emerald-50 text-emerald-700",
-};
-
-const CONVERSION_TYPE_LABELS: Record<ConversionEvent["type"], string> = {
+const CONVERSAO_ROTULO: Record<ConversionEvent["type"], string> = {
   LEAD: "Lead",
   QUALIFIED_LEAD: "Lead qualificado",
   PURCHASE: "Compra",
 };
 
-const CONVERSION_STATUS_LABELS: Record<ConversionEvent["status"], string> = {
-  PENDING: "Na fila",
-  SENT: "Enviado",
-  RETRYING: "Tentando novamente",
-  FAILED: "Falhou",
-};
-
-const CONVERSION_STATUS_CLASSES: Record<ConversionEvent["status"], string> = {
-  PENDING: "text-ink-mute",
-  SENT: "text-emerald-700",
-  RETRYING: "text-amber-700",
-  FAILED: "text-red-700",
+const CONVERSAO_ESTADO: Record<ConversionEvent["status"], { rotulo: string; tom: "neutral" | "success" | "warning" | "danger" }> = {
+  PENDING: { rotulo: "Na fila", tom: "neutral" },
+  SENT: { rotulo: "Enviado", tom: "success" },
+  RETRYING: { rotulo: "Tentando", tom: "warning" },
+  FAILED: { rotulo: "Falhou", tom: "danger" },
 };
 
 function formatDateTime(value: string | null | undefined): string {
-  return value ? new Date(value).toLocaleString("pt-BR") : "Sem data";
+  return value ? dataCompleta(value) : "Sem data";
 }
 
-/** Sem nome sincronizado, o id cru ainda diz mais do que um campo vazio. */
+/** Sem nome sincronizado, o id cru ainda diz mais que um campo vazio. */
 function adReferenceLabel(reference: AdReference | null): string {
   if (!reference) return "Sem anúncio";
   return reference.name ?? reference.externalId;
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone?: string }) {
+/** Painel da coluna lateral: título discreto, conteúdo em primeiro plano. */
+function Painel({ titulo, children, acao }: { titulo: string; children: ReactNode; acao?: ReactNode }) {
   return (
-    <div>
-      <dt className="text-xs text-ink-mute">{label}</dt>
-      <dd className={`text-lg font-semibold ${tone ?? "text-ink"}`}>{value}</dd>
-    </div>
-  );
-}
-
-function Field({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-ink-mute">{label}</dt>
-      <dd className="break-words text-ink-soft">{value || "Sem dado"}</dd>
-    </div>
-  );
-}
-
-function Card({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div className="mb-6 rounded-xl border border-line bg-panel p-6">
-      <h2 className="mb-4 text-sm font-semibold text-ink">{title}</h2>
+    <section className="surface p-5">
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.11em] text-ink-mute">{titulo}</h2>
+        {acao}
+      </div>
       {children}
+    </section>
+  );
+}
+
+function Linha({ rotulo, valor }: { rotulo: string; valor: ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 py-1.5">
+      <dt className="shrink-0 text-[12.5px] text-ink-mute">{rotulo}</dt>
+      <dd className="min-w-0 truncate text-right text-[13px] text-ink-soft">{valor}</dd>
     </div>
   );
 }
@@ -223,196 +207,246 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     ["utm_term", click?.utmTerm],
   ].filter(([, value]) => Boolean(value)) as [string, string][];
 
+  const tomResposta = SPEED_TONE_CLASSES[responseSpeedTone(metrics.firstResponseSeconds)];
+
   return (
-    <div>
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-ink">{lead.name ?? "Sem nome"}</h1>
-          <p className="text-sm text-ink-mute">{lead.normalizedPhone}</p>
-        </div>
-        <span className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_CLASSES[lead.status]}`}>
-          {STATUS_LABELS[lead.status]}
-        </span>
-        {/*
-          O dado mais acionável da tela: se a última mensagem é do lead, alguém
-          precisa responder agora. Fica ao lado do nome, não escondido num card.
-        */}
-        {lead.disqualifiedAt ? (
-          <span className="rounded-full bg-line px-3 py-1 text-xs font-medium text-ink-soft">
-            Desqualificado
-          </span>
-        ) : null}
-        {metrics.awaitingReply ? (
-          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
-            Aguardando resposta desde {formatDateTime(metrics.lastMessageAt)}
-          </span>
-        ) : null}
-      </div>
-
-      <Card title="Atendimento">
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
-          <Stat
-            label="Primeira resposta"
-            value={formatDuration(metrics.firstResponseSeconds)}
-            tone={SPEED_TONE_CLASSES[responseSpeedTone(metrics.firstResponseSeconds)]}
-          />
-          <Stat label="Do clique ao contato" value={formatDuration(metrics.clickToContactSeconds)} />
-          <Stat label="Até qualificar" value={formatDuration(metrics.timeToQualifiedSeconds)} />
-          <Stat label="Até a venda" value={formatDuration(metrics.timeToWonSeconds)} />
-        </dl>
-        <p className="mt-4 text-xs text-ink-mute">
-          {metrics.inboundCount} recebida(s) · {metrics.outboundCount} enviada(s) · primeiro contato em{" "}
-          {formatDateTime(lead.firstContactAt)}
-        </p>
-      </Card>
-
-      <Card title="Origem">
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
-          <Field label="Origem" value={attributionSourceLabel(attribution)} />
-          <Field label="Como foi identificada" value={attributionMethodLabel(attribution?.method)} />
-          <Field label="Confiança" value={attribution?.confidence === "HIGH" ? "Alta" : "Sem evidência"} />
-          <Field label="Campanha" value={adReferenceLabel(adReferences.campaign) || attributionCampaignLabel(attribution)} />
-          <Field label="Conjunto de anúncios" value={adReferenceLabel(adReferences.adSet)} />
-          <Field label="Anúncio" value={adReferenceLabel(adReferences.ad)} />
-        </dl>
-
-        {click ? (
-          <>
-            <div className="my-4 border-t border-line/60" />
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
-              <Field label="Clicou em" value={formatDateTime(click.clickedAt)} />
-              <Field label="Dispositivo" value={deviceLabel(click.userAgent)} />
-              <Field label="Link rastreável" value={click.trackingLink?.name} />
-              <Field label="Página de destino" value={click.landingUrl} />
-              <Field label="Veio de" value={click.referrer} />
-            </dl>
-            {utms.length > 0 ? (
-              <div className="mt-4">
-                <p className="mb-2 text-xs text-ink-mute">Parâmetros UTM</p>
-                <div className="flex flex-wrap gap-2">
-                  {utms.map(([key, value]) => (
-                    <span key={key} className="rounded bg-panel-soft px-2 py-1 text-xs text-ink-soft">
-                      {key}={value}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </>
-        ) : (
-          <p className="mt-4 text-xs text-ink-mute">
-            {attribution?.method === "CTWA_REFERRAL"
-              ? "A Meta identificou o anúncio diretamente no referral da mensagem, sem clique rastreado por nós."
-              : "Sem clique rastreado para este lead."}
-          </p>
-        )}
-      </Card>
-
-      <Card title="Status e venda">
-        <dl className="mb-4 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
-          <Field label="Qualificado em" value={formatDateTime(lead.qualifiedAt)} />
-          <Field label="Reunião marcada em" value={formatDateTime(lead.meetingScheduledAt)} />
-          <Field label="Venda em" value={formatDateTime(lead.wonAt)} />
-          <Field label="Receita" value={formatCentsAsBRL(lead.sale?.amountCents)} />
-          <Field
-            label="Registro da venda"
-            value={lead.sale ? (lead.sale.classifierType === "MANUAL" ? "Manual" : "Automático") : "Sem venda"}
-          />
-        </dl>
-
-        <p className="mb-3 text-xs text-ink-mute">
-          Correção manual. Use apenas quando o tracking automático não capturou o estágio/valor corretamente.
-        </p>
-        <ManualEditForm leadId={lead.id} status={lead.status} />
-
-        <div className="mt-5 border-t border-line/60 pt-5">
-          <p className="mb-3 text-xs text-ink-mute">
-            Desqualificar retira o lead das taxas de conversão sem apagar o histórico, para quem
-            nunca foi oportunidade. O estágio a que ele chegou é preservado.
-          </p>
-          <DisqualifyForm
-            leadId={lead.id}
-            disqualifiedAt={lead.disqualifiedAt}
-            disqualifiedReason={lead.disqualifiedReason}
-            isWon={lead.status === "WON"}
-          />
-        </div>
-      </Card>
+    <div className="mx-auto max-w-6xl">
+      <Link
+        href="/leads"
+        className="focus-ring group mb-5 inline-flex items-center gap-1.5 rounded text-[13px] text-ink-mute transition-colors hover:text-ink"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 transition-transform duration-200 ease-soft group-hover:-translate-x-0.5" aria-hidden>
+          <path d="M19 12H5M11 18l-6-6 6-6" />
+        </svg>
+        Todos os leads
+      </Link>
 
       {/*
-        Sem isto o cliente não tem como saber se a conversão voltou para a
-        Meta, ou seja, se o algoritmo que ele paga para otimizar chegou a
-        receber o resultado que ele está vendo nesta tela.
+        Cabeçalho como identidade, não como mais um card. O nome grande, o
+        telefone abaixo, e os selos de estado na mesma linha: quem abre a ficha
+        quer saber quem é e em que pé está antes de qualquer número.
       */}
-      <Card title="Conversões enviadas à Meta">
-        {lead.conversionEvents.length > 0 ? (
-          <ul className="space-y-2 text-sm">
-            {lead.conversionEvents.map((event) => (
-              <li key={event.id} className="flex flex-wrap items-baseline gap-x-2">
-                <span className="text-ink-soft">{CONVERSION_TYPE_LABELS[event.type]}</span>
-                <span className={CONVERSION_STATUS_CLASSES[event.status]}>
-                  {CONVERSION_STATUS_LABELS[event.status]}
-                </span>
-                <span className="text-xs text-ink-mute">
-                  {event.sentAt ? `em ${formatDateTime(event.sentAt)}` : `ocorreu em ${formatDateTime(event.occurredAt)}`}
-                  {event.attempts > 1 ? ` · ${event.attempts} tentativas` : ""}
-                </span>
-                {event.lastError ? <span className="w-full text-xs text-red-600">{event.lastError}</span> : null}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-ink-mute">
-            Nenhuma conversão enviada. Conecte a API de Conversões nas integrações para devolver esses eventos à Meta.
-          </p>
-        )}
-      </Card>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-line bg-panel p-6">
-          <h2 className="mb-4 text-sm font-semibold text-ink">Timeline</h2>
-          <ol className="space-y-3">
-            {lead.events.map((event) => (
-              <li key={event.id} className="text-sm">
-                <span className="text-ink-mute">{formatDateTime(event.occurredAt)}</span>{" "}
-                <span className="text-ink-soft">{EVENT_LABELS[event.type] ?? event.type}</span>
-              </li>
-            ))}
-            {lead.events.length === 0 ? <li className="text-sm text-ink-mute">Sem eventos ainda.</li> : null}
-          </ol>
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-display text-[28px] font-semibold leading-tight tracking-tight text-ink">
+            {lead.name ?? "Sem nome"}
+          </h1>
+          <p className="mt-0.5 text-sm tabular-nums text-ink-mute">{lead.normalizedPhone}</p>
         </div>
 
-        <div className="rounded-xl border border-line bg-panel p-6">
-          <h2 className="mb-4 text-sm font-semibold text-ink">Conversa</h2>
-          <ol className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone={STATUS[lead.status].tom}>{STATUS[lead.status].rotulo}</Badge>
+          {lead.disqualifiedAt ? <Badge tone="neutral">Descartado</Badge> : null}
+          {/*
+            O dado mais acionável da tela inteira: se a última mensagem é do
+            lead, alguém precisa responder agora. Fica junto do nome, com ponto
+            pulsante, porque é uma condição contínua e não um rótulo estático.
+          */}
+          {metrics.awaitingReply ? (
+            <Badge tone="warning">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-current opacity-60 motion-safe:animate-ping" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-current" />
+              </span>
+              Aguardando resposta {metrics.lastMessageAt ? tempoRelativo(metrics.lastMessageAt) : ""}
+            </Badge>
+          ) : null}
+        </div>
+      </header>
+
+      {/*
+        A conversa ocupa dois terços e os fatos ficam à direita. É a inversão
+        do layout antigo, onde tudo empilhava com o mesmo peso: quem abre um
+        lead vem ler o que foi dito, e os números existem para contextualizar
+        essa leitura, não para competir com ela.
+      */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+        <section className="surface flex max-h-[42rem] flex-col p-5">
+          <div className="mb-4 flex items-baseline justify-between gap-3">
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.11em] text-ink-mute">Conversa</h2>
+            <span className="text-[12px] text-ink-mute">
+              {metrics.inboundCount} recebidas · {metrics.outboundCount} enviadas
+            </span>
+          </div>
+
+          <ol className="-mx-1 flex-1 space-y-2.5 overflow-y-auto px-1">
             {lead.messages.map((message) => {
-              const isOutbound = message.direction === "OUTBOUND";
+              const nossa = message.direction === "OUTBOUND";
               return (
-                <li key={message.id} className={isOutbound ? "flex justify-end" : "flex justify-start"}>
+                <li key={message.id} className={nossa ? "flex justify-end" : "flex justify-start"}>
                   <div
-                    className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-                      isOutbound ? "bg-emerald-50 text-emerald-900" : "bg-panel-soft text-ink"
+                    className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13.5px] leading-relaxed shadow-subtle ${
+                      nossa
+                        ? "rounded-br-md bg-accent/10 text-ink ring-1 ring-inset ring-accent/20"
+                        : "rounded-bl-md bg-panel-soft text-ink ring-1 ring-inset ring-line/60"
                     }`}
                   >
                     <p className="whitespace-pre-wrap break-words">
-                      {message.type === "TEXT" ? message.text : "[mensagem não textual]"}
+                      {message.type === "TEXT" ? message.text : "Mensagem não textual"}
                     </p>
-                    <p className="mt-1 text-xs text-ink-mute">
-                      {formatDateTime(message.timestamp)}
-                      {isOutbound && message.outboundStatus === "PENDING" ? " · enviando..." : null}
-                      {isOutbound && message.outboundStatus === "SENT" ? " · enviada" : null}
+                    <p className="mt-1 text-[11px] text-ink-mute" title={dataCompleta(message.timestamp)}>
+                      {tempoRelativo(message.timestamp)}
+                      {nossa && message.outboundStatus === "PENDING" ? " · enviando" : null}
+                      {nossa && message.outboundStatus === "SENT" ? " · enviada" : null}
                     </p>
-                    {isOutbound && message.outboundStatus === "FAILED" ? (
-                      <p className="mt-1 text-xs text-red-600">Falha no envio: {message.sendError}</p>
+                    {nossa && message.outboundStatus === "FAILED" ? (
+                      <p className="mt-1 text-[11.5px] text-red-600 dark:text-red-400">
+                        Falha no envio: {message.sendError}
+                      </p>
                     ) : null}
                   </div>
                 </li>
               );
             })}
-            {lead.messages.length === 0 ? <li className="text-sm text-ink-mute">Sem mensagens ainda.</li> : null}
+            {lead.messages.length === 0 ? (
+              <li className="py-10 text-center text-sm text-ink-mute">Nenhuma mensagem ainda.</li>
+            ) : null}
           </ol>
 
-          <ReplyBox leadId={lead.id} disabledReason={replyDisabledReason} />
+          <div className="mt-4 border-t border-line/60 pt-4">
+            <ReplyBox leadId={lead.id} disabledReason={replyDisabledReason} />
+          </div>
+        </section>
+
+        <div className="flex flex-col gap-5">
+          <Painel titulo="Atendimento">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-[11.5px] text-ink-mute">Primeira resposta</p>
+                <p className={`mt-0.5 text-lg font-semibold tabular-nums ${tomResposta}`}>
+                  {formatDuration(metrics.firstResponseSeconds)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11.5px] text-ink-mute">Do clique ao contato</p>
+                <p className="mt-0.5 text-lg font-semibold tabular-nums text-ink">
+                  {formatDuration(metrics.clickToContactSeconds)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11.5px] text-ink-mute">Até qualificar</p>
+                <p className="mt-0.5 text-lg font-semibold tabular-nums text-ink">
+                  {formatDuration(metrics.timeToQualifiedSeconds)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11.5px] text-ink-mute">Até a venda</p>
+                <p className="mt-0.5 text-lg font-semibold tabular-nums text-ink">
+                  {formatDuration(metrics.timeToWonSeconds)}
+                </p>
+              </div>
+            </div>
+          </Painel>
+
+          <Painel titulo="Origem">
+            <dl className="divide-y divide-line/50">
+              <Linha rotulo="Origem" valor={attributionSourceLabel(attribution)} />
+              <Linha rotulo="Evidência" valor={attributionMethodLabel(attribution?.method)} />
+              <Linha
+                rotulo="Campanha"
+                valor={adReferences.campaign ? adReferenceLabel(adReferences.campaign) : attributionCampaignLabel(attribution)}
+              />
+              {adReferences.adSet ? <Linha rotulo="Conjunto" valor={adReferenceLabel(adReferences.adSet)} /> : null}
+              {adReferences.ad ? <Linha rotulo="Anúncio" valor={adReferenceLabel(adReferences.ad)} /> : null}
+              {click ? (
+                <>
+                  <Linha rotulo="Clicou" valor={tempoRelativo(click.clickedAt)} />
+                  <Linha rotulo="Dispositivo" valor={deviceLabel(click.userAgent)} />
+                  {click.trackingLink ? <Linha rotulo="Link" valor={click.trackingLink.name} /> : null}
+                </>
+              ) : null}
+            </dl>
+
+            {utms.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-1.5 border-t border-line/50 pt-3">
+                {utms.map(([chave, valor]) => (
+                  <span key={chave} className="rounded-md bg-panel-soft px-2 py-1 text-[11px] text-ink-soft">
+                    {chave}={valor}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
+            {!click ? (
+              <p className="mt-3 border-t border-line/50 pt-3 text-[12px] leading-relaxed text-ink-mute">
+                {attribution?.method === "CTWA_REFERRAL"
+                  ? "A Meta identificou o anúncio no referral da mensagem, sem clique rastreado por nós."
+                  : "Sem clique rastreado para este lead."}
+              </p>
+            ) : null}
+          </Painel>
+
+          <Painel titulo="Estágio e venda">
+            <dl className="mb-4 divide-y divide-line/50">
+              <Linha rotulo="Primeiro contato" valor={tempoRelativo(lead.firstContactAt)} />
+              <Linha rotulo="Qualificado" valor={lead.qualifiedAt ? tempoRelativo(lead.qualifiedAt) : "Sem data"} />
+              <Linha rotulo="Reunião" valor={lead.meetingScheduledAt ? tempoRelativo(lead.meetingScheduledAt) : "Sem data"} />
+              <Linha rotulo="Venda" valor={lead.wonAt ? tempoRelativo(lead.wonAt) : "Sem data"} />
+              <Linha rotulo="Receita" valor={formatCentsAsBRL(lead.sale?.amountCents)} />
+              {lead.sale ? (
+                <Linha rotulo="Registro" valor={lead.sale.classifierType === "MANUAL" ? "Manual" : "Automático"} />
+              ) : null}
+            </dl>
+
+            <div className="border-t border-line/50 pt-4">
+              <p className="mb-3 text-[11.5px] leading-relaxed text-ink-mute">
+                Correção manual. Use quando o tracking automático não capturou o estágio ou o valor.
+              </p>
+              <ManualEditForm leadId={lead.id} status={lead.status} />
+
+              <div className="mt-4 border-t border-line/50 pt-4">
+                <DisqualifyForm
+                  leadId={lead.id}
+                  disqualifiedAt={lead.disqualifiedAt}
+                  disqualifiedReason={lead.disqualifiedReason}
+                  isWon={lead.status === "WON"}
+                />
+              </div>
+            </div>
+          </Painel>
+
+          <Painel titulo="Enviado à Meta">
+            {lead.conversionEvents.length > 0 ? (
+              <ul className="space-y-2.5">
+                {lead.conversionEvents.map((evento) => (
+                  <li key={evento.id} className="flex flex-wrap items-center gap-2 text-[13px]">
+                    <span className="text-ink-soft">{CONVERSAO_ROTULO[evento.type]}</span>
+                    <Badge tone={CONVERSAO_ESTADO[evento.status].tom}>{CONVERSAO_ESTADO[evento.status].rotulo}</Badge>
+                    <span className="text-[11.5px] text-ink-mute">
+                      {evento.sentAt ? tempoRelativo(evento.sentAt) : tempoRelativo(evento.occurredAt)}
+                    </span>
+                    {evento.lastError ? (
+                      <span className="w-full text-[11.5px] text-red-600 dark:text-red-400">{evento.lastError}</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-[12.5px] leading-relaxed text-ink-mute">
+                Nenhuma conversão enviada. Conecte a API de Conversões para devolver esses eventos à Meta.
+              </p>
+            )}
+          </Painel>
+
+          <Painel titulo="Histórico">
+            {/*
+              Linha vertical ligando os pontos: a sucessão fica explícita, em
+              vez de o leitor ter que inferir ordem de uma pilha de linhas.
+            */}
+            <ol className="relative space-y-3 pl-4">
+              <span className="absolute bottom-2 left-[3px] top-2 w-px bg-line" aria-hidden />
+              {lead.events.map((evento) => (
+                <li key={evento.id} className="relative">
+                  <span className="absolute -left-4 top-1.5 h-[7px] w-[7px] rounded-full bg-ink-mute ring-2 ring-panel" aria-hidden />
+                  <p className="text-[13px] text-ink-soft">{EVENT_LABELS[evento.type] ?? evento.type}</p>
+                  <p className="text-[11.5px] text-ink-mute" title={formatDateTime(evento.occurredAt)}>
+                    {tempoRelativo(evento.occurredAt)}
+                  </p>
+                </li>
+              ))}
+              {lead.events.length === 0 ? <li className="text-[13px] text-ink-mute">Sem eventos.</li> : null}
+            </ol>
+          </Painel>
         </div>
       </div>
     </div>
