@@ -52,9 +52,13 @@ export class MetaSyncService {
             externalId: campaign.id,
             name: campaign.name,
             status: campaign.status,
+            platform: "META",
             lastSyncedAt: now,
           },
-          update: { name: campaign.name, status: campaign.status, lastSyncedAt: now },
+          // `platform` também no update: uma campanha lançada à mão que depois
+          // apareça na sincronização passa a ser reconhecida como da Meta, em
+          // vez de manter o rótulo de quando foi digitada.
+          update: { name: campaign.name, status: campaign.status, platform: "META", manual: false, lastSyncedAt: now },
         });
       }
 

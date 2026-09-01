@@ -579,12 +579,36 @@ model MetaConnection {
  * UUID we mint ourselves is, and because we need a stable internal id that
  * survives even if Meta's id format or meaning ever changed.
  */
+enum AdPlatform {
+  META
+  GOOGLE
+}
+
+/**
+ * De onde a campanha veio.
+ *
+ * Sem isto um id do Google e um da Meta são indistinguíveis na mesma tabela, e
+ * qualquer número separado por canal sai errado. É o pré-requisito de tudo
+ * relacionado a Google Ads, e por isso vem primeiro.
+ */
 model Campaign {
   id             String    @id @default(uuid())
   organizationId String    @map("organization_id")
   externalId     String    @unique @map("external_id")
   name           String
   status         String
+  platform       AdPlatform @default(META)
+
+  /**
+   * Campanha registrada à mão, sem vir de sincronização.
+   *
+   * A API do Google Ads exige um token de desenvolvedor aprovado por eles, o
+   * que leva semanas e não depende de nós. Registrar manualmente permite medir
+   * custo por lead e retorno do Google desde já; quando a API entrar, ela passa
+   * a atualizar estas mesmas linhas em vez de criar outras.
+   */
+  manual         Boolean   @default(false)
+
   lastSyncedAt   DateTime  @map("last_synced_at")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")

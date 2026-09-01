@@ -21,6 +21,14 @@ export default function IntegrationsPage() {
           <p className="font-medium text-ink">Meta Ads</p>
           <p className="mt-1 text-sm text-ink-mute">Sincronize campanhas, conjuntos, anúncios e investimento.</p>
         </Link>
+
+        <Link
+          href="/integrations/google"
+          className="rounded-xl border border-line bg-panel p-6 transition-all duration-300 ease-soft hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-card"
+        >
+          <p className="font-medium text-ink">Google Ads</p>
+          <p className="mt-1 text-sm text-ink-mute">Registre campanhas e o gasto diário para medir custo por lead.</p>
+        </Link>
       </div>
     </div>
   );
