@@ -46,6 +46,17 @@ model Organization {
   logoUrl    String? @map("logo_url")
   /** Cor de acento em hex (#RRGGBB). Null usa o acento padrão do produto. */
   brandColor String? @map("brand_color")
+
+  /**
+   * Nomes das ações de conversão no Google Ads, para a exportação offline.
+   *
+   * Guardados porque precisam bater exatamente com o que existe na conta do
+   * cliente: o Google casa a linha do arquivo pelo nome, e um acento ou uma
+   * maiúscula fora do lugar faz a linha ser descartada em silêncio. Redigitar
+   * isso a cada exportação seria uma chance de erro por semana.
+   */
+  googleConversionQualified String? @map("google_conversion_qualified")
+  googleConversionWon       String? @map("google_conversion_won")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")

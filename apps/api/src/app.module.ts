@@ -17,6 +17,7 @@ import { AdminModule } from "./admin/admin.module";
 import { AnalyticsModule } from "./analytics/analytics.module";
 import { NotificationsStreamModule } from "./notifications/notifications-stream.module";
 import { ConversationsModule } from "./conversations/conversations.module";
+import { GoogleConversionsModule } from "./integrations/google/google-conversions.module";
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { ConversationsModule } from "./conversations/conversations.module";
     AnalyticsModule,
     NotificationsStreamModule,
     ConversationsModule,
+    GoogleConversionsModule,
   ],
 })
 export class AppModule {}

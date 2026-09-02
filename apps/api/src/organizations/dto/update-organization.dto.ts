@@ -24,4 +24,18 @@ export class UpdateOrganizationDto {
   @ValidateIf((_, value) => value !== "")
   @IsHexColor()
   brandColor?: string;
+
+  /**
+   * Nomes das ações de conversão no Google Ads. String vazia limpa o campo,
+   * pelo mesmo motivo da logo: sem isso não haveria como desfazer.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  googleConversionQualified?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  googleConversionWon?: string;
 }

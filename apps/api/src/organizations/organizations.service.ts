@@ -34,6 +34,8 @@ export class OrganizationsService {
         // volta ao padrão depois de ter sido preenchido.
         ...(dto.logoUrl === "" ? { logoUrl: null } : {}),
         ...(dto.brandColor === "" ? { brandColor: null } : {}),
+        ...(dto.googleConversionQualified === "" ? { googleConversionQualified: null } : {}),
+        ...(dto.googleConversionWon === "" ? { googleConversionWon: null } : {}),
       },
     });
   }
