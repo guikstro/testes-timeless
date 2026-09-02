@@ -59,8 +59,15 @@ export function mesAnterior(ano: number, mes: number): { ano: number; mes: numbe
   return mes === 1 ? { ano: ano - 1, mes: 12 } : { ano, mes: mes - 1 };
 }
 
+/**
+ * O mês corrente no fuso de quem usa, e não em UTC.
+ *
+ * Os contêineres declaram `TZ=America/Sao_Paulo`, então o relógio local aqui é
+ * o de Brasília. Em UTC, entre as 21h e a meia-noite do último dia do mês a
+ * tela abriria já no mês seguinte.
+ */
 export function mesAtual(agora = new Date()): { ano: number; mes: number } {
-  return { ano: agora.getUTCFullYear(), mes: agora.getUTCMonth() + 1 };
+  return { ano: agora.getFullYear(), mes: agora.getMonth() + 1 };
 }
 
 /**

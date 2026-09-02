@@ -16,6 +16,7 @@ import {
 } from "./overview-aggregation";
 import { computeLeadMetrics } from "../leads/lead-metrics";
 import { extractAdIds } from "../leads/ad-references";
+import { fimDoDia, inicioDoDia } from "../common/tempo";
 import {
   agregaDesempenhoPorCampanha,
   CampanhaComparada,
@@ -203,15 +204,18 @@ export class AnalyticsService {
   /**
    * Uma janela só, já cruzada.
    *
-   * As datas são montadas em UTC de propósito: o gasto é gravado na meia-noite
-   * UTC do dia civil, e os contêineres rodam em UTC, então é o mesmo eixo que
-   * o resto do sistema usa para contar dias.
+   * As duas pontas são montadas em fusos diferentes de propósito, e a
+   * diferença não é descuido:
+   *
+   * - O lead é um instante, então a janela dele vai da meia-noite à meia-noite
+   *   no horário de Brasília. Em UTC, um lead das 22h cairia no dia seguinte.
+   * - O gasto é um dia civil sem hora, gravado na meia-noite UTC. A janela
+   *   dele acompanha esse mesmo eixo, ou nenhuma linha casaria.
    */
   private async desempenhoNaJanela(organizationId: string, janela: Janela): Promise<DesempenhoPorCampanha> {
-    const de = new Date(`${janela.de}T00:00:00.000Z`);
-    const ate = new Date(`${janela.ate}T23:59:59.999Z`);
-    // O gasto tem só a data, sem hora: a ponta final precisa ser a meia-noite
-    // do último dia, ou nenhuma linha daquele dia entra na comparação.
+    const de = inicioDoDia(janela.de);
+    const ate = fimDoDia(janela.ate);
+    const deDia = new Date(`${janela.de}T00:00:00.000Z`);
     const ateDia = new Date(`${janela.ate}T00:00:00.000Z`);
 
     const [campanhas, leads] = await Promise.all([
@@ -222,7 +226,7 @@ export class AnalyticsService {
           externalId: true,
           name: true,
           platform: true,
-          spend: { where: { date: { gte: de, lte: ateDia } }, select: { date: true, spendCents: true } },
+          spend: { where: { date: { gte: deDia, lte: ateDia } }, select: { date: true, spendCents: true } },
         },
       }),
       this.prisma.lead.findMany({

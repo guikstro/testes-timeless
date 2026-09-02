@@ -113,19 +113,22 @@ describe("AnalyticsService.desempenhoPorCampanha", () => {
     expect(comComparacao.prisma.lead.findMany).toHaveBeenCalledTimes(2);
   });
 
-  it("fecha a janela na última hora do dia final, para não perder o próprio dia", async () => {
+  it("monta a janela do lead no horário de Brasília e a do gasto em UTC", async () => {
     const { service, prisma } = buildService();
 
     await service.desempenhoPorCampanha("org-1", marco, null);
 
     const where = prisma.lead.findMany.mock.calls[0][0].where;
     expect(where.organizationId).toBe("org-1");
-    expect(where.firstContactAt.gte.toISOString()).toBe("2026-03-01T00:00:00.000Z");
-    expect(where.firstContactAt.lte.toISOString()).toBe("2026-03-31T23:59:59.999Z");
+    // Meia-noite em Brasília são três da manhã em UTC. Sem este deslocamento,
+    // o lead que chegou às 22h do dia 31 entraria no mês seguinte.
+    expect(where.firstContactAt.gte.toISOString()).toBe("2026-03-01T03:00:00.000Z");
+    expect(where.firstContactAt.lte.toISOString()).toBe("2026-04-01T02:59:59.999Z");
 
-    // O gasto guarda só a data, na meia-noite: usar a mesma ponta das 23:59
-    // não excluiria nada, mas a ponta certa deixa a intenção explícita.
+    // O gasto não é instante, é dia civil gravado na meia-noite UTC: a janela
+    // dele acompanha esse eixo, ou nenhuma linha casaria.
     const gasto = prisma.campaign.findMany.mock.calls[0][0].select.spend.where.date;
+    expect(gasto.gte.toISOString()).toBe("2026-03-01T00:00:00.000Z");
     expect(gasto.lte.toISOString()).toBe("2026-03-31T00:00:00.000Z");
   });
 

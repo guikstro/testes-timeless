@@ -202,14 +202,19 @@ function SeletorDeMes({
     <div className="surface p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.11em] text-ink-mute">{titulo}</h2>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <SetaDeAno href={hrefDoAno(ano - 1)} rotulo={`Ir para ${ano - 1}`} direcao="anterior" />
           <span className="min-w-[3rem] text-center text-[13px] font-medium tabular-nums text-ink">{ano}</span>
           <SetaDeAno href={hrefDoAno(ano + 1)} rotulo={`Ir para ${ano + 1}`} direcao="proximo" />
         </div>
       </div>
 
-      <div className="grid grid-cols-6 gap-1">
+      {/*
+        Mesma bandeja de pílulas dos modos do gráfico e do seletor do
+        relatório: doze meses não cabem numa linha só, então a bandeja vira
+        grade, mas cada opção continua sendo a mesma pílula do resto do produto.
+      */}
+      <div className="grid grid-cols-6 gap-1 rounded-2xl border border-line bg-panel-soft/60 p-1">
         {MESES_CURTOS.map((rotulo, indice) => {
           const mes = indice + 1;
           const ativo = selecionado?.ano === ano && selecionado.mes === mes;
@@ -218,8 +223,8 @@ function SeletorDeMes({
               key={rotulo}
               href={href(mes)}
               aria-current={ativo ? "page" : undefined}
-              className={`focus-ring rounded-lg py-1.5 text-center text-[12.5px] transition-all duration-200 ${
-                ativo ? "bg-ink font-medium text-canvas" : "text-ink-soft hover:bg-panel-soft hover:text-ink"
+              className={`focus-ring rounded-full px-2 py-1.5 text-center text-[12px] font-medium transition-all duration-200 ease-soft active:scale-95 ${
+                ativo ? "bg-ink text-canvas shadow-subtle" : "text-ink-mute hover:text-ink"
               }`}
             >
               {rotulo}
@@ -229,13 +234,19 @@ function SeletorDeMes({
       </div>
 
       {hrefSemComparacao !== undefined && (
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-3">
           {hrefSemComparacao ? (
-            <Link href={hrefSemComparacao} className="focus-ring rounded-full border border-line px-3 py-1 text-[12px] text-ink-soft transition-colors hover:text-ink">
+            <Link
+              href={hrefSemComparacao}
+              className="focus-ring inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium text-ink-soft transition-all duration-200 ease-soft hover:bg-ink/[0.06] hover:text-ink active:scale-95"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="h-3.5 w-3.5" aria-hidden>
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
               Remover comparação
             </Link>
           ) : (
-            <span className="text-[12px] text-ink-mute">Escolha um mês para comparar.</span>
+            <p className="px-1 text-[12px] text-ink-mute">Escolha um mês para comparar com o período.</p>
           )}
         </div>
       )}
@@ -248,7 +259,7 @@ function SetaDeAno({ href, rotulo, direcao }: { href: string; rotulo: string; di
     <Link
       href={href}
       aria-label={rotulo}
-      className="focus-ring rounded-lg p-1 text-ink-mute transition-colors hover:text-ink"
+      className="focus-ring inline-flex h-7 w-7 items-center justify-center rounded-full text-ink-mute transition-all duration-200 ease-soft hover:bg-ink/[0.06] hover:text-ink active:scale-95"
     >
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden>
         {direcao === "anterior" ? <path d="M15 18l-6-6 6-6" /> : <path d="M9 18l6-6-6-6" />}

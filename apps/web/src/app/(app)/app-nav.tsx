@@ -75,11 +75,9 @@ const NAV_ITEMS: NavItem[] = [
     href: "/campanhas",
     label: "Campanhas",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M4 20V10" />
-        <path d="M10 20V4" />
-        <path d="M16 20v-7" />
-        <path d="M22 20H2" />
+      <svg {...ICON_PROPS}>
+        <path d="M4 10v4a1 1 0 0 0 1 1h3l6 4V5L8 9H5a1 1 0 0 0-1 1z" />
+        <path d="M18 9a4 4 0 0 1 0 6" />
       </svg>
     ),
   },

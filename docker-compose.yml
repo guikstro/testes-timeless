@@ -77,6 +77,10 @@ services:
     env_file:
       - .env
     environment:
+      # O produto é brasileiro e todo relatório é lido em horário de Brasília.
+      # Sem isto o Node conta os dias em UTC, e um lead das 22h aparece no dia
+      # seguinte no gráfico, no mapa de horários e na virada do mês.
+      TZ: America/Sao_Paulo
       DATABASE_URL: postgresql://tintim:tintim@postgres:5432/tintim
       REDIS_URL: redis://redis:6379
     ports:
@@ -108,6 +112,10 @@ services:
     env_file:
       - .env
     environment:
+      # O produto é brasileiro e todo relatório é lido em horário de Brasília.
+      # Sem isto o Node conta os dias em UTC, e um lead das 22h aparece no dia
+      # seguinte no gráfico, no mapa de horários e na virada do mês.
+      TZ: America/Sao_Paulo
       DATABASE_URL: postgresql://tintim:tintim@postgres:5432/tintim
       REDIS_URL: redis://redis:6379
     depends_on:
@@ -136,6 +144,7 @@ services:
       # container), so this must resolve on the Docker network, not the host —
       # "localhost" here would point at the web container itself, not the api one.
       NEXT_PUBLIC_API_URL: http://api:3001/api
+      TZ: America/Sao_Paulo
       PORT: 3000
     ports:
       - "3000:3000"

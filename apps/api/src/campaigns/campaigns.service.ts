@@ -3,6 +3,7 @@ import { HttpStatus } from "@nestjs/common";
 import { AdPlatform } from "@prisma/client";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { AppException } from "../common/exceptions/app-exception";
+import { hojeLocal } from "../common/tempo";
 import { CriarCampanhaManualDto, RegistrarGastoDto } from "./dto/manual-campaign.dto";
 import { extraiGastos, leCsv } from "./csv-gasto";
 
@@ -45,9 +46,10 @@ export class CampaignsService {
    */
   async investimentoNoPeriodo(organizationId: string, dias: number) {
     // As datas de gasto são gravadas na meia-noite UTC do dia civil, então a
-    // janela é montada no mesmo formato, e não a partir do instante atual.
-    const hoje = new Date();
-    const ate = new Date(Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()));
+    // janela é montada no mesmo formato. O dia de hoje, porém, é o dia de
+    // Brasília: perto da meia-noite o UTC já virou, e a janela pularia um dia
+    // à frente do que o cliente vê no relógio dele.
+    const ate = new Date(`${hojeLocal()}T00:00:00.000Z`);
     const de = new Date(ate);
     de.setUTCDate(de.getUTCDate() - (dias - 1));
 
