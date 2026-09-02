@@ -70,7 +70,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             diz se o WhatsApp está no ar, que é o sinal que decide se leads
             estão entrando.
           */}
-          <div className="sticky top-0 z-30 flex h-[var(--faixa-do-topo)] items-center justify-between gap-2 border-b border-line/60 bg-canvas/80 px-4 backdrop-blur-xl sm:px-6">
+          <div className="sticky top-0 z-30 flex h-[var(--faixa-do-topo)] items-center justify-end gap-1 border-b border-line/60 bg-canvas/80 px-4 backdrop-blur-xl sm:px-6">
+            {/*
+              Ambos à direita, e não o estado à esquerda: a barra lateral
+              expande sobre este canto, e um indicador que some quando o mouse
+              passa no menu não serve como sinal permanente.
+            */}
             <ConnectionStatus conexao={conexao} />
             <NotificationBell />
           </div>

@@ -193,11 +193,30 @@ export function AppNav({
   }
 
   return (
-    // O trilho reserva a largura no layout; o <aside> flutua sobre o conteúdo.
-    <div className="w-16 shrink-0">
+    /*
+      O trilho reserva a largura no layout e o <aside> flutua sobre o conteúdo.
+      Fixada, porém, o trilho cresce junto: flutuar é o certo para o passar do
+      mouse, que é momentâneo, mas fixar e continuar cobrindo cento e setenta
+      pixels de toda tela tira o sentido de fixar.
+    */
+    <div
+      className={`shrink-0 transition-[width] duration-300 ease-soft motion-reduce:transition-none ${
+        pinned ? "w-60" : "w-16"
+      }`}
+    >
       <aside
         data-pinned={pinned}
-        className="group fixed bottom-0 left-0 top-0 z-30 flex w-16 flex-col overflow-hidden border-r border-line/70 bg-panel/80 px-3 py-5 backdrop-blur-xl transition-[width,box-shadow] duration-300 ease-soft hover:w-60 hover:shadow-lifted has-[:focus-visible]:w-60 data-[pinned=true]:w-60 data-[pinned=true]:shadow-none motion-reduce:transition-none"
+        /*
+          Acima da faixa do topo, e não no mesmo nível.
+          Expandida, a barra flutua sobre o conteúdo, e a faixa é irmã dela no
+          mesmo z-30: como a faixa vem depois no DOM, o fundo e a borda dela
+          passavam por cima e cortavam o nome da organização ao meio.
+
+          A escala aqui é: 30 para a moldura fixa da tela, 40 para o que
+          flutua sobre ela, 50 para o que precisa vencer tudo (avisos, gaveta
+          de notificação, faixa de impersonação).
+        */
+        className="group fixed bottom-0 left-0 top-0 z-40 flex w-16 flex-col overflow-hidden border-r border-line/70 bg-panel/80 px-3 py-5 backdrop-blur-xl transition-[width,box-shadow] duration-300 ease-soft hover:w-60 hover:shadow-lifted has-[:focus-visible]:w-60 data-[pinned=true]:w-60 data-[pinned=true]:shadow-none motion-reduce:transition-none"
       >
         {/*
           Segundo sinal: a identidade no topo do menu passa a ser a do cliente,
