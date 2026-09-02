@@ -22,12 +22,14 @@ describe("LeadsService", () => {
       recordPurchase: jest.fn(),
     };
     const sendQueue = { add: jest.fn() };
+    const notifications = { notificar: jest.fn().mockResolvedValue(undefined) };
     const service = new LeadsService(
       prisma as unknown as PrismaService,
       conversionEvents as unknown as ConversionEventsService,
       sendQueue as never,
+      notifications as never,
     );
-    return { service, prisma, conversionEvents, sendQueue };
+    return { service, prisma, conversionEvents, sendQueue, notifications };
   }
 
   it("scopes the list query to the caller's organization", async () => {

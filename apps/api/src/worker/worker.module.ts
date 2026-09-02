@@ -13,6 +13,7 @@ import {
 import { AttributionModule } from "../attribution/attribution.module";
 import { ClassificationModule } from "../classification/classification.module";
 import { ConversionEventsModule } from "../integrations/meta/conversion-events.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 import { WhatsAppEventProcessor } from "./processors/whatsapp-event.processor";
 import { WhatsAppIngestionService } from "./processors/whatsapp-ingestion.service";
 import { MetaSyncProcessor } from "./processors/meta-sync.processor";
@@ -32,6 +33,7 @@ import { EvolutionClient } from "../integrations/whatsapp/evolution-client";
     AttributionModule,
     ClassificationModule,
     ConversionEventsModule,
+    NotificationsModule,
     BullModule.forRoot({ connection: getRedisConnectionOptions() }),
     BullModule.registerQueue(
       { name: WHATSAPP_EVENTS_QUEUE },

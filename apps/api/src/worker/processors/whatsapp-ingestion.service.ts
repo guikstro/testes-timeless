@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Message } from "@prisma/client";
+import { LeadStatus, Message } from "@prisma/client";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { normalizePhone } from "../../common/utils/normalize-phone";
 import { isUniqueConstraintError } from "../../common/utils/is-unique-constraint-error";
@@ -7,6 +7,20 @@ import { WhatsAppInboundMessageJob } from "../../common/queue/whatsapp-event.job
 import { AttributionEngine } from "../../attribution/attribution-engine";
 import { ConversationClassifierService } from "../../classification/conversation-classifier.service";
 import { ConversionEventsService } from "../../integrations/meta/conversion-events.service";
+import { NotificationsService } from "../../notifications/notifications.service";
+import { ANUNCIO_POR_ESTAGIO } from "../../notifications/notification-event";
+
+
+/** Quanto de uma mensagem cabe num aviso sem virar parede de texto. */
+const LIMITE_DA_PREVIA = 140;
+
+function recorta(texto: string | undefined): string | undefined {
+  if (!texto) return undefined;
+  const limpo = texto.replace(/\s+/g, " ").trim();
+  if (limpo.length === 0) return undefined;
+  return limpo.length > LIMITE_DA_PREVIA ? `${limpo.slice(0, LIMITE_DA_PREVIA - 1)}…` : limpo;
+}
+
 
 @Injectable()
 export class WhatsAppIngestionService {
@@ -17,6 +31,7 @@ export class WhatsAppIngestionService {
     private readonly attributionEngine: AttributionEngine,
     private readonly classifier: ConversationClassifierService,
     private readonly conversionEvents: ConversionEventsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -124,6 +139,64 @@ export class WhatsAppIngestionService {
     await this.prisma.whatsAppConnection.update({
       where: { id: connection.id },
       data: { lastEventAt: new Date() },
+    });
+
+    // O aviso sai por último, com tudo já gravado. Ao contrário, a tela
+    // poderia receber o evento e ir buscar um lead que ainda não existe.
+    await this.avisar(organizationId, lead, leadWasCreated, job, occurredAt);
+  }
+
+  /**
+   * Traduz o que acabou de acontecer em avisos para quem está com a tela
+   * aberta.
+   *
+   * O estágio depois do classificador é relido do banco em vez de deduzido
+   * aqui. Espelhar as regras dele nesta função criaria duas cópias da mesma
+   * lógica, e a segunda envelheceria calada: um caminho novo lá dentro
+   * simplesmente deixaria de ser anunciado, sem nada quebrar.
+   */
+  private async avisar(
+    organizationId: string,
+    leadAntes: { id: string; name: string | null; rawPhone: string; status: LeadStatus },
+    leadWasCreated: boolean,
+    job: WhatsAppInboundMessageJob,
+    occurredAt: Date,
+  ): Promise<void> {
+    const nome = leadAntes.name ?? leadAntes.rawPhone;
+    const previa = job.type === "text" ? recorta(job.text) : undefined;
+    const comum = {
+      organizationId,
+      leadId: leadAntes.id,
+      leadName: nome,
+      phone: leadAntes.rawPhone,
+      message: previa,
+      timestamp: occurredAt.toISOString(),
+    };
+
+    // Lead novo recebe um aviso só: anunciar a criação e a primeira mensagem
+    // separadamente encheria a tela com dois cartões sobre o mesmo fato.
+    await this.notifications.notificar(
+      leadWasCreated
+        ? { ...comum, type: "lead.created", title: `Novo lead: ${nome}`, body: previa }
+        : { ...comum, type: "message.received", title: `${nome} respondeu`, body: previa },
+    );
+
+    const depois = await this.prisma.lead.findUnique({
+      where: { id: leadAntes.id },
+      select: { status: true },
+    });
+    // `NEW` está fora porque o funil não anda para trás: se o estágio mudou e
+    // ainda é NEW, alguma coisa está errada, e inventar um aviso seria pior
+    // que ficar calado.
+    if (!depois || depois.status === leadAntes.status || depois.status === "NEW") return;
+
+    const anuncio = ANUNCIO_POR_ESTAGIO[depois.status];
+    await this.notifications.notificar({
+      ...comum,
+      type: anuncio.tipo,
+      stage: depois.status,
+      title: `${anuncio.titulo}: ${nome}`,
+      body: previa,
     });
   }
 

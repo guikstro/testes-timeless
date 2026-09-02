@@ -4,6 +4,8 @@ import { InjectQueue } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { AppException } from "../common/exceptions/app-exception";
+import { NotificationsService } from "../notifications/notifications.service";
+import { ANUNCIO_POR_ESTAGIO } from "../notifications/notification-event";
 import { PaginatedResult, PaginationQueryDto } from "../common/dto/pagination.dto";
 import { ConversionEventsService } from "../integrations/meta/conversion-events.service";
 import { WHATSAPP_SEND_QUEUE } from "../common/queue/queue.constants";
@@ -57,6 +59,7 @@ export class LeadsService {
     private readonly prisma: PrismaService,
     private readonly conversionEvents: ConversionEventsService,
     @InjectQueue(WHATSAPP_SEND_QUEUE) private readonly sendQueue: Queue<WhatsAppSendJob>,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async list(organizationId: string, query: ListLeadsDto): Promise<PaginatedResult<unknown>> {
@@ -461,6 +464,22 @@ export class LeadsService {
           before: { status: beforeStatus },
           after: { status: data.status },
         },
+      });
+
+      // O mesmo aviso que a mudança automática produz. Para quem está com o
+      // quadro aberto do outro lado, um cartão movido pelo colega e um movido
+      // por uma regra são o mesmo fato: o lead andou.
+      const anuncio = ANUNCIO_POR_ESTAGIO[data.status as "QUALIFIED" | "MEETING_SCHEDULED" | "WON"];
+      const nome = lead.name ?? lead.rawPhone;
+      await this.notifications.notificar({
+        type: anuncio.tipo,
+        organizationId,
+        leadId: id,
+        leadName: nome,
+        phone: lead.rawPhone,
+        stage: data.status as string,
+        title: `${anuncio.titulo}: ${nome}`,
+        timestamp: now.toISOString(),
       });
     }
 

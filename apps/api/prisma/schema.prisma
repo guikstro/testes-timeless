@@ -61,6 +61,7 @@ model Organization {
   metaConnection      MetaConnection?
   campaigns           Campaign[]
   conversionEvents    ConversionEvent[]
+  notifications       Notification[]
 
   @@map("organizations")
 }
@@ -88,6 +89,7 @@ model User {
   passwordResetTokens  PasswordResetToken[]
   refreshTokens        RefreshToken[]
   auditLogs            AuditLog[]
+  notifications        Notification[]
 
   @@map("users")
 }
@@ -334,6 +336,7 @@ model Lead {
   attribution      Attribution?
   sale             Sale?
   conversionEvents ConversionEvent[]
+  notifications    Notification[]
 
   @@unique([organizationId, normalizedPhone])
   @@index([organizationId, lastContactAt])
@@ -726,4 +729,40 @@ model ConversionEvent {
   @@unique([leadId, type])
   @@index([organizationId])
   @@map("conversion_events")
+}
+
+/**
+ * Aviso já entregue, guardado para quem não estava com a tela aberta.
+ *
+ * Uma linha por pessoa, e não uma linha por organização com `userId` nulo:
+ * o estado de leitura é de quem lê. Com uma linha só para todos, o operador
+ * que marcasse como lida faria o aviso sumir da caixa do colega, que talvez
+ * nem tivesse visto. A coluna continua opcional para um eventual aviso do
+ * sistema que não pertença a ninguém em particular.
+ *
+ * O tempo real é o canal principal; esta tabela é a memória dele.
+ */
+model Notification {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String?  @map("user_id")
+  /** Mesmo vocabulário do canal em tempo real: lead.created, lead.won, etc. */
+  type           String
+  title          String
+  body           String?
+  leadId         String?  @map("lead_id")
+  read           Boolean  @default(false)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /**
+   * A notificação sobrevive ao lead ser apagado: ela é o registro de que o
+   * aviso aconteceu, e some-la reescreveria o histórico de quem foi avisado.
+   */
+  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([userId, read, createdAt])
+  @@index([organizationId, createdAt])
+  @@map("notifications")
 }

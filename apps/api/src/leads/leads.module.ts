@@ -4,9 +4,14 @@ import { ConversionEventsModule } from "../integrations/meta/conversion-events.m
 import { WHATSAPP_SEND_QUEUE } from "../common/queue/queue.constants";
 import { LeadsController } from "./leads.controller";
 import { LeadsService } from "./leads.service";
+import { NotificationsModule } from "../notifications/notifications.module";
 
 @Module({
-  imports: [ConversionEventsModule, BullModule.registerQueue({ name: WHATSAPP_SEND_QUEUE })],
+  imports: [
+    ConversionEventsModule,
+    NotificationsModule,
+    BullModule.registerQueue({ name: WHATSAPP_SEND_QUEUE }),
+  ],
   controllers: [LeadsController],
   providers: [LeadsService],
 })

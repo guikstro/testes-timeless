@@ -4,6 +4,7 @@ import { PrismaService } from "../../common/prisma/prisma.service";
 import { AttributionEngine } from "../../attribution/attribution-engine";
 import { ConversationClassifierService } from "../../classification/conversation-classifier.service";
 import { ConversionEventsService } from "../../integrations/meta/conversion-events.service";
+import { NotificationsService } from "../../notifications/notifications.service";
 import { WhatsAppInboundMessageJob } from "../../common/queue/whatsapp-event.job";
 
 function uniqueConstraintError(): Prisma.PrismaClientKnownRequestError {
@@ -70,17 +71,23 @@ describe("WhatsAppIngestionService", () => {
     return { recordLead: jest.fn(), recordQualifiedLead: jest.fn(), recordPurchase: jest.fn() };
   }
 
+  function buildNotificationsMock() {
+    return { notificar: jest.fn().mockResolvedValue(undefined) };
+  }
+
   function buildService(
     prisma: ReturnType<typeof buildPrismaMock>,
     attributionEngine = buildAttributionEngineMock(),
     classifier = buildClassifierMock(),
     conversionEvents = buildConversionEventsMock(),
+    notifications = buildNotificationsMock(),
   ) {
     return new WhatsAppIngestionService(
       prisma as unknown as PrismaService,
       attributionEngine as unknown as AttributionEngine,
       classifier as unknown as ConversationClassifierService,
       conversionEvents as unknown as ConversionEventsService,
+      notifications as unknown as NotificationsService,
     );
   }
 

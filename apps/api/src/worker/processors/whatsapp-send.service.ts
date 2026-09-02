@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { EvolutionClient } from "../../integrations/whatsapp/evolution-client";
 import { ConversationClassifierService } from "../../classification/conversation-classifier.service";
+import { NotificationsService } from "../../notifications/notifications.service";
 
 /**
  * Entrega uma mensagem OUTBOUND já persistida ao provider. Relê o estado
@@ -17,6 +18,7 @@ export class WhatsAppSendService {
     private readonly prisma: PrismaService,
     private readonly evolution: EvolutionClient,
     private readonly classifier: ConversationClassifierService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async send(messageId: string, isLastAttempt: boolean): Promise<void> {
@@ -88,10 +90,33 @@ export class WhatsAppSendService {
     }
   }
 
+  /**
+   * Só na última tentativa, e é de propósito: avisar a cada retentativa
+   * encheria a tela de alarmes por uma falha que a fila ainda vai resolver
+   * sozinha. O aviso vale quando a mensagem realmente não vai sair.
+   */
   private async fail(messageId: string, reason: string): Promise<void> {
-    await this.prisma.message.update({
+    const mensagem = await this.prisma.message.update({
       where: { id: messageId },
       data: { outboundStatus: "FAILED", sendError: reason },
+      select: {
+        text: true,
+        conversation: {
+          select: { lead: { select: { id: true, name: true, rawPhone: true, organizationId: true } } },
+        },
+      },
+    });
+
+    const lead = mensagem.conversation.lead;
+    const nome = lead.name ?? lead.rawPhone;
+    await this.notifications.notificar({
+      type: "message.failed",
+      organizationId: lead.organizationId,
+      leadId: lead.id,
+      leadName: nome,
+      phone: lead.rawPhone,
+      title: `Mensagem não entregue para ${nome}`,
+      body: reason,
     });
   }
 }

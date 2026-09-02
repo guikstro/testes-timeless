@@ -3,18 +3,33 @@ import { PrismaService } from "../../common/prisma/prisma.service";
 import { EvolutionClient } from "../../integrations/whatsapp/evolution-client";
 import { EvolutionApiError } from "../../integrations/whatsapp/evolution-api-error";
 import { ConversationClassifierService } from "../../classification/conversation-classifier.service";
+import { NotificationsService } from "../../notifications/notifications.service";
 
 describe("WhatsAppSendService", () => {
   function buildService() {
-    const prisma = { message: { findUnique: jest.fn(), update: jest.fn() } };
+    const prisma = {
+      message: {
+        findUnique: jest.fn(),
+        // A marcação de falha relê o lead na mesma escrita, para poder
+        // nomear quem ficou sem resposta no aviso.
+        update: jest.fn().mockResolvedValue({
+          text: "Olá, tudo bem?",
+          conversation: {
+            lead: { id: "lead-1", name: "Ana", rawPhone: "5511999999999", organizationId: "org-1" },
+          },
+        }),
+      },
+    };
     const evolution = { sendText: jest.fn().mockResolvedValue({ externalId: "3EB0SENT" }) };
     const classifier = { classify: jest.fn() };
+    const notifications = { notificar: jest.fn().mockResolvedValue(undefined) };
     const service = new WhatsAppSendService(
       prisma as unknown as PrismaService,
       evolution as unknown as EvolutionClient,
       classifier as unknown as ConversationClassifierService,
+      notifications as unknown as NotificationsService,
     );
-    return { service, prisma, evolution, classifier };
+    return { service, prisma, evolution, classifier, notifications };
   }
 
   function messageRow(overrides: Record<string, unknown> = {}) {
@@ -74,10 +89,12 @@ describe("WhatsAppSendService", () => {
     await expect(service.send("msg-1", false)).resolves.not.toThrow();
 
     expect(evolution.sendText).not.toHaveBeenCalled();
-    expect(prisma.message.update).toHaveBeenCalledWith({
-      where: { id: "msg-1" },
-      data: expect.objectContaining({ outboundStatus: "FAILED" }),
-    });
+    expect(prisma.message.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "msg-1" },
+        data: expect.objectContaining({ outboundStatus: "FAILED" }),
+      }),
+    );
   });
 
   it("fails explicitly for a Cloud API connection instead of pretending the message went out", async () => {
@@ -94,10 +111,12 @@ describe("WhatsAppSendService", () => {
     await service.send("msg-1", false);
 
     expect(evolution.sendText).not.toHaveBeenCalled();
-    expect(prisma.message.update).toHaveBeenCalledWith({
-      where: { id: "msg-1" },
-      data: expect.objectContaining({ outboundStatus: "FAILED" }),
-    });
+    expect(prisma.message.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "msg-1" },
+        data: expect.objectContaining({ outboundStatus: "FAILED" }),
+      }),
+    );
   });
 
   it("sends the text to the lead's number without the leading + and records the provider's id", async () => {
@@ -133,10 +152,35 @@ describe("WhatsAppSendService", () => {
 
     await expect(service.send("msg-1", true)).rejects.toThrow("Connection Closed");
 
-    expect(prisma.message.update).toHaveBeenCalledWith({
-      where: { id: "msg-1" },
-      data: { outboundStatus: "FAILED", sendError: "Connection Closed" },
-    });
+    expect(prisma.message.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "msg-1" },
+        data: { outboundStatus: "FAILED", sendError: "Connection Closed" },
+      }),
+    );
+  });
+
+  it("avisa quem está na tela só quando a mensagem realmente não vai mais sair", async () => {
+    const { service, prisma, evolution, notifications } = buildService();
+    prisma.message.findUnique.mockResolvedValue(messageRow());
+    evolution.sendText.mockRejectedValue(new EvolutionApiError("Connection Closed", 400));
+
+    // Ainda há retentativa pela frente: a fila pode resolver sozinha, e um
+    // alarme a cada tentativa encheria a tela de falso alarme. O erro sobe do
+    // mesmo jeito, porque é ele que faz o BullMQ tentar de novo.
+    await expect(service.send("msg-1", false)).rejects.toThrow("Connection Closed");
+    expect(notifications.notificar).not.toHaveBeenCalled();
+
+    await expect(service.send("msg-1", true)).rejects.toThrow("Connection Closed");
+    expect(notifications.notificar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "message.failed",
+        organizationId: "org-1",
+        leadId: "lead-1",
+        title: "Mensagem não entregue para Ana",
+        body: "Connection Closed",
+      }),
+    );
   });
 
   describe("classificação da mensagem enviada (Fase 11)", () => {

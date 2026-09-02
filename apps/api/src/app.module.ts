@@ -15,6 +15,7 @@ import { MetaConnectionsModule } from "./integrations/meta/meta-connections.modu
 import { CampaignsModule } from "./campaigns/campaigns.module";
 import { AdminModule } from "./admin/admin.module";
 import { AnalyticsModule } from "./analytics/analytics.module";
+import { NotificationsStreamModule } from "./notifications/notifications-stream.module";
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { AnalyticsModule } from "./analytics/analytics.module";
     CampaignsModule,
     AdminModule,
     AnalyticsModule,
+    NotificationsStreamModule,
   ],
 })
 export class AppModule {}
