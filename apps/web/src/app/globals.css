@@ -21,6 +21,10 @@
   --panel-soft: 250 245 235;
   --line: 226 219 205;
 
+  /* Altura da faixa do topo. A caixa de entrada desconta isto para ocupar
+     o resto da janela, e um número solto nos dois lugares separaria. */
+  --faixa-do-topo: 45px;
+
   --ink: 12 11 10;
   --ink-soft: 82 76 68;
   --ink-mute: 133 125 113;

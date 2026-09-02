@@ -5,6 +5,7 @@ import { LivingBackground } from "@/components/living-background";
 import { AppNav } from "./app-nav";
 import { ImpersonationHairline } from "./impersonation-banner";
 import { AppMain } from "./app-main";
+import { ConexaoDoWhatsApp, ConnectionStatus } from "./connection-status";
 import { NotificationProvider } from "@/components/notifications/notification-provider";
 import { NotificationToasts } from "@/components/notifications/notification-toasts";
 import { NotificationBell } from "@/components/notifications/notification-bell";
@@ -24,6 +25,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       redirect("/login");
     }
     throw error;
+  }
+
+  /*
+    A faixa do topo mostra o estado da conexão, então ele é buscado aqui. O
+    try/catch não é zelo excessivo: sem ele, uma falha nesta consulta derruba
+    o layout inteiro, e o app ficaria inacessível por causa de um indicador.
+  */
+  let conexao: ConexaoDoWhatsApp | null = null;
+  try {
+    conexao = await apiFetch<ConexaoDoWhatsApp | null>("/integrations/whatsapp");
+  } catch {
+    conexao = null;
   }
 
   return (
@@ -51,7 +64,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             outro lugar do sistema. Sem fundo sólido ela deixaria o conteúdo
             passar por baixo ao rolar.
           */}
-          <div className="sticky top-0 z-30 flex justify-end gap-1 border-b border-line/60 bg-canvas/80 px-6 py-2 backdrop-blur-xl sm:px-8">
+          {/*
+            Faixa fina no topo, grudada. Antes gastava cinquenta e três pixels
+            para carregar um sino e nada mais; agora tem quarenta e cinco e
+            diz se o WhatsApp está no ar, que é o sinal que decide se leads
+            estão entrando.
+          */}
+          <div className="sticky top-0 z-30 flex h-[var(--faixa-do-topo)] items-center justify-between gap-2 border-b border-line/60 bg-canvas/80 px-4 backdrop-blur-xl sm:px-6">
+            <ConnectionStatus conexao={conexao} />
             <NotificationBell />
           </div>
 

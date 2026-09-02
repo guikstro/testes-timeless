@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ESTAGIO_ROTULO, ESTAGIO_TOM, FichaDoLead, nomeDoLead } from "@/lib/conversas/tipos";
 import { tempoRelativo } from "@/lib/relative-time";
 import { Conversation } from "../leads/[id]/conversation";
@@ -34,10 +35,31 @@ export function InboxChat({
   aoAlternarPainel: () => void;
 }) {
   if (!ficha) {
+    // Com a conversa a caminho, as bolhas aparecem em silhueta: a coluna já
+    // fica com a forma que vai ter, e a troca não sacode a tela.
+    if (carregando) {
+      return (
+        <div className="flex h-full flex-col bg-canvas">
+          <div className="flex items-center gap-2.5 border-b border-line/60 bg-panel/60 px-4 py-2.5">
+            <div className="flex-1">
+              <Skeleton className="h-3.5 w-32" />
+              <Skeleton className="mt-1.5 h-3 w-44" />
+            </div>
+            <Skeleton className="h-6 w-20 rounded-full" />
+          </div>
+          <div className="flex-1 space-y-3 p-4">
+            <Skeleton className="h-14 w-[70%] rounded-2xl" />
+            <Skeleton className="ml-auto h-12 w-[60%] rounded-2xl" />
+            <Skeleton className="h-10 w-[55%] rounded-2xl" />
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex h-full items-center justify-center p-8">
         <p className="max-w-xs text-center text-corpo leading-relaxed text-ink-mute">
-          {carregando ? "Abrindo a conversa…" : "Escolha uma conversa à esquerda para ler e responder."}
+          Escolha uma conversa à esquerda para ler e responder.
         </p>
       </div>
     );

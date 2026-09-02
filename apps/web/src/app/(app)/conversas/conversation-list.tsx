@@ -3,6 +3,7 @@
 import { ATRASO_SEGUNDOS, FiltroDaCaixa, ItemDaCaixa, nomeDoLead } from "@/lib/conversas/tipos";
 import { tempoRelativo } from "@/lib/relative-time";
 import { GrupoDePilulas } from "@/components/ui/pill-group";
+import { LinhaDeConversaEsqueleto } from "@/components/ui/skeleton";
 
 const FILTROS: { valor: FiltroDaCaixa; rotulo: string; explicacao: string }[] = [
   { valor: "all", rotulo: "Todas", explicacao: "Todas as conversas" },
@@ -87,9 +88,13 @@ export function ConversationList({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {itens.length === 0 ? (
+        {carregando && itens.length === 0 ? (
+          // Silhueta em vez da palavra "carregando": a lista mantém a altura
+          // e não pula quando as conversas chegam.
+          Array.from({ length: 7 }).map((_, i) => <LinhaDeConversaEsqueleto key={i} />)
+        ) : itens.length === 0 ? (
           <p className="px-4 py-10 text-center text-corpo text-ink-mute">
-            {carregando ? "Carregando…" : busca ? "Nenhuma conversa com esse termo." : "Nenhuma conversa ainda."}
+            {busca ? "Nenhuma conversa com esse termo." : "Nenhuma conversa ainda."}
           </p>
         ) : (
           <ul>

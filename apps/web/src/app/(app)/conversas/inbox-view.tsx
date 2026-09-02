@@ -151,7 +151,7 @@ export function InboxView({
         dentro de cada coluna, nunca na página: o rodapé de resposta precisa
         ficar sempre à vista.
       */
-      className={`grid h-[calc(100dvh-53px)] min-h-0 grid-cols-1 md:grid-cols-[280px_minmax(0,1fr)] ${
+      className={`grid h-[calc(100dvh-var(--faixa-do-topo))] min-h-0 grid-cols-1 md:grid-cols-[280px_minmax(0,1fr)] ${
         painelAberto ? "lg:grid-cols-[300px_minmax(0,1fr)_340px]" : "lg:grid-cols-[300px_minmax(0,1fr)]"
       }`}
     >
