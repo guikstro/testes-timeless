@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AtualizaAoVivo } from "@/components/notifications/atualiza-ao-vivo";
 import { apiFetch } from "@/lib/api-client";
 import { formatCentsAsBRL } from "@/lib/currency";
 import { formatDuration, responseSpeedTone, SPEED_TONE_CLASSES } from "@/lib/duration";
@@ -82,6 +83,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-ink">Dashboard</h1>
+          <AtualizaAoVivo />
           <p className="mt-0.5 text-sm text-ink-mute">
             {totals.leads > 0
               ? `${totals.leads} lead(s) nos últimos ${days} dias`

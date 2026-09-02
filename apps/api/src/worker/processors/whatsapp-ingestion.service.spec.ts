@@ -366,4 +366,68 @@ describe("WhatsAppIngestionService", () => {
       expect(classifier.classify).not.toHaveBeenCalled();
     });
   });
+
+  describe("avisos em tempo real", () => {
+    it("anuncia o lead novo, e uma vez só", async () => {
+      const prisma = buildPrismaMock();
+      prisma.lead.create.mockResolvedValue({
+        id: "lead-1",
+        name: null,
+        rawPhone: "5585999999999",
+        status: "NEW",
+        lastContactAt: new Date(0),
+      });
+      prisma.conversation.create.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
+      const notifications = buildNotificationsMock();
+      const service = buildService(
+        prisma,
+        buildAttributionEngineMock(),
+        buildClassifierMock(),
+        buildConversionEventsMock(),
+        notifications,
+      );
+
+      await service.ingest(buildJob());
+
+      // Um aviso, não dois: anunciar a criação e a primeira mensagem
+      // separadamente encheria a tela com dois cartões sobre o mesmo fato.
+      expect(notifications.notificar).toHaveBeenCalledTimes(1);
+      expect(notifications.notificar).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "lead.created", organizationId: "org-1", leadId: "lead-1" }),
+      );
+    });
+
+    it("anuncia o avanço no funil quando o classificador moveu o lead", async () => {
+      const prisma = buildPrismaMock();
+      const existente = {
+        id: "lead-1",
+        name: "Ana",
+        rawPhone: "5585999999999",
+        status: "NEW",
+        lastContactAt: new Date(0),
+      };
+      prisma.lead.findUnique.mockResolvedValue(existente);
+      prisma.lead.update.mockResolvedValue(existente);
+      prisma.conversation.findFirst.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
+      prisma.conversation.update.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
+      const notifications = buildNotificationsMock();
+      const service = buildService(
+        prisma,
+        buildAttributionEngineMock(),
+        buildClassifierMock(),
+        buildConversionEventsMock(),
+        notifications,
+      );
+
+      // O estágio é relido depois do classificador: é assim que qualquer
+      // caminho novo dentro dele continua sendo anunciado sem ninguém lembrar.
+      prisma.lead.findUnique.mockResolvedValueOnce(existente).mockResolvedValueOnce({ status: "WON" });
+
+      await service.ingest(buildJob());
+
+      expect(notifications.notificar).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "lead.won", title: "Venda registrada: Ana" }),
+      );
+    });
+  });
 });
