@@ -1,5 +1,8 @@
 import { apiFetch } from "@/lib/api-client";
 import { Card, CardHeader } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/skeleton";
+import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
 import { BrandForm } from "./brand-form";
 import { CreateRuleForm } from "./create-rule-form";
 import { DeleteRuleButton } from "./delete-rule-button";
@@ -11,10 +14,11 @@ interface ClassificationRule {
   createdAt: string;
 }
 
-const TARGET_LABELS: Record<ClassificationRule["targetStatus"], string> = {
-  QUALIFIED: "Qualifica o lead",
-  MEETING_SCHEDULED: "Marca reunião agendada",
-  WON: "Marca como venda",
+/** O que cada gatilho faz, com o tom do estágio para onde ele leva. */
+const ALVO: Record<ClassificationRule["targetStatus"], { rotulo: string; tom: "info" | "warning" | "success" }> = {
+  QUALIFIED: { rotulo: "Qualifica o lead", tom: "info" },
+  MEETING_SCHEDULED: { rotulo: "Marca reunião", tom: "warning" },
+  WON: { rotulo: "Marca venda", tom: "success" },
 };
 
 interface SupportAccess {
@@ -38,97 +42,103 @@ export default async function SettingsPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto max-w-4xl">
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Configurações</h1>
-      <p className="mb-8 mt-1 text-sm text-ink-mute">Identidade visual, gatilhos e acessos.</p>
+      <p className="mb-6 mt-1 text-corpo text-ink-mute">Identidade visual, gatilhos e acessos.</p>
 
-      <Card className="mb-8 p-6">
-        <CardHeader
-          title="Identidade da empresa"
-          description="A logo e a cor aparecem no menu, nos botões e nos destaques da plataforma."
-          className="mb-6"
-        />
-        <BrandForm
-          organizationName={organization.name}
-          logoUrl={organization.logoUrl}
-          brandColor={organization.brandColor}
-        />
-      </Card>
+      {/*
+        As três seções em cartões iguais. Antes uma era cartão e as outras duas
+        eram título solto com tabela embaixo, e a tela parecia três telas
+        empilhadas em vez de uma.
+      */}
+      <div className="space-y-5">
+        <Card className="p-6">
+          <CardHeader
+            title="Identidade da empresa"
+            description="A logo e a cor aparecem no menu, nos botões e nos destaques da plataforma."
+            className="mb-6"
+          />
+          <BrandForm
+            organizationName={organization.name}
+            logoUrl={organization.logoUrl}
+            brandColor={organization.brandColor}
+          />
+        </Card>
 
-      <h2 className="mb-3 text-sm font-semibold text-ink">Gatilhos de qualificação e venda</h2>
-      <p className="mb-4 text-sm text-ink-mute">
-        Quando uma mensagem recebida contiver a frase exata (sem diferenciar maiúsculas/minúsculas), o lead muda de
-        estágio automaticamente. Prefira frases distintas e específicas. Frases genéricas podem gerar falsos
-        positivos.
-      </p>
+        <Card className="p-6">
+          <CardHeader
+            title="Gatilhos de qualificação e venda"
+            description="Quando uma mensagem recebida contiver a frase exata, sem diferenciar maiúsculas de minúsculas, o lead muda de estágio sozinho."
+            className="mb-5"
+          />
 
-      <div className="mb-6">
-        <CreateRuleForm />
-      </div>
+          <div className="mb-5">
+            <CreateRuleForm />
+          </div>
 
-      {rules.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-line bg-panel p-8 text-center text-sm text-ink-soft">
-          Nenhum gatilho configurado ainda.
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-line bg-panel">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-line text-ink-mute">
-              <tr>
-                <th className="px-4 py-3 font-medium">Tipo</th>
-                <th className="px-4 py-3 font-medium">Frase</th>
-                <th className="px-4 py-3 font-medium"></th>
-              </tr>
-            </thead>
-            <tbody>
+          {rules.length === 0 ? (
+            <EmptyState
+              title="Nenhum gatilho configurado"
+              description="Sem gatilhos, o funil só anda quando alguém move o lead à mão."
+            />
+          ) : (
+            <ul className="divide-y divide-line/60 overflow-hidden rounded-xl border border-line/70">
               {rules.map((rule) => (
-                <tr key={rule.id} className="border-b border-line/60 last:border-0">
-                  <td className="px-4 py-3 text-ink-soft">{TARGET_LABELS[rule.targetStatus]}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-ink-soft">{rule.phrase}</td>
-                  <td className="px-4 py-3 text-right">
-                    <DeleteRuleButton id={rule.id} />
-                  </td>
-                </tr>
+                <li
+                  key={rule.id}
+                  className="flex items-center gap-3 px-3.5 py-3 transition-colors hover:bg-panel-soft/50"
+                >
+                  <Badge tone={ALVO[rule.targetStatus].tom}>{ALVO[rule.targetStatus].rotulo}</Badge>
+                  {/* A frase em mono e entre aspas: é texto literal, e o
+                      espaço em branco nela muda o que casa. */}
+                  <code className="min-w-0 flex-1 truncate font-mono text-apoio text-ink-soft" title={rule.phrase}>
+                    &ldquo;{rule.phrase}&rdquo;
+                  </code>
+                  <DeleteRuleButton id={rule.id} />
+                </li>
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </ul>
+          )}
 
-      <h2 className="mb-3 mt-10 text-sm font-semibold text-ink">Acessos do suporte à sua conta</h2>
-      <p className="mb-4 text-sm text-ink-mute">
-        Sempre que alguém da nossa equipe precisa entrar na sua conta para dar suporte, o acesso aparece aqui.
-      </p>
+          <p className="mt-3 text-rotulo leading-relaxed text-ink-mute">
+            Prefira frases distintas e específicas. Uma frase genérica como &ldquo;ok&rdquo; qualificaria quase toda
+            conversa, e um funil que qualifica todo mundo não separa ninguém.
+          </p>
+        </Card>
 
-      {supportAccesses.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-line bg-panel p-8 text-center text-sm text-ink-soft">
-          Ninguém da nossa equipe acessou sua conta.
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-line bg-panel">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-line text-ink-mute">
-              <tr>
-                <th className="px-4 py-3 font-medium">Quando</th>
-                <th className="px-4 py-3 font-medium">Quem</th>
-              </tr>
-            </thead>
-            <tbody>
+        <Card className="p-6">
+          <CardHeader
+            title="Acessos do suporte à sua conta"
+            description="Sempre que alguém da nossa equipe entra na sua conta para dar suporte, o acesso aparece aqui."
+            className="mb-5"
+          />
+
+          {supportAccesses.length === 0 ? (
+            <EmptyState
+              title="Ninguém da nossa equipe acessou sua conta"
+              description="Se algum dia acontecer, o registro aparece aqui com quem entrou e quando."
+            />
+          ) : (
+            <ul className="divide-y divide-line/60 overflow-hidden rounded-xl border border-line/70">
               {supportAccesses.map((access) => (
-                <tr key={access.id} className="border-b border-line/60 last:border-0">
-                  <td className="px-4 py-3 text-ink-mute">
-                    {new Date(access.createdAt).toLocaleString("pt-BR")}
-                  </td>
-                  <td className="px-4 py-3 text-ink-soft">
-                    {access.user?.name ?? "Usuário removido"}
-                    <span className="block text-xs text-ink-mute">{access.user?.email}</span>
-                  </td>
-                </tr>
+                <li key={access.id} className="flex items-center justify-between gap-4 px-3.5 py-3">
+                  <span className="min-w-0">
+                    <span className="block truncate text-corpo text-ink">
+                      {access.user?.name ?? "Usuário removido"}
+                    </span>
+                    {access.user?.email ? (
+                      <span className="block truncate text-rotulo text-ink-mute">{access.user.email}</span>
+                    ) : null}
+                  </span>
+                  <span className="shrink-0 text-apoio text-ink-mute" title={dataCompleta(access.createdAt)}>
+                    {tempoRelativo(access.createdAt)}
+                  </span>
+                </li>
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </ul>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }

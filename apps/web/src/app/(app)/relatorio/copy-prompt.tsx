@@ -2,15 +2,14 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { copiarTexto } from "@/lib/clipboard";
 
 /**
  * Copiar e baixar o prompt.
  *
  * Os dois caminhos existem porque o prompt é longo: colar direto no ChatGPT é o
  * fluxo normal, mas em conversa que já tem histórico às vezes é melhor anexar o
- * arquivo. `execCommand` fica como reserva porque a área de transferência
- * moderna exige contexto seguro, e em `http://localhost` alguns navegadores a
- * recusam, que é exatamente onde este produto roda em desenvolvimento.
+ * arquivo. O caminho reserva da cópia vive em `lib/clipboard`.
  */
 export function CopyPrompt({ prompt, nomeArquivo }: { prompt: string; nomeArquivo: string }) {
   const [copiado, setCopiado] = useState(false);
@@ -18,21 +17,9 @@ export function CopyPrompt({ prompt, nomeArquivo }: { prompt: string; nomeArquiv
 
   async function copiar() {
     setErro(null);
-    try {
-      await navigator.clipboard.writeText(prompt);
-    } catch {
-      const area = document.createElement("textarea");
-      area.value = prompt;
-      area.style.position = "fixed";
-      area.style.opacity = "0";
-      document.body.appendChild(area);
-      area.select();
-      const deuCerto = document.execCommand("copy");
-      document.body.removeChild(area);
-      if (!deuCerto) {
-        setErro("Não consegui copiar. Selecione o texto abaixo e copie manualmente.");
-        return;
-      }
+    if (!(await copiarTexto(prompt))) {
+      setErro("Não consegui copiar. Selecione o texto abaixo e copie manualmente.");
+      return;
     }
     setCopiado(true);
     window.setTimeout(() => setCopiado(false), 2200);

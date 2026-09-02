@@ -1,4 +1,7 @@
 import { apiFetch } from "@/lib/api-client";
+import { BotaoCopiar } from "@/components/ui/copy-button";
+import { EmptyState } from "@/components/ui/skeleton";
+import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
 import { CreateLinkForm } from "./create-link-form";
 
 interface TrackingLinkListItem {
@@ -20,45 +23,96 @@ const PUBLIC_TRACKING_BASE_URL = process.env.PUBLIC_TRACKING_BASE_URL ?? "http:/
 export default async function LinksPage() {
   const { items } = await apiFetch<PaginatedResult<TrackingLinkListItem>>("/tracking-links?limit=50");
 
-  return (
-    <div>
-      <h1 className="mb-6 font-display text-2xl font-semibold tracking-tight text-ink">Links rastreáveis</h1>
+  const totalDeCliques = items.reduce((soma, item) => soma + item._count.clicks, 0);
 
-      <CreateLinkForm />
+  return (
+    <div className="mx-auto max-w-5xl">
+      <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Links rastreáveis</h1>
+      <p className="mb-6 mt-1 text-corpo text-ink-mute">
+        Cada link carrega a origem do clique até o WhatsApp. É o que liga um lead à campanha que o trouxe.
+      </p>
+
+      <div className="mb-6">
+        <CreateLinkForm />
+      </div>
 
       {items.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-line bg-panel p-8 text-center text-sm text-ink-soft">
-          Nenhum link criado ainda.
+        <div className="surface">
+          <EmptyState
+            icon={
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6" aria-hidden>
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+            }
+            title="Nenhum link criado ainda"
+            description="Crie um link acima e use ele no anúncio. Sem ele, o lead chega sem origem e a campanha fica sem crédito pela venda."
+          />
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-line bg-panel">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-line text-ink-mute">
-              <tr>
-                <th className="px-4 py-3 font-medium">Nome</th>
-                <th className="px-4 py-3 font-medium">Link</th>
-                <th className="px-4 py-3 font-medium">Destino</th>
-                <th className="px-4 py-3 font-medium">Cliques</th>
-                <th className="px-4 py-3 font-medium">Criado em</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id} className="border-b border-line/60 last:border-0">
-                  <td className="px-4 py-3 text-ink">{item.name}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-ink-soft">
-                    {PUBLIC_TRACKING_BASE_URL}/r/{item.code}
-                  </td>
-                  <td className="max-w-xs truncate px-4 py-3 text-ink-mute">{item.destinationUrl}</td>
-                  <td className="px-4 py-3 text-ink">{item._count.clicks}</td>
-                  <td className="px-4 py-3 text-ink-mute">
-                    {new Date(item.createdAt).toLocaleDateString("pt-BR")}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div className="surface overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[48rem] text-left">
+                <thead>
+                  <tr className="border-b border-line text-rotulo font-semibold uppercase tracking-[0.09em] text-ink-mute">
+                    <th className="px-4 py-3 font-semibold">Nome</th>
+                    <th className="px-4 py-3 font-semibold">Link para usar no anúncio</th>
+                    <th className="px-4 py-3 font-semibold">Destino</th>
+                    <th className="px-4 py-3 text-right font-semibold">Cliques</th>
+                    <th className="px-4 py-3 text-right font-semibold">Criado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item) => {
+                    const url = `${PUBLIC_TRACKING_BASE_URL}/r/${item.code}`;
+                    return (
+                      <tr key={item.id} className="border-b border-line/60 transition-colors last:border-0 hover:bg-panel-soft/50">
+                        <td className="px-4 py-3 text-corpo font-medium text-ink">{item.name}</td>
+
+                        {/*
+                          O botão de copiar é o ponto da tela inteira: o link
+                          existe para ser colado num anúncio, e antes era texto
+                          solto que obrigava a selecionar com o mouse.
+                        */}
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5">
+                            <code className="min-w-0 truncate rounded-md bg-panel-soft px-2 py-1 font-mono text-rotulo text-ink-soft">
+                              {url}
+                            </code>
+                            <BotaoCopiar texto={url} rotulo={`Copiar o link de ${item.name}`} />
+                          </div>
+                        </td>
+
+                        <td className="max-w-[14rem] truncate px-4 py-3 text-apoio text-ink-mute" title={item.destinationUrl}>
+                          {item.destinationUrl}
+                        </td>
+
+                        <td className="px-4 py-3 text-right text-corpo tabular-nums text-ink">
+                          {item._count.clicks}
+                        </td>
+
+                        <td className="px-4 py-3 text-right text-apoio text-ink-mute" title={dataCompleta(item.createdAt)}>
+                          {tempoRelativo(item.createdAt)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <p className="mt-3 text-apoio text-ink-mute">
+            {items.length} {items.length === 1 ? "link" : "links"} · {totalDeCliques}{" "}
+            {totalDeCliques === 1 ? "clique registrado" : "cliques registrados"}.{" "}
+            {/*
+              Clique não é lead. Dizer isso aqui evita a conta errada de
+              comparar cliques com leads e concluir que o rastreio perdeu gente.
+            */}
+            Um clique vira lead quando a pessoa manda a primeira mensagem.
+          </p>
+        </>
       )}
     </div>
   );
