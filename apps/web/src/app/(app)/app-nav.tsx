@@ -72,6 +72,18 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
+    href: "/campanhas",
+    label: "Campanhas",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M4 20V10" />
+        <path d="M10 20V4" />
+        <path d="M16 20v-7" />
+        <path d="M22 20H2" />
+      </svg>
+    ),
+  },
+  {
     href: "/links",
     label: "Links",
     icon: (

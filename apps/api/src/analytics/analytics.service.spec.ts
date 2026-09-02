@@ -91,3 +91,111 @@ describe("AnalyticsService", () => {
     expect(result.daily).toHaveLength(30);
   });
 })
+
+describe("AnalyticsService.desempenhoPorCampanha", () => {
+  function buildService(campanhas: unknown[] = [], leads: unknown[] = []) {
+    const prisma = {
+      campaign: { findMany: jest.fn().mockResolvedValue(campanhas) },
+      lead: { findMany: jest.fn().mockResolvedValue(leads) },
+    };
+    return { service: new AnalyticsService(prisma as unknown as PrismaService), prisma };
+  }
+
+  const marco = { de: "2026-03-01", ate: "2026-03-31" };
+
+  it("consulta as duas janelas quando há comparação, e só uma quando não há", async () => {
+    const semComparacao = buildService();
+    await semComparacao.service.desempenhoPorCampanha("org-1", marco, null);
+    expect(semComparacao.prisma.lead.findMany).toHaveBeenCalledTimes(1);
+
+    const comComparacao = buildService();
+    await comComparacao.service.desempenhoPorCampanha("org-1", marco, { de: "2026-07-01", ate: "2026-07-31" });
+    expect(comComparacao.prisma.lead.findMany).toHaveBeenCalledTimes(2);
+  });
+
+  it("fecha a janela na última hora do dia final, para não perder o próprio dia", async () => {
+    const { service, prisma } = buildService();
+
+    await service.desempenhoPorCampanha("org-1", marco, null);
+
+    const where = prisma.lead.findMany.mock.calls[0][0].where;
+    expect(where.organizationId).toBe("org-1");
+    expect(where.firstContactAt.gte.toISOString()).toBe("2026-03-01T00:00:00.000Z");
+    expect(where.firstContactAt.lte.toISOString()).toBe("2026-03-31T23:59:59.999Z");
+
+    // O gasto guarda só a data, na meia-noite: usar a mesma ponta das 23:59
+    // não excluiria nada, mas a ponta certa deixa a intenção explícita.
+    const gasto = prisma.campaign.findMany.mock.calls[0][0].select.spend.where.date;
+    expect(gasto.lte.toISOString()).toBe("2026-03-31T00:00:00.000Z");
+  });
+
+  it("cruza o lead com a campanha pelo id externo do clique", async () => {
+    const { service } = buildService(
+      [
+        {
+          id: "c1",
+          externalId: "ext-1",
+          name: "Institucional",
+          platform: "GOOGLE",
+          spend: [{ date: new Date("2026-03-02T00:00:00.000Z"), spendCents: 20000 }],
+        },
+      ],
+      [
+        {
+          qualifiedAt: new Date("2026-03-03T10:00:00.000Z"),
+          wonAt: new Date("2026-03-05T10:00:00.000Z"),
+          sale: { amountCents: 90000 },
+          attribution: { evidence: null, trackingClick: { campaignId: "ext-1", adsetId: null, adId: null } },
+        },
+        // Sem atribuição nenhuma: entra na contagem à parte, não numa campanha.
+        { qualifiedAt: null, wonAt: null, sale: null, attribution: null },
+      ],
+    );
+
+    const resultado = await service.desempenhoPorCampanha("org-1", marco, null);
+
+    expect(resultado.campanhas).toHaveLength(1);
+    expect(resultado.campanhas[0].atual).toMatchObject({
+      nome: "Institucional",
+      gastoCentavos: 20000,
+      leads: 1,
+      vendas: 1,
+      receitaCentavos: 90000,
+      custoPorLeadCentavos: 20000,
+      roas: 4.5,
+    });
+    expect(resultado.semCampanha).toEqual({ atual: 1, anterior: 0 });
+    expect(resultado.totais).toEqual({ gastoCentavos: 20000, leads: 1, vendas: 1, receitaCentavos: 90000 });
+  });
+
+  it("aceita o id da campanha vindo só da evidência, como no clique para WhatsApp", async () => {
+    const { service } = buildService(
+      [{ id: "c1", externalId: "ext-9", name: "CTWA", platform: "META", spend: [] }],
+      [{ qualifiedAt: null, wonAt: null, sale: null, attribution: { evidence: { campaignId: "ext-9" }, trackingClick: null } }],
+    );
+
+    const resultado = await service.desempenhoPorCampanha("org-1", marco, null);
+
+    expect(resultado.campanhas[0].atual!.leads).toBe(1);
+  });
+
+  it("deixa de fora a campanha que não teve gasto nem lead na janela", async () => {
+    const { service } = buildService(
+      [
+        { id: "c1", externalId: "ext-1", name: "Parada", platform: "GOOGLE", spend: [] },
+        {
+          id: "c2",
+          externalId: "ext-2",
+          name: "Ativa",
+          platform: "GOOGLE",
+          spend: [{ date: new Date("2026-03-02T00:00:00.000Z"), spendCents: 100 }],
+        },
+      ],
+      [],
+    );
+
+    const resultado = await service.desempenhoPorCampanha("org-1", marco, null);
+
+    expect(resultado.campanhas.map((linha) => linha.nome)).toEqual(["Ativa"]);
+  });
+});

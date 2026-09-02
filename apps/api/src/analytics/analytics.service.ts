@@ -15,6 +15,14 @@ import {
   OverviewTotals,
 } from "./overview-aggregation";
 import { computeLeadMetrics } from "../leads/lead-metrics";
+import { extractAdIds } from "../leads/ad-references";
+import {
+  agregaDesempenhoPorCampanha,
+  CampanhaComparada,
+  comparaDesempenho,
+  DesempenhoPorCampanha,
+  LeadAtribuido,
+} from "./campaign-performance";
 
 export interface Overview {
   period: { days: number; from: string; to: string };
@@ -31,6 +39,21 @@ export interface Overview {
     aguardando: number;
   };
   setup: { whatsappConnected: boolean; metaConnected: boolean; trackingLinkCount: number };
+}
+
+
+export interface Janela {
+  /** Dia civil no formato YYYY-MM-DD, inclusive nas duas pontas. */
+  de: string;
+  ate: string;
+}
+
+export interface DesempenhoDeCampanhas {
+  periodo: Janela;
+  comparacao: Janela | null;
+  campanhas: CampanhaComparada[];
+  semCampanha: { atual: number; anterior: number };
+  totais: { gastoCentavos: number; leads: number; vendas: number; receitaCentavos: number };
 }
 
 @Injectable()
@@ -136,5 +159,104 @@ export class AnalyticsService {
         trackingLinkCount,
       },
     };
+  }
+
+  /**
+   * Desempenho por campanha em dois períodos escolhidos à mão.
+   *
+   * Períodos livres, e não uma janela de "últimos N dias", porque uma
+   * organização roda campanhas diferentes em meses diferentes: nenhuma janela
+   * contada a partir de hoje consegue isolar a campanha que rodou em março, e
+   * comparar março com julho é a pergunta que se faz de verdade.
+   */
+  async desempenhoPorCampanha(
+    organizationId: string,
+    periodo: Janela,
+    comparacao: Janela | null,
+  ): Promise<DesempenhoDeCampanhas> {
+    const [atual, anterior] = await Promise.all([
+      this.desempenhoNaJanela(organizationId, periodo),
+      comparacao
+        ? this.desempenhoNaJanela(organizationId, comparacao)
+        : Promise.resolve<DesempenhoPorCampanha>({ campanhas: [], semCampanha: 0 }),
+    ]);
+
+    const juncao = comparaDesempenho(atual, anterior);
+
+    return {
+      periodo,
+      comparacao,
+      campanhas: juncao.campanhas,
+      semCampanha: juncao.semCampanha,
+      totais: atual.campanhas.reduce(
+        (soma, linha) => ({
+          gastoCentavos: soma.gastoCentavos + linha.gastoCentavos,
+          leads: soma.leads + linha.leads,
+          vendas: soma.vendas + linha.vendas,
+          receitaCentavos: soma.receitaCentavos + linha.receitaCentavos,
+        }),
+        { gastoCentavos: 0, leads: 0, vendas: 0, receitaCentavos: 0 },
+      ),
+    };
+  }
+
+  /**
+   * Uma janela só, já cruzada.
+   *
+   * As datas são montadas em UTC de propósito: o gasto é gravado na meia-noite
+   * UTC do dia civil, e os contêineres rodam em UTC, então é o mesmo eixo que
+   * o resto do sistema usa para contar dias.
+   */
+  private async desempenhoNaJanela(organizationId: string, janela: Janela): Promise<DesempenhoPorCampanha> {
+    const de = new Date(`${janela.de}T00:00:00.000Z`);
+    const ate = new Date(`${janela.ate}T23:59:59.999Z`);
+    // O gasto tem só a data, sem hora: a ponta final precisa ser a meia-noite
+    // do último dia, ou nenhuma linha daquele dia entra na comparação.
+    const ateDia = new Date(`${janela.ate}T00:00:00.000Z`);
+
+    const [campanhas, leads] = await Promise.all([
+      this.prisma.campaign.findMany({
+        where: { organizationId },
+        select: {
+          id: true,
+          externalId: true,
+          name: true,
+          platform: true,
+          spend: { where: { date: { gte: de, lte: ateDia } }, select: { date: true, spendCents: true } },
+        },
+      }),
+      this.prisma.lead.findMany({
+        where: { organizationId, firstContactAt: { gte: de, lte: ate } },
+        select: {
+          qualifiedAt: true,
+          wonAt: true,
+          sale: { select: { amountCents: true } },
+          attribution: {
+            select: {
+              evidence: true,
+              trackingClick: { select: { campaignId: true, adsetId: true, adId: true } },
+            },
+          },
+        },
+      }),
+    ]);
+
+    const atribuidos: LeadAtribuido[] = leads.map((lead) => ({
+      // A mesma extração usada na ficha do lead: o id da campanha vem da
+      // coluna do clique ou, no caso do CTWA, só do JSON de evidência.
+      campaignExternalId: extractAdIds(lead.attribution).campaignId,
+      qualifiedAt: lead.qualifiedAt,
+      wonAt: lead.wonAt,
+      sale: lead.sale,
+    }));
+
+    const comAtividade = new Set(atribuidos.map((lead) => lead.campaignExternalId));
+
+    return agregaDesempenhoPorCampanha(
+      // Campanha sem gasto e sem lead na janela fica de fora: listá-la diria
+      // que ela rodou sem resultado, quando o caso é que ela não rodou.
+      campanhas.filter((campanha) => campanha.spend.length > 0 || comAtividade.has(campanha.externalId)),
+      atribuidos,
+    );
   }
 }
