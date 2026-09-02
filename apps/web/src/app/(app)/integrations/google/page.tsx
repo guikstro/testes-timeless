@@ -2,6 +2,9 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
 import { EmptyState } from "@/components/ui/skeleton";
 import { CartaoCampanha, NovaCampanha } from "./campaign-forms";
+import { ConversionsExport, PERIODOS } from "./conversions-export";
+import { LinhaDeConversao } from "@/lib/google/conversoes-csv";
+import { diaCivil } from "@/lib/periodo";
 
 interface Campanha {
   id: string;
@@ -11,8 +14,33 @@ interface Campanha {
   spend: { date: string; spendCents: number }[];
 }
 
-export default async function GoogleAdsPage() {
-  const campanhas = await apiFetch<Campanha[]>("/campaigns?platform=GOOGLE");
+interface Exportacao {
+  acoes: { qualificado: string | null; venda: string | null };
+  linhas: LinhaDeConversao[];
+  semGclid: { qualificados: number; vendas: number };
+}
+
+export default async function GoogleAdsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ dias?: string }>;
+}) {
+  const { dias: diasCru } = await searchParams;
+  const dias = PERIODOS.includes(Number(diasCru)) ? Number(diasCru) : 30;
+
+  // A janela é montada em dias civis daqui, como o resto do produto: contar a
+  // partir do instante atual faria o período mudar de tamanho conforme a hora.
+  const hoje = new Date();
+  const ate = diaCivil(hoje);
+  const inicio = new Date(hoje);
+  inicio.setDate(inicio.getDate() - (dias - 1));
+  const de = diaCivil(inicio);
+
+  const [campanhas, exportacao, organizacao] = await Promise.all([
+    apiFetch<Campanha[]>("/campaigns?platform=GOOGLE"),
+    apiFetch<Exportacao>(`/integrations/google/conversions?de=${de}&ate=${ate}`),
+    apiFetch<{ currency: string }>("/organizations/current"),
+  ]);
 
   const gastoTotal = campanhas.reduce(
     (soma, campanha) => soma + campanha.spend.reduce((s, dia) => s + dia.spendCents, 0),
@@ -46,6 +74,16 @@ export default async function GoogleAdsPage() {
           </Link>
           . Informar o ID da campanha aqui é o que liga esses leads ao gasto correspondente.
         </p>
+      </div>
+
+      <div className="mb-6">
+        <ConversionsExport
+          linhas={exportacao.linhas}
+          acoes={exportacao.acoes}
+          semGclid={exportacao.semGclid}
+          moeda={organizacao.currency}
+          dias={dias}
+        />
       </div>
 
       <div className="surface mb-6 p-5">
