@@ -35,7 +35,7 @@ export function ArrivalHeatmap({ celulas }: { celulas: Celula[] }) {
       <div className="flex gap-1.5">
         <div className="flex w-8 shrink-0 flex-col justify-around pt-4 text-right">
           {DIAS.map((dia) => (
-            <span key={dia} className="text-[10px] leading-none text-ink-mute">
+            <span key={dia} className="text-rotulo leading-none text-ink-mute">
               {dia}
             </span>
           ))}
@@ -44,7 +44,7 @@ export function ArrivalHeatmap({ celulas }: { celulas: Celula[] }) {
         <div className="min-w-0 flex-1">
           <div className="mb-1 grid grid-cols-8 gap-1">
             {[0, 3, 6, 9, 12, 15, 18, 21].map((hora) => (
-              <span key={hora} className="text-center text-[9.5px] leading-none text-ink-mute">
+              <span key={hora} className="text-center text-rotulo leading-none text-ink-mute">
                 {String(hora).padStart(2, "0")}h
               </span>
             ))}
@@ -87,7 +87,7 @@ export function ArrivalHeatmap({ celulas }: { celulas: Celula[] }) {
         </div>
       </div>
 
-      <p className="mt-3 h-4 text-[11.5px] text-ink-mute" aria-live="polite">
+      <p className="mt-3 h-4 text-rotulo text-ink-mute" aria-live="polite">
         {ativa ? (
           <>
             <span className="font-medium text-ink-soft">

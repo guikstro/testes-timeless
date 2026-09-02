@@ -2,6 +2,7 @@
 
 import { ATRASO_SEGUNDOS, FiltroDaCaixa, ItemDaCaixa, nomeDoLead } from "@/lib/conversas/tipos";
 import { tempoRelativo } from "@/lib/relative-time";
+import { GrupoDePilulas } from "@/components/ui/pill-group";
 
 const FILTROS: { valor: FiltroDaCaixa; rotulo: string; explicacao: string }[] = [
   { valor: "all", rotulo: "Todas", explicacao: "Todas as conversas" },
@@ -69,34 +70,25 @@ export function ConversationList({
             value={busca}
             onChange={(evento) => aoBuscar(evento.target.value)}
             placeholder="Buscar"
-            className="focus-ring w-full rounded-full border border-line bg-panel-soft/60 py-2 pl-9 pr-3 text-[13px] text-ink placeholder:text-ink-mute"
+            className="focus-ring w-full rounded-full border border-line bg-panel-soft/60 py-2 pl-9 pr-3 text-corpo text-ink placeholder:text-ink-mute"
           />
         </label>
 
-        <div className="flex gap-1 rounded-full border border-line bg-panel-soft/60 p-1">
-          {FILTROS.map((opcao) => {
-            const ativo = opcao.valor === filtro;
-            return (
-              <button
-                key={opcao.valor}
-                type="button"
-                onClick={() => aoFiltrar(opcao.valor)}
-                aria-pressed={ativo}
-                title={opcao.explicacao}
-                className={`focus-ring flex-1 whitespace-nowrap rounded-full px-2 py-1.5 text-[12px] font-medium transition-all duration-200 ease-soft active:scale-95 ${
-                  ativo ? "bg-ink text-canvas shadow-subtle" : "text-ink-mute hover:text-ink"
-                }`}
-              >
-                {opcao.rotulo}
-              </button>
-            );
-          })}
-        </div>
+        <GrupoDePilulas
+          className="flex w-full"
+          ativo={filtro}
+          opcoes={FILTROS.map((opcao) => ({
+            chave: opcao.valor,
+            rotulo: opcao.rotulo,
+            titulo: opcao.explicacao,
+            aoClicar: () => aoFiltrar(opcao.valor),
+          }))}
+        />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {itens.length === 0 ? (
-          <p className="px-4 py-10 text-center text-[13px] text-ink-mute">
+          <p className="px-4 py-10 text-center text-corpo text-ink-mute">
             {carregando ? "Carregando…" : busca ? "Nenhuma conversa com esse termo." : "Nenhuma conversa ainda."}
           </p>
         ) : (
@@ -129,24 +121,24 @@ export function ConversationList({
                     <span className="min-w-0 flex-1">
                       <span className="flex items-baseline justify-between gap-2">
                         <span
-                          className={`truncate text-[13.5px] text-ink ${naoLida ? "font-semibold" : "font-medium"}`}
+                          className={`truncate text-corpo text-ink ${naoLida ? "font-semibold" : "font-medium"}`}
                         >
                           {nomeDoLead(item.lead)}
                         </span>
                         {item.lastMessage && (
-                          <span className="shrink-0 text-[11px] text-ink-mute">
+                          <span className="shrink-0 text-rotulo text-ink-mute">
                             {tempoRelativo(item.lastMessage.timestamp)}
                           </span>
                         )}
                       </span>
 
                       <span className="mt-0.5 flex items-center justify-between gap-2">
-                        <span className={`truncate text-[12px] ${naoLida ? "text-ink-soft" : "text-ink-mute"}`}>
+                        <span className={`truncate text-apoio ${naoLida ? "text-ink-soft" : "text-ink-mute"}`}>
                           {item.lastMessage?.direction === "OUTBOUND" ? "Você: " : ""}
                           {item.lastMessage?.text ?? "Sem mensagens"}
                         </span>
                         {naoLida && (
-                          <span className="inline-flex min-w-[1.05rem] shrink-0 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-4 text-accent-contrast">
+                          <span className="inline-flex min-w-[1.05rem] shrink-0 items-center justify-center rounded-full bg-accent px-1 text-rotulo font-semibold leading-4 text-accent-contrast">
                             {item.unreadCount > 9 ? "9+" : item.unreadCount}
                           </span>
                         )}
@@ -164,7 +156,7 @@ export function ConversationList({
           além daqui" viram a mesma frase para quem lê.
         */}
         {truncado && (
-          <p className="border-t border-line/50 px-4 py-3 text-[11.5px] leading-relaxed text-ink-mute">
+          <p className="border-t border-line/50 px-4 py-3 text-rotulo leading-relaxed text-ink-mute">
             Mostrando as conversas mais recentes. Use a busca para encontrar uma mais antiga.
           </p>
         )}

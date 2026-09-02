@@ -81,26 +81,26 @@ export function LeadCard({
 
         <div className="relative flex items-start gap-2.5">
           <span
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[13px] font-semibold ${tomDoNome(nome)}`}
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-corpo font-semibold ${tomDoNome(nome)}`}
             aria-hidden
           >
             {inicial}
           </span>
 
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[13.5px] font-medium text-ink">{nome}</p>
-            <p className="truncate text-[11.5px] tabular-nums text-ink-mute">{lead.normalizedPhone}</p>
+            <p className="truncate text-corpo font-medium text-ink">{nome}</p>
+            <p className="truncate text-rotulo tabular-nums text-ink-mute">{lead.normalizedPhone}</p>
           </div>
 
           {lead.sale?.amountCents ? (
-            <span className="shrink-0 text-[12px] font-semibold tabular-nums text-ink">
+            <span className="shrink-0 text-apoio font-semibold tabular-nums text-ink">
               {formatCentsAsBRL(lead.sale.amountCents)}
             </span>
           ) : null}
         </div>
 
         {lead.lastMessage?.text ? (
-          <p className="relative mt-2.5 line-clamp-2 text-[12.5px] leading-snug text-ink-soft">
+          <p className="relative mt-2.5 line-clamp-2 text-apoio leading-snug text-ink-soft">
             {lead.lastMessage.direction === "OUTBOUND" ? (
               <span className="text-ink-mute">Você: </span>
             ) : null}
@@ -114,7 +114,7 @@ export function LeadCard({
               Transforma a lista em fila de trabalho: o tempo de espera é a
               informação que decide o que fazer primeiro.
             */
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/12 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/12 px-2 py-0.5 text-rotulo font-medium text-amber-700 dark:text-amber-400">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="absolute inline-flex h-full w-full rounded-full bg-current opacity-60 motion-safe:animate-ping" />
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-current" />
@@ -122,14 +122,14 @@ export function LeadCard({
               Espera {tempoRelativo(lead.lastMessage!.timestamp).replace("há ", "")}
             </span>
           ) : (
-            <span className="text-[11px] text-ink-mute">{tempoRelativo(lead.lastContactAt)}</span>
+            <span className="text-rotulo text-ink-mute">{tempoRelativo(lead.lastContactAt)}</span>
           )}
 
           {lead.disqualifiedAt ? (
-            <span className="rounded-full bg-panel-soft px-2 py-0.5 text-[11px] text-ink-mute">Descartado</span>
+            <span className="rounded-full bg-panel-soft px-2 py-0.5 text-rotulo text-ink-mute">Descartado</span>
           ) : null}
 
-          <span className="ml-auto truncate text-[11px] text-ink-mute">
+          <span className="ml-auto truncate text-rotulo text-ink-mute">
             {attributionSourceLabel(lead.attribution)}
           </span>
         </div>

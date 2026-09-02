@@ -82,7 +82,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     <div className="mx-auto max-w-6xl">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-ink">Dashboard</h1>
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Dashboard</h1>
           <AtualizaAoVivo />
           <p className="mt-0.5 text-sm text-ink-mute">
             {totals.leads > 0
@@ -206,17 +206,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-2xl border border-line bg-panel p-5 shadow-subtle">
-          <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-ink-mute">Resposta típica</p>
+          <p className="text-rotulo font-medium uppercase tracking-[0.1em] text-ink-mute">Resposta típica</p>
           <p className={`mt-2 text-[26px] font-semibold leading-none tabular-nums ${SPEED_TONE_CLASSES[responseSpeedTone(atendimento.medianaPrimeiraRespostaSegundos)]}`}>
             {formatDuration(atendimento.medianaPrimeiraRespostaSegundos)}
           </p>
           {/* Mediana e não média: um lead respondido três dias depois puxaria
               a média e faria uma operação boa parecer ruim. */}
-          <p className="mt-2 text-[11.5px] text-ink-mute">Mediana até a primeira resposta</p>
+          <p className="mt-2 text-rotulo text-ink-mute">Mediana até a primeira resposta</p>
         </div>
 
         <div className="rounded-2xl border border-line bg-panel p-5 shadow-subtle">
-          <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-ink-mute">Aguardando você</p>
+          <p className="text-rotulo font-medium uppercase tracking-[0.1em] text-ink-mute">Aguardando você</p>
           <p className="mt-2 flex items-baseline gap-2 text-[26px] font-semibold leading-none tabular-nums text-ink">
             {atendimento.aguardando}
             {atendimento.aguardando > 0 ? (
@@ -226,15 +226,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               </span>
             ) : null}
           </p>
-          <Link href="/leads?aguardando=1" className="focus-ring mt-2 inline-block rounded text-[11.5px] text-ink-mute underline decoration-line underline-offset-4 transition-colors hover:text-ink">
+          <Link href="/leads?aguardando=1" className="focus-ring mt-2 inline-block rounded text-rotulo text-ink-mute underline decoration-line underline-offset-4 transition-colors hover:text-ink">
             Ver na fila
           </Link>
         </div>
 
         <div className="rounded-2xl border border-line bg-panel p-5 shadow-subtle">
-          <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-ink-mute">Sem resposta</p>
+          <p className="text-rotulo font-medium uppercase tracking-[0.1em] text-ink-mute">Sem resposta</p>
           <p className="mt-2 text-[26px] font-semibold leading-none tabular-nums text-ink">{atendimento.semResposta}</p>
-          <p className="mt-2 text-[11.5px] text-ink-mute">
+          <p className="mt-2 text-rotulo text-ink-mute">
             de {atendimento.respondidos + atendimento.semResposta} leads no período
           </p>
         </div>
@@ -242,7 +242,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
       <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
         <div className="surface p-6">
-          <h2 className="font-display text-[15px] font-semibold tracking-tight text-ink">Onde os leads param</h2>
+          <h2 className="font-display text-destaque font-semibold tracking-tight text-ink">Onde os leads param</h2>
           <p className="mb-5 mt-0.5 text-xs text-ink-mute">A queda entre cada etapa do funil</p>
           <FunnelChart
             etapas={[
@@ -255,7 +255,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </div>
 
         <div className="surface p-6">
-          <h2 className="font-display text-[15px] font-semibold tracking-tight text-ink">Qual origem fecha melhor</h2>
+          <h2 className="font-display text-destaque font-semibold tracking-tight text-ink">Qual origem fecha melhor</h2>
           {/* Volume esconde qualidade: a origem que traz mais gente
               frequentemente não é a que fecha melhor. */}
           <p className="mb-4 mt-0.5 text-xs text-ink-mute">Clique num título para reordenar</p>
@@ -268,7 +268,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </div>
 
       <div className="surface mb-6 p-6">
-        <h2 className="font-display text-[15px] font-semibold tracking-tight text-ink">Quando os leads chegam</h2>
+        <h2 className="font-display text-destaque font-semibold tracking-tight text-ink">Quando os leads chegam</h2>
         <p className="mb-5 mt-0.5 text-xs text-ink-mute">
           Por dia da semana e faixa de horário, no fuso deste navegador
         </p>

@@ -39,7 +39,7 @@ export default async function WhatsAppIntegrationPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-ink">WhatsApp</h1>
+      <h1 className="mb-6 font-display text-2xl font-semibold tracking-tight text-ink">WhatsApp</h1>
 
       <div className="mb-8 rounded-xl border border-line bg-panel p-6">
         {connection ? (

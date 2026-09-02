@@ -39,7 +39,7 @@ export function LeadSidePanel({ ficha }: { ficha: FichaDoLead }) {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto border-l border-line/70 bg-panel">
       <div className="flex items-center justify-between gap-2 border-b border-line/60 px-4 py-2.5">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.11em] text-ink-mute">Contexto</h2>
+        <h2 className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">Contexto</h2>
         <LinkParaFicha leadId={ficha.id} />
       </div>
 
@@ -53,11 +53,11 @@ export function LeadSidePanel({ ficha }: { ficha: FichaDoLead }) {
             />
             <Numero rotulo="Do clique ao contato" valor={formatDuration(metrics.clickToContactSeconds)} />
           </div>
-          <p className="mt-2 text-[11.5px] text-ink-mute">
+          <p className="mt-2 text-rotulo text-ink-mute">
             {metrics.inboundCount} recebidas · {metrics.outboundCount} enviadas
           </p>
           {metrics.awaitingReply ? (
-            <p className="mt-2 text-[12px] font-medium text-amber-700 dark:text-amber-400">
+            <p className="mt-2 text-apoio font-medium text-amber-700 dark:text-amber-400">
               Aguardando resposta {metrics.lastMessageAt ? tempoRelativo(metrics.lastMessageAt) : ""}
             </p>
           ) : null}
@@ -85,7 +85,7 @@ export function LeadSidePanel({ ficha }: { ficha: FichaDoLead }) {
             {ficha.disqualifiedAt ? <Badge tone="neutral">Descartado</Badge> : null}
           </div>
           {ficha.disqualifiedReason ? (
-            <p className="mt-2 text-[12px] leading-relaxed text-ink-mute">{ficha.disqualifiedReason}</p>
+            <p className="mt-2 text-apoio leading-relaxed text-ink-mute">{ficha.disqualifiedReason}</p>
           ) : null}
           <div className="mt-2">
             <Linha
@@ -101,15 +101,15 @@ export function LeadSidePanel({ ficha }: { ficha: FichaDoLead }) {
 
         <Painel titulo="Histórico">
           {eventos.length === 0 ? (
-            <p className="text-[12.5px] text-ink-mute">Sem eventos ainda.</p>
+            <p className="text-apoio text-ink-mute">Sem eventos ainda.</p>
           ) : (
             <ol className="space-y-2">
               {eventos.map((evento) => (
                 <li key={evento.id} className="flex items-baseline justify-between gap-3">
-                  <span className="min-w-0 truncate text-[12.5px] text-ink-soft">
+                  <span className="min-w-0 truncate text-apoio text-ink-soft">
                     {ROTULO_DO_EVENTO[evento.type] ?? evento.type}
                   </span>
-                  <span className="shrink-0 text-[11px] text-ink-mute" title={dataCompleta(evento.occurredAt)}>
+                  <span className="shrink-0 text-rotulo text-ink-mute" title={dataCompleta(evento.occurredAt)}>
                     {tempoRelativo(evento.occurredAt)}
                   </span>
                 </li>
@@ -117,7 +117,7 @@ export function LeadSidePanel({ ficha }: { ficha: FichaDoLead }) {
             </ol>
           )}
           {ficha.events.length > EVENTOS_VISIVEIS ? (
-            <p className="mt-2 text-[11.5px] text-ink-mute">
+            <p className="mt-2 text-rotulo text-ink-mute">
               Mais {ficha.events.length - EVENTOS_VISIVEIS} na ficha completa.
             </p>
           ) : null}
@@ -130,7 +130,7 @@ export function LeadSidePanel({ ficha }: { ficha: FichaDoLead }) {
 function Painel({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
     <section className="rounded-2xl border border-line/70 bg-panel-soft/40 p-3.5">
-      <h3 className="mb-2.5 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-ink-mute">{titulo}</h3>
+      <h3 className="mb-2.5 text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">{titulo}</h3>
       {children}
     </section>
   );
@@ -139,8 +139,8 @@ function Painel({ titulo, children }: { titulo: string; children: ReactNode }) {
 function Numero({ rotulo, valor, classe }: { rotulo: string; valor: string; classe?: string }) {
   return (
     <div>
-      <p className="text-[11px] text-ink-mute">{rotulo}</p>
-      <p className={`mt-0.5 text-[15px] font-semibold tabular-nums ${classe ?? "text-ink"}`}>{valor}</p>
+      <p className="text-rotulo text-ink-mute">{rotulo}</p>
+      <p className={`mt-0.5 text-destaque font-semibold tabular-nums ${classe ?? "text-ink"}`}>{valor}</p>
     </div>
   );
 }
@@ -148,8 +148,8 @@ function Numero({ rotulo, valor, classe }: { rotulo: string; valor: string; clas
 function Linha({ rotulo, valor }: { rotulo: string; valor: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1">
-      <dt className="shrink-0 text-[12px] text-ink-mute">{rotulo}</dt>
-      <dd className="min-w-0 truncate text-right text-[12.5px] text-ink-soft">{valor}</dd>
+      <dt className="shrink-0 text-apoio text-ink-mute">{rotulo}</dt>
+      <dd className="min-w-0 truncate text-right text-apoio text-ink-soft">{valor}</dd>
     </div>
   );
 }

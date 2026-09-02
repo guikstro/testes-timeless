@@ -67,7 +67,7 @@ export default async function LeadsPage({
           <LeadBoard colunas={colunas} />
 
           {colunas.some((coluna) => coluna.total > coluna.itens.length) ? (
-            <p className="mt-4 text-center text-[12.5px] text-ink-mute">
+            <p className="mt-4 text-center text-apoio text-ink-mute">
               Cada coluna mostra até {POR_COLUNA} leads, do contato mais recente. Use a busca para chegar nos
               outros.
             </p>

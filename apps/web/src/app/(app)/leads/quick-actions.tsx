@@ -89,22 +89,22 @@ export function QuickActions({
           }}
           rows={2}
           placeholder={`Responder ${nome.split(" ")[0]}`}
-          className="w-full resize-none rounded-lg border border-line bg-canvas px-2.5 py-2 text-[12.5px] text-ink placeholder:text-ink-mute focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15"
+          className="w-full resize-none rounded-lg border border-line bg-canvas px-2.5 py-2 text-apoio text-ink placeholder:text-ink-mute focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15"
         />
-        {erro ? <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{erro}</p> : null}
+        {erro ? <p className="mt-1 text-rotulo text-red-600 dark:text-red-400">{erro}</p> : null}
         <div className="mt-1.5 flex items-center gap-1.5">
           <button
             type="button"
             onClick={enviar}
             disabled={pendente || !texto.trim()}
-            className="focus-ring rounded-lg bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-contrast transition-all duration-200 hover:brightness-105 active:scale-95 disabled:opacity-40"
+            className="focus-ring rounded-lg bg-accent px-3 py-1.5 text-apoio font-medium text-accent-contrast transition-all duration-200 hover:brightness-105 active:scale-95 disabled:opacity-40"
           >
             {pendente ? "Enviando" : "Enviar"}
           </button>
           <button
             type="button"
             onClick={() => setCompondo(false)}
-            className="focus-ring rounded-lg px-2.5 py-1.5 text-[12px] text-ink-mute transition-colors hover:text-ink"
+            className="focus-ring rounded-lg px-2.5 py-1.5 text-apoio text-ink-mute transition-colors hover:text-ink"
           >
             Cancelar
           </button>
@@ -122,7 +122,7 @@ export function QuickActions({
         type="button"
         onClick={() => setCompondo(true)}
         title="Responder sem abrir o lead"
-        className="focus-ring inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel px-2.5 py-1 text-[11.5px] text-ink-soft transition-all duration-200 hover:border-accent/40 hover:text-ink active:scale-95"
+        className="focus-ring inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel px-2.5 py-1 text-rotulo text-ink-soft transition-all duration-200 hover:border-accent/40 hover:text-ink active:scale-95"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden>
           <path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.5 8.5 0 01-4-1L3 21l2.1-5a8.4 8.4 0 01-1-4 8.5 8.5 0 018.4-9 8.5 8.5 0 018.5 8.5z" />
@@ -136,7 +136,7 @@ export function QuickActions({
           onClick={marcarReuniao}
           disabled={pendente}
           title="Marcar reunião agendada"
-          className="focus-ring inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel px-2.5 py-1 text-[11.5px] text-ink-soft transition-all duration-200 hover:border-accent/40 hover:text-ink active:scale-95 disabled:opacity-40"
+          className="focus-ring inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel px-2.5 py-1 text-rotulo text-ink-soft transition-all duration-200 hover:border-accent/40 hover:text-ink active:scale-95 disabled:opacity-40"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden>
             <rect x="3" y="5" width="18" height="16" rx="2" />
@@ -146,7 +146,7 @@ export function QuickActions({
         </button>
       ) : null}
 
-      {erro ? <span className="text-[11px] text-red-600 dark:text-red-400">{erro}</span> : null}
+      {erro ? <span className="text-rotulo text-red-600 dark:text-red-400">{erro}</span> : null}
     </div>
   );
 }

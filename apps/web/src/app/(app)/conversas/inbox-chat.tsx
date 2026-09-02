@@ -36,7 +36,7 @@ export function InboxChat({
   if (!ficha) {
     return (
       <div className="flex h-full items-center justify-center p-8">
-        <p className="max-w-xs text-center text-[13px] leading-relaxed text-ink-mute">
+        <p className="max-w-xs text-center text-corpo leading-relaxed text-ink-mute">
           {carregando ? "Abrindo a conversa…" : "Escolha uma conversa à esquerda para ler e responder."}
         </p>
       </div>
@@ -60,8 +60,8 @@ export function InboxChat({
         </button>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[14px] font-semibold text-ink">{nomeDoLead(ficha)}</p>
-          <p className="truncate text-[11.5px] tabular-nums text-ink-mute">
+          <p className="truncate text-corpo font-semibold text-ink">{nomeDoLead(ficha)}</p>
+          <p className="truncate text-rotulo tabular-nums text-ink-mute">
             {ficha.normalizedPhone}
             {ficha.metrics.lastMessageAt ? ` · ${tempoRelativo(ficha.metrics.lastMessageAt)}` : ""}
           </p>
@@ -114,7 +114,7 @@ export function LinkParaFicha({ leadId }: { leadId: string }) {
     <Link
       href={`/leads/${leadId}`}
       target="_blank"
-      className="focus-ring rounded-full px-2 py-1 text-[11.5px] font-medium text-ink-soft transition-colors hover:text-ink"
+      className="focus-ring rounded-full px-2 py-1 text-rotulo font-medium text-ink-soft transition-colors hover:text-ink"
     >
       Ver ficha completa
     </Link>

@@ -10,6 +10,7 @@ import {
   rotuloDoIntervalo,
 } from "@/lib/periodo";
 import { CampanhaComparada, DesempenhoDeCampanhas } from "./tipos";
+import { GrupoDePilulas } from "@/components/ui/pill-group";
 
 /**
  * Separado da página pelo mesmo motivo da tela de relatório: a página busca no
@@ -114,7 +115,7 @@ export function CampanhasView({
       {campanhas.length === 0 ? (
         <div className="surface p-8 text-center">
           <p className="text-sm text-ink-soft">Nenhuma campanha com gasto ou lead em {rotuloDoIntervalo(periodo)}.</p>
-          <p className="mt-1.5 text-[12.5px] text-ink-mute">
+          <p className="mt-1.5 text-apoio text-ink-mute">
             Lance o gasto em Integrações, por importação de CSV ou manualmente, para as campanhas aparecerem aqui.
           </p>
         </div>
@@ -130,7 +131,7 @@ export function CampanhasView({
         tabela que não diz isso passa a impressão de que as campanhas respondem
         por tudo o que entra.
       */}
-      <p className="mt-4 text-[12.5px] leading-relaxed text-ink-mute">
+      <p className="mt-4 text-apoio leading-relaxed text-ink-mute">
         {semCampanha.atual > 0 ? (
           <>
             Mais {semCampanha.atual} {semCampanha.atual === 1 ? "lead entrou" : "leads entraram"} no período sem
@@ -145,7 +146,7 @@ export function CampanhasView({
       </p>
 
       {semIdDaPlataforma > 0 && (
-        <p className="mt-2 text-[12.5px] leading-relaxed text-ink-mute">
+        <p className="mt-2 text-apoio leading-relaxed text-ink-mute">
           {semIdDaPlataforma === 1 ? "Uma campanha aparece" : `${semIdDaPlataforma} campanhas aparecem`} com gasto e
           nenhum lead porque {semIdDaPlataforma === 1 ? "foi criada" : "foram criadas"} sem o id da plataforma. O lead
           é ligado à campanha pelo id que chega no clique, então preencha o id real do Google Ads ou do Meta ao criar a
@@ -172,7 +173,7 @@ function Resumo({
 
   return (
     <div className="surface p-4">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-ink-mute">{titulo}</p>
+      <p className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">{titulo}</p>
       <p className="mt-1.5 font-display text-xl font-semibold tabular-nums text-ink">{valor}</p>
       {compara && (
         <div className="mt-1">
@@ -201,10 +202,10 @@ function SeletorDeMes({
   return (
     <div className="surface p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.11em] text-ink-mute">{titulo}</h2>
+        <h2 className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">{titulo}</h2>
         <div className="flex items-center gap-0.5">
           <SetaDeAno href={hrefDoAno(ano - 1)} rotulo={`Ir para ${ano - 1}`} direcao="anterior" />
-          <span className="min-w-[3rem] text-center text-[13px] font-medium tabular-nums text-ink">{ano}</span>
+          <span className="min-w-[3rem] text-center text-corpo font-medium tabular-nums text-ink">{ano}</span>
           <SetaDeAno href={hrefDoAno(ano + 1)} rotulo={`Ir para ${ano + 1}`} direcao="proximo" />
         </div>
       </div>
@@ -214,31 +215,26 @@ function SeletorDeMes({
         relatório: doze meses não cabem numa linha só, então a bandeja vira
         grade, mas cada opção continua sendo a mesma pílula do resto do produto.
       */}
-      <div className="grid grid-cols-6 gap-1 rounded-2xl border border-line bg-panel-soft/60 p-1">
-        {MESES_CURTOS.map((rotulo, indice) => {
-          const mes = indice + 1;
-          const ativo = selecionado?.ano === ano && selecionado.mes === mes;
-          return (
-            <Link
-              key={rotulo}
-              href={href(mes)}
-              aria-current={ativo ? "page" : undefined}
-              className={`focus-ring rounded-full px-2 py-1.5 text-center text-[12px] font-medium transition-all duration-200 ease-soft active:scale-95 ${
-                ativo ? "bg-ink text-canvas shadow-subtle" : "text-ink-mute hover:text-ink"
-              }`}
-            >
-              {rotulo}
-            </Link>
-          );
-        })}
-      </div>
+      {/*
+        Mesma bandeja de pílulas do resto do produto, em grade porque doze
+        meses não cabem numa linha só.
+      */}
+      <GrupoDePilulas
+        layout="grade"
+        ativo={selecionado?.ano === ano ? String(selecionado.mes) : null}
+        opcoes={MESES_CURTOS.map((rotulo, indice) => ({
+          chave: String(indice + 1),
+          rotulo,
+          href: href(indice + 1),
+        }))}
+      />
 
       {hrefSemComparacao !== undefined && (
         <div className="mt-3">
           {hrefSemComparacao ? (
             <Link
               href={hrefSemComparacao}
-              className="focus-ring inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium text-ink-soft transition-all duration-200 ease-soft hover:bg-ink/[0.06] hover:text-ink active:scale-95"
+              className="focus-ring inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-apoio font-medium text-ink-soft transition-all duration-200 ease-soft hover:bg-ink/[0.06] hover:text-ink active:scale-95"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="h-3.5 w-3.5" aria-hidden>
                 <path d="M18 6L6 18M6 6l12 12" />
@@ -246,7 +242,7 @@ function SeletorDeMes({
               Remover comparação
             </Link>
           ) : (
-            <p className="px-1 text-[12px] text-ink-mute">Escolha um mês para comparar com o período.</p>
+            <p className="px-1 text-apoio text-ink-mute">Escolha um mês para comparar com o período.</p>
           )}
         </div>
       )}
@@ -282,9 +278,9 @@ function Tabela({
     <div className="surface overflow-hidden">
       {/* A tabela é larga de propósito; quem rola é ela, nunca a página. */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[56rem] text-[13px]">
+        <table className="w-full min-w-[56rem] text-corpo">
           <thead>
-            <tr className="border-b border-line text-left text-[11px] font-semibold uppercase tracking-[0.09em] text-ink-mute">
+            <tr className="border-b border-line text-left text-rotulo font-semibold uppercase tracking-[0.09em] text-ink-mute">
               <th className="px-4 py-3 font-semibold">Campanha</th>
               <th className="px-4 py-3 text-right font-semibold">Investimento</th>
               <th className="px-4 py-3 text-right font-semibold">Leads</th>
@@ -324,7 +320,7 @@ function Linha({
     <tr className={`border-b border-line/60 last:border-0 ${ausente ? "opacity-55" : ""}`}>
       <td className="px-4 py-3 align-top">
         <p className="font-medium text-ink">{linha.nome}</p>
-        <p className="mt-0.5 text-[11.5px] text-ink-mute">
+        <p className="mt-0.5 text-rotulo text-ink-mute">
           {PLATAFORMAS[linha.plataforma] ?? linha.plataforma}
           {dados.ativo && (
             <>
@@ -340,7 +336,7 @@ function Linha({
           campanha não existiu.
         */}
         {ausente && (
-          <p className="mt-1 text-[11.5px] text-ink-mute">
+          <p className="mt-1 text-rotulo text-ink-mute">
             Não rodou no período escolhido. Os números ao lado são de {rotuloDaComparacao}.
           </p>
         )}
@@ -387,7 +383,7 @@ function Numero({
           <Delta delta={variacao.delta} />
         </span>
       )}
-      {nota && <span className="mt-0.5 block text-[11px] font-normal text-ink-mute">{nota}</span>}
+      {nota && <span className="mt-0.5 block text-rotulo font-normal text-ink-mute">{nota}</span>}
     </td>
   );
 }

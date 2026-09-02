@@ -20,7 +20,7 @@ export function ManualEditForm({ leadId, status }: { leadId: string; status: Lea
       <select
         name="status"
         defaultValue=""
-        className="h-10 w-full rounded-xl border border-line bg-panel px-3 text-[13px] text-ink shadow-subtle transition-all duration-200 ease-soft hover:border-ink/20 focus:border-accent focus:outline-none focus:ring-4 focus:ring-accent/10"
+        className="h-10 w-full rounded-xl border border-line bg-panel px-3 text-corpo text-ink shadow-subtle transition-all duration-200 ease-soft hover:border-ink/20 focus:border-accent focus:outline-none focus:ring-4 focus:ring-accent/10"
       >
         <option value="">Manter status atual</option>
         {/* O status só avança: oferecer um estágio já passado geraria um erro previsível. */}
@@ -36,10 +36,10 @@ export function ManualEditForm({ leadId, status }: { leadId: string; status: Lea
         name="revenueReais"
         placeholder="Receita em R$ (opcional)"
         inputMode="decimal"
-        className="h-10 w-full rounded-xl border border-line bg-panel px-3 text-[13px] text-ink shadow-subtle transition-all duration-200 ease-soft placeholder:text-ink-mute hover:border-ink/20 focus:border-accent focus:outline-none focus:ring-4 focus:ring-accent/10"
+        className="h-10 w-full rounded-xl border border-line bg-panel px-3 text-corpo text-ink shadow-subtle transition-all duration-200 ease-soft placeholder:text-ink-mute hover:border-ink/20 focus:border-accent focus:outline-none focus:ring-4 focus:ring-accent/10"
       />
       <Button type="submit" loading={pending} size="sm" className="w-full">{pending ? "Salvando..." : "Salvar correção"}</Button>
-      {state.error ? <p className="text-[12.5px] text-red-600 dark:text-red-400">{state.error}</p> : null}
+      {state.error ? <p className="text-apoio text-red-600 dark:text-red-400">{state.error}</p> : null}
     </form>
   );
 }

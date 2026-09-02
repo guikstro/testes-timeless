@@ -30,7 +30,7 @@ export default async function OperatorsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-ink">Operadores</h1>
+      <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Operadores</h1>
       <p className="mb-6 mt-1 text-sm text-ink-mute">
         Quem da sua equipe pode acessar a administração da plataforma e entrar nas contas dos clientes.
       </p>

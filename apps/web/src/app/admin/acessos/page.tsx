@@ -28,7 +28,7 @@ export default async function ImpersonationLogPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-ink">Acessos a clientes</h1>
+      <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Acessos a clientes</h1>
       <p className="mb-6 mt-1 text-sm text-ink-mute">
         Toda vez que um operador entra em um cliente, o acesso é registrado aqui, sem exceção.
       </p>

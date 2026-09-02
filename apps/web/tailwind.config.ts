@@ -41,6 +41,28 @@ const config: Config = {
           contrast: "rgb(var(--accent-contrast) / <alpha-value>)",
         },
       },
+      /**
+       * Quatro degraus, com nome.
+       *
+       * Antes eram catorze tamanhos escritos à mão, e seis deles cabiam numa
+       * faixa de três pixels: 10,5 · 11 · 11,5 · 12 · 12,5 · 13. Ninguém
+       * enxerga meio pixel de diferença, mas o olho registra que nada está
+       * alinhado, e é isso que faz uma tela parecer quase certa sem que se
+       * consiga apontar o motivo.
+       *
+       * Os nomes dizem o papel, não o tamanho, para o próximo trecho de
+       * código não inventar um 12,7.
+       */
+      fontSize: {
+        /** Rótulo de seção, carimbo de hora, legenda. */
+        rotulo: ["0.6875rem", { lineHeight: "1.45" }],
+        /** Texto de apoio: descrições, prévias, notas de rodapé. */
+        apoio: ["0.78125rem", { lineHeight: "1.5" }],
+        /** Corpo do produto: o que se lê de verdade. */
+        corpo: ["0.84375rem", { lineHeight: "1.55" }],
+        /** Número ou frase que precisa saltar dentro de um painel. */
+        destaque: ["0.9375rem", { lineHeight: "1.4" }],
+      },
       fontFamily: {
         sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
         display: ["var(--font-display)", "var(--font-sans)", "ui-sans-serif", "sans-serif"],

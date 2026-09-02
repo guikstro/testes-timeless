@@ -53,14 +53,14 @@ export function OriginTable({ origens }: { origens: Origem[] }) {
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="border-b border-line/70">
-            <th className="py-2 pr-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-mute">Origem</th>
+            <th className="py-2 pr-4 text-rotulo font-semibold uppercase tracking-[0.08em] text-ink-mute">Origem</th>
             {colunas.map((coluna) => (
               <th key={coluna.chave} className="py-2 pr-3 text-right">
                 <button
                   type="button"
                   onClick={() => setCriterio(coluna.chave)}
                   aria-pressed={criterio === coluna.chave}
-                  className={`focus-ring rounded px-1 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors ${
+                  className={`focus-ring rounded px-1 text-rotulo font-semibold uppercase tracking-[0.08em] transition-colors ${
                     criterio === coluna.chave ? "text-accent" : "text-ink-mute hover:text-ink"
                   }`}
                 >
@@ -86,7 +86,7 @@ export function OriginTable({ origens }: { origens: Origem[] }) {
                   <span className="flex items-center gap-2">
                     <span className="truncate text-ink-soft">{origem.label}</span>
                     {destaque ? (
-                      <span className="shrink-0 rounded-full bg-accent/12 px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                      <span className="shrink-0 rounded-full bg-accent/12 px-1.5 py-0.5 text-rotulo font-medium text-accent">
                         melhor taxa
                       </span>
                     ) : null}

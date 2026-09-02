@@ -45,14 +45,14 @@ export function Field({
   const id = useId();
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      <label htmlFor={id} className="text-[13px] font-medium text-ink-soft">
+      <label htmlFor={id} className="text-corpo font-medium text-ink-soft">
         {label}
       </label>
       {children(id)}
       {error ? (
-        <p className="animate-fade-in text-[12.5px] text-red-600">{error}</p>
+        <p className="animate-fade-in text-apoio text-red-600">{error}</p>
       ) : hint ? (
-        <p className="text-[12.5px] text-ink-mute">{hint}</p>
+        <p className="text-apoio text-ink-mute">{hint}</p>
       ) : null}
     </div>
   );

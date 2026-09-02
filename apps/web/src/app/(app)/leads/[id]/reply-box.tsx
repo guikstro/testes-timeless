@@ -69,7 +69,7 @@ export function ReplyBox({
         </div>
       </div>
       {compacta && state.error ? (
-        <p className="text-[12.5px] text-red-600 dark:text-red-400">{state.error}</p>
+        <p className="text-apoio text-red-600 dark:text-red-400">{state.error}</p>
       ) : null}
     </form>
   );

@@ -56,7 +56,7 @@ export default async function AdminOrganizationsPage({
     <div>
       <div className="mb-6 flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-ink">Clientes</h1>
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Clientes</h1>
           <p className="mt-1 text-sm text-ink-mute">
             {data.total} {data.total === 1 ? "organização" : "organizações"}
           </p>

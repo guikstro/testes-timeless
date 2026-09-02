@@ -164,7 +164,7 @@ function Painel({ titulo, children, acao }: { titulo: string; children: ReactNod
   return (
     <section className="surface p-5">
       <div className="mb-4 flex items-baseline justify-between gap-3">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.11em] text-ink-mute">{titulo}</h2>
+        <h2 className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">{titulo}</h2>
         {acao}
       </div>
       {children}
@@ -175,8 +175,8 @@ function Painel({ titulo, children, acao }: { titulo: string; children: ReactNod
 function Linha({ rotulo, valor }: { rotulo: string; valor: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-4 py-1.5">
-      <dt className="shrink-0 text-[12.5px] text-ink-mute">{rotulo}</dt>
-      <dd className="min-w-0 truncate text-right text-[13px] text-ink-soft">{valor}</dd>
+      <dt className="shrink-0 text-apoio text-ink-mute">{rotulo}</dt>
+      <dd className="min-w-0 truncate text-right text-corpo text-ink-soft">{valor}</dd>
     </div>
   );
 }
@@ -214,7 +214,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     <div className="mx-auto max-w-6xl">
       <Link
         href="/leads"
-        className="focus-ring group mb-5 inline-flex items-center gap-1.5 rounded text-[13px] text-ink-mute transition-colors hover:text-ink"
+        className="focus-ring group mb-5 inline-flex items-center gap-1.5 rounded text-corpo text-ink-mute transition-colors hover:text-ink"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 transition-transform duration-200 ease-soft group-hover:-translate-x-0.5" aria-hidden>
           <path d="M19 12H5M11 18l-6-6 6-6" />
@@ -264,8 +264,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
         <section className="surface flex max-h-[42rem] flex-col p-5">
           <div className="mb-4 flex items-baseline justify-between gap-3">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.11em] text-ink-mute">Conversa</h2>
-            <span className="text-[12px] text-ink-mute">
+            <h2 className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">Conversa</h2>
+            <span className="text-apoio text-ink-mute">
               {metrics.inboundCount} recebidas · {metrics.outboundCount} enviadas
             </span>
           </div>
@@ -281,25 +281,25 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           <Painel titulo="Atendimento">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-[11.5px] text-ink-mute">Primeira resposta</p>
+                <p className="text-rotulo text-ink-mute">Primeira resposta</p>
                 <p className={`mt-0.5 text-lg font-semibold tabular-nums ${tomResposta}`}>
                   {formatDuration(metrics.firstResponseSeconds)}
                 </p>
               </div>
               <div>
-                <p className="text-[11.5px] text-ink-mute">Do clique ao contato</p>
+                <p className="text-rotulo text-ink-mute">Do clique ao contato</p>
                 <p className="mt-0.5 text-lg font-semibold tabular-nums text-ink">
                   {formatDuration(metrics.clickToContactSeconds)}
                 </p>
               </div>
               <div>
-                <p className="text-[11.5px] text-ink-mute">Até qualificar</p>
+                <p className="text-rotulo text-ink-mute">Até qualificar</p>
                 <p className="mt-0.5 text-lg font-semibold tabular-nums text-ink">
                   {formatDuration(metrics.timeToQualifiedSeconds)}
                 </p>
               </div>
               <div>
-                <p className="text-[11.5px] text-ink-mute">Até a venda</p>
+                <p className="text-rotulo text-ink-mute">Até a venda</p>
                 <p className="mt-0.5 text-lg font-semibold tabular-nums text-ink">
                   {formatDuration(metrics.timeToWonSeconds)}
                 </p>
@@ -329,7 +329,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             {utms.length > 0 ? (
               <div className="mt-3 flex flex-wrap gap-1.5 border-t border-line/50 pt-3">
                 {utms.map(([chave, valor]) => (
-                  <span key={chave} className="rounded-md bg-panel-soft px-2 py-1 text-[11px] text-ink-soft">
+                  <span key={chave} className="rounded-md bg-panel-soft px-2 py-1 text-rotulo text-ink-soft">
                     {chave}={valor}
                   </span>
                 ))}
@@ -337,7 +337,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             ) : null}
 
             {!click ? (
-              <p className="mt-3 border-t border-line/50 pt-3 text-[12px] leading-relaxed text-ink-mute">
+              <p className="mt-3 border-t border-line/50 pt-3 text-apoio leading-relaxed text-ink-mute">
                 {attribution?.method === "CTWA_REFERRAL"
                   ? "A Meta identificou o anúncio no referral da mensagem, sem clique rastreado por nós."
                   : "Sem clique rastreado para este lead."}
@@ -358,7 +358,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             </dl>
 
             <div className="border-t border-line/50 pt-4">
-              <p className="mb-3 text-[11.5px] leading-relaxed text-ink-mute">
+              <p className="mb-3 text-rotulo leading-relaxed text-ink-mute">
                 Correção manual. Use quando o tracking automático não capturou o estágio ou o valor.
               </p>
               <ManualEditForm leadId={lead.id} status={lead.status} />
@@ -378,20 +378,20 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             {lead.conversionEvents.length > 0 ? (
               <ul className="space-y-2.5">
                 {lead.conversionEvents.map((evento) => (
-                  <li key={evento.id} className="flex flex-wrap items-center gap-2 text-[13px]">
+                  <li key={evento.id} className="flex flex-wrap items-center gap-2 text-corpo">
                     <span className="text-ink-soft">{CONVERSAO_ROTULO[evento.type]}</span>
                     <Badge tone={CONVERSAO_ESTADO[evento.status].tom}>{CONVERSAO_ESTADO[evento.status].rotulo}</Badge>
-                    <span className="text-[11.5px] text-ink-mute">
+                    <span className="text-rotulo text-ink-mute">
                       {evento.sentAt ? tempoRelativo(evento.sentAt) : tempoRelativo(evento.occurredAt)}
                     </span>
                     {evento.lastError ? (
-                      <span className="w-full text-[11.5px] text-red-600 dark:text-red-400">{evento.lastError}</span>
+                      <span className="w-full text-rotulo text-red-600 dark:text-red-400">{evento.lastError}</span>
                     ) : null}
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-[12.5px] leading-relaxed text-ink-mute">
+              <p className="text-apoio leading-relaxed text-ink-mute">
                 Nenhuma conversão enviada. Conecte a API de Conversões para devolver esses eventos à Meta.
               </p>
             )}
@@ -407,13 +407,13 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {lead.events.map((evento) => (
                 <li key={evento.id} className="relative">
                   <span className="absolute -left-4 top-1.5 h-[7px] w-[7px] rounded-full bg-ink-mute ring-2 ring-panel" aria-hidden />
-                  <p className="text-[13px] text-ink-soft">{EVENT_LABELS[evento.type] ?? evento.type}</p>
-                  <p className="text-[11.5px] text-ink-mute" title={formatDateTime(evento.occurredAt)}>
+                  <p className="text-corpo text-ink-soft">{EVENT_LABELS[evento.type] ?? evento.type}</p>
+                  <p className="text-rotulo text-ink-mute" title={formatDateTime(evento.occurredAt)}>
                     {tempoRelativo(evento.occurredAt)}
                   </p>
                 </li>
               ))}
-              {lead.events.length === 0 ? <li className="text-[13px] text-ink-mute">Sem eventos.</li> : null}
+              {lead.events.length === 0 ? <li className="text-corpo text-ink-mute">Sem eventos.</li> : null}
             </ol>
           </Painel>
         </div>

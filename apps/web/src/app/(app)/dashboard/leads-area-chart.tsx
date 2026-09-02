@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { GrupoDePilulas } from "@/components/ui/pill-group";
 
 /**
  * Gráfico de área com duas séries, desenhado em SVG.
@@ -229,25 +230,16 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
         Os modos ficam acima do gráfico e não escondidos num menu: são quatro,
         cabem, e trocar de leitura precisa ser um clique, não uma descoberta.
       */}
-      <div className="mb-3 flex flex-wrap items-center gap-1 rounded-full border border-line bg-panel-soft/60 p-1 [width:fit-content]">
-        {MODOS.map((opcao) => {
-          const ativo = modo === opcao.modo;
-          return (
-            <button
-              key={opcao.modo}
-              type="button"
-              onClick={() => setModo(opcao.modo)}
-              aria-pressed={ativo}
-              className={`focus-ring inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium transition-all duration-200 ease-soft active:scale-95 ${
-                ativo ? "bg-panel text-ink shadow-subtle" : "text-ink-mute hover:text-ink"
-              }`}
-            >
-              {opcao.icone}
-              {opcao.rotulo}
-            </button>
-          );
-        })}
-      </div>
+      <GrupoDePilulas
+        className="mb-3"
+        ativo={modo}
+        opcoes={MODOS.map((opcao) => ({
+          chave: opcao.modo,
+          rotulo: opcao.rotulo,
+          icone: opcao.icone,
+          aoClicar: () => setModo(opcao.modo),
+        }))}
+      />
 
       <svg
         width={width}
@@ -279,7 +271,7 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
               stroke="rgb(var(--grade))"
               strokeWidth={1}
             />
-            <text x={PAD.left - 8} y={yAt(tick) + 4} textAnchor="end" className="fill-[rgb(var(--ink-mute))] text-[11px]">
+            <text x={PAD.left - 8} y={yAt(tick) + 4} textAnchor="end" className="fill-[rgb(var(--ink-mute))] text-rotulo">
               {tick}
             </text>
           </g>
@@ -292,7 +284,7 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
               x={xAt(index)}
               y={HEIGHT - 8}
               textAnchor="middle"
-              className="fill-[rgb(var(--ink-mute))] text-[11px]"
+              className="fill-[rgb(var(--ink-mute))] text-rotulo"
             >
               {formatDay(point.date)}
             </text>
@@ -401,7 +393,7 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
             left: Math.min(Math.max(xAt(hovered!) + 12, 8), Math.max(8, width - 148)),
           }}
         >
-          <p className="mb-1.5 text-[11px] font-medium text-ink-mute">
+          <p className="mb-1.5 text-rotulo font-medium text-ink-mute">
             {formatDay(active.date)}
             {modo === "acumulado" ? " · acumulado" : ""}
           </p>

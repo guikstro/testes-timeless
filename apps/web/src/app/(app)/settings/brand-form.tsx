@@ -76,11 +76,11 @@ export function BrandForm({
             {pending ? "Salvando" : "Salvar identidade"}
           </Button>
           {state.savedAt ? (
-            <span key={state.savedAt} className="animate-fade-in text-[13px] text-emerald-600">
+            <span key={state.savedAt} className="animate-fade-in text-corpo text-emerald-600">
               Identidade atualizada
             </span>
           ) : null}
-          {state.error ? <span className="animate-fade-in text-[13px] text-red-600">{state.error}</span> : null}
+          {state.error ? <span className="animate-fade-in text-corpo text-red-600">{state.error}</span> : null}
         </div>
       </div>
 
@@ -97,11 +97,11 @@ export function BrandForm({
       >
         <OrgLogo name={organizationName} logoUrl={url || null} className="h-12 w-12" />
         <p className="font-display text-sm font-semibold text-ink">{organizationName}</p>
-        <span className="rounded-full bg-brand-soft px-2.5 py-1 text-[11.5px] font-medium text-brand-ink">
+        <span className="rounded-full bg-brand-soft px-2.5 py-1 text-rotulo font-medium text-brand-ink">
           Item ativo
         </span>
         <span className="h-9 w-full rounded-xl bg-brand shadow-subtle" />
-        <p className="text-[11px] text-ink-mute">Prévia</p>
+        <p className="text-rotulo text-ink-mute">Prévia</p>
       </div>
     </form>
   );

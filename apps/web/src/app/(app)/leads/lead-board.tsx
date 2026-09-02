@@ -70,7 +70,7 @@ export function LeadBoard({ colunas }: { colunas: ColunaDoQuadro[] }) {
       </div>
 
       {erro ? (
-        <p role="alert" className="mb-3 rounded-xl bg-red-500/10 px-4 py-2.5 text-[13px] text-red-700 dark:text-red-300">
+        <p role="alert" className="mb-3 rounded-xl bg-red-500/10 px-4 py-2.5 text-corpo text-red-700 dark:text-red-300">
           {erro}
         </p>
       ) : null}
@@ -108,9 +108,9 @@ export function LeadBoard({ colunas }: { colunas: ColunaDoQuadro[] }) {
             >
               <header className="mb-3 flex items-center gap-2 px-1">
                 <span className={`h-2 w-2 rounded-full ${cor}`} aria-hidden />
-                <h2 className="text-[12px] font-semibold uppercase tracking-[0.09em] text-ink-soft">{titulo}</h2>
+                <h2 className="text-apoio font-semibold uppercase tracking-[0.09em] text-ink-soft">{titulo}</h2>
                 <span
-                  className="ml-auto rounded-full bg-panel-soft px-2 py-0.5 text-[11px] tabular-nums text-ink-mute"
+                  className="ml-auto rounded-full bg-panel-soft px-2 py-0.5 text-rotulo tabular-nums text-ink-mute"
                   title={coluna.total > daColuna.length ? `${daColuna.length} de ${coluna.total} carregados` : undefined}
                 >
                   {coluna.total}
@@ -132,7 +132,7 @@ export function LeadBoard({ colunas }: { colunas: ColunaDoQuadro[] }) {
                 ))}
 
                 {daColuna.length === 0 ? (
-                  <li className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-line/60 py-8 text-[12px] text-ink-mute">
+                  <li className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-line/60 py-8 text-apoio text-ink-mute">
                     {recebe ? "Solte aqui" : "Vazio"}
                   </li>
                 ) : null}

@@ -11,6 +11,7 @@ import {
 import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
 import { corDaNotificacao, IconeDaNotificacao } from "@/components/notifications/notification-icons";
 import { useEventoDeNotificacao, useNotificacoes } from "@/components/notifications/notification-provider";
+import { GrupoDePilulas } from "@/components/ui/pill-group";
 
 const FILTROS: { rotulo: string; tipo: TipoDeNotificacao | null }[] = [
   { rotulo: "Tudo", tipo: null },
@@ -111,28 +112,19 @@ export function NotificationsView({
       </p>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="flex flex-wrap gap-1 rounded-full border border-line bg-panel-soft/60 p-1">
-          {FILTROS.map((filtro) => {
-            const ativo = filtro.tipo === tipo;
-            return (
-              <Link
-                key={filtro.rotulo}
-                href={href(filtro.tipo, naoLidas)}
-                aria-current={ativo ? "page" : undefined}
-                className={`focus-ring rounded-full px-3 py-1.5 text-[12px] font-medium transition-all duration-200 ease-soft active:scale-95 ${
-                  ativo ? "bg-ink text-canvas shadow-subtle" : "text-ink-mute hover:text-ink"
-                }`}
-              >
-                {filtro.rotulo}
-              </Link>
-            );
-          })}
-        </div>
+        <GrupoDePilulas
+          ativo={tipo ?? "todos"}
+          opcoes={FILTROS.map((filtro) => ({
+            chave: filtro.tipo ?? "todos",
+            rotulo: filtro.rotulo,
+            href: href(filtro.tipo, naoLidas),
+          }))}
+        />
 
         <Link
           href={href(tipo, !naoLidas)}
           aria-pressed={naoLidas}
-          className={`focus-ring inline-flex h-8 items-center rounded-full border px-3 text-[12px] font-medium transition-all duration-200 ease-soft active:scale-95 ${
+          className={`focus-ring inline-flex h-8 items-center rounded-full border px-3 text-apoio font-medium transition-all duration-200 ease-soft active:scale-95 ${
             naoLidas ? "border-transparent bg-ink text-canvas" : "border-line text-ink-soft hover:text-ink"
           }`}
         >
@@ -145,7 +137,7 @@ export function NotificationsView({
             setLinhas((atuais) => atuais.map((l) => ({ ...l, read: true })));
             void marcarTodasComoLidas();
           }}
-          className="focus-ring inline-flex h-8 items-center rounded-full px-3 text-[12px] font-medium text-ink-soft transition-all duration-200 ease-soft hover:bg-ink/[0.06] hover:text-ink active:scale-95"
+          className="focus-ring inline-flex h-8 items-center rounded-full px-3 text-apoio font-medium text-ink-soft transition-all duration-200 ease-soft hover:bg-ink/[0.06] hover:text-ink active:scale-95"
         >
           Marcar todos como lidos
         </button>
@@ -154,7 +146,7 @@ export function NotificationsView({
       {linhas.length === 0 ? (
         <div className="surface p-10 text-center">
           <p className="text-sm text-ink-soft">Nada por aqui.</p>
-          <p className="mt-1.5 text-[12.5px] text-ink-mute">
+          <p className="mt-1.5 text-apoio text-ink-mute">
             Avisos aparecem quando um lead chega, avança no funil ou uma mensagem não sai.
           </p>
         </div>
@@ -168,15 +160,15 @@ export function NotificationsView({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-baseline justify-between gap-3">
-                    <span className="truncate text-[13.5px] font-medium text-ink">{linha.title}</span>
-                    <span className="shrink-0 text-[11px] text-ink-mute" title={dataCompleta(linha.createdAt)}>
+                    <span className="truncate text-corpo font-medium text-ink">{linha.title}</span>
+                    <span className="shrink-0 text-rotulo text-ink-mute" title={dataCompleta(linha.createdAt)}>
                       {tempoRelativo(linha.createdAt)}
                     </span>
                   </span>
                   {linha.body ? (
-                    <span className="mt-0.5 block text-[12.5px] leading-relaxed text-ink-soft">{linha.body}</span>
+                    <span className="mt-0.5 block text-apoio leading-relaxed text-ink-soft">{linha.body}</span>
                   ) : null}
-                  <span className="mt-1 block text-[10.5px] font-semibold uppercase tracking-[0.09em] text-ink-mute">
+                  <span className="mt-1 block text-rotulo font-semibold uppercase tracking-[0.09em] text-ink-mute">
                     {ROTULO_POR_TIPO[linha.type]}
                   </span>
                 </span>
@@ -212,7 +204,7 @@ export function NotificationsView({
             type="button"
             onClick={() => void carregarMais()}
             disabled={carregando}
-            className="focus-ring inline-flex h-9 items-center rounded-full border border-line bg-panel px-4 text-[13px] font-medium text-ink shadow-subtle transition-all duration-200 ease-soft hover:shadow-card active:scale-95 disabled:opacity-50"
+            className="focus-ring inline-flex h-9 items-center rounded-full border border-line bg-panel px-4 text-corpo font-medium text-ink shadow-subtle transition-all duration-200 ease-soft hover:shadow-card active:scale-95 disabled:opacity-50"
           >
             {carregando ? "Carregando…" : "Carregar mais"}
           </button>

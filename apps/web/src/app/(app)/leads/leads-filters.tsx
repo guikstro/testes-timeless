@@ -88,7 +88,7 @@ export function LeadsFilters({ total }: { total: number }) {
           type="button"
           onClick={alternarAguardando}
           aria-pressed={soAguardando}
-          className={`focus-ring inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[13px] transition-all duration-200 ease-soft active:scale-95 ${
+          className={`focus-ring inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-corpo transition-all duration-200 ease-soft active:scale-95 ${
             soAguardando
               ? "bg-amber-500/15 text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-300"
               : "border border-line bg-panel text-ink-soft hover:border-ink/20 hover:text-ink"
@@ -103,7 +103,7 @@ export function LeadsFilters({ total }: { total: number }) {
           Aguardando você
         </button>
 
-        <span className="ml-auto text-[13px] tabular-nums text-ink-mute">
+        <span className="ml-auto text-corpo tabular-nums text-ink-mute">
           {total} {total === 1 ? "lead" : "leads"}
         </span>
       </div>

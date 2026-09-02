@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function IntegrationsPage() {
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-ink">Integrações</h1>
+      <h1 className="mb-6 font-display text-2xl font-semibold tracking-tight text-ink">Integrações</h1>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Link

@@ -26,7 +26,7 @@ export function NotificationBell() {
         </svg>
 
         {naoLidas > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 inline-flex min-w-[1.05rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-4 text-white">
+          <span className="absolute -right-0.5 -top-0.5 inline-flex min-w-[1.05rem] items-center justify-center rounded-full bg-red-500 px-1 text-rotulo font-semibold leading-4 text-white">
             {naoLidas > 99 ? "99+" : naoLidas}
           </span>
         )}
@@ -45,12 +45,12 @@ export function NotificationBell() {
 
           <div className="absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] origin-top-right animate-rise-in overflow-hidden rounded-2xl border border-line bg-panel shadow-lifted">
             <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.11em] text-ink-mute">Avisos</h2>
+              <h2 className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">Avisos</h2>
               {naoLidas > 0 && (
                 <button
                   type="button"
                   onClick={() => void marcarTodasComoLidas()}
-                  className="focus-ring rounded-full px-2 py-1 text-[12px] font-medium text-ink-soft transition-colors hover:text-ink"
+                  className="focus-ring rounded-full px-2 py-1 text-apoio font-medium text-ink-soft transition-colors hover:text-ink"
                 >
                   Marcar todas como lidas
                 </button>
@@ -59,7 +59,7 @@ export function NotificationBell() {
 
             <div className="max-h-[22rem] overflow-y-auto">
               {recentes.length === 0 ? (
-                <p className="px-4 py-8 text-center text-[13px] text-ink-mute">Nenhum aviso por enquanto.</p>
+                <p className="px-4 py-8 text-center text-corpo text-ink-mute">Nenhum aviso por enquanto.</p>
               ) : (
                 recentes.map((linha) => {
                   const conteudo = (
@@ -69,15 +69,15 @@ export function NotificationBell() {
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex items-baseline justify-between gap-2">
-                          <span className="truncate text-[13px] font-medium text-ink">{linha.title}</span>
-                          <span className="shrink-0 text-[11px] text-ink-mute">
+                          <span className="truncate text-corpo font-medium text-ink">{linha.title}</span>
+                          <span className="shrink-0 text-rotulo text-ink-mute">
                             {tempoRelativo(linha.createdAt)}
                           </span>
                         </span>
                         {linha.body ? (
-                          <span className="mt-0.5 block truncate text-[12px] text-ink-soft">{linha.body}</span>
+                          <span className="mt-0.5 block truncate text-apoio text-ink-soft">{linha.body}</span>
                         ) : null}
-                        <span className="mt-0.5 block text-[10.5px] font-semibold uppercase tracking-[0.09em] text-ink-mute">
+                        <span className="mt-0.5 block text-rotulo font-semibold uppercase tracking-[0.09em] text-ink-mute">
                           {ROTULO_POR_TIPO[linha.type]}
                         </span>
                       </span>
@@ -120,7 +120,7 @@ export function NotificationBell() {
               <Link
                 href="/notifications"
                 onClick={() => setAberto(false)}
-                className="focus-ring rounded-full px-2 py-1 text-[12px] font-medium text-ink-soft transition-colors hover:text-ink"
+                className="focus-ring rounded-full px-2 py-1 text-apoio font-medium text-ink-soft transition-colors hover:text-ink"
               >
                 Ver todos
               </Link>
@@ -129,7 +129,7 @@ export function NotificationBell() {
                 mudo: sem isso, "nenhum aviso" e "não estou recebendo aviso
                 nenhum" parecem a mesma coisa na tela.
               */}
-              {!conectado && <span className="px-2 text-[11.5px] text-ink-mute">Reconectando…</span>}
+              {!conectado && <span className="px-2 text-rotulo text-ink-mute">Reconectando…</span>}
             </div>
           </div>
         </>

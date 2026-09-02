@@ -27,7 +27,7 @@ export function FunnelChart({
         return (
           <div key={etapa.rotulo}>
             {anterior !== null ? (
-              <div className="flex items-center gap-2 py-1.5 pl-[7.5rem] text-[11.5px]">
+              <div className="flex items-center gap-2 py-1.5 pl-[7.5rem] text-rotulo">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="h-3 w-3 shrink-0 text-ink-mute" aria-hidden>
                   <path d="M12 5v14M6 13l6 6 6-6" />
                 </svg>
@@ -43,7 +43,7 @@ export function FunnelChart({
             ) : null}
 
             <div className="group flex items-center gap-3">
-              <span className="w-28 shrink-0 text-[12.5px] text-ink-soft">{etapa.rotulo}</span>
+              <span className="w-28 shrink-0 text-apoio text-ink-soft">{etapa.rotulo}</span>
               <div className="flex min-w-0 flex-1 items-center gap-2.5">
                 <div className="h-7 flex-1 overflow-hidden rounded-lg bg-panel-soft">
                   <div
@@ -51,11 +51,11 @@ export function FunnelChart({
                     style={{ width: `${Math.max(1.5, (etapa.valor / maior) * 100)}%` }}
                   />
                 </div>
-                <span className="w-12 shrink-0 text-right text-[15px] font-semibold tabular-nums text-ink">
+                <span className="w-12 shrink-0 text-right text-destaque font-semibold tabular-nums text-ink">
                   {etapa.valor}
                 </span>
                 {etapa.nota ? (
-                  <span className="hidden w-14 shrink-0 text-[11.5px] tabular-nums text-ink-mute sm:block">
+                  <span className="hidden w-14 shrink-0 text-rotulo tabular-nums text-ink-mute sm:block">
                     {etapa.nota}
                   </span>
                 ) : null}

@@ -33,13 +33,13 @@ export default async function GoogleAdsPage() {
         para o cliente não ficar esperando.
       */}
       <div className="mb-6 rounded-2xl border border-line bg-panel-soft/60 p-5">
-        <h2 className="text-[13px] font-semibold text-ink">Por que o lançamento é manual</h2>
-        <p className="mt-1.5 text-[13px] leading-relaxed text-ink-soft">
+        <h2 className="text-corpo font-semibold text-ink">Por que o lançamento é manual</h2>
+        <p className="mt-1.5 text-corpo leading-relaxed text-ink-soft">
           A sincronização automática com o Google Ads depende de um token de desenvolvedor que o próprio Google
           aprova, e essa aprovação leva semanas. Lançar o gasto à mão permite medir retorno desde já. Quando a
           integração automática entrar, ela vai atualizar estas mesmas campanhas, sem refazer nada.
         </p>
-        <p className="mt-2.5 text-[13px] leading-relaxed text-ink-soft">
+        <p className="mt-2.5 text-corpo leading-relaxed text-ink-soft">
           A atribuição dos leads do Google já funciona hoje, por{" "}
           <Link href="/links" className="text-ink underline decoration-line underline-offset-4 hover:decoration-accent">
             link rastreável
@@ -49,7 +49,7 @@ export default async function GoogleAdsPage() {
       </div>
 
       <div className="surface mb-6 p-5">
-        <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.11em] text-ink-mute">Nova campanha</h2>
+        <h2 className="mb-4 text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">Nova campanha</h2>
         <NovaCampanha />
       </div>
 
@@ -63,10 +63,10 @@ export default async function GoogleAdsPage() {
       ) : (
         <>
           <div className="mb-3 flex items-baseline justify-between">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.11em] text-ink-mute">
+            <h2 className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">
               Campanhas ({campanhas.length})
             </h2>
-            <span className="text-[13px] text-ink-mute">
+            <span className="text-corpo text-ink-mute">
               Gasto total lançado:{" "}
               <span className="font-semibold tabular-nums text-ink">
                 {(gastoTotal / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}

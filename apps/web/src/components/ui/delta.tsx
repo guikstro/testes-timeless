@@ -10,7 +10,7 @@
  */
 export function Delta({ delta, invertido = false }: { delta: number | null; invertido?: boolean }) {
   if (delta === null) {
-    return <span className="text-[11.5px] text-ink-mute">sem base anterior</span>;
+    return <span className="text-rotulo text-ink-mute">sem base anterior</span>;
   }
 
   const parado = Math.abs(delta) < 0.005;
@@ -24,7 +24,7 @@ export function Delta({ delta, invertido = false }: { delta: number | null; inve
       : "text-red-600 dark:text-red-400";
 
   return (
-    <span className={`inline-flex items-center gap-0.5 text-[11.5px] font-medium tabular-nums ${cor}`}>
+    <span className={`inline-flex items-center gap-0.5 text-rotulo font-medium tabular-nums ${cor}`}>
       {parado ? (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" className="h-3 w-3" aria-hidden>
           <path d="M5 12h14" />

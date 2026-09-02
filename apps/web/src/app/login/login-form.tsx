@@ -76,7 +76,7 @@ export function LoginForm() {
    * não é necessário — é o mesmo princípio de deixar o conteúdo falar.
    */
   const field =
-    "peer h-12 w-full border-0 border-b border-line bg-transparent px-0 text-[17px] text-ink " +
+    "peer h-12 w-full border-0 border-b border-line bg-transparent px-0 text-destaque text-ink " +
     "transition-colors duration-200 placeholder:text-ink-mute/60 " +
     "focus:border-accent focus:outline-none focus:ring-0";
 
@@ -97,7 +97,7 @@ export function LoginForm() {
           identidade sozinha: um marcador de posição com nome falso envelhece
           pior que a ausência dele.
         */}
-        <p className="flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-mute">
+        <p className="flex items-center gap-2.5 text-rotulo font-semibold uppercase tracking-[0.2em] text-ink-mute">
           <span className="h-1.5 w-1.5 rounded-full bg-accent" />
           Built to last
         </p>
@@ -135,19 +135,19 @@ export function LoginForm() {
                 esquecerUltimoNome();
                 setNome(null);
               }}
-              className="focus-ring mt-4 rounded text-[13px] text-ink-mute underline decoration-line underline-offset-4 transition-colors hover:text-ink"
+              className="focus-ring mt-4 rounded text-corpo text-ink-mute underline decoration-line underline-offset-4 transition-colors hover:text-ink"
             >
               Não é você? Entrar com outra conta
             </button>
           ) : (
-            <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-ink-soft">
+            <p className="mt-5 max-w-sm text-destaque leading-relaxed text-ink-soft">
               Cada lead, do anúncio à venda, com a origem provada, nunca deduzida.
             </p>
           )}
 
           <form onSubmit={handleSubmit} className="mt-10 flex flex-col gap-7">
             <div className="relative">
-              <label htmlFor="login-email" className="mb-1.5 block text-[12px] font-medium uppercase tracking-[0.12em] text-ink-mute">
+              <label htmlFor="login-email" className="mb-1.5 block text-apoio font-medium uppercase tracking-[0.12em] text-ink-mute">
                 E-mail
               </label>
               <input
@@ -163,7 +163,7 @@ export function LoginForm() {
             </div>
 
             <div className="relative">
-              <label htmlFor="login-password" className="mb-1.5 block text-[12px] font-medium uppercase tracking-[0.12em] text-ink-mute">
+              <label htmlFor="login-password" className="mb-1.5 block text-apoio font-medium uppercase tracking-[0.12em] text-ink-mute">
                 Senha
               </label>
               <div className="relative">
@@ -204,7 +204,7 @@ export function LoginForm() {
             </div>
 
             {error ? (
-              <p role="alert" className="animate-rise-in border-l-2 border-red-500 pl-3 text-[13px] text-red-600 dark:text-red-400">
+              <p role="alert" className="animate-rise-in border-l-2 border-red-500 pl-3 text-corpo text-red-600 dark:text-red-400">
                 {error}
               </p>
             ) : null}
@@ -213,7 +213,7 @@ export function LoginForm() {
               type="submit"
               disabled={loading}
               aria-busy={loading || undefined}
-              className="focus-ring group mt-1 inline-flex h-14 items-center justify-between gap-3 rounded-full bg-accent px-7 text-[15px] font-semibold text-accent-contrast transition-all duration-300 ease-soft hover:brightness-110 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60"
+              className="focus-ring group mt-1 inline-flex h-14 items-center justify-between gap-3 rounded-full bg-accent px-7 text-destaque font-semibold text-accent-contrast transition-all duration-300 ease-soft hover:brightness-110 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60"
             >
               <span>{loading ? "Entrando" : "Entrar"}</span>
               {loading ? (
@@ -229,7 +229,7 @@ export function LoginForm() {
             </button>
           </form>
 
-          <p className="mt-8 text-[13px] text-ink-mute">
+          <p className="mt-8 text-corpo text-ink-mute">
             Não tem conta?{" "}
             <Link href="/register" className="focus-ring rounded font-medium text-ink underline decoration-line underline-offset-4 transition-colors hover:decoration-accent">
               Criar organização
@@ -238,7 +238,7 @@ export function LoginForm() {
         </div>
       </main>
 
-      <footer className="relative z-10 text-[11px] text-ink-mute">
+      <footer className="relative z-10 text-rotulo text-ink-mute">
         Tracking e atribuição de conversões
       </footer>
     </div>

@@ -67,7 +67,7 @@ export function LiveRefresh({ pausado }: { pausado: boolean }) {
   const aceso = !pausado && conectado;
 
   return (
-    <span className="inline-flex items-center gap-1.5 text-[11.5px] text-ink-mute" aria-live="polite">
+    <span className="inline-flex items-center gap-1.5 text-rotulo text-ink-mute" aria-live="polite">
       <span className="relative flex h-1.5 w-1.5">
         {aceso ? (
           <span className="absolute inline-flex h-full w-full rounded-full bg-accent opacity-70 motion-safe:animate-ping" />

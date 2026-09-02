@@ -73,11 +73,11 @@ export function CopyPrompt({ prompt, nomeArquivo }: { prompt: string; nomeArquiv
         Baixar .txt
       </Button>
 
-      <span className="text-[12px] text-ink-mute">
+      <span className="text-apoio text-ink-mute">
         {prompt.length.toLocaleString("pt-BR")} caracteres
       </span>
 
-      {erro ? <span className="text-[12.5px] text-red-600 dark:text-red-400">{erro}</span> : null}
+      {erro ? <span className="text-apoio text-red-600 dark:text-red-400">{erro}</span> : null}
     </div>
   );
 }

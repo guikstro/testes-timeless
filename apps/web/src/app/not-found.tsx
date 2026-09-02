@@ -12,7 +12,7 @@ export default function NotFound() {
     <main className="flex min-h-screen items-center justify-center bg-panel-soft p-6">
       <div className="w-full max-w-md rounded-xl border border-line bg-panel p-8 text-center">
         <p className="text-sm font-medium text-ink-mute">404</p>
-        <h1 className="mt-2 text-xl font-semibold text-ink">Página não encontrada</h1>
+        <h1 className="mt-2 font-display text-xl font-semibold tracking-tight text-ink">Página não encontrada</h1>
         <p className="mt-2 text-sm text-ink-mute">
           O endereço não existe ou o registro que você procura foi removido.
         </p>
