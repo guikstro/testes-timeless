@@ -5,6 +5,8 @@ import { apiFetch, ApiRequestError } from "@/lib/api-client";
 
 export interface CreateLinkState {
   error?: string;
+  /** Carimbo do sucesso, para o formulário limpar os campos e confirmar. */
+  criadoEm?: number;
 }
 
 export async function createTrackingLink(
@@ -14,6 +16,7 @@ export async function createTrackingLink(
   const name = String(formData.get("name") ?? "").trim();
   const destinationUrl = String(formData.get("destinationUrl") ?? "").trim();
   const defaultSource = String(formData.get("defaultSource") ?? "").trim();
+  const defaultMedium = String(formData.get("defaultMedium") ?? "").trim();
   const defaultCampaign = String(formData.get("defaultCampaign") ?? "").trim();
 
   if (!name || !destinationUrl) {
@@ -27,6 +30,7 @@ export async function createTrackingLink(
         name,
         destinationUrl,
         ...(defaultSource ? { defaultSource } : {}),
+        ...(defaultMedium ? { defaultMedium } : {}),
         ...(defaultCampaign ? { defaultCampaign } : {}),
       }),
     });
@@ -38,5 +42,5 @@ export async function createTrackingLink(
   }
 
   revalidatePath("/links");
-  return {};
+  return { criadoEm: Date.now() };
 }

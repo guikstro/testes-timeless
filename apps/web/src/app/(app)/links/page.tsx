@@ -3,12 +3,15 @@ import { BotaoCopiar } from "@/components/ui/copy-button";
 import { EmptyState } from "@/components/ui/skeleton";
 import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
 import { CreateLinkForm } from "./create-link-form";
+import { plataformaDe } from "./plataformas";
 
 interface TrackingLinkListItem {
   id: string;
   name: string;
   code: string;
   destinationUrl: string;
+  defaultSource: string | null;
+  defaultMedium: string | null;
   createdAt: string;
   _count: { clicks: number };
 }
@@ -68,7 +71,28 @@ export default async function LinksPage() {
                     const url = `${PUBLIC_TRACKING_BASE_URL}/r/${item.code}`;
                     return (
                       <tr key={item.id} className="border-b border-line/60 transition-colors last:border-0 hover:bg-panel-soft/50">
-                        <td className="px-4 py-3 text-corpo font-medium text-ink">{item.name}</td>
+                        <td className="px-4 py-3">
+                          <p className="text-corpo font-medium text-ink">{item.name}</p>
+                          {/*
+                            De onde o link foi publicado, logo abaixo do nome:
+                            é assim que se acha "o link do stories" numa lista
+                            de vinte, sem abrir cada um.
+                          */}
+                          {(() => {
+                            const plataforma = plataformaDe(item.defaultSource, item.defaultMedium);
+                            if (!plataforma && !item.defaultSource) return null;
+                            return (
+                              <p className="mt-0.5 flex items-center gap-1.5 text-rotulo text-ink-mute">
+                                <span
+                                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                                  style={{ backgroundColor: plataforma?.cor ?? "#9CA3AF" }}
+                                  aria-hidden
+                                />
+                                {plataforma?.rotulo ?? item.defaultSource}
+                              </p>
+                            );
+                          })()}
+                        </td>
 
                         {/*
                           O botão de copiar é o ponto da tela inteira: o link
