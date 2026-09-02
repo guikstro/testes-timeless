@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { AuthenticatedUser } from "./jwt-payload.interface";
@@ -8,6 +8,8 @@ import { LoginDto } from "./dto/login.dto";
 import { RefreshTokenDto } from "./dto/refresh-token.dto";
 import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
+import { ChangePasswordDto } from "./dto/change-password.dto";
+import { ChangeEmailDto } from "./dto/change-email.dto";
 
 @Controller("auth")
 export class AuthController {
@@ -64,5 +66,22 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async resetPassword(@Body() dto: ResetPasswordDto): Promise<void> {
     await this.authService.resetPassword(dto);
+  }
+
+  /**
+   * Devolvem um par novo de tokens: a troca derruba as outras sessões, e sem
+   * o par novo quem trocou seria expulso pela própria ação.
+   */
+  @Post("change-password")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  changePassword(@CurrentUser() user: AuthenticatedUser, @Body() dto: ChangePasswordDto) {
+    return this.authService.changePassword(user, dto);
+  }
+
+  @Patch("email")
+  @UseGuards(JwtAuthGuard)
+  changeEmail(@CurrentUser() user: AuthenticatedUser, @Body() dto: ChangeEmailDto) {
+    return this.authService.changeEmail(user, dto);
   }
 }

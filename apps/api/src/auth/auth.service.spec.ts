@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import { AuthService } from "./auth.service";
 import { PrismaService } from "../common/prisma/prisma.service";
+import { AuthenticatedUser } from "./jwt-payload.interface";
 import { AppException } from "../common/exceptions/app-exception";
 
 // bcrypt's native binding exports non-configurable properties, so
@@ -32,7 +33,7 @@ function buildPrismaMock(): MockPrisma {
   };
 
   return {
-    user: { findUnique: jest.fn(), create: jest.fn() },
+    user: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
     organization: { findUnique: jest.fn() },
     membership: { create: jest.fn() },
     refreshToken: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
@@ -192,6 +193,89 @@ describe("AuthService", () => {
       await expect(service.refresh("some-revoked-token")).rejects.toMatchObject({
         response: { code: "INVALID_REFRESH_TOKEN" },
       });
+    });
+  });
+
+  describe("trocar a própria senha", () => {
+    const bcrypt = jest.requireActual("bcrypt") as typeof import("bcrypt");
+
+    const quem = (over: Partial<AuthenticatedUser> = {}): AuthenticatedUser => ({
+      userId: "user-1",
+      organizationId: "org-1",
+      role: "OWNER",
+      impersonating: false,
+      ...over,
+    });
+
+    function usuarioComSenha(senha: string) {
+      return { id: "user-1", email: "ana@x.com", passwordHash: bcrypt.hashSync(senha, 4), deletedAt: null };
+    }
+
+    it("recusa quando a senha atual está errada", async () => {
+      prisma.user.findUnique.mockResolvedValue(usuarioComSenha("senha-certa"));
+
+      await expect(
+        service.changePassword(quem(), { currentPassword: "chute", newPassword: "outra-senha-boa" }),
+      ).rejects.toThrow("Senha atual incorreta.");
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("recusa repetir a senha que já está em uso", async () => {
+      prisma.user.findUnique.mockResolvedValue(usuarioComSenha("senha-atual"));
+
+      await expect(
+        service.changePassword(quem(), { currentPassword: "senha-atual", newPassword: "senha-atual" }),
+      ).rejects.toThrow("A nova senha precisa ser diferente da atual.");
+    });
+
+    it("derruba as outras sessões e devolve um par novo de tokens", async () => {
+      prisma.user.findUnique.mockResolvedValue(usuarioComSenha("senha-atual"));
+
+      const tokens = await service.changePassword(quem(), {
+        currentPassword: "senha-atual",
+        newPassword: "senha-nova-boa",
+      });
+
+      // Derrubar as outras sessões é o ponto de trocar a senha quando se
+      // desconfia de alguém; o par novo evita que quem trocou seja expulso
+      // pela própria ação.
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { userId: "user-1", revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
+      });
+      expect(tokens.accessToken).toEqual(expect.any(String));
+      expect(tokens.refreshToken).toEqual(expect.any(String));
+    });
+
+    it("recusa durante um acesso de suporte", async () => {
+      prisma.user.findUnique.mockResolvedValue(usuarioComSenha("senha-atual"));
+
+      // Numa impersonação a senha atual conhecida é a do operador, não a do
+      // cliente: sem esta trava, entrar para dar suporte permitiria assumir a
+      // conta.
+      await expect(
+        service.changePassword(quem({ impersonating: true }), {
+          currentPassword: "senha-atual",
+          newPassword: "senha-nova-boa",
+        }),
+      ).rejects.toThrow("Não é possível alterar credenciais durante um acesso de suporte.");
+      expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("não revela que o e-mail novo já pertence a alguém", async () => {
+      prisma.user.findUnique.mockResolvedValue(usuarioComSenha("senha-atual"));
+      prisma.$transaction.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+          code: "P2002",
+          clientVersion: "test",
+        }),
+      );
+
+      // "Já existe conta com este e-mail" transformaria esta rota num
+      // verificador de quem tem conta no produto.
+      await expect(
+        service.changeEmail(quem(), { currentPassword: "senha-atual", newEmail: "outra@x.com" }),
+      ).rejects.toThrow("Não foi possível usar este e-mail.");
     });
   });
 });

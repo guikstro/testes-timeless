@@ -517,6 +517,13 @@ enum AuditAction {
   CONNECTION_CHANGED
   /** Um operador da plataforma entrou na organização (Fase 9). Registrado sempre, sem exceção. */
   IMPERSONATION_STARTED
+  /**
+   * Mudanças na equipe. Ficam auditadas porque tirar alguém de uma conta é
+   * irreversível do ponto de vista de quem foi tirado, e a pergunta "quem me
+   * removeu, e quando" precisa ter resposta.
+   */
+  MEMBER_ROLE_CHANGED
+  MEMBER_REMOVED
 }
 
 /** Section 65 — who changed what, with a before/after snapshot, for any manual correction. */

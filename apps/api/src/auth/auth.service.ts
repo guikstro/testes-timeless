@@ -11,6 +11,8 @@ import { RegisterDto } from "./dto/register.dto";
 import { LoginDto } from "./dto/login.dto";
 import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
+import { ChangePasswordDto } from "./dto/change-password.dto";
+import { ChangeEmailDto } from "./dto/change-email.dto";
 import { AuthenticatedUser, JwtPayload } from "./jwt-payload.interface";
 
 const ACCESS_TOKEN_TTL = "15m";
@@ -215,6 +217,109 @@ export class AuthService {
         data: { revokedAt: new Date() },
       }),
     ]);
+  }
+
+
+  /**
+   * Troca a senha de quem está logado.
+   *
+   * A senha atual é exigida mesmo havendo sessão aberta: sem isso, uma aba
+   * esquecida num computador compartilhado vira troca de senha, e quem
+   * passou por ali fica dono da conta.
+   *
+   * Todas as outras sessões caem, que é o ponto de trocar a senha quando se
+   * desconfia de alguém. Um par novo de tokens é devolvido para quem trocou
+   * continuar onde está, em vez de ser expulso pela própria ação.
+   */
+  async changePassword(quem: AuthenticatedUser, dto: ChangePasswordDto): Promise<TokenPair> {
+    this.recusaSeForVisita(quem);
+    const user = await this.prisma.user.findUnique({ where: { id: quem.userId } });
+    if (!user || user.deletedAt) {
+      throw new AppException("NOT_FOUND", "Usuário não encontrado.", HttpStatus.NOT_FOUND);
+    }
+
+    if (!(await bcrypt.compare(dto.currentPassword, user.passwordHash))) {
+      throw new AppException("INVALID_PASSWORD", "Senha atual incorreta.", HttpStatus.BAD_REQUEST);
+    }
+
+    if (await bcrypt.compare(dto.newPassword, user.passwordHash)) {
+      throw new AppException("SAME_PASSWORD", "A nova senha precisa ser diferente da atual.", HttpStatus.BAD_REQUEST);
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: quem.userId }, data: { passwordHash } }),
+      this.prisma.refreshToken.updateMany({
+        where: { userId: quem.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+
+    return this.issueTokenPair(user.id, quem.organizationId, quem.role);
+  }
+
+  /**
+   * Troca o e-mail de acesso.
+   *
+   * Não existe confirmação no endereço novo porque o produto ainda não envia
+   * e-mail (ver `forgotPassword` e docs/ARCHITECTURE.md). Isso tem uma
+   * consequência que a tela precisa dizer com todas as letras: um endereço
+   * digitado errado passa a ser o login, e a recuperação de senha iria para
+   * ele. A senha atual é exigida por isso, e as outras sessões caem junto.
+   */
+  async changeEmail(quem: AuthenticatedUser, dto: ChangeEmailDto): Promise<TokenPair> {
+    this.recusaSeForVisita(quem);
+    const user = await this.prisma.user.findUnique({ where: { id: quem.userId } });
+    if (!user || user.deletedAt) {
+      throw new AppException("NOT_FOUND", "Usuário não encontrado.", HttpStatus.NOT_FOUND);
+    }
+
+    if (!(await bcrypt.compare(dto.currentPassword, user.passwordHash))) {
+      throw new AppException("INVALID_PASSWORD", "Senha atual incorreta.", HttpStatus.BAD_REQUEST);
+    }
+
+    const novoEmail = dto.newEmail.trim().toLowerCase();
+    if (novoEmail === user.email) {
+      throw new AppException("SAME_EMAIL", "Este já é o seu e-mail.", HttpStatus.BAD_REQUEST);
+    }
+
+    try {
+      await this.prisma.$transaction([
+        this.prisma.user.update({ where: { id: quem.userId }, data: { email: novoEmail } }),
+        this.prisma.refreshToken.updateMany({
+          where: { userId: quem.userId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        }),
+      ]);
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        // Mensagem genérica de propósito: dizer "já existe conta com este
+        // e-mail" transforma esta rota num verificador de quem tem conta.
+        throw new AppException("EMAIL_UNAVAILABLE", "Não foi possível usar este e-mail.", HttpStatus.CONFLICT);
+      }
+      throw error;
+    }
+
+    return this.issueTokenPair(user.id, quem.organizationId, quem.role);
+  }
+
+
+  /**
+   * Nem senha nem e-mail mudam de dentro de uma visita de suporte.
+   *
+   * Numa impersonação o token continua sendo do operador da plataforma, então
+   * a senha atual que ele conhece é a dele. Sem esta trava, entrar para dar
+   * suporte permitiria trocar a credencial do cliente e assumir a conta.
+   */
+  private recusaSeForVisita(quem: AuthenticatedUser): void {
+    if (quem.impersonating) {
+      throw new AppException(
+        "IMPERSONATION_FORBIDDEN",
+        "Não é possível alterar credenciais durante um acesso de suporte.",
+        HttpStatus.FORBIDDEN,
+      );
+    }
   }
 
   /** Contexto da sessão para o shell da aplicação — ver `AuthController.session`. */
