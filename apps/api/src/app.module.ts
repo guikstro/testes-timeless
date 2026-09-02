@@ -16,6 +16,7 @@ import { CampaignsModule } from "./campaigns/campaigns.module";
 import { AdminModule } from "./admin/admin.module";
 import { AnalyticsModule } from "./analytics/analytics.module";
 import { NotificationsStreamModule } from "./notifications/notifications-stream.module";
+import { ConversationsModule } from "./conversations/conversations.module";
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { NotificationsStreamModule } from "./notifications/notifications-stream.
     AdminModule,
     AnalyticsModule,
     NotificationsStreamModule,
+    ConversationsModule,
   ],
 })
 export class AppModule {}

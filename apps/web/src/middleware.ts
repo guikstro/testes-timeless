@@ -10,7 +10,7 @@ import {
 // "/webhooks" saiu: a tela nunca existiu e o link quebrado no menu foi
 // removido na Fase 9. "/admin" entrou para a renovação silenciosa de sessão
 // abaixo também valer no painel do operador da plataforma.
-const PROTECTED_PREFIXES = ["/dashboard", "/leads", "/links", "/integrations", "/settings", "/campanhas", "/relatorio", "/notifications", "/admin"];
+const PROTECTED_PREFIXES = ["/dashboard", "/conversas", "/leads", "/links", "/integrations", "/settings", "/campanhas", "/relatorio", "/notifications", "/admin"];
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
 
 export async function middleware(request: NextRequest) {
@@ -69,6 +69,7 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     "/dashboard/:path*",
+    "/conversas/:path*",
     "/leads/:path*",
     "/links/:path*",
     "/integrations/:path*",

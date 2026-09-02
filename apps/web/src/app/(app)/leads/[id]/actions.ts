@@ -103,5 +103,6 @@ export async function sendMessage(
   }
 
   revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/conversas");
   return { sentAt: Date.now() };
 }

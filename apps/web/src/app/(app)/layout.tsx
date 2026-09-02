@@ -4,6 +4,7 @@ import { BrandStyle } from "@/components/brand-style";
 import { LivingBackground } from "@/components/living-background";
 import { AppNav } from "./app-nav";
 import { ImpersonationHairline } from "./impersonation-banner";
+import { AppMain } from "./app-main";
 import { NotificationProvider } from "@/components/notifications/notification-provider";
 import { NotificationToasts } from "@/components/notifications/notification-toasts";
 import { NotificationBell } from "@/components/notifications/notification-bell";
@@ -56,7 +57,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
           {/* `key` na rota faz a entrada tocar a cada navegação, em vez de só
               na primeira montagem do layout. */}
-          <div className="animate-rise-in p-6 sm:p-8">{children}</div>
+          <AppMain>{children}</AppMain>
         </main>
       </div>
 
