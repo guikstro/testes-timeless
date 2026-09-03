@@ -113,3 +113,41 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/*
+  Impressão.
+
+  O relatório é feito para virar PDF pela impressão do navegador, o que
+  dispensa biblioteca de PDF no servidor e sai com as fontes e a cor da marca
+  já aplicadas. Para isso a moldura do aplicativo precisa sumir: menu, faixa
+  do topo e fundo vivo não pertencem ao documento que o cliente recebe.
+*/
+@media print {
+  aside,
+  nav,
+  [data-imprimir="esconder"] {
+    display: none !important;
+  }
+
+  /* Fundo branco e tinta preta: economiza tinta e evita o cinza chapado que
+     a impressora produz ao tentar reproduzir o marfim. */
+  :root {
+    --canvas: 255 255 255;
+    --panel: 255 255 255;
+    --panel-soft: 246 246 244;
+    --ink: 17 17 17;
+    --ink-soft: 51 51 51;
+    --ink-mute: 102 102 102;
+    --line: 214 214 210;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  main {
+    /* Sem a barra lateral, o conteúdo ocupa a folha inteira. */
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}

@@ -2,6 +2,7 @@ import { apiFetch } from "@/lib/api-client";
 import { montaBlocoDeDados } from "@/lib/relatorio/dados";
 import { montaPrompt } from "@/lib/relatorio/prompt";
 import { PERIODOS, RelatorioView } from "./relatorio-view";
+import { DadosDoRelatorio } from "./relatorio-impresso";
 
 interface Overview {
   period: { days: number; from: string; to: string };
@@ -20,7 +21,12 @@ interface Overview {
     won: { anterior: number };
     revenueCents: { anterior: number };
   };
-  atendimento: { medianaPrimeiraRespostaSegundos: number | null; aguardando: number; semResposta: number };
+  atendimento: {
+    medianaPrimeiraRespostaSegundos: number | null;
+    aguardando: number;
+    semResposta: number;
+    respondidos: number;
+  };
   byOrigin: { label: string; leads: number; meetings: number; won: number; revenueCents: number }[];
   daily: { date: string; leads: number; won: number }[];
 }
@@ -96,5 +102,45 @@ export default async function RelatorioPage({
   const prompt = montaPrompt(bloco);
   const nomeArquivo = `relatorio-${organizacao.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${inicio}.txt`;
 
-  return <RelatorioView bloco={bloco} prompt={prompt} nomeArquivo={nomeArquivo} days={days} />;
+  const dados: DadosDoRelatorio = {
+    cliente: organizacao.name,
+    periodo: { de: inicio, ate: fim, dias: days },
+    totais: {
+      leads: overview.totals.leads,
+      aproveitaveis: overview.totals.leads - overview.totals.disqualified,
+      qualificados: overview.totals.qualified,
+      reunioes: overview.totals.meetings,
+      vendas: overview.totals.won,
+      receitaCentavos: overview.totals.revenueCents,
+      descartados: overview.totals.disqualified,
+    },
+    anterior: {
+      leads: overview.comparacao.leads.anterior,
+      vendas: overview.comparacao.won.anterior,
+      receitaCentavos: overview.comparacao.revenueCents.anterior,
+    },
+    atendimento: {
+      medianaSegundos: overview.atendimento.medianaPrimeiraRespostaSegundos,
+      semResposta: overview.atendimento.semResposta,
+      respondidos: overview.atendimento.respondidos,
+    },
+    origens: overview.byOrigin.map((o) => ({
+      nome: o.label,
+      leads: o.leads,
+      vendas: o.won,
+      receitaCentavos: o.revenueCents,
+    })),
+    investimento: investimentos
+      .filter((campanha) => campanha.totalCents > 0)
+      .map((campanha) => ({
+        campanha: campanha.name,
+        plataforma: campanha.platform === "GOOGLE" ? "Google Ads" : "Meta Ads",
+        totalCentavos: campanha.totalCents,
+        dias: campanha.diasComGasto,
+      })),
+  };
+
+  return (
+    <RelatorioView dados={dados} bloco={bloco} prompt={prompt} nomeArquivo={nomeArquivo} days={days} />
+  );
 }
