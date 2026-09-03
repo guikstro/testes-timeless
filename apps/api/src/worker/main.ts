@@ -26,6 +26,17 @@ async function bootstrap() {
   */
   app.flushLogs();
 
+  /*
+    Desligar com ordem.
+
+    Aqui isto vale ainda mais que na API: sem os ganchos, um `docker stop` no
+    meio de um job o deixava marcado como em execução no Redis. O BullMQ só o
+    recupera quando o verificador de travados passa, e um job que trava duas
+    vezes é dado como falho de vez. Com os ganchos, o worker termina o que
+    está na mão antes de sair.
+  */
+  app.enableShutdownHooks();
+
   Logger.log("Worker process started", "Bootstrap");
 }
 

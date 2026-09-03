@@ -42,6 +42,21 @@ export class NotificationsGateway implements OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
+    /*
+      Encerra os fluxos antes de soltar o Redis.
+
+      Uma conexão de tempo real não termina sozinha: ela fica aberta até
+      alguém desligar. Sem completar os `Subject` aqui, o `app.close()` ficava
+      esperando por respostas HTTP que nunca acabariam, e todo desligamento
+      demorava o tempo inteiro de tolerância do Docker até o processo ser
+      morto à força. Completando, o navegador recebe o fim, reconecta sozinho
+      em três segundos, e a saída é limpa.
+    */
+    for (const assinatura of this.porOrganizacao.values()) {
+      assinatura.assunto.complete();
+    }
+    this.porOrganizacao.clear();
+
     await this.assinante.quit();
   }
 

@@ -74,6 +74,17 @@ async function bootstrap() {
     ],
   });
 
+  /*
+    Desligar com ordem, em vez de ser morto no meio.
+
+    Sem isto, `docker stop` mandava o sinal, ninguém escutava, e dez segundos
+    depois o processo era morto: requisição em andamento cortada, conexão de
+    tempo real pendurada, e o `$disconnect` do Prisma nunca chamado. Com os
+    ganchos ligados, o Nest percorre os `onModuleDestroy` antes de sair, que é
+    onde as conexões com Redis e Postgres se despedem.
+  */
+  app.enableShutdownHooks();
+
   const port = process.env.PORT ? Number(process.env.PORT) : 3001;
   await app.listen(port);
   Logger.log(`API listening on port ${port}`, "Bootstrap");

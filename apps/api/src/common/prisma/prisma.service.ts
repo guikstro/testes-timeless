@@ -11,6 +11,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async onModuleDestroy(): Promise<void> {
+    // Registrado, e não silencioso: esta linha é a prova, no log, de que o
+    // processo saiu com ordem em vez de ter sido morto no meio. Sem ela, um
+    // desligamento limpo e um `kill -9` são indistinguíveis de fora.
+    this.logger.log("Disconnecting from PostgreSQL");
     await this.$disconnect();
   }
 }

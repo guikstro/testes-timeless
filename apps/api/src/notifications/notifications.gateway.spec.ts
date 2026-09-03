@@ -114,4 +114,23 @@ describe("NotificationsGateway", () => {
 
     expect(subscribe).toHaveBeenCalledTimes(2);
   });
+
+  it("encerra os fluxos abertos ao desligar", async () => {
+    const gateway = new NotificationsGateway();
+    const encerrados: string[] = [];
+
+    gateway.fluxo("org-1").subscribe({ complete: () => encerrados.push("org-1") });
+    gateway.fluxo("org-2").subscribe({ complete: () => encerrados.push("org-2") });
+
+    await gateway.onModuleDestroy();
+
+    /*
+      Uma conexão de tempo real não termina sozinha.
+
+      Sem encerrar aqui, o `app.close()` ficava esperando respostas HTTP que
+      nunca acabariam, e todo desligamento demorava a tolerância inteira do
+      Docker até o processo ser morto à força.
+    */
+    expect(encerrados.sort()).toEqual(["org-1", "org-2"]);
+  });
 });
