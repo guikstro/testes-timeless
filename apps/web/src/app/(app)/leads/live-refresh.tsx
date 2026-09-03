@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAtualizacaoAgrupada } from "@/components/notifications/usar-atualizacao";
 import {
   useEventoDeNotificacao,
   useNotificacoes,
@@ -29,17 +29,20 @@ import {
 const INTERVALO_DE_RESERVA = 30_000;
 
 export function LiveRefresh({ pausado }: { pausado: boolean }) {
-  const router = useRouter();
   const { conectado } = useNotificacoes();
   const [atualizadoEm, setAtualizadoEm] = useState<number | null>(null);
   const pausadoRef = useRef(pausado);
   pausadoRef.current = pausado;
 
+  // Agrupado: sem isso, uma rajada de mensagens recarregava o quadro uma vez
+  // por mensagem, e ele engasgava justamente quando há movimento.
+  const pedirAtualizacao = useAtualizacaoAgrupada(() => pausadoRef.current);
+
   const atualizar = useCallback(() => {
     if (pausadoRef.current || document.hidden) return;
-    router.refresh();
+    pedirAtualizacao();
     setAtualizadoEm(Date.now());
-  }, [router]);
+  }, [pedirAtualizacao]);
 
   // Só o que mexe no quadro: uma falha de envio muda a conversa de um lead,
   // não a posição de nenhum cartão, e recarregar por causa dela seria

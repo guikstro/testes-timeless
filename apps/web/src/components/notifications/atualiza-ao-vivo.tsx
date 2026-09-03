@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { useEventoDeNotificacao, useNotificacoes } from "./notification-provider";
+import { useAtualizacaoAgrupada } from "./usar-atualizacao";
 
 /**
  * Faz a tela buscar os dados de novo quando algo acontece.
@@ -16,13 +16,8 @@ import { useEventoDeNotificacao, useNotificacoes } from "./notification-provider
 const INTERVALO_DE_RESERVA = 30_000;
 
 export function AtualizaAoVivo() {
-  const router = useRouter();
   const { conectado } = useNotificacoes();
-
-  const atualizar = useCallback(() => {
-    if (document.hidden) return;
-    router.refresh();
-  }, [router]);
+  const atualizar = useAtualizacaoAgrupada();
 
   useEventoDeNotificacao(atualizar);
 
