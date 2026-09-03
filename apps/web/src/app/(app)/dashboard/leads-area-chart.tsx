@@ -230,16 +230,31 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
         Os modos ficam acima do gráfico e não escondidos num menu: são quatro,
         cabem, e trocar de leitura precisa ser um clique, não uma descoberta.
       */}
-      <GrupoDePilulas
-        className="mb-3"
-        ativo={modo}
-        opcoes={MODOS.map((opcao) => ({
-          chave: opcao.modo,
-          rotulo: opcao.rotulo,
-          icone: opcao.icone,
+      {/*
+        A legenda sobe para junto do seletor. No rodapé, em letra miúda, ela
+        existia sem ser vista: quem olhava o gráfico não sabia o que cada cor
+        queria dizer, que é a primeira pergunta de qualquer gráfico.
+      */}
+      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <GrupoDePilulas
+          ativo={modo}
+          opcoes={MODOS.map((opcao) => ({
+            chave: opcao.modo,
+            rotulo: opcao.rotulo,
+            icone: opcao.icone,
           aoClicar: () => setModo(opcao.modo),
-        }))}
-      />
+          }))}
+        />
+
+        <div className="flex items-center gap-4">
+          {SERIES.map((series) => (
+            <span key={series.key} className="flex items-center gap-1.5 text-apoio text-ink-soft">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: series.color }} />
+              {series.label}
+            </span>
+          ))}
+        </div>
+      </div>
 
       <svg
         width={width}
@@ -407,14 +422,6 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
         </div>
       ) : null}
 
-      <div className="mt-3 flex items-center gap-4">
-        {SERIES.map((series) => (
-          <span key={series.key} className="flex items-center gap-2 text-xs text-ink-soft">
-            <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: series.color }} />
-            {series.label}
-          </span>
-        ))}
-      </div>
     </div>
   );
 }

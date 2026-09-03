@@ -1,5 +1,5 @@
 import { EmptyState } from "@/components/ui/skeleton";
-import { FluxoDoFunil } from "./fluxo-do-funil";
+import { FunilSimples } from "./funil-simples";
 import { StatCard } from "./stat-card";
 import type { Overview } from "./tipos";
 import { formatRate } from "./tipos";
@@ -39,16 +39,16 @@ export function AbaFunil({ overview }: { overview: Overview }) {
       <section className="surface p-6 sm:p-8">
         <h2 className="font-display text-destaque font-semibold tracking-tight text-ink">Para onde os leads vão</h2>
         <p className="mb-6 mt-0.5 text-apoio text-ink-mute">
-          A faixa é quem seguiu. O que desce é quem saiu, e em que ponto.
+          Cada barra é uma etapa. Entre elas, quantas pessoas não passaram.
         </p>
 
         {totals.leads > 0 ? (
           <>
-            <FluxoDoFunil etapas={etapas} />
+            <FunilSimples etapas={etapas} />
 
             {/* A conclusão escrita, para não depender de medir a faixa com o olho. */}
             {maiorPerda && maiorPerda.proporcao > 0 ? (
-              <p className="mx-auto mt-6 max-w-2xl border-t border-line/60 pt-5 text-center text-corpo leading-relaxed text-ink-soft">
+              <p className="mt-6 border-t border-line/60 pt-5 text-corpo leading-relaxed text-ink-soft">
                 A maior perda está entre <span className="font-semibold text-ink">{maiorPerda.de}</span> e{" "}
                 <span className="font-semibold text-ink">{maiorPerda.para}</span>:{" "}
                 <span className="font-semibold text-ink">{Math.round(maiorPerda.proporcao * 100)}%</span> das pessoas
