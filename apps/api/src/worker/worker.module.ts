@@ -6,11 +6,15 @@ import { EncryptionModule } from "../common/encryption/encryption.module";
 import { getRedisConnectionOptions } from "../common/queue/redis-connection";
 import {
   META_CONVERSIONS_QUEUE,
+  MANUTENCAO_QUEUE,
   META_SYNC_QUEUE,
   WHATSAPP_EVENTS_QUEUE,
   WHATSAPP_SEND_QUEUE,
 } from "../common/queue/queue.constants";
 import { AgendaDeSincronia } from "./agenda-de-sincronia";
+import { AgendaDeFaxina } from "./manutencao/agenda-de-faxina";
+import { FaxinaProcessor } from "./manutencao/faxina.processor";
+import { FaxinaService } from "./manutencao/faxina.service";
 import { AttributionModule } from "../attribution/attribution.module";
 import { ClassificationModule } from "../classification/classification.module";
 import { ConversionEventsModule } from "../integrations/meta/conversion-events.module";
@@ -41,10 +45,14 @@ import { EvolutionClient } from "../integrations/whatsapp/evolution-client";
       { name: WHATSAPP_SEND_QUEUE },
       { name: META_SYNC_QUEUE },
       { name: META_CONVERSIONS_QUEUE },
+      { name: MANUTENCAO_QUEUE },
     ),
   ],
   providers: [
     AgendaDeSincronia,
+    AgendaDeFaxina,
+    FaxinaProcessor,
+    FaxinaService,
     WhatsAppEventProcessor,
     WhatsAppIngestionService,
     WhatsAppSendProcessor,

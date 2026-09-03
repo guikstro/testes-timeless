@@ -2,6 +2,8 @@ export const WHATSAPP_EVENTS_QUEUE = "whatsapp-events";
 export const WHATSAPP_SEND_QUEUE = "whatsapp-send";
 export const META_SYNC_QUEUE = "meta-sync";
 export const META_CONVERSIONS_QUEUE = "meta-conversions";
+/** Limpeza periódica do que já não serve para ninguém. */
+export const MANUTENCAO_QUEUE = "manutencao";
 
 /**
  * Nomes dos jobs da fila de sincronia da Meta.
@@ -12,3 +14,6 @@ export const META_CONVERSIONS_QUEUE = "meta-conversions";
  */
 export const SINCRONIA_PERIODICA = "sincronizar-todas";
 export const SINCRONIA_DE_UMA = "sync";
+
+/** O job diário de faxina. */
+export const FAXINA_PERIODICA = "faxina";
