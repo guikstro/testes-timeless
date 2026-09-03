@@ -17,6 +17,28 @@ services:
       timeout: 5s
       retries: 10
 
+  # Cópia de segurança do banco.
+  #
+  # Contêiner próprio com a imagem do Postgres, e não uma tarefa dentro da
+  # API: assim o pg_dump é exatamente da mesma versão do servidor, e nenhuma
+  # imagem da aplicação precisa carregar o cliente de banco. Se a API cair, a
+  # cópia continua acontecendo.
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://tintim:tintim@postgres:5432/tintim
+      # Uma cópia por dia, guardando as últimas trinta.
+      BACKUP_INTERVAL_SECONDS: "86400"
+      BACKUP_KEEP: "30"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./docker/backup:/scripts:ro
+      - backups:/backups
+    entrypoint: ["/bin/sh", "/scripts/backup.sh"]
+
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -169,6 +191,7 @@ services:
     command: sh -c "pnpm --filter web dev"
 
 volumes:
+  backups:
   uploads:
   postgres_data:
   redis_data:
