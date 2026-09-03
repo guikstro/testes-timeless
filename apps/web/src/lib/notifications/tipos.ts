@@ -5,7 +5,9 @@ export type TipoDeNotificacao =
   | "lead.won"
   | "lead.stage_changed"
   | "message.received"
-  | "message.failed";
+  | "message.failed"
+  /** Algo que a operação precisa resolver: integração caída, sincronia falhando. */
+  | "sistema.erro";
 
 /** O que chega pelo cano de tempo real. */
 export interface EventoDeNotificacao {
@@ -45,4 +47,5 @@ export const ROTULO_POR_TIPO: Record<TipoDeNotificacao, string> = {
   "lead.stage_changed": "Mudou de etapa",
   "message.received": "Mensagem",
   "message.failed": "Falha no envio",
+  "sistema.erro": "Problema no sistema",
 };

@@ -1,5 +1,6 @@
 import { MetaSyncService } from "./meta-sync.service";
 import { PrismaService } from "../../common/prisma/prisma.service";
+import { NotificationsService } from "../../notifications/notifications.service";
 import { EncryptionService } from "../../common/encryption/encryption.service";
 import { MetaGraphClient } from "../../integrations/meta/meta-graph-client";
 import { MetaApiError } from "../../integrations/meta/meta-api-error";
@@ -20,12 +21,14 @@ describe("MetaSyncService", () => {
       getAds: jest.fn().mockResolvedValue([]),
       getInsights: jest.fn().mockResolvedValue([]),
     };
+    const notifications = { notificar: jest.fn().mockResolvedValue(undefined) };
     const service = new MetaSyncService(
       prisma as unknown as PrismaService,
       encryption as unknown as EncryptionService,
       metaGraphClient as unknown as MetaGraphClient,
+      notifications as unknown as NotificationsService,
     );
-    return { service, prisma, encryption, metaGraphClient };
+    return { service, prisma, encryption, metaGraphClient, notifications };
   }
 
   function connectionRow(overrides: Record<string, unknown> = {}) {
@@ -167,6 +170,38 @@ describe("MetaSyncService", () => {
     expect(prisma.metaConnection.update).toHaveBeenCalledWith({
       where: { organizationId: "org-1" },
       data: { status: "SYNC_FAILED", lastSyncError: "network timeout" },
+    });
+  });
+
+  describe("aviso de falha", () => {
+    it("avisa na primeira falha, e não repete enquanto continuar falhando", async () => {
+      const { service, prisma, metaGraphClient, notifications } = buildService();
+      prisma.metaConnection.findUnique.mockResolvedValue({
+        organizationId: "org-1",
+        adAccountId: "act_1",
+        status: "CONNECTED",
+        accessTokenEncrypted: "cifrado",
+      });
+      metaGraphClient.getCampaigns.mockRejectedValue(new Error("deu ruim"));
+
+      await expect(service.sync("org-1")).rejects.toThrow("deu ruim");
+      expect(notifications.notificar).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "sistema.erro", organizationId: "org-1" }),
+      );
+
+      // Segunda rodada com a conexão já marcada como quebrada: a sincronia
+      // roda de hora em hora, e repetir o mesmo aviso encheria o sino com um
+      // problema só, que é o jeito mais rápido de ensinar alguém a ignorá-lo.
+      notifications.notificar.mockClear();
+      prisma.metaConnection.findUnique.mockResolvedValue({
+        organizationId: "org-1",
+        adAccountId: "act_1",
+        status: "SYNC_FAILED",
+        accessTokenEncrypted: "cifrado",
+      });
+
+      await expect(service.sync("org-1")).rejects.toThrow("deu ruim");
+      expect(notifications.notificar).not.toHaveBeenCalled();
     });
   });
 });

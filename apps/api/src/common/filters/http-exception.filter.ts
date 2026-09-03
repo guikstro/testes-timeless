@@ -12,6 +12,13 @@ interface ErrorBody {
   code: string;
   message: string;
   details?: unknown;
+  /**
+   * Vai na resposta para a tela poder mostrá-lo.
+   *
+   * É o que transforma "deu erro" em algo procurável: a pessoa lê o código na
+   * tela e ele aparece igual no log, com a rota, a organização e a pilha.
+   */
+  requestId?: string;
 }
 
 @Catch()
@@ -46,15 +53,39 @@ export class HttpExceptionFilter implements ExceptionFilter {
           details: obj.errors ?? undefined,
         };
       }
-    } else {
+    }
+
+    const requestId = request.idDaRequisicao;
+
+    /*
+      Registra tudo que não seja erro do cliente.
+
+      O corte é em 500 de propósito: um 400 é a validação funcionando, e um
+      404 é alguém pedindo o que não existe. Registrar os dois afogaria o que
+      importa, e o log só serve se der para achar o defeito de verdade dentro
+      dele.
+    */
+    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      const usuario = (request as Request & { user?: { userId?: string; organizationId?: string } }).user;
+
       this.logger.error(
-        exception instanceof Error ? exception.stack : String(exception),
-        undefined,
-        `${request.method} ${request.url}`,
+        JSON.stringify({
+          event: "erro_nao_tratado",
+          requestId,
+          method: request.method,
+          path: request.url,
+          status,
+          // Quem e de qual cliente: sem isso, um erro que só acontece numa
+          // organização é impossível de reproduzir.
+          organizationId: usuario?.organizationId,
+          userId: usuario?.userId,
+          message: exception instanceof Error ? exception.message : String(exception),
+          stack: exception instanceof Error ? exception.stack : undefined,
+        }),
       );
     }
 
-    response.status(status).json(body);
+    response.status(status).json({ ...body, requestId });
   }
 }
 

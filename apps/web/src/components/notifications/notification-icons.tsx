@@ -25,6 +25,17 @@ export function IconeDaNotificacao({ tipo }: { tipo: TipoDeNotificacao }) {
       </svg>
     );
   }
+  if (tipo === "sistema.erro") {
+    return (
+      <svg {...PROPS}>
+        {/* Tomada solta: o problema é de ligação com outro sistema, não de
+            uma conversa. */}
+        <path d="M9 3v6M15 3v6" />
+        <path d="M5 9h14v3a7 7 0 0 1-14 0z" />
+        <path d="M12 19v2" />
+      </svg>
+    );
+  }
   if (tipo === "message.failed") {
     return (
       <svg {...PROPS}>
@@ -58,6 +69,6 @@ export function IconeDaNotificacao({ tipo }: { tipo: TipoDeNotificacao }) {
 
 export function corDaNotificacao(tipo: TipoDeNotificacao): string {
   if (tipo === "lead.won") return "text-emerald-600 dark:text-emerald-400";
-  if (tipo === "message.failed") return "text-red-600 dark:text-red-400";
+  if (tipo === "message.failed" || tipo === "sistema.erro") return "text-red-600 dark:text-red-400";
   return "text-accent";
 }

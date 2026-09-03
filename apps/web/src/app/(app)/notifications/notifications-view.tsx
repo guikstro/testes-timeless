@@ -20,6 +20,7 @@ const FILTROS: { rotulo: string; tipo: TipoDeNotificacao | null }[] = [
   { rotulo: "Vendas", tipo: "lead.won" },
   { rotulo: "Mensagens", tipo: "message.received" },
   { rotulo: "Falhas", tipo: "message.failed" },
+  { rotulo: "Sistema", tipo: "sistema.erro" },
 ];
 
 export function NotificationsView({

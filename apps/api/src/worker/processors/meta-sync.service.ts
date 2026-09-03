@@ -3,6 +3,7 @@ import { PrismaService } from "../../common/prisma/prisma.service";
 import { EncryptionService } from "../../common/encryption/encryption.service";
 import { MetaGraphClient, InsightsRange } from "../../integrations/meta/meta-graph-client";
 import { MetaApiError } from "../../integrations/meta/meta-api-error";
+import { NotificationsService } from "../../notifications/notifications.service";
 
 const INSIGHTS_LOOKBACK_DAYS = 7;
 
@@ -22,6 +23,7 @@ export class MetaSyncService {
     private readonly prisma: PrismaService,
     private readonly encryption: EncryptionService,
     private readonly metaGraphClient: MetaGraphClient,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async sync(organizationId: string): Promise<void> {
@@ -116,11 +118,27 @@ export class MetaSyncService {
   }
 
   private async handleSyncError(organizationId: string, error: unknown): Promise<void> {
+    // O estado anterior decide se alguém precisa ser avisado. A sincronia roda
+    // de hora em hora: avisar a cada falha encheria o sino com o mesmo
+    // problema, e um sino cheio de repetição é um sino que ninguém lê.
+    const antes = await this.prisma.metaConnection.findUnique({
+      where: { organizationId },
+      select: { status: true },
+    });
+    const jaEstavaQuebrada = antes?.status === "TOKEN_EXPIRED" || antes?.status === "SYNC_FAILED";
+
     if (error instanceof MetaApiError && error.isTokenExpired) {
       await this.prisma.metaConnection.update({
         where: { organizationId },
         data: { status: "TOKEN_EXPIRED", lastSyncError: error.message },
       });
+      if (!jaEstavaQuebrada) {
+        await this.avisar(
+          organizationId,
+          "Meta Ads desconectou",
+          "O acesso expirou. Reconecte em Integrações para o gasto voltar a ser sincronizado.",
+        );
+      }
       return;
     }
 
@@ -135,6 +153,29 @@ export class MetaSyncService {
     await this.prisma.metaConnection.update({
       where: { organizationId },
       data: { status: "SYNC_FAILED", lastSyncError: message },
+    });
+
+    if (!jaEstavaQuebrada) {
+      await this.avisar(
+        organizationId,
+        "Sincronização do Meta Ads falhou",
+        // A causa vai junto: sem ela o aviso obriga a abrir outra tela só
+        // para descobrir o que houve.
+        `O gasto das campanhas pode estar desatualizado. ${message}`,
+      );
+    }
+  }
+
+  /**
+   * Avisa a operação. Nunca lança: a sincronia não pode falhar por causa do
+   * aviso sobre ela ter falhado.
+   */
+  private async avisar(organizationId: string, titulo: string, corpo: string): Promise<void> {
+    await this.notifications.notificar({
+      type: "sistema.erro",
+      organizationId,
+      title: titulo,
+      body: corpo,
     });
   }
 

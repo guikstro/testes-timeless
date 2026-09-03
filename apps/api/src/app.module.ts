@@ -1,4 +1,5 @@
-import { Module } from "@nestjs/common";
+import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
+import { IdDaRequisicaoMiddleware } from "./common/observabilidade/id-da-requisicao.middleware";
 import { ConfigModule } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
 import { ThrottlerModule } from "@nestjs/throttler";
@@ -23,6 +24,7 @@ import { AdminModule } from "./admin/admin.module";
 import { AnalyticsModule } from "./analytics/analytics.module";
 import { NotificationsStreamModule } from "./notifications/notifications-stream.module";
 import { ConversationsModule } from "./conversations/conversations.module";
+import { TelemetriaModule } from "./telemetria/telemetria.module";
 import { GoogleConversionsModule } from "./integrations/google/google-conversions.module";
 
 @Module({
@@ -56,6 +58,7 @@ import { GoogleConversionsModule } from "./integrations/google/google-conversion
     NotificationsStreamModule,
     ConversationsModule,
     GoogleConversionsModule,
+    TelemetriaModule,
   ],
   providers: [
     // Global: uma rota nova nasce protegida, e abrir exceção exige escrever
@@ -63,4 +66,10 @@ import { GoogleConversionsModule } from "./integrations/google/google-conversion
     { provide: APP_GUARD, useClass: UsuarioOuIpThrottlerGuard },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    // Em tudo: o identificador precisa existir antes de qualquer erro, e um
+    // erro pode acontecer em qualquer rota.
+    consumer.apply(IdDaRequisicaoMiddleware).forRoutes("*");
+  }
+}

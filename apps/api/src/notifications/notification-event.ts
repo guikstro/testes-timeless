@@ -13,7 +13,9 @@ export type TipoDeNotificacao =
   | "lead.won"
   | "lead.stage_changed"
   | "message.received"
-  | "message.failed";
+  | "message.failed"
+  /** Algo que a operação precisa resolver: integração caída, sincronia falhando. */
+  | "sistema.erro";
 
 export interface NotificationEvent {
   type: TipoDeNotificacao;

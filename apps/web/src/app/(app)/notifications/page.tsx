@@ -10,6 +10,7 @@ const TIPOS: TipoDeNotificacao[] = [
   "lead.stage_changed",
   "message.received",
   "message.failed",
+  "sistema.erro",
 ];
 
 export default async function NotificationsPage({
