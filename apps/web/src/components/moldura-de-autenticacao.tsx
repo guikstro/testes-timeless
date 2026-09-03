@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Marca } from "@/components/marca";
 
 /**
  * A moldura das telas de entrada.
@@ -30,7 +31,7 @@ export function MolduraDeAutenticacao({
 
       <header className="relative z-10 flex items-center justify-between">
         <p className="flex items-center gap-2.5 text-rotulo font-semibold uppercase tracking-[0.2em] text-ink-mute">
-          <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+          <Marca tamanho={16} className="shrink-0 text-accent" />
           Built to last
         </p>
         <ThemeToggle />

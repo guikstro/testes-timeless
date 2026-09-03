@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!--
+    Ícone da aba. Mesma geometria de components/marca.tsx, com a espessura do
+    traço na banda dos tamanhos pequenos: aqui ele é visto em dezesseis pixels.
+
+    Estático de propósito: é servido fora da página, então não alcança as
+    variáveis de tema. O verde padrão é o passo do tema claro, que lê sobre a
+    barra clara da maioria dos navegadores; quem suporta a consulta abaixo
+    recebe o passo do escuro, pela mesma regra do resto da marca.
+
+    O traço nasce fora do anel para o furo continuar aparecendo. Vazado contra
+    cheio é a diferença entre origem e resultado, e é o sentido do desenho.
+  -->
+  <style>
+    .fio { stroke: #007D5E; fill: none; }
+    .cheio { fill: #007D5E; }
+    @media (prefers-color-scheme: dark) {
+      .fio { stroke: #00A87B; }
+      .cheio { fill: #00A87B; }
+    }
+  </style>
+  <path class="fio" d="M 21.55 35 C 29 35, 29 13, 37 13" stroke-width="6" stroke-linecap="round"/>
+  <circle class="fio" cx="11" cy="35" r="4.6" stroke-width="3.5"/>
+  <circle class="cheio" cx="37" cy="13" r="5"/>
+</svg>

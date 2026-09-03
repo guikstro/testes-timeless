@@ -2,6 +2,7 @@ import { FunilSimples } from "../dashboard/funil-simples";
 import { formatCentsAsBRL } from "@/lib/currency";
 import { formatDuration } from "@/lib/duration";
 import { formataDia } from "@/lib/periodo";
+import { Marca } from "@/components/marca";
 
 /**
  * O relatório em si, pronto para ser lido e impresso.
@@ -53,7 +54,15 @@ export function RelatorioImpresso({ dados }: { dados: DadosDoRelatorio }) {
   return (
     <article className="space-y-8 print:space-y-6">
       <header className="border-b border-line pb-6">
-        <p className="text-rotulo font-semibold uppercase tracking-[0.14em] text-ink-mute">
+        {/*
+          A marca assina o documento, discreta, junto do que ele é. O nome do
+          cliente continua sendo o título: quem recebe o relatório é ele, e a
+          ferramenta que produziu a medição entra como assinatura, não como
+          cabeçalho. O verde sobrevive à impressão porque o bloco de `@media
+          print` redefine os neutros e não toca no acento.
+        */}
+        <p className="flex items-center gap-2 text-rotulo font-semibold uppercase tracking-[0.14em] text-ink-mute">
+          <Marca tamanho={14} className="shrink-0 text-accent" />
           Relatório de performance
         </p>
         <h2 className="mt-1 font-display text-[clamp(1.7rem,4vw,2.4rem)] font-semibold tracking-tight text-ink">

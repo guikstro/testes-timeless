@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { esquecerUltimoNome, gravarUltimoNome, lerUltimoNome } from "@/lib/last-user";
+import { Marca } from "@/components/marca";
 
 const FALLBACK = "Não foi possível entrar.";
 
@@ -103,7 +104,7 @@ export function LoginForm() {
           pior que a ausência dele.
         */}
         <p className="flex items-center gap-2.5 text-rotulo font-semibold uppercase tracking-[0.2em] text-ink-mute">
-          <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+          <Marca tamanho={16} className="shrink-0 text-accent" />
           Built to last
         </p>
         <ThemeToggle />

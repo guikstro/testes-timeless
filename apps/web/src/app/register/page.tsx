@@ -1,7 +1,27 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { BOTAO, CAMPO, MolduraDeAutenticacao } from "@/components/moldura-de-autenticacao";
+
+const PADRAO = "Não foi possível criar a conta.";
+
+/**
+ * Lê a mensagem de erro sem confiar que a resposta tem corpo.
+ *
+ * Um `response.json()` direto quebra a tela com "Unexpected end of JSON input"
+ * quando a API responde vazio, e um erro de rede não pode virar tela branca.
+ * É a mesma proteção que a tela de entrada já tinha e esta não tinha.
+ */
+async function mensagemDeErro(resposta: Response): Promise<string> {
+  try {
+    const corpo = await resposta.json();
+    return typeof corpo?.message === "string" ? corpo.message : PADRAO;
+  } catch {
+    return resposta.status >= 500 ? "O servidor não respondeu. Tente de novo." : PADRAO;
+  }
+}
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -9,114 +29,138 @@ export default function RegisterPage() {
   const [organizationName, setOrganizationName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [carregando, setCarregando] = useState(false);
 
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    setError(null);
-    setLoading(true);
+  async function enviar(evento: React.FormEvent) {
+    evento.preventDefault();
+    setErro(null);
+    setCarregando(true);
 
     try {
-      const response = await fetch("/api/auth/register", {
+      const resposta = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, organizationName, email, password }),
       });
 
-      if (!response.ok) {
-        const body = await response.json();
-        setError(body.message ?? "Não foi possível criar a conta.");
+      if (!resposta.ok) {
+        setErro(await mensagemDeErro(resposta));
         return;
       }
 
       router.push("/dashboard");
       router.refresh();
+    } catch {
+      setErro("Sem conexão com o servidor.");
     } finally {
-      setLoading(false);
+      setCarregando(false);
     }
   }
 
+  const rotulo = "mb-1.5 block text-apoio font-medium uppercase tracking-[0.12em] text-ink-mute";
+
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-sm rounded-xl border border-line bg-panel p-8 shadow-sm">
-        <h1 className="mb-1 font-display text-xl font-semibold tracking-tight text-ink">Criar organização</h1>
-        <p className="mb-6 text-sm text-ink-mute">Comece a rastrear suas conversões</p>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink-soft" htmlFor="organizationName">
-              Nome da organização
-            </label>
-            <input
-              id="organizationName"
-              required
-              value={organizationName}
-              onChange={(e) => setOrganizationName(e.target.value)}
-              className="w-full rounded-md border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink-soft" htmlFor="name">
-              Seu nome
-            </label>
-            <input
-              id="name"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-md border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink-soft" htmlFor="email">
-              E-mail
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink-soft" htmlFor="password">
-              Senha
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
-            />
-          </div>
-
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="focus-ring inline-flex h-11 w-full items-center justify-center rounded-full bg-ink text-sm font-medium text-canvas shadow-subtle transition-all duration-300 ease-soft hover:shadow-card active:scale-[0.97] disabled:opacity-50"
-          >
-            {loading ? "Criando..." : "Criar organização"}
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-sm text-ink-mute">
+    <MolduraDeAutenticacao
+      titulo="Criar organização"
+      descricao="Cada lead, do anúncio à venda, com a origem provada, nunca deduzida."
+      rodape={
+        <>
           Já tem conta?{" "}
-          <a href="/login" className="font-medium text-ink underline">
+          <Link
+            href="/login"
+            className="focus-ring rounded font-medium text-ink underline decoration-line underline-offset-4 transition-colors hover:decoration-accent"
+          >
             Entrar
-          </a>
-        </p>
-      </div>
-    </div>
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={enviar} className="mt-10 flex flex-col gap-7">
+        <div>
+          <label htmlFor="organizationName" className={rotulo}>
+            Nome da organização
+          </label>
+          <input
+            id="organizationName"
+            required
+            minLength={2}
+            placeholder="Sua empresa"
+            value={organizationName}
+            onChange={(evento) => setOrganizationName(evento.target.value)}
+            className={CAMPO}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="name" className={rotulo}>
+            Seu nome
+          </label>
+          <input
+            id="name"
+            required
+            minLength={2}
+            autoComplete="name"
+            placeholder="Como quer ser chamado"
+            value={name}
+            onChange={(evento) => setName(evento.target.value)}
+            className={CAMPO}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="email" className={rotulo}>
+            E-mail
+          </label>
+          <input
+            id="email"
+            type="email"
+            required
+            autoComplete="email"
+            placeholder="voce@empresa.com"
+            value={email}
+            onChange={(evento) => setEmail(evento.target.value)}
+            className={CAMPO}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="password" className={rotulo}>
+            Senha
+          </label>
+          <input
+            id="password"
+            type="password"
+            required
+            minLength={8}
+            autoComplete="new-password"
+            placeholder="Ao menos oito caracteres"
+            value={password}
+            onChange={(evento) => setPassword(evento.target.value)}
+            className={CAMPO}
+          />
+        </div>
+
+        {erro ? (
+          <p role="alert" className="animate-rise-in border-l-2 border-red-500 pl-3 text-corpo text-red-600 dark:text-red-400">
+            {erro}
+          </p>
+        ) : null}
+
+        <button type="submit" disabled={carregando} aria-busy={carregando || undefined} className={BOTAO}>
+          <span>{carregando ? "Criando" : "Criar organização"}</span>
+          {carregando ? (
+            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" className="opacity-30" />
+              <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px] transition-transform duration-300 ease-soft group-hover:translate-x-1" aria-hidden>
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+          )}
+        </button>
+      </form>
+    </MolduraDeAutenticacao>
   );
 }
