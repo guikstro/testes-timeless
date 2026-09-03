@@ -90,11 +90,18 @@ export class AuthService {
   async login(dto: LoginDto): Promise<TokenPair> {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
-      include: { memberships: true },
+      // Vínculo com organização apagada não conta. Sem este filtro, entrar
+      // funcionava e a sessão morria logo depois em `getSession`, que confere
+      // isto: o resultado era um login que dava certo e uma tela que dizia
+      // "sessão inválida", sem nada explicando por quê.
+      include: { memberships: { where: { organization: { deletedAt: null } } } },
     });
 
     const passwordMatches = await bcrypt.compare(dto.password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
-    if (!user || !passwordMatches) {
+    // Conta desativada responde igual a e-mail que não existe, e depois de
+    // pagar o mesmo custo de bcrypt: separar as duas respostas transformaria
+    // o login num verificador de quem já teve conta aqui.
+    if (!user || user.deletedAt || !passwordMatches) {
       throw new AppException("INVALID_CREDENTIALS", "E-mail ou senha inválidos.", HttpStatus.UNAUTHORIZED);
     }
 
@@ -156,7 +163,49 @@ export class AuthService {
       );
     }
 
-    return this.issueTokenPair(payload.sub, payload.organizationId, payload.role, impersonation);
+    if (impersonation) {
+      /*
+        Visita de suporte: o operador não tem vínculo com a organização do
+        cliente, então não há papel a reler. O que precisa ser reconferido é
+        se ele ainda é operador da plataforma: revogar o acesso de alguém não
+        pode esperar a visita dele terminar.
+      */
+      const operador = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+        select: { platformRole: true, deletedAt: true },
+      });
+
+      if (!operador?.platformRole || operador.deletedAt) {
+        throw new AppException("INVALID_REFRESH_TOKEN", "Sessão expirada. Faça login novamente.", HttpStatus.UNAUTHORIZED);
+      }
+
+      return this.issueTokenPair(payload.sub, payload.organizationId, payload.role, impersonation);
+    }
+
+    /*
+      O papel vem do banco, nunca do token antigo.
+
+      Renovar remontava o token a partir do papel que estava no token
+      anterior, e isso tinha uma consequência que anulava a tela de equipe:
+      rebaixar alguém de dono para membro não surtia efeito nenhum enquanto a
+      pessoa mantivesse a sessão viva. Ela renovava sozinha a cada quinze
+      minutos, sempre com o papel antigo, por até sete dias. Remover já
+      revogava as sessões; rebaixar não, e o rebaixamento é justamente a ação
+      pensada para quando não se quer expulsar ninguém.
+
+      O vínculo também é reconferido aqui, e não só o papel: uma sessão de
+      quem não está mais na organização não deve produzir token novo.
+    */
+    const vinculo = await this.prisma.membership.findUnique({
+      where: { organizationId_userId: { organizationId: payload.organizationId, userId: payload.sub } },
+      select: { role: true, user: { select: { deletedAt: true } } },
+    });
+
+    if (!vinculo || vinculo.user.deletedAt) {
+      throw new AppException("INVALID_REFRESH_TOKEN", "Sessão expirada. Faça login novamente.", HttpStatus.UNAUTHORIZED);
+    }
+
+    return this.issueTokenPair(payload.sub, payload.organizationId, vinculo.role);
   }
 
   async logout(refreshToken: string): Promise<void> {
@@ -173,7 +222,9 @@ export class AuthService {
    * configured EmailProvider (see integrations/email) — see docs/ARCHITECTURE.md.
    */
   async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string; devToken?: string }> {
-    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    // `deletedAt` no filtro: uma conta desativada não recupera a si mesma de
+    // volta para dentro do sistema.
+    const user = await this.prisma.user.findFirst({ where: { email: dto.email, deletedAt: null } });
     if (!user) {
       return { message: "Se o e-mail existir, enviaremos instruções de recuperação." };
     }
