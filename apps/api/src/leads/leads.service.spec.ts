@@ -15,6 +15,7 @@ describe("LeadsService", () => {
       conversation: { findFirst: jest.fn(), update: jest.fn() },
       ad: { findUnique: jest.fn() },
       campaign: { findUnique: jest.fn() },
+      organization: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const conversionEvents = {
       recordLead: jest.fn(),

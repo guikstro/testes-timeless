@@ -14,6 +14,7 @@ import { UpdateLeadDto } from "./dto/update-lead.dto";
 import { SendMessageDto } from "./dto/send-message.dto";
 import { ListLeadsDto } from "./dto/list-leads.dto";
 import { computeLeadMetrics } from "./lead-metrics";
+import { expedienteDa, SELECAO_DE_EXPEDIENTE } from "../common/expediente-da-organizacao";
 import { AdIds, AdReferences, extractAdIds } from "./ad-references";
 
 /**
@@ -176,7 +177,19 @@ export class LeadsService {
     ]);
 
     const adReferences = await this.resolveAdReferences(organizationId, extractAdIds(lead.attribution));
-    const metrics = computeLeadMetrics(lead, messages, lead.attribution?.trackingClick?.clickedAt ?? null);
+    // O expediente vem junto para o tempo de resposta não contar a
+    // madrugada de quem não atende de madrugada.
+    const organizacao = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: SELECAO_DE_EXPEDIENTE,
+    });
+
+    const metrics = computeLeadMetrics(
+      lead,
+      messages,
+      lead.attribution?.trackingClick?.clickedAt ?? null,
+      expedienteDa(organizacao),
+    );
 
     return { ...lead, events, messages, metrics, adReferences };
   }

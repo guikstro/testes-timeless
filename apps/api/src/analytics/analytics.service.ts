@@ -15,6 +15,7 @@ import {
   OverviewTotals,
 } from "./overview-aggregation";
 import { computeLeadMetrics } from "../leads/lead-metrics";
+import { expedienteDa, SELECAO_DE_EXPEDIENTE } from "../common/expediente-da-organizacao";
 import { extractAdIds } from "../leads/ad-references";
 import { fimDoDia, inicioDoDia } from "../common/tempo";
 import {
@@ -89,7 +90,7 @@ export class AnalyticsService {
       },
     } as const;
 
-    const [leads, anteriores, whatsapp, meta, trackingLinkCount] = await Promise.all([
+    const [leads, anteriores, whatsapp, meta, trackingLinkCount, organizacao] = await Promise.all([
       // Só as colunas que a agregação lê. Carregar o lead inteiro traria a
       // conversa junto e tornaria o custo da tela proporcional ao volume de
       // mensagens, não ao de leads.
@@ -118,7 +119,12 @@ export class AnalyticsService {
         select: { status: true },
       }),
       this.prisma.trackingLink.count({ where: { organizationId, deletedAt: null } }),
+      this.prisma.organization.findUnique({ where: { id: organizationId }, select: SELECAO_DE_EXPEDIENTE }),
     ]);
+
+    // A mediana da tela precisa da mesma conta da ficha do lead, ou os dois
+    // lugares diriam números diferentes para a mesma espera.
+    const expediente = expedienteDa(organizacao);
 
     // A venda é 1:1 com o lead, mas só conta aqui se não foi removida:
     // `sale` já vem null para vendas apagadas por causa do soft delete.
@@ -127,7 +133,7 @@ export class AnalyticsService {
 
     const tempos = leads.map((lead) => {
       const mensagens = lead.conversations.flatMap((conversa) => conversa.messages);
-      return computeLeadMetrics(lead, mensagens, null).firstResponseSeconds;
+      return computeLeadMetrics(lead, mensagens, null, expediente).firstResponseSeconds;
     });
     const respondidos = tempos.filter((t) => t !== null).length;
 

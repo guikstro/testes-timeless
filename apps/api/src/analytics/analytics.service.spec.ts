@@ -8,6 +8,8 @@ describe("AnalyticsService", () => {
       whatsAppConnection: { findUnique: jest.fn().mockResolvedValue(null) },
       metaConnection: { findUnique: jest.fn().mockResolvedValue(null) },
       trackingLink: { count: jest.fn().mockResolvedValue(0) },
+      // O expediente da organização entra no cálculo do tempo de resposta.
+      organization: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     return { service: new AnalyticsService(prisma as unknown as PrismaService), prisma };
   }

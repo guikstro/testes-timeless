@@ -1,3 +1,4 @@
+import { Expediente, segundosDeExpediente } from "../common/expediente";
 import { MessageDirection, OutboundStatus } from "@prisma/client";
 
 /**
@@ -66,10 +67,19 @@ function reachedTheLead(message: MetricsMessage): boolean {
 }
 
 /** `messages` precisa vir ordenada por timestamp crescente. */
+/**
+ * O expediente vale só para a primeira resposta.
+ *
+ * Ela mede a equipe: se ninguém atende de madrugada, a madrugada não é
+ * demora. Já o tempo até qualificar ou vender mede o ciclo de venda, e ali o
+ * relógio corrido é a unidade honesta, porque o cliente espera dias reais,
+ * não dias úteis.
+ */
 export function computeLeadMetrics(
   lead: MetricsLead,
   messages: MetricsMessage[],
   clickedAt: Date | null,
+  expediente?: Expediente,
 ): LeadMetrics {
   const inbound = messages.filter((message) => message.direction === "INBOUND");
   const outbound = messages.filter((message) => message.direction === "OUTBOUND");
@@ -85,7 +95,11 @@ export function computeLeadMetrics(
 
   return {
     firstResponseSeconds:
-      firstInbound && firstResponse ? secondsBetween(firstInbound.timestamp, firstResponse.timestamp) : null,
+      firstInbound && firstResponse
+        ? expediente
+          ? segundosDeExpediente(firstInbound.timestamp, firstResponse.timestamp, expediente)
+          : secondsBetween(firstInbound.timestamp, firstResponse.timestamp)
+        : null,
     clickToContactSeconds:
       clickedAt && firstInbound ? secondsBetween(clickedAt, firstInbound.timestamp) : null,
     timeToQualifiedSeconds: lead.qualifiedAt ? secondsBetween(lead.firstContactAt, lead.qualifiedAt) : null,

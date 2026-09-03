@@ -57,6 +57,23 @@ model Organization {
    */
   googleConversionQualified String? @map("google_conversion_qualified")
   googleConversionWon       String? @map("google_conversion_won")
+
+  /**
+   * Horário de atendimento, para o tempo de resposta parar de mentir.
+   *
+   * Sem isto, um lead que chega às 23h e é respondido às 9h aparece como dez
+   * horas de espera, e o número que o produto mais destaca acusa descaso de
+   * quem simplesmente não atende de madrugada.
+   *
+   * Desligado por padrão de propósito: ligar muda como todo histórico é lido,
+   * e essa é uma decisão de quem usa, não um padrão que se herda sem saber.
+   */
+  expedienteAtivo    Boolean @default(false) @map("expediente_ativo")
+  /** Dias atendidos. 0 é domingo, como no Date do JavaScript. */
+  expedienteDias     Int[]   @default([1, 2, 3, 4, 5]) @map("expediente_dias")
+  /** Minutos desde a meia-noite, no fuso da organização. */
+  expedienteInicio   Int     @default(540) @map("expediente_inicio")
+  expedienteFim      Int     @default(1080) @map("expediente_fim")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")

@@ -1,4 +1,5 @@
-import { IsHexColor, IsOptional, IsString, IsUrl, MaxLength, ValidateIf } from "class-validator";
+import { ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsHexColor, IsInt, IsOptional, IsString, IsUrl, Max, MaxLength, Min, ValidateIf } from "class-validator";
+import { Type } from "class-transformer";
 
 export class UpdateOrganizationDto {
   @IsOptional()
@@ -38,4 +39,39 @@ export class UpdateOrganizationDto {
   @IsString()
   @MaxLength(120)
   googleConversionWon?: string;
+
+  /**
+   * Horário de atendimento. Ligar muda como todo o histórico de tempo de
+   * resposta é lido, então é uma escolha explícita e não um padrão herdado.
+   */
+  @IsOptional()
+  @IsBoolean()
+  expedienteAtivo?: boolean;
+
+  /** Dias atendidos, de 0 (domingo) a 6. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(7)
+  @ArrayUnique()
+  @Type(() => Number)
+  @IsInt({ each: true })
+  @Min(0, { each: true })
+  @Max(6, { each: true })
+  expedienteDias?: number[];
+
+  /** Minutos desde a meia-noite. 1439 é 23:59; abrir depois disso não existe. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(1439)
+  expedienteInicio?: number;
+
+  /** Até 1440, que é a meia-noite do dia seguinte, para quem fecha às 24h. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(1440)
+  expedienteFim?: number;
 }

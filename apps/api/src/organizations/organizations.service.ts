@@ -26,6 +26,21 @@ export class OrganizationsService {
 
   async updateCurrent(organizationId: string, dto: UpdateOrganizationDto) {
     await this.getCurrent(organizationId);
+
+    // Uma janela invertida faria toda espera contar como zero, sem erro
+    // visível: o número simplesmente ficaria bom demais para ser verdade.
+    if (
+      dto.expedienteInicio !== undefined &&
+      dto.expedienteFim !== undefined &&
+      dto.expedienteFim <= dto.expedienteInicio
+    ) {
+      throw new AppException(
+        "EXPEDIENTE_INVALIDO",
+        "O horário de fechamento precisa ser depois do de abertura.",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     return this.prisma.organization.update({
       where: { id: organizationId },
       data: {

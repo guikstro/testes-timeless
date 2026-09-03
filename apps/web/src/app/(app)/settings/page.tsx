@@ -1,6 +1,6 @@
 import { apiFetch } from "@/lib/api-client";
 import { GrupoDePilulas } from "@/components/ui/pill-group";
-import { AbaGatilhos } from "./aba-gatilhos";
+import { AbaOperacao } from "./aba-operacao";
 import { AbaAparencia } from "./aba-aparencia";
 import { AbaSeguranca } from "./aba-seguranca";
 import { AbaEquipe } from "./aba-equipe";
@@ -12,7 +12,7 @@ import { Papel } from "./team-list";
   se voltam a tocar. Abrir no que se usa mais poupa um clique por visita.
 */
 const ABAS = [
-  { chave: "gatilhos", rotulo: "Gatilhos" },
+  { chave: "operacao", rotulo: "Operação" },
   { chave: "equipe", rotulo: "Equipe" },
   { chave: "aparencia", rotulo: "Aparência" },
   { chave: "seguranca", rotulo: "Segurança" },
@@ -32,7 +32,7 @@ export default async function SettingsPage({
   searchParams: Promise<{ aba?: string }>;
 }) {
   const { aba } = await searchParams;
-  const atual: Aba = ABAS.some((opcao) => opcao.chave === aba) ? (aba as Aba) : "gatilhos";
+  const atual: Aba = ABAS.some((opcao) => opcao.chave === aba) ? (aba as Aba) : "operacao";
 
   // A sessão diz quem é você e o que você pode: as três abas dependem disso,
   // então vem antes de escolher o que buscar.
@@ -60,7 +60,7 @@ export default async function SettingsPage({
       </div>
 
       {/* Cada aba busca só o que ela mostra, em vez de a página buscar tudo. */}
-      {atual === "gatilhos" ? <AbaGatilhos /> : null}
+      {atual === "operacao" ? <AbaOperacao /> : null}
       {atual === "aparencia" ? <AbaAparencia /> : null}
       {atual === "seguranca" ? (
         <AbaSeguranca emailAtual={sessao.user.email} impersonando={sessao.impersonating} />
