@@ -16,6 +16,7 @@
     "typecheck": "pnpm -r typecheck",
     "prisma:generate": "pnpm --filter api prisma:generate",
     "prisma:migrate": "pnpm --filter api prisma:migrate",
-    "prisma:seed": "pnpm --filter api prisma:seed"
+    "prisma:seed": "pnpm --filter api prisma:seed",
+    "fumaca": "node scripts/fumaca-das-telas.mjs"
   }
 }

@@ -10,10 +10,9 @@ import { formatCentsAsBRL } from "@/lib/currency";
 import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
 import { contaExportaveis, LinhaDeConversao, montaCsv, NomesDasAcoes } from "@/lib/google/conversoes-csv";
 import { EstadoDasAcoes, salvarAcoesDeConversao } from "./conversion-actions";
+import { PERIODOS } from "./periodos";
 
 const inicial: EstadoDasAcoes = {};
-
-export const PERIODOS = [30, 60, 90];
 
 export function ConversionsExport({
   linhas,

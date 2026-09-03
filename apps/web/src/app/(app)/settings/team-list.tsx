@@ -5,8 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/input";
 import { tempoRelativo } from "@/lib/relative-time";
 import { mudarPapel, removerMembro } from "./team-actions";
+import { PAPEL, Papel } from "./papeis";
 
-export type Papel = "OWNER" | "ADMIN" | "MEMBER";
 
 export interface Membro {
   userId: string;
@@ -16,11 +16,6 @@ export interface Membro {
   joinedAt: string;
 }
 
-export const PAPEL: Record<Papel, { rotulo: string; tom: "success" | "info" | "neutral"; explica: string }> = {
-  OWNER: { rotulo: "Dono", tom: "success", explica: "Faz tudo, inclusive gerenciar outros donos." },
-  ADMIN: { rotulo: "Administrador", tom: "info", explica: "Gerencia a equipe, menos os donos." },
-  MEMBER: { rotulo: "Membro", tom: "neutral", explica: "Usa o sistema, sem mexer na equipe." },
-};
 
 export function TeamList({ membros, euId, meuPapel }: { membros: Membro[]; euId: string; meuPapel: Papel }) {
   const posso = meuPapel === "OWNER" || meuPapel === "ADMIN";

@@ -1,7 +1,8 @@
 import { apiFetch } from "@/lib/api-client";
 import { montaBlocoDeDados } from "@/lib/relatorio/dados";
 import { montaPrompt } from "@/lib/relatorio/prompt";
-import { PERIODOS, RelatorioView } from "./relatorio-view";
+import { RelatorioView } from "./relatorio-view";
+import { periodoValido } from "./periodos";
 import { DadosDoRelatorio } from "./relatorio-impresso";
 
 interface Overview {
@@ -48,7 +49,7 @@ export default async function RelatorioPage({
   searchParams: Promise<{ days?: string }>;
 }) {
   const params = await searchParams;
-  const days = PERIODOS.includes(Number(params.days)) ? Number(params.days) : 30;
+  const days = periodoValido(params.days);
 
   const [overview, investimentos, organizacao] = await Promise.all([
     apiFetch<Overview>(`/analytics/overview?days=${days}`),

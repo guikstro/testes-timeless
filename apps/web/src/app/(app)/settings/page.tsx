@@ -4,7 +4,7 @@ import { AbaOperacao } from "./aba-operacao";
 import { AbaAparencia } from "./aba-aparencia";
 import { AbaSeguranca } from "./aba-seguranca";
 import { AbaEquipe } from "./aba-equipe";
-import { Papel } from "./team-list";
+import { Papel } from "./papeis";
 
 /*
   Na ordem em que se usa, e não na ordem em que foram escritas. Gatilhos e

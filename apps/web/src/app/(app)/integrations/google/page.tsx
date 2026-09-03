@@ -2,7 +2,8 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
 import { EmptyState } from "@/components/ui/skeleton";
 import { CartaoCampanha, NovaCampanha } from "./campaign-forms";
-import { ConversionsExport, PERIODOS } from "./conversions-export";
+import { ConversionsExport } from "./conversions-export";
+import { periodoValido } from "./periodos";
 import { LinhaDeConversao } from "@/lib/google/conversoes-csv";
 import { diaCivil } from "@/lib/periodo";
 
@@ -26,7 +27,7 @@ export default async function GoogleAdsPage({
   searchParams: Promise<{ dias?: string }>;
 }) {
   const { dias: diasCru } = await searchParams;
-  const dias = PERIODOS.includes(Number(diasCru)) ? Number(diasCru) : 30;
+  const dias = periodoValido(diasCru);
 
   // A janela é montada em dias civis daqui, como o resto do produto: contar a
   // partir do instante atual faria o período mudar de tamanho conforme a hora.

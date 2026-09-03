@@ -1,6 +1,7 @@
 import { apiFetch } from "@/lib/api-client";
 import { Card, CardHeader } from "@/components/ui/card";
-import { Membro, Papel, PAPEL, TeamList } from "./team-list";
+import { Membro, TeamList } from "./team-list";
+import { PAPEL, Papel } from "./papeis";
 
 export async function AbaEquipe({ euId, meuPapel }: { euId: string; meuPapel: Papel }) {
   const membros = await apiFetch<Membro[]>("/organizations/current/members");

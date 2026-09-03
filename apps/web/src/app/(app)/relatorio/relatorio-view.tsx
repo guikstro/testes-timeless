@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { GrupoDePilulas } from "@/components/ui/pill-group";
 import { CopyPrompt } from "./copy-prompt";
 import { DadosDoRelatorio, RelatorioImpresso } from "./relatorio-impresso";
-
-export const PERIODOS = [7, 30, 90];
+import { PERIODOS } from "./periodos";
 
 /**
  * Separado da página para que a montagem dos dados e a apresentação possam

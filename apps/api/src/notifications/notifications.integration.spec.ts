@@ -13,7 +13,18 @@ import { PrismaService } from "../common/prisma/prisma.service";
  * passaria despercebido em tudo o que veio antes.
  *
  * Depende do Redis que o Docker Compose já sobe para o BullMQ.
+ *
+ * Os prazos daqui são folgados de propósito. Este teste espera uma ida e
+ * volta de verdade pela rede, e a suíte inteira roda em paralelo: com a
+ * máquina carregada, um orçamento apertado falha por lentidão e não por
+ * defeito. Um vermelho intermitente é pior que teste nenhum, porque ensina a
+ * ignorar vermelho.
  */
+/** Quanto esperamos pela volta do Redis antes de desistir. */
+const ESPERA_MS = 15_000;
+/** O prazo do Jest precisa ser maior que o nosso, senão ele corta antes e a
+ *  mensagem de falha fala de tempo esgotado em vez do que de fato aconteceu. */
+const PRAZO_DO_TESTE_MS = ESPERA_MS + 5_000;
 describe("notificações de ponta a ponta pelo Redis", () => {
   let gateway: NotificationsGateway;
   let service: NotificationsService;
@@ -35,11 +46,11 @@ describe("notificações de ponta a ponta pelo Redis", () => {
 
   it("entrega ao assinante o evento publicado do outro lado", async () => {
     const organizationId = `org-teste-${Date.now()}`;
-    const recebido = firstValueFrom(gateway.fluxo(organizationId).pipe(timeout(5000)));
+    const recebido = firstValueFrom(gateway.fluxo(organizationId).pipe(timeout(ESPERA_MS)));
 
     // O `subscribe` do Redis é assíncrono: publicar antes de ele completar
     // perderia a mensagem, e o teste falharia por corrida, não por defeito.
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     await service.notificar({
       type: "lead.created",
@@ -54,7 +65,7 @@ describe("notificações de ponta a ponta pelo Redis", () => {
       organizationId,
       leadName: "Ana",
     });
-  });
+  }, PRAZO_DO_TESTE_MS);
 
   it("não entrega a uma organização o que foi publicado para outra", async () => {
     const minha = `org-a-${Date.now()}`;
@@ -62,12 +73,15 @@ describe("notificações de ponta a ponta pelo Redis", () => {
     const recebidos: unknown[] = [];
 
     const assinatura = gateway.fluxo(minha).subscribe((evento) => recebidos.push(evento));
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     await service.notificar({ type: "lead.won", organizationId: alheia, title: "Venda registrada: Bruno" });
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    // Espera generosa antes de concluir que nada chegou: com pouco tempo, uma
+    // entrega lenta passaria por isolamento funcionando, que é o oposto do
+    // que este teste deveria provar.
+    await new Promise((resolve) => setTimeout(resolve, 1500));
 
     expect(recebidos).toHaveLength(0);
     assinatura.unsubscribe();
-  });
+  }, PRAZO_DO_TESTE_MS);
 });
