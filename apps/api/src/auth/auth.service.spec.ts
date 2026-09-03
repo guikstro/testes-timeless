@@ -5,6 +5,7 @@ import { AuthService } from "./auth.service";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { AuthenticatedUser } from "./jwt-payload.interface";
 import { AppException } from "../common/exceptions/app-exception";
+import { EmailService } from "../common/email/email.service";
 
 // bcrypt's native binding exports non-configurable properties, so
 // jest.spyOn(bcrypt, "compare") fails with "Cannot redefine property".
@@ -51,11 +52,13 @@ describe("AuthService", () => {
   let prisma: MockPrisma;
   let jwt: JwtService;
   let service: AuthService;
+  let email: { enfileirar: jest.Mock };
 
   beforeEach(() => {
     prisma = buildPrismaMock();
     jwt = new JwtService({ secret: "test-secret" });
-    service = new AuthService(prisma as unknown as PrismaService, jwt);
+    email = { enfileirar: jest.fn().mockResolvedValue(undefined) };
+    service = new AuthService(prisma as unknown as PrismaService, jwt, email as unknown as EmailService);
   });
 
   describe("register", () => {
@@ -221,11 +224,8 @@ describe("AuthService", () => {
   });
 
   describe("recuperação de senha", () => {
-    const original = process.env.NODE_ENV;
-    afterEach(() => { process.env.NODE_ENV = original; });
-
     async function pedirRecuperacao() {
-      prisma.user.findFirst.mockResolvedValue({ id: "user-1", email: "ana@x.com" });
+      prisma.user.findFirst.mockResolvedValue({ id: "user-1", name: "Ana", email: "ana@x.com" });
       prisma.passwordResetToken.create.mockResolvedValue({});
       return service.forgotPassword({ email: "ana@x.com" });
     }
@@ -233,43 +233,101 @@ describe("AuthService", () => {
     /*
       A regressão mais grave da revisão.
 
-      O atalho era ligado por `NODE_ENV !== "production"`, e a imagem de
-      produção deste repositório nunca definia `NODE_ENV`. Ou seja: em
-      produção, esta rota pública devolvia um token de recuperação válido para
-      qualquer e-mail existente. Isso é tomada de conta, não vazamento.
+      O token voltava dentro da resposta quando `NODE_ENV !== "production"`, e
+      a imagem de produção não definia essa variável. Ou seja: esta rota
+      pública entregava um token válido para qualquer e-mail existente, o que
+      é tomada de conta. O atalho não existe mais em ambiente nenhum.
     */
-    it("não devolve o token quando NODE_ENV não está definida", async () => {
-      delete process.env.NODE_ENV;
+    it("nunca devolve o token na resposta", async () => {
+      const original = process.env.NODE_ENV;
+      for (const ambiente of ["development", "production", "prod", undefined]) {
+        if (ambiente === undefined) delete process.env.NODE_ENV;
+        else process.env.NODE_ENV = ambiente;
 
-      expect(await pedirRecuperacao()).not.toHaveProperty("devToken");
+        expect(await pedirRecuperacao()).toEqual({
+          message: "Se o e-mail existir, enviaremos instruções de recuperação.",
+        });
+      }
+      process.env.NODE_ENV = original;
     });
 
-    it("não devolve o token em produção", async () => {
-      process.env.NODE_ENV = "production";
+    it("manda o e-mail com um endereço que abre a tela de redefinir", async () => {
+      process.env.WEB_APP_URL = "https://app.exemplo.com";
 
-      expect(await pedirRecuperacao()).not.toHaveProperty("devToken");
+      await pedirRecuperacao();
+
+      expect(email.enfileirar).toHaveBeenCalledWith(
+        expect.objectContaining({ para: "ana@x.com", assunto: "Redefinir sua senha" }),
+      );
+      const enviado = email.enfileirar.mock.calls[0][0] as { texto: string };
+      expect(enviado.texto).toContain("https://app.exemplo.com/redefinir-senha?token=");
     });
 
-    it("não devolve o token com um valor escrito errado", async () => {
-      process.env.NODE_ENV = "prod";
-
-      expect(await pedirRecuperacao()).not.toHaveProperty("devToken");
-    });
-
-    it("devolve o token só quando alguém diz que é desenvolvimento", async () => {
-      process.env.NODE_ENV = "development";
-
-      expect(await pedirRecuperacao()).toHaveProperty("devToken", expect.any(String));
-    });
-
-    it("responde igual para um e-mail que não existe", async () => {
-      process.env.NODE_ENV = "development";
+    it("não manda nada, e responde igual, para um e-mail que não existe", async () => {
       prisma.user.findFirst.mockResolvedValue(null);
 
       const resposta = await service.forgotPassword({ email: "ninguem@x.com" });
 
-      expect(resposta).not.toHaveProperty("devToken");
+      // A resposta idêntica é o que impede a rota de virar um verificador de
+      // quem tem conta aqui.
       expect(resposta.message).toContain("Se o e-mail existir");
+      expect(email.enfileirar).not.toHaveBeenCalled();
+    });
+
+    it("procura só contas ativas", async () => {
+      prisma.user.findFirst.mockResolvedValue(null);
+
+      await service.forgotPassword({ email: "ana@x.com" });
+
+      // Uma conta desativada não recupera a si mesma de volta para dentro.
+      expect(prisma.user.findFirst).toHaveBeenCalledWith({
+        where: { email: "ana@x.com", deletedAt: null },
+      });
+    });
+  });
+
+  describe("trocar o e-mail de acesso", () => {
+    const bcrypt = jest.requireActual("bcrypt") as typeof import("bcrypt");
+
+    const quem = (over: Partial<AuthenticatedUser> = {}): AuthenticatedUser => ({
+      userId: "user-1",
+      organizationId: "org-1",
+      role: "OWNER",
+      impersonating: false,
+      ...over,
+    });
+
+    beforeEach(() => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: "user-1",
+        name: "Ana",
+        email: "antigo@x.com",
+        passwordHash: bcrypt.hashSync("senha-atual", 4),
+        deletedAt: null,
+      });
+    });
+
+    it("avisa o endereço ANTIGO, não o novo", async () => {
+      await service.changeEmail(quem(), { currentPassword: "senha-atual", newEmail: "novo@x.com" });
+
+      /*
+        Para o antigo de propósito. Mandar para o novo avisaria justamente
+        quem fez a troca, que já sabe. O endereço antigo é o único canal que
+        ainda alcança o dono legítimo depois de uma tomada de conta.
+      */
+      expect(email.enfileirar).toHaveBeenCalledWith(
+        expect.objectContaining({ para: "antigo@x.com", assunto: "O e-mail de acesso da sua conta foi alterado" }),
+      );
+      const enviado = email.enfileirar.mock.calls[0][0] as { texto: string };
+      expect(enviado.texto).toContain("novo@x.com");
+    });
+
+    it("não avisa ninguém quando a troca é recusada", async () => {
+      await expect(
+        service.changeEmail(quem(), { currentPassword: "chute", newEmail: "novo@x.com" }),
+      ).rejects.toThrow("Senha atual incorreta.");
+
+      expect(email.enfileirar).not.toHaveBeenCalled();
     });
   });
 
@@ -380,7 +438,7 @@ describe("AuthService", () => {
     });
 
     function usuarioComSenha(senha: string) {
-      return { id: "user-1", email: "ana@x.com", passwordHash: bcrypt.hashSync(senha, 4), deletedAt: null };
+      return { id: "user-1", name: "Ana", email: "ana@x.com", passwordHash: bcrypt.hashSync(senha, 4), deletedAt: null };
     }
 
     it("recusa quando a senha atual está errada", async () => {
@@ -417,6 +475,18 @@ describe("AuthService", () => {
       });
       expect(tokens.accessToken).toEqual(expect.any(String));
       expect(tokens.refreshToken).toEqual(expect.any(String));
+    });
+
+    it("avisa por e-mail que a senha mudou", async () => {
+      prisma.user.findUnique.mockResolvedValue(usuarioComSenha("senha-atual"));
+
+      await service.changePassword(quem(), { currentPassword: "senha-atual", newPassword: "senha-nova-boa" });
+
+      // O aviso não é para quem trocou, que já sabe: é para quem NÃO trocou.
+      // É assim que a pessoa descobre no mesmo dia que perdeu a conta.
+      expect(email.enfileirar).toHaveBeenCalledWith(
+        expect.objectContaining({ para: "ana@x.com", assunto: "Sua senha foi alterada" }),
+      );
     });
 
     it("recusa durante um acesso de suporte", async () => {

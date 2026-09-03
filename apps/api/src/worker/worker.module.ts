@@ -3,15 +3,18 @@ import { ConfigModule } from "@nestjs/config";
 import { BullModule } from "@nestjs/bullmq";
 import { PrismaModule } from "../common/prisma/prisma.module";
 import { EncryptionModule } from "../common/encryption/encryption.module";
+import { EmailModule } from "../common/email/email.module";
 import { getRedisConnectionOptions } from "../common/queue/redis-connection";
 import {
   META_CONVERSIONS_QUEUE,
   MANUTENCAO_QUEUE,
+  EMAIL_QUEUE,
   META_SYNC_QUEUE,
   WHATSAPP_EVENTS_QUEUE,
   WHATSAPP_SEND_QUEUE,
 } from "../common/queue/queue.constants";
 import { AgendaDeSincronia } from "./agenda-de-sincronia";
+import { EmailProcessor } from "./processors/email.processor";
 import { AgendaDeFaxina } from "./manutencao/agenda-de-faxina";
 import { FaxinaProcessor } from "./manutencao/faxina.processor";
 import { FaxinaService } from "./manutencao/faxina.service";
@@ -35,6 +38,7 @@ import { EvolutionClient } from "../integrations/whatsapp/evolution-client";
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     EncryptionModule,
+    EmailModule,
     AttributionModule,
     ClassificationModule,
     ConversionEventsModule,
@@ -46,6 +50,7 @@ import { EvolutionClient } from "../integrations/whatsapp/evolution-client";
       { name: META_SYNC_QUEUE },
       { name: META_CONVERSIONS_QUEUE },
       { name: MANUTENCAO_QUEUE },
+      { name: EMAIL_QUEUE },
     ),
   ],
   providers: [
@@ -53,6 +58,7 @@ import { EvolutionClient } from "../integrations/whatsapp/evolution-client";
     AgendaDeFaxina,
     FaxinaProcessor,
     FaxinaService,
+    EmailProcessor,
     WhatsAppEventProcessor,
     WhatsAppIngestionService,
     WhatsAppSendProcessor,

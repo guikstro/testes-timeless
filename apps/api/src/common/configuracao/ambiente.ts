@@ -90,6 +90,26 @@ const EXIGENCIAS: Exigencia[] = [
     processos: ["api"],
   },
   {
+    nome: "EMAIL_TRANSPORTE",
+    porque:
+      "sem um transporte real, quem esquecer a senha fica trancado fora da conta para sempre",
+    soEmProducao: true,
+    confere: (valor) =>
+      valor.toLowerCase() === "smtp"
+        ? null
+        : "em produção só vale `smtp`; `registro` apenas escreve o e-mail no log e não entrega nada",
+  },
+  {
+    nome: "SMTP_HOST",
+    porque: "é para onde o e-mail é entregue",
+    soEmProducao: true,
+  },
+  {
+    nome: "EMAIL_REMETENTE",
+    porque: "é o endereço que aparece como remetente, e um domínio errado cai em spam",
+    soEmProducao: true,
+  },
+  {
     nome: "PUBLIC_TRACKING_BASE_URL",
     porque: "entra no endereço público dos links e das imagens, e fica gravado no banco",
     soEmProducao: true,
@@ -153,4 +173,17 @@ export function origensPermitidas(): string[] | boolean {
  */
 export function enderecoPublico(): string {
   return process.env.PUBLIC_TRACKING_BASE_URL?.trim() || "http://localhost:3001";
+}
+
+/**
+ * Onde a aplicação web vive, como quem recebe um e-mail a alcança.
+ *
+ * Sai da primeira origem de `WEB_APP_URL`, que já é a lista de origens
+ * confiáveis: um link de recuperação de senha precisa apontar para o mesmo
+ * lugar de onde a sessão é servida, e manter isso em duas variáveis diferentes
+ * seria criar a chance de elas discordarem.
+ */
+export function enderecoDaAplicacao(): string {
+  const origens = process.env.WEB_APP_URL?.split(",").map((o) => o.trim()).filter(Boolean);
+  return origens?.[0] ?? "http://localhost:3000";
 }

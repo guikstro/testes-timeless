@@ -15,6 +15,9 @@ describe("confereAmbiente", () => {
     process.env.REDIS_URL = "redis://x";
     process.env.WEB_APP_URL = "https://app.exemplo.com";
     process.env.PUBLIC_TRACKING_BASE_URL = "https://exemplo.com";
+    process.env.EMAIL_TRANSPORTE = "smtp";
+    process.env.SMTP_HOST = "smtp.exemplo.com";
+    process.env.EMAIL_REMETENTE = "Timeless <nao-responda@exemplo.com>";
     process.env.NODE_ENV = "production";
     jest.clearAllMocks();
   });
@@ -72,6 +75,33 @@ describe("confereAmbiente", () => {
     expect(() => confereAmbiente("api", logger)).toThrow(/PUBLIC_TRACKING_BASE_URL/);
   });
 
+  it("recusa subir em produção com o provedor de registro", () => {
+    process.env.EMAIL_TRANSPORTE = "registro";
+
+    /*
+      O provedor de registro só escreve o e-mail no log.
+
+      Em produção isso significa que quem esquecer a senha fica trancado fora
+      da conta para sempre: o token é gerado, gravado, e nunca alcança
+      ninguém. É uma falha silenciosa, e por isso vira impedimento de subida.
+    */
+    expect(() => confereAmbiente("api", logger)).toThrow(/EMAIL_TRANSPORTE/);
+  });
+
+  it("exige para onde entregar e quem assina", () => {
+    delete process.env.SMTP_HOST;
+    delete process.env.EMAIL_REMETENTE;
+
+    try {
+      confereAmbiente("api", logger);
+      throw new Error("devia ter recusado");
+    } catch (erro) {
+      const mensagem = (erro as Error).message;
+      expect(mensagem).toContain("SMTP_HOST");
+      expect(mensagem).toContain("EMAIL_REMETENTE");
+    }
+  });
+
   it("não cobra do worker o que é só da API", () => {
     delete process.env.WEB_APP_URL;
     delete process.env.PUBLIC_TRACKING_BASE_URL;
@@ -79,10 +109,18 @@ describe("confereAmbiente", () => {
     expect(() => confereAmbiente("worker", logger)).not.toThrow();
   });
 
+  it("cobra o e-mail do worker também, que é quem entrega", () => {
+    process.env.EMAIL_TRANSPORTE = "registro";
+
+    expect(() => confereAmbiente("worker", logger)).toThrow(/EMAIL_TRANSPORTE/);
+  });
+
   it("fora de produção avisa em vez de impedir", () => {
     process.env.NODE_ENV = "development";
     delete process.env.WEB_APP_URL;
     delete process.env.PUBLIC_TRACKING_BASE_URL;
+    delete process.env.SMTP_HOST;
+    process.env.EMAIL_TRANSPORTE = "registro";
 
     expect(() => confereAmbiente("api", logger)).not.toThrow();
     expect((logger as unknown as { warn: jest.Mock }).warn).toHaveBeenCalled();

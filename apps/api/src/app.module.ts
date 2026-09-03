@@ -9,6 +9,7 @@ import { UsuarioOuIpThrottlerGuard } from "./common/throttling/throttler.guard";
 import { PADRAO } from "./common/throttling/limites";
 import { PrismaModule } from "./common/prisma/prisma.module";
 import { EncryptionModule } from "./common/encryption/encryption.module";
+import { EmailModule } from "./common/email/email.module";
 import { AuthModule } from "./auth/auth.module";
 import { OrganizationsModule } from "./organizations/organizations.module";
 import { HealthModule } from "./health/health.module";
@@ -42,6 +43,7 @@ import { GoogleConversionsModule } from "./integrations/google/google-conversion
     }),
     PrismaModule,
     EncryptionModule,
+    EmailModule,
     AuthModule,
     OrganizationsModule,
     HealthModule,

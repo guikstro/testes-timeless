@@ -13,7 +13,9 @@ import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { ChangeEmailDto } from "./dto/change-email.dto";
-import { ehDesenvolvimento } from "../common/configuracao/ambiente";
+import { enderecoDaAplicacao } from "../common/configuracao/ambiente";
+import { EmailService } from "../common/email/email.service";
+import { emailAlterado, recuperacaoDeSenha, senhaAlterada } from "../common/email/mensagens";
 import { AuthenticatedUser, JwtPayload } from "./jwt-payload.interface";
 
 const ACCESS_TOKEN_TTL = "15m";
@@ -36,6 +38,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly email: EmailService,
   ) {}
 
   async register(dto: RegisterDto): Promise<TokenPair> {
@@ -219,10 +222,9 @@ export class AuthService {
 
   /**
    * Always returns success regardless of whether the e-mail exists, to avoid
-   * leaking account existence. The token itself is only surfaced via the
-   * configured EmailProvider (see integrations/email) — see docs/ARCHITECTURE.md.
+   * leaking account existence. O token só sai por e-mail, nunca na resposta.
    */
-  async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string; devToken?: string }> {
+  async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string }> {
     // `deletedAt` no filtro: uma conta desativada não recupera a si mesma de
     // volta para dentro do sistema.
     const user = await this.prisma.user.findFirst({ where: { email: dto.email, deletedAt: null } });
@@ -239,21 +241,19 @@ export class AuthService {
       },
     });
 
-    /*
-      In production this should be delivered via a real EmailProvider
-      (SMTP/SES/Resend). No provider is configured yet — see
-      docs/ARCHITECTURE.md "Pendências".
+    const endereco = `${enderecoDaAplicacao()}/redefinir-senha?token=${rawToken}`;
+    await this.email.enfileirar(recuperacaoDeSenha(user.email, user.name, endereco));
 
-      A pergunta é "isto é desenvolvimento?", e não "isto não é produção?". A
-      diferença não é estilo: a segunda forma responde sim quando `NODE_ENV`
-      não está definida, que era justamente o caso da imagem de produção deste
-      repositório. Nela, esta rota pública devolvia um token de recuperação
-      válido para qualquer e-mail existente, o que é tomada de conta.
+    /*
+      O token nunca volta na resposta, em ambiente nenhum.
+
+      Antes ele voltava quando `NODE_ENV !== "production"`, e a imagem de
+      produção não definia essa variável: esta rota pública entregava um token
+      válido para qualquer e-mail existente. O atalho sumiu junto com a
+      condição. Em desenvolvimento o token continua acessível, mas no log do
+      servidor, por meio do provedor de registro.
     */
-    return {
-      message: "Se o e-mail existir, enviaremos instruções de recuperação.",
-      ...(ehDesenvolvimento() ? { devToken: rawToken } : {}),
-    };
+    return { message: "Se o e-mail existir, enviaremos instruções de recuperação." };
   }
 
   async resetPassword(dto: ResetPasswordDto): Promise<void> {
@@ -316,6 +316,11 @@ export class AuthService {
       }),
     ]);
 
+    // O aviso não é para quem trocou, que já sabe: é para quem NÃO trocou.
+    // É assim que a pessoa descobre no mesmo dia que perdeu a conta, em vez
+    // de na próxima vez que tentar entrar.
+    await this.email.enfileirar(senhaAlterada(user.email, user.name));
+
     return this.issueTokenPair(user.id, quem.organizationId, quem.role);
   }
 
@@ -360,6 +365,17 @@ export class AuthService {
       }
       throw error;
     }
+
+    /*
+      Para o endereço ANTIGO, de propósito.
+
+      Mandar para o novo avisaria justamente quem fez a troca, que já sabe. O
+      endereço antigo é o único canal que ainda alcança o dono legítimo depois
+      de uma tomada de conta, e sem este aviso a troca é completamente
+      silenciosa para ele. Não substitui a confirmação no endereço novo, que
+      continua faltando, mas fecha o pior dos dois buracos.
+    */
+    await this.email.enfileirar(emailAlterado(user.email, user.name, novoEmail));
 
     return this.issueTokenPair(user.id, quem.organizationId, quem.role);
   }

@@ -108,11 +108,40 @@ existisse.
 
 ## Pendências conhecidas
 
-- Envio real de e-mail (recuperação de senha) — hoje `forgotPassword` retorna
-  o token diretamente na resposta quando `NODE_ENV !== production` (modo dev)
-  e não envia nada em produção até um `EmailProvider` real ser configurado.
-  Precisa de credenciais de um provedor (SMTP, Resend, SES etc.) para ligar
-  em produção.
+- Confirmação no endereço novo ao trocar o e-mail de acesso — hoje a troca
+  vale na hora e o endereço **antigo** recebe um aviso de que ela aconteceu,
+  o que permite reagir a uma tomada de conta. Falta o passo que impede um
+  endereço digitado errado de virar o login: confirmar antes de valer.
 - Credenciais Meta (App ID/secret, token de sistema, ad account, pixel) e
   WhatsApp (Cloud API token, phone number id, verify token) — já existem
   como variáveis em `.env.example`, mas nenhuma integração ainda as consome.
+
+## Envio de e-mail
+
+O sistema fala com uma porta (`ProvedorDeEmail`), nunca com um fornecedor.
+Dois adaptadores existem:
+
+- `registro` escreve o e-mail no log e não entrega nada. É o de
+  desenvolvimento, e substituiu um remendo pior: a rota de recuperação
+  devolvia o token dentro da própria resposta HTTP.
+- `smtp` entrega de verdade. SMTP e não a API de um serviço específico
+  porque quase todo provedor (SES, Resend, Postmark, Mailgun) oferece SMTP,
+  então trocar de fornecedor é mudar variável e não código.
+
+A escolha é explícita, por `EMAIL_TRANSPORTE`, e não deduzida do ambiente:
+deduzir significaria que uma variável esquecida troca o comportamento em
+silêncio, e o silêncio aqui é não mandar o e-mail que alguém está esperando
+para voltar a entrar na conta. Em produção, `confereAmbiente` recusa a subida
+com o provedor de registro.
+
+Nada é enviado no caminho da requisição. A mensagem já montada vai para uma
+fila, e o worker entrega com retentativa e recuo. Um servidor de SMTP lento
+não pode segurar a resposta de quem pediu recuperação de senha.
+
+Três e-mails existem hoje, todos em texto puro, porque um e-mail de segurança
+precisa chegar e ser lido em qualquer leitor:
+
+- recuperação de senha, com link de uma hora e uso único;
+- aviso de senha alterada, para o endereço da conta;
+- aviso de e-mail alterado, para o endereço **antigo** — é o único canal que
+  ainda alcança o dono legítimo depois de uma tomada de conta.

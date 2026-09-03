@@ -37,6 +37,10 @@ export function LoginForm() {
   // hidratação com um texto diferente do que ele mandou.
   useEffect(() => setNome(lerUltimoNome()), []);
 
+  // Quem acabou de redefinir a senha chega aqui vindo do link do e-mail, e
+  // sem uma confirmação a tela de entrada parece que a troca não aconteceu.
+  const senhaRedefinida = searchParams.get("senhaRedefinida") === "1";
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
@@ -145,6 +149,12 @@ export function LoginForm() {
             </p>
           )}
 
+          {senhaRedefinida ? (
+            <p role="status" className="animate-rise-in mt-6 border-l-2 border-accent pl-3 text-corpo text-ink-soft">
+              Senha alterada. Entre com a nova.
+            </p>
+          ) : null}
+
           <form onSubmit={handleSubmit} className="mt-10 flex flex-col gap-7">
             <div className="relative">
               <label htmlFor="login-email" className="mb-1.5 block text-apoio font-medium uppercase tracking-[0.12em] text-ink-mute">
@@ -202,6 +212,18 @@ export function LoginForm() {
                 </button>
               </div>
             </div>
+
+            {/*
+              O caminho de volta fica junto do campo de senha, que é onde a
+              pessoa descobre que não lembra dela. Sem este link a recuperação
+              existia no servidor e não existia para quem precisa.
+            */}
+            <Link
+              href="/esqueci-senha"
+              className="focus-ring -mt-4 self-start rounded text-corpo text-ink-mute underline decoration-line underline-offset-4 transition-colors hover:text-ink"
+            >
+              Esqueci a senha
+            </Link>
 
             {error ? (
               <p role="alert" className="animate-rise-in border-l-2 border-red-500 pl-3 text-corpo text-red-600 dark:text-red-400">
