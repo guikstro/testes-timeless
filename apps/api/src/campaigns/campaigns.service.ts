@@ -3,6 +3,7 @@ import { HttpStatus } from "@nestjs/common";
 import { AdPlatform } from "@prisma/client";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { AppException } from "../common/exceptions/app-exception";
+import { isUniqueConstraintError } from "../common/utils/is-unique-constraint-error";
 import { hojeLocal } from "../common/tempo";
 import { CriarCampanhaManualDto, RegistrarGastoDto } from "./dto/manual-campaign.dto";
 import { extraiGastos, leCsv } from "./csv-gasto";
@@ -81,26 +82,41 @@ export class CampaignsService {
   async criarManual(organizationId: string, dto: CriarCampanhaManualDto) {
     const externalId = dto.externalId?.trim() || `manual:${organizationId}:${Date.now()}`;
 
-    const existente = await this.prisma.campaign.findUnique({ where: { externalId } });
+    // Dentro da organização, nunca no sistema inteiro. Com a conferência
+    // global, o conflito revelava que outro cliente usava aquele id e ainda
+    // impedia este de registrar o id verdadeiro da própria campanha.
+    const existente = await this.prisma.campaign.findFirst({ where: { organizationId, externalId } });
     if (existente) {
       throw new AppException(
         "CAMPAIGN_EXISTS",
-        "Já existe uma campanha com esse id nesta plataforma.",
+        "Já existe uma campanha sua com esse id nesta plataforma.",
         HttpStatus.CONFLICT,
       );
     }
 
-    return this.prisma.campaign.create({
-      data: {
-        organizationId,
-        externalId,
-        name: dto.name.trim(),
-        platform: dto.platform,
-        status: "ACTIVE",
-        manual: true,
-        lastSyncedAt: new Date(),
-      },
-    });
+    try {
+      return await this.prisma.campaign.create({
+        data: {
+          organizationId,
+          externalId,
+          name: dto.name.trim(),
+          platform: dto.platform,
+          status: "ACTIVE",
+          manual: true,
+          lastSyncedAt: new Date(),
+        },
+      });
+    } catch (erro) {
+      // A conferência acima e a criação não são atômicas: quem manda de
+      // verdade é a restrição do banco, e dois envios seguidos do mesmo
+      // formulário chegam aqui.
+      if (!isUniqueConstraintError(erro)) throw erro;
+      throw new AppException(
+        "CAMPAIGN_EXISTS",
+        "Já existe uma campanha sua com esse id nesta plataforma.",
+        HttpStatus.CONFLICT,
+      );
+    }
   }
 
   /**

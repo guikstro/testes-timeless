@@ -683,7 +683,17 @@ enum AdPlatform {
 model Campaign {
   id             String    @id @default(uuid())
   organizationId String    @map("organization_id")
-  externalId     String    @unique @map("external_id")
+  /**
+   * O id da campanha na plataforma de origem.
+   *
+   * Único POR ORGANIZAÇÃO, e não no sistema inteiro. Era global, e isso tinha
+   * duas consequências entre clientes diferentes: registrar uma campanha
+   * manual com um id já usado revelava que outra organização o usava, e
+   * bloqueava quem tentasse; e a sincronização, que casa a linha por este
+   * campo, escreveria o nome da campanha de um cliente dentro da linha de
+   * outro, porque o ramo de atualização não mexe na organização.
+   */
+  externalId     String    @map("external_id")
   name           String
   status         String
   platform       AdPlatform @default(META)
@@ -706,6 +716,7 @@ model Campaign {
   adSets       AdSet[]
   spend        AdSpend[]
 
+  @@unique([organizationId, externalId])
   @@index([organizationId])
   @@map("campaigns")
 }
@@ -713,7 +724,8 @@ model Campaign {
 model AdSet {
   id           String   @id @default(uuid())
   campaignId   String   @map("campaign_id")
-  externalId   String   @unique @map("external_id")
+  /** Único dentro da campanha, pelo mesmo motivo do `externalId` dela. */
+  externalId   String   @map("external_id")
   name         String
   status       String
   lastSyncedAt DateTime @map("last_synced_at")
@@ -723,6 +735,7 @@ model AdSet {
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   ads      Ad[]
 
+  @@unique([campaignId, externalId])
   @@index([campaignId])
   @@map("ad_sets")
 }
@@ -730,7 +743,8 @@ model AdSet {
 model Ad {
   id           String   @id @default(uuid())
   adSetId      String   @map("ad_set_id")
-  externalId   String   @unique @map("external_id")
+  /** Único dentro do conjunto, pelo mesmo motivo do `externalId` da campanha. */
+  externalId   String   @map("external_id")
   name         String
   status       String
   lastSyncedAt DateTime @map("last_synced_at")
@@ -739,6 +753,7 @@ model Ad {
 
   adSet AdSet @relation(fields: [adSetId], references: [id], onDelete: Cascade)
 
+  @@unique([adSetId, externalId])
   @@index([adSetId])
   @@map("ads")
 }

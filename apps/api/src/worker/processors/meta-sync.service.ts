@@ -58,7 +58,9 @@ export class MetaSyncService {
 
       for (const campaign of campaigns) {
         await this.prisma.campaign.upsert({
-          where: { externalId: campaign.id },
+          // Dentro da organização: com a chave global, o id ocupado por outro
+          // cliente fazia esta atualização escrever na linha dele.
+          where: { organizationId_externalId: { organizationId, externalId: campaign.id } },
           create: {
             organizationId,
             externalId: campaign.id,
@@ -84,7 +86,7 @@ export class MetaSyncService {
         const campaignId = campaignIdByExternalId.get(adSet.campaign_id);
         if (!campaignId) continue; // ad set for a campaign we don't know about — skip, don't guess
         await this.prisma.adSet.upsert({
-          where: { externalId: adSet.id },
+          where: { campaignId_externalId: { campaignId, externalId: adSet.id } },
           create: { campaignId, externalId: adSet.id, name: adSet.name, status: adSet.status, lastSyncedAt: now },
           update: { campaignId, name: adSet.name, status: adSet.status, lastSyncedAt: now },
         });
@@ -97,7 +99,7 @@ export class MetaSyncService {
         const adSetId = adSetIdByExternalId.get(ad.adset_id);
         if (!adSetId) continue;
         await this.prisma.ad.upsert({
-          where: { externalId: ad.id },
+          where: { adSetId_externalId: { adSetId, externalId: ad.id } },
           create: { adSetId, externalId: ad.id, name: ad.name, status: ad.status, lastSyncedAt: now },
           update: { adSetId, name: ad.name, status: ad.status, lastSyncedAt: now },
         });

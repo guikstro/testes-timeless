@@ -83,17 +83,20 @@ describe("MetaSyncService", () => {
     await service.sync("org-1");
 
     expect(prisma.campaign.upsert).toHaveBeenCalledWith({
-      where: { externalId: "c1" },
+      where: { organizationId_externalId: { organizationId: "org-1", externalId: "c1" } },
       create: expect.objectContaining({ organizationId: "org-1", externalId: "c1", name: "Direito Trabalhista" }),
       update: expect.objectContaining({ name: "Direito Trabalhista", status: "ACTIVE" }),
     });
     expect(prisma.adSet.upsert).toHaveBeenCalledWith({
-      where: { externalId: "as1" },
+      // Dentro da campanha, e não pelo id externo solto: ele era único no
+      // sistema inteiro, e um id ocupado por outro cliente fazia esta
+      // atualização escrever na linha dele.
+      where: { campaignId_externalId: { campaignId: "internal-campaign-1", externalId: "as1" } },
       create: expect.objectContaining({ campaignId: "internal-campaign-1", externalId: "as1" }),
       update: expect.objectContaining({ campaignId: "internal-campaign-1" }),
     });
     expect(prisma.ad.upsert).toHaveBeenCalledWith({
-      where: { externalId: "ad1" },
+      where: { adSetId_externalId: { adSetId: "internal-adset-1", externalId: "ad1" } },
       create: expect.objectContaining({ adSetId: "internal-adset-1", externalId: "ad1" }),
       update: expect.objectContaining({ adSetId: "internal-adset-1" }),
     });

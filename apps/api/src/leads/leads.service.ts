@@ -213,14 +213,15 @@ export class LeadsService {
     };
 
     if (ids.adId) {
-      const ad = await this.prisma.ad.findUnique({
-        where: { externalId: ids.adId },
+      // O escopo entra na própria consulta, e não numa conferência depois.
+      // Ad e AdSet não carregam organizationId: o vínculo existe só na
+      // campanha, e é por ela que a busca desce. Filtrar aqui é o que impede
+      // um id de outra conta de revelar o nome do anúncio dela.
+      const ad = await this.prisma.ad.findFirst({
+        where: { externalId: ids.adId, adSet: { campaign: { organizationId } } },
         include: { adSet: { include: { campaign: true } } },
       });
-      // Ad e AdSet não carregam organizationId — o vínculo com a organização
-      // existe só na campanha. Verificar aqui é o que impede um id de outra
-      // conta de revelar o nome do anúncio dela.
-      if (ad && ad.adSet.campaign.organizationId === organizationId) {
+      if (ad) {
         return {
           campaign: { externalId: ad.adSet.campaign.externalId, name: ad.adSet.campaign.name },
           adSet: { externalId: ad.adSet.externalId, name: ad.adSet.name },
@@ -230,8 +231,10 @@ export class LeadsService {
     }
 
     if (ids.campaignId) {
-      const campaign = await this.prisma.campaign.findUnique({ where: { externalId: ids.campaignId } });
-      if (campaign && campaign.organizationId === organizationId) {
+      const campaign = await this.prisma.campaign.findFirst({
+        where: { externalId: ids.campaignId, organizationId },
+      });
+      if (campaign) {
         return { ...rawIds, campaign: { externalId: campaign.externalId, name: campaign.name } };
       }
     }

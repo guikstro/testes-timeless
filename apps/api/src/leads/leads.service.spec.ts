@@ -13,8 +13,8 @@ describe("LeadsService", () => {
       auditLog: { create: jest.fn() },
       whatsAppConnection: { findUnique: jest.fn() },
       conversation: { findFirst: jest.fn(), update: jest.fn() },
-      ad: { findUnique: jest.fn() },
-      campaign: { findUnique: jest.fn() },
+      ad: { findFirst: jest.fn() },
+      campaign: { findFirst: jest.fn() },
       organization: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const conversionEvents = {
@@ -130,7 +130,7 @@ describe("LeadsService", () => {
         firstContactAt,
         attribution: { evidence: null, trackingClick: { campaignId: null, adsetId: null, adId: "ad-ext" } },
       });
-      prisma.ad.findUnique.mockResolvedValue({
+      prisma.ad.findFirst.mockResolvedValue({
         externalId: "ad-ext",
         name: "Criativo Vídeo 15s",
         adSet: {
@@ -142,8 +142,14 @@ describe("LeadsService", () => {
 
       const result = await service.findOne("org-1", "lead-1");
 
-      // Uma consulta só entrega anúncio, conjunto e campanha.
-      expect(prisma.ad.findUnique).toHaveBeenCalledTimes(1);
+      // Uma consulta só entrega anúncio, conjunto e campanha, e ela já desce
+      // pela campanha para nunca alcançar a conta de outro cliente.
+      expect(prisma.ad.findFirst).toHaveBeenCalledTimes(1);
+      expect(prisma.ad.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { externalId: "ad-ext", adSet: { campaign: { organizationId: "org-1" } } },
+        }),
+      );
       expect(result.adReferences).toEqual({
         ad: { externalId: "ad-ext", name: "Criativo Vídeo 15s" },
         adSet: { externalId: "set-ext", name: "Público Frio" },
@@ -164,15 +170,12 @@ describe("LeadsService", () => {
         firstContactAt,
         attribution: { evidence: null, trackingClick: { campaignId: null, adsetId: null, adId: "ad-ext" } },
       });
-      prisma.ad.findUnique.mockResolvedValue({
-        externalId: "ad-ext",
-        name: "Criativo do concorrente",
-        adSet: {
-          externalId: "set-ext",
-          name: "Não deveria aparecer",
-          campaign: { externalId: "camp-ext", name: "Nem isto", organizationId: "outra-org" },
-        },
-      });
+      // O anúncio existe, mas é de outra organização: a consulta não o
+      // alcança, porque o escopo entra nela em vez de virar conferência
+      // depois. `externalId` deixou de ser único no sistema inteiro
+      // justamente para este id poder existir nas duas contas.
+      prisma.ad.findFirst.mockResolvedValue(null);
+      prisma.campaign.findFirst.mockResolvedValue(null);
 
       const result = await service.findOne("org-1", "lead-1");
 
@@ -190,7 +193,7 @@ describe("LeadsService", () => {
         firstContactAt,
         attribution: { evidence: { adId: "ad-nunca-sincronizado" }, trackingClick: null },
       });
-      prisma.ad.findUnique.mockResolvedValue(null);
+      prisma.ad.findFirst.mockResolvedValue(null);
 
       const result = await service.findOne("org-1", "lead-1");
 
@@ -208,8 +211,8 @@ describe("LeadsService", () => {
 
       await service.findOne("org-1", "lead-1");
 
-      expect(prisma.ad.findUnique).not.toHaveBeenCalled();
-      expect(prisma.campaign.findUnique).not.toHaveBeenCalled();
+      expect(prisma.ad.findFirst).not.toHaveBeenCalled();
+      expect(prisma.campaign.findFirst).not.toHaveBeenCalled();
     });
   });
 

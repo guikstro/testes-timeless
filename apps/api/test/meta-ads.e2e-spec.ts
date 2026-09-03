@@ -168,11 +168,17 @@ describe("Meta Ads sync (e2e, against a local Graph API double)", () => {
     expect(campaigns.map((c) => c.name).sort()).toEqual(["Campanha Instagram", "Direito Trabalhista"]);
 
     const campaign1 = campaigns.find((c) => c.externalId === "c1")!;
-    const adSet = await waitFor(() => prisma.adSet.findUnique({ where: { externalId: "as1" } }));
+    // Pelo par, e não só pelo id externo: ele passou a ser único dentro da
+    // campanha, porque global ele era um espaço compartilhado entre clientes.
+    const adSet = await waitFor(() =>
+      prisma.adSet.findUnique({ where: { campaignId_externalId: { campaignId: campaign1.id, externalId: "as1" } } }),
+    );
     expect(adSet.campaignId).toBe(campaign1.id);
     expect(adSet.name).toBe("Fortaleza 25-55");
 
-    const ad = await waitFor(() => prisma.ad.findUnique({ where: { externalId: "ad1" } }));
+    const ad = await waitFor(() =>
+      prisma.ad.findUnique({ where: { adSetId_externalId: { adSetId: adSet.id, externalId: "ad1" } } }),
+    );
     expect(ad.adSetId).toBe(adSet.id);
     expect(ad.name).toBe("Rescisão Indireta - Vídeo 01");
 
