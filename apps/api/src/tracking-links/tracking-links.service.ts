@@ -4,10 +4,16 @@ import { PrismaService } from "../common/prisma/prisma.service";
 import { AppException } from "../common/exceptions/app-exception";
 import { generateTrackingCode } from "../common/utils/generate-code";
 import { PaginatedResult, PaginationQueryDto } from "../common/dto/pagination.dto";
+import { enderecoPublico } from "../common/configuracao/ambiente";
 import { CreateTrackingLinkDto } from "./dto/create-tracking-link.dto";
 import { UpdateTrackingLinkDto } from "./dto/update-tracking-link.dto";
 
 const CODE_GENERATION_MAX_ATTEMPTS = 5;
+
+/** O link como a lista o mostra: o registro mais o endereço já montado. */
+export type LinkListado = Prisma.TrackingLinkGetPayload<{
+  include: { _count: { select: { clicks: true } } };
+}> & { publicUrl: string };
 
 @Injectable()
 export class TrackingLinksService {
@@ -36,7 +42,7 @@ export class TrackingLinksService {
   async list(
     organizationId: string,
     pagination: PaginationQueryDto,
-  ): Promise<PaginatedResult<Prisma.TrackingLinkGetPayload<{ include: { _count: { select: { clicks: true } } } }>>> {
+  ): Promise<PaginatedResult<LinkListado>> {
     const offset = pagination.offset ?? 0;
     const limit = pagination.limit ?? 20;
 
@@ -51,7 +57,21 @@ export class TrackingLinksService {
       this.prisma.trackingLink.count({ where: { organizationId, deletedAt: null } }),
     ]);
 
-    return { items, total, offset, limit };
+    /*
+      O endereço público sai montado daqui.
+
+      Antes a tela montava sozinha, com a própria cópia da variável e o
+      próprio padrão de localhost. Duas cópias da mesma configuração, e a da
+      tela era a que ia parar dentro de um anúncio: um `localhost` copiado
+      para uma campanha manda todo mundo para lugar nenhum, e o dinheiro é
+      gasto do mesmo jeito.
+    */
+    return { items: items.map((item) => ({ ...item, publicUrl: this.enderecoDoLink(item.code) })), total, offset, limit };
+  }
+
+  /** Como quem está de fora enxerga este link. */
+  private enderecoDoLink(code: string): string {
+    return `${enderecoPublico()}/r/${code}`;
   }
 
   async findOne(organizationId: string, id: string) {

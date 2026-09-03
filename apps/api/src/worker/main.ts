@@ -2,6 +2,7 @@ import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { Logger } from "@nestjs/common";
 import { WorkerModule } from "./worker.module";
+import { confereAmbiente } from "../common/configuracao/ambiente";
 
 /**
  * Standalone BullMQ worker process. Runs the same queue processors used by
@@ -10,6 +11,9 @@ import { WorkerModule } from "./worker.module";
  * docs/ARCHITECTURE.md.
  */
 async function bootstrap() {
+  // Mesma conferência da API, com as exigências deste processo.
+  confereAmbiente("worker");
+
   const app = await NestFactory.createApplicationContext(WorkerModule, { bufferLogs: true });
 
   /*

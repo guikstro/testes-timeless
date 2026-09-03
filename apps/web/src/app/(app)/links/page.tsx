@@ -14,14 +14,14 @@ interface TrackingLinkListItem {
   defaultMedium: string | null;
   createdAt: string;
   _count: { clicks: number };
+  /** Endereço já montado pela API, pronto para colar no anúncio. */
+  publicUrl: string;
 }
 
 interface PaginatedResult<T> {
   items: T[];
   total: number;
 }
-
-const PUBLIC_TRACKING_BASE_URL = process.env.PUBLIC_TRACKING_BASE_URL ?? "http://localhost:3001";
 
 export default async function LinksPage() {
   const { items } = await apiFetch<PaginatedResult<TrackingLinkListItem>>("/tracking-links?limit=50");
@@ -68,7 +68,10 @@ export default async function LinksPage() {
                 </thead>
                 <tbody>
                   {items.map((item) => {
-                    const url = `${PUBLIC_TRACKING_BASE_URL}/r/${item.code}`;
+                    // Montado pela API, que é quem sabe o endereço público
+                    // deste sistema. Duas cópias da mesma configuração já
+                    // colocaram um localhost dentro de anúncio.
+                    const url = item.publicUrl;
                     return (
                       <tr key={item.id} className="border-b border-line/60 transition-colors last:border-0 hover:bg-panel-soft/50">
                         <td className="px-4 py-3">

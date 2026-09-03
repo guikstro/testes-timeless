@@ -6,6 +6,7 @@ import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { UpdateOrganizationDto } from "./dto/update-organization.dto";
 import { ArmazenamentoService } from "./upload/armazenamento.service";
 import { ErroDaImagem, validaImagem } from "./upload/imagem-enviada";
+import { enderecoPublico } from "../common/configuracao/ambiente";
 
 @Injectable()
 export class OrganizationsService {
@@ -86,7 +87,10 @@ export class OrganizationsService {
     }
 
     const nome = await this.armazenamento.guardar(resultado.imagem);
-    const base = process.env.PUBLIC_TRACKING_BASE_URL ?? "http://localhost:3001";
+    // O endereço fica gravado no banco: um localhost aqui continua errado
+    // depois de a variável ser corrigida. A conferência de ambiente barra
+    // isso na subida, em produção.
+    const base = enderecoPublico();
 
     const atualizada = await this.prisma.organization.update({
       where: { id: organizationId },

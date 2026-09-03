@@ -15,7 +15,10 @@ export class EncryptionService {
 
   constructor() {
     const hexKey = process.env.TOKEN_ENCRYPTION_KEY;
-    if (!hexKey || hexKey.length !== 64) {
+    // Hexadecimal, não só o tamanho: sessenta e quatro caracteres quaisquer
+    // passavam daqui e viravam uma chave curta silenciosamente, e o erro só
+    // aparecia depois, no `createCipheriv`, dizendo outra coisa.
+    if (!hexKey || !/^[0-9a-fA-F]{64}$/.test(hexKey)) {
       throw new Error(
         "TOKEN_ENCRYPTION_KEY must be set to a 64-character hex string (32 bytes). Generate with: openssl rand -hex 32",
       );

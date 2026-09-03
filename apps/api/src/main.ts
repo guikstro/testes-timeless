@@ -5,8 +5,13 @@ import { ValidationPipe, Logger, RequestMethod } from "@nestjs/common";
 import helmet from "helmet";
 import { AppModule } from "./app.module";
 import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
+import { confereAmbiente, origensPermitidas } from "./common/configuracao/ambiente";
 
 async function bootstrap() {
+  // Antes de tudo: uma variável faltando precisa impedir a subida, e não virar
+  // um padrão silencioso que quebra semanas depois na tela de outra pessoa.
+  confereAmbiente("api");
+
   // rawBody: true preserves req.rawBody so the WhatsApp webhook can verify
   // Meta's HMAC signature over the exact bytes received (see
   // whatsapp-webhook/verify-signature.ts) — a re-serialized JSON body
@@ -44,7 +49,10 @@ async function bootstrap() {
 
   app.use(helmet());
   app.enableCors({
-    origin: process.env.WEB_APP_URL?.split(",") ?? true,
+    // Nunca `true` em produção: liberar qualquer origem junto de
+    // `credentials: true` é o oposto do que se quer, e antes disso bastava
+    // esquecer uma variável para chegar lá. Ver `origensPermitidas`.
+    origin: origensPermitidas(),
     credentials: true,
   });
 
