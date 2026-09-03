@@ -5,6 +5,8 @@ describe("AnalyticsService", () => {
   function buildService() {
     const prisma = {
       lead: { findMany: jest.fn().mockResolvedValue([]) },
+      // O atendimento vem agregado do banco, não junto dos leads.
+      $queryRaw: jest.fn().mockResolvedValue([]),
       whatsAppConnection: { findUnique: jest.fn().mockResolvedValue(null) },
       metaConnection: { findUnique: jest.fn().mockResolvedValue(null) },
       trackingLink: { count: jest.fn().mockResolvedValue(0) },
@@ -13,6 +15,59 @@ describe("AnalyticsService", () => {
     };
     return { service: new AnalyticsService(prisma as unknown as PrismaService), prisma };
   }
+
+  it("não pede mensagem nenhuma junto dos leads", async () => {
+    const { service, prisma } = buildService();
+
+    await service.overview("org-1", 30);
+
+    /*
+      A regressão que motivou a mudança.
+
+      A tela trazia toda mensagem de toda conversa de todo lead da janela para
+      dentro do Node, para responder duas perguntas que cabem em três datas.
+      O custo da tela mais acessada do produto crescia com o volume de
+      conversa, e um único lead conversador dominava a consulta inteira.
+    */
+    const argumentos = prisma.lead.findMany.mock.calls[0][0] as { select: Record<string, unknown> };
+    expect(argumentos.select).not.toHaveProperty("conversations");
+    expect(argumentos.select.id).toBe(true);
+  });
+
+  it("mede a primeira resposta pelo agregado, com a mesma conta da ficha do lead", async () => {
+    const { service, prisma } = buildService();
+    const recebido = new Date("2026-01-01T12:00:00Z");
+    const respondido = new Date("2026-01-01T12:02:30Z");
+    prisma.lead.findMany.mockResolvedValueOnce([
+      { id: "lead-1", status: "NEW", firstContactAt: recebido, qualifiedAt: null, wonAt: null, meetingScheduledAt: null, disqualifiedAt: null, sale: null, attribution: null },
+    ]);
+    prisma.$queryRaw.mockResolvedValue([
+      { leadId: "lead-1", primeiroRecebido: recebido, primeiraResposta: respondido, ultimoSentido: "OUTBOUND" },
+    ]);
+
+    const resultado = await service.overview("org-1", 30);
+
+    expect(resultado.atendimento.medianaPrimeiraRespostaSegundos).toBe(150);
+    expect(resultado.atendimento.respondidos).toBe(1);
+    expect(resultado.atendimento.semResposta).toBe(0);
+    expect(resultado.atendimento.aguardando).toBe(0);
+  });
+
+  it("conta como aguardando o lead cuja última mensagem é dele", async () => {
+    const { service, prisma } = buildService();
+    const recebido = new Date("2026-01-01T12:00:00Z");
+    prisma.lead.findMany.mockResolvedValueOnce([
+      { id: "lead-1", status: "NEW", firstContactAt: recebido, qualifiedAt: null, wonAt: null, meetingScheduledAt: null, disqualifiedAt: null, sale: null, attribution: null },
+    ]);
+    prisma.$queryRaw.mockResolvedValue([
+      { leadId: "lead-1", primeiroRecebido: recebido, primeiraResposta: null, ultimoSentido: "INBOUND" },
+    ]);
+
+    const resultado = await service.overview("org-1", 30);
+
+    expect(resultado.atendimento.aguardando).toBe(1);
+    expect(resultado.atendimento.semResposta).toBe(1);
+  });
 
   it("escopa a consulta à organização de quem pediu", async () => {
     const { service, prisma } = buildService();

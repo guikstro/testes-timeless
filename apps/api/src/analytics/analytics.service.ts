@@ -14,7 +14,8 @@ import {
   OriginBucket,
   OverviewTotals,
 } from "./overview-aggregation";
-import { computeLeadMetrics } from "../leads/lead-metrics";
+import { MetricsMessage, computeLeadMetrics } from "../leads/lead-metrics";
+import { AtendimentoDoLead, atendimentoPorLead } from "./atendimento-por-lead";
 import { expedienteDa, SELECAO_DE_EXPEDIENTE } from "../common/expediente-da-organizacao";
 import { extractAdIds } from "../leads/ad-references";
 import { fimDoDia, inicioDoDia } from "../common/tempo";
@@ -58,6 +59,26 @@ export interface DesempenhoDeCampanhas {
   totais: { gastoCentavos: number; leads: number; vendas: number; receitaCentavos: number };
 }
 
+/**
+ * As duas mensagens que o cálculo de primeira resposta realmente olha.
+ *
+ * Reconstruídas a partir das datas agregadas, em vez de reimplementar a
+ * conta aqui: assim o tempo de resposta da tela e o da ficha do lead saem da
+ * mesma função, incluindo a proteção contra intervalo negativo e o desconto
+ * de expediente. Duas cópias da mesma regra envelheceriam separadas.
+ */
+function mensagensDoAtendimento(atendimento: AtendimentoDoLead | undefined): MetricsMessage[] {
+  if (!atendimento) return [];
+  const mensagens: MetricsMessage[] = [];
+  if (atendimento.primeiroRecebido) {
+    mensagens.push({ direction: "INBOUND", timestamp: atendimento.primeiroRecebido, outboundStatus: null });
+  }
+  if (atendimento.primeiraResposta) {
+    mensagens.push({ direction: "OUTBOUND", timestamp: atendimento.primeiraResposta, outboundStatus: "SENT" });
+  }
+  return mensagens;
+}
+
 @Injectable()
 export class AnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -96,15 +117,9 @@ export class AnalyticsService {
       // mensagens, não ao de leads.
       this.prisma.lead.findMany({
         where: { organizationId, firstContactAt: { gte: from, lte: to } },
-        select: {
-          ...selecao,
-          // As mensagens entram só para o tempo de resposta, e só do período
-          // atual: comparar mediana de atendimento entre períodos dobraria o
-          // custo da consulta para um número que ninguém pediu.
-          conversations: {
-            select: { messages: { select: { direction: true, timestamp: true, outboundStatus: true }, orderBy: { timestamp: "asc" } } },
-          },
-        },
+        // O `id` entra para o atendimento ser buscado depois, agregado no
+        // banco, em vez de vir junto como a conversa inteira.
+        select: { ...selecao, id: true },
       }),
       this.prisma.lead.findMany({
         where: { organizationId, firstContactAt: { gte: anteriorDe, lte: anteriorAte } },
@@ -131,18 +146,28 @@ export class AnalyticsService {
     const aggregationLeads = leads as unknown as AggregationLead[];
     const totals = aggregateTotals(aggregationLeads);
 
+    /*
+      As mensagens não vêm mais para cá.
+
+      Esta tela usava toda mensagem de toda conversa de todo lead da janela
+      para responder duas perguntas: quanto a equipe demorou para responder, e
+      se a bola está com ela agora. Na base atual isso é treze vezes mais
+      linha do que lead, e um único lead conversador domina a tela inteira.
+      Agora o banco devolve três datas por lead, e a conta continua sendo
+      feita pela mesma função da ficha do lead, com as duas mensagens que ela
+      de fato olha. Assim o número da tela e o da ficha não podem divergir.
+    */
+    const atendimentoDosLeads = await atendimentoPorLead(this.prisma, leads.map((lead) => lead.id));
+
     const tempos = leads.map((lead) => {
-      const mensagens = lead.conversations.flatMap((conversa) => conversa.messages);
-      return computeLeadMetrics(lead, mensagens, null, expediente).firstResponseSeconds;
+      const atendimento = atendimentoDosLeads.get(lead.id);
+      return computeLeadMetrics(lead, mensagensDoAtendimento(atendimento), null, expediente).firstResponseSeconds;
     });
     const respondidos = tempos.filter((t) => t !== null).length;
 
-    const aguardando = leads.filter((lead) => {
-      const ultimas = lead.conversations
-        .map((conversa) => conversa.messages[conversa.messages.length - 1])
-        .filter(Boolean);
-      return ultimas.some((mensagem) => mensagem.direction === "INBOUND");
-    }).length;
+    const aguardando = leads.filter(
+      (lead) => atendimentoDosLeads.get(lead.id)?.ultimoSentido === "INBOUND",
+    ).length;
 
     return {
       period: { days, from: from.toISOString(), to: to.toISOString() },
