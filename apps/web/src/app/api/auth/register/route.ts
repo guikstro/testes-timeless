@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cabecalhoDoIp } from "@/lib/ip-do-cliente";
 import {
   ACCESS_TOKEN_COOKIE,
   ACCESS_TOKEN_MAX_AGE,
@@ -14,7 +15,9 @@ export async function POST(request: NextRequest) {
 
   const backendResponse = await fetch(`${API_URL}/auth/register`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    // O IP de quem está tentando entrar, e não o do contêiner do site: sem
+    // ele o limite de tentativas contaria todos os clientes num balde só.
+    headers: { "Content-Type": "application/json", ...cabecalhoDoIp(request) },
     body: JSON.stringify(payload),
     cache: "no-store",
   });

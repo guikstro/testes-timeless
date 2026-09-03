@@ -1,5 +1,11 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { APP_GUARD } from "@nestjs/core";
+import { ThrottlerModule } from "@nestjs/throttler";
+import { RedisThrottlerStorage } from "./common/throttling/redis-throttler.storage";
+import { ThrottlingModule } from "./common/throttling/throttling.module";
+import { UsuarioOuIpThrottlerGuard } from "./common/throttling/throttler.guard";
+import { PADRAO } from "./common/throttling/limites";
 import { PrismaModule } from "./common/prisma/prisma.module";
 import { EncryptionModule } from "./common/encryption/encryption.module";
 import { AuthModule } from "./auth/auth.module";
@@ -22,6 +28,16 @@ import { GoogleConversionsModule } from "./integrations/google/google-conversion
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    /*
+      Um teto só, definido aqui, e apertado rota a rota com `@Throttle`.
+      Declarar vários tetos nomeados no módulo faria todos valerem para toda
+      requisição, e o teto de login passaria a valer para o dashboard.
+    */
+    ThrottlingModule,
+    ThrottlerModule.forRootAsync({
+      inject: [RedisThrottlerStorage],
+      useFactory: (storage: RedisThrottlerStorage) => ({ throttlers: [PADRAO], storage }),
+    }),
     PrismaModule,
     EncryptionModule,
     AuthModule,
@@ -40,6 +56,11 @@ import { GoogleConversionsModule } from "./integrations/google/google-conversion
     NotificationsStreamModule,
     ConversationsModule,
     GoogleConversionsModule,
+  ],
+  providers: [
+    // Global: uma rota nova nasce protegida, e abrir exceção exige escrever
+    // `@SkipThrottle` de propósito, que é visível na revisão.
+    { provide: APP_GUARD, useClass: UsuarioOuIpThrottlerGuard },
   ],
 })
 export class AppModule {}

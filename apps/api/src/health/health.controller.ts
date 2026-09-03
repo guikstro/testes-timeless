@@ -1,4 +1,5 @@
 import { Controller, Get } from "@nestjs/common";
+import { SkipThrottle } from "@nestjs/throttler";
 import {
   HealthCheck,
   HealthCheckError,
@@ -9,6 +10,8 @@ import {
 import Redis from "ioredis";
 import { PrismaService } from "../common/prisma/prisma.service";
 
+// O monitoramento consulta isto o tempo todo; limitar seria criar alarme falso.
+@SkipThrottle()
 @Controller("health")
 export class HealthController {
   constructor(

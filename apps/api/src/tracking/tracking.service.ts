@@ -25,7 +25,20 @@ export class TrackingService {
    * missing evidence in the query string — only an unknown link code is an
    * error here, since every other field is optional by nature (section 10).
    */
-  async recordClick(code: string, context: RecordClickContext): Promise<{ destinationUrl: string }> {
+  async recordClick(
+    code: string,
+    context: RecordClickContext,
+    /**
+     * Falso quando o IP passou do teto de cliques por minuto.
+     *
+     * Deixa de contar sem deixar de redirecionar. O dano de um endereço
+     * público sem limite não é carga, é número inventado: quem enche a tabela
+     * de cliques falsos faz o custo por lead do cliente despencar no
+     * relatório. Já devolver 429 quebraria a jornada de quem clicou no
+     * anúncio de verdade, que é justamente quem precisa chegar ao WhatsApp.
+     */
+    registrar = true,
+  ): Promise<{ destinationUrl: string }> {
     const link = await this.prisma.trackingLink.findFirst({
       where: { code, deletedAt: null },
     });
@@ -43,6 +56,10 @@ export class TrackingService {
     const attributionToken = generateTrackingCode();
     const redirectUrl = buildWhatsAppRedirectUrl(link.destinationUrl, attributionToken);
     const tokenWasEmbedded = redirectUrl !== link.destinationUrl;
+
+    if (!registrar) {
+      return { destinationUrl: redirectUrl };
+    }
 
     await this.prisma.trackingClick.create({
       data: {

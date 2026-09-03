@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, RawBodyRequest, Req, Res } from "@nestjs/common";
+import { SkipThrottle } from "@nestjs/throttler";
 import { Request, Response } from "express";
 import { WhatsAppWebhookService } from "./whatsapp-webhook.service";
 
@@ -7,6 +8,13 @@ import { WhatsAppWebhookService } from "./whatsapp-webhook.service";
  * exclusion). Authenticity is enforced via HMAC signature (POST) and the
  * verify token (GET handshake), not a session.
  */
+/*
+  Sem teto de requisição: o tráfego aqui vem dos servidores da Meta e da
+  Evolution, de poucos endereços e em rajada. Um limite por IP descartaria
+  mensagem de cliente achando que é abuso, e a proteção correta aqui é outra,
+  a conferência da assinatura.
+*/
+@SkipThrottle()
 @Controller("whatsapp-webhook")
 export class WhatsAppWebhookController {
   constructor(private readonly webhookService: WhatsAppWebhookService) {}

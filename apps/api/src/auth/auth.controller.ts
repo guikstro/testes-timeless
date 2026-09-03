@@ -1,5 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, UseGuards } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
+import { AUTENTICACAO, CREDENCIAL } from "../common/throttling/limites";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { AuthenticatedUser } from "./jwt-payload.interface";
 import { AuthService } from "./auth.service";
@@ -28,11 +30,13 @@ export class AuthController {
     return this.authService.getSession(user);
   }
 
+  @Throttle({ default: AUTENTICACAO })
   @Post("register")
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
 
+  @Throttle({ default: AUTENTICACAO })
   @Post("login")
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: LoginDto) {
@@ -56,12 +60,14 @@ export class AuthController {
     await this.authService.logout(dto.refreshToken);
   }
 
+  @Throttle({ default: AUTENTICACAO })
   @Post("forgot-password")
   @HttpCode(HttpStatus.OK)
   forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto);
   }
 
+  @Throttle({ default: AUTENTICACAO })
   @Post("reset-password")
   @HttpCode(HttpStatus.NO_CONTENT)
   async resetPassword(@Body() dto: ResetPasswordDto): Promise<void> {
@@ -72,6 +78,7 @@ export class AuthController {
    * Devolvem um par novo de tokens: a troca derruba as outras sessões, e sem
    * o par novo quem trocou seria expulso pela própria ação.
    */
+  @Throttle({ default: CREDENCIAL })
   @Post("change-password")
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
@@ -79,6 +86,7 @@ export class AuthController {
     return this.authService.changePassword(user, dto);
   }
 
+  @Throttle({ default: CREDENCIAL })
   @Patch("email")
   @UseGuards(JwtAuthGuard)
   changeEmail(@CurrentUser() user: AuthenticatedUser, @Body() dto: ChangeEmailDto) {

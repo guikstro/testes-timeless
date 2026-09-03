@@ -27,6 +27,21 @@ async function bootstrap() {
   // público num vetor de exaustão de memória.
   app.useBodyParser("json", { limit: "10mb" });
 
+  /*
+    Quantos proxies existem na frente da API, para o IP do visitante ser o
+    real e não o do balanceador.
+
+    Precisa ser configurado de propósito, e não ligado por padrão: confiar no
+    cabeçalho `X-Forwarded-For` sem proxy na frente deixa qualquer pessoa
+    escrever o IP que quiser, e o limite de requisições vira enfeite, porque
+    cada tentativa parece vir de um endereço novo. Desligado, o limite conta
+    pelo IP do socket, que ninguém falsifica.
+  */
+  const proxiesConfiaveis = Number(process.env.TRUST_PROXY ?? 0);
+  if (Number.isInteger(proxiesConfiaveis) && proxiesConfiaveis > 0) {
+    app.set("trust proxy", proxiesConfiaveis);
+  }
+
   app.use(helmet());
   app.enableCors({
     origin: process.env.WEB_APP_URL?.split(",") ?? true,
