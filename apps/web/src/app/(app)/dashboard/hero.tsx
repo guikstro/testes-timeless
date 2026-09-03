@@ -1,8 +1,6 @@
 import { ReactNode } from "react";
 import { Delta } from "@/components/ui/delta";
-import { GrupoDePilulas } from "@/components/ui/pill-group";
 import { formatCentsAsBRL } from "@/lib/currency";
-import { formataDia } from "@/lib/periodo";
 
 /**
  * A abertura da tela.
@@ -16,20 +14,12 @@ import { formataDia } from "@/lib/periodo";
  * hierarquia de uma grade de caixas.
  */
 export function Hero({
-  dias,
-  periodos,
-  de,
-  ate,
   leads,
   deltaLeads,
   receitaCentavos,
   deltaReceita,
   secundarios,
 }: {
-  dias: number;
-  periodos: number[];
-  de: string;
-  ate: string;
   leads: number;
   deltaLeads: number | null;
   receitaCentavos: number;
@@ -45,25 +35,7 @@ export function Hero({
         className="pointer-events-none absolute -right-[10%] -top-[60%] h-[130%] w-[70%] rounded-full opacity-70 blur-[70px] [background:radial-gradient(closest-side,rgb(var(--accent)/0.22),transparent)]"
       />
 
-      <div className="relative flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-rotulo font-semibold uppercase tracking-[0.14em] text-ink-mute">
-            {formataDia(de)} a {formataDia(ate)}
-          </p>
-          <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink">Dashboard</h1>
-        </div>
-
-        <GrupoDePilulas
-          ativo={String(dias)}
-          opcoes={periodos.map((opcao) => ({
-            chave: String(opcao),
-            rotulo: `${opcao} dias`,
-            href: `/dashboard?days=${opcao}`,
-          }))}
-        />
-      </div>
-
-      <div className="relative mt-7 flex flex-wrap items-end gap-x-12 gap-y-6">
+      <div className="relative flex flex-wrap items-end gap-x-12 gap-y-6">
         <Numero rotulo="Leads no período" valor={leads.toLocaleString("pt-BR")} delta={deltaLeads} />
         <Numero
           rotulo="Receita atribuída"

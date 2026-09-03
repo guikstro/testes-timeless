@@ -1,311 +1,138 @@
 import Link from "next/link";
 import { AtualizaAoVivo } from "@/components/notifications/atualiza-ao-vivo";
+import { GrupoDePilulas } from "@/components/ui/pill-group";
 import { apiFetch } from "@/lib/api-client";
-import { formatCentsAsBRL } from "@/lib/currency";
-import { Hero } from "./hero";
-import { Funil3D } from "./funil-3d";
-import { formatDuration, responseSpeedTone, SPEED_TONE_CLASSES } from "@/lib/duration";
-import { ArrivalHeatmap } from "./arrival-heatmap";
-import { OriginTable } from "./origin-table";
-import { StatCard } from "./stat-card";
-import { DailyPoint, LeadsAreaChart } from "./leads-area-chart";
+import { formataDia } from "@/lib/periodo";
+import { AbaVisaoGeral } from "./aba-visao-geral";
+import { AbaFunil } from "./aba-funil";
+import { AbaOrigem } from "./aba-origem";
+import { AbaAtendimento } from "./aba-atendimento";
+import { Overview } from "./tipos";
 
-interface OriginBucket {
-  key: string;
-  label: string;
-  leads: number;
-  qualified: number;
-  meetings: number;
-  won: number;
-  disqualified: number;
-  revenueCents: number;
-}
+const PERIODOS = [7, 30, 90];
 
-interface Variacao {
-  delta: number | null;
-  anterior: number;
-}
+/**
+ * Uma pergunta por aba.
+ *
+ * A tela anterior empilhava oito painéis numa rolagem só, e responder
+ * "quantos leads entraram" exigia passar por gráfico de horário, tabela de
+ * origem e funil. Aqui cada aba responde uma coisa, e o que não é daquela
+ * pergunta não aparece.
+ */
+const ABAS = [
+  { chave: "geral", rotulo: "Visão geral", pergunta: "Quanto entrou, e melhorou?" },
+  { chave: "funil", rotulo: "Funil", pergunta: "Onde as pessoas somem?" },
+  { chave: "origem", rotulo: "Origem", pergunta: "O que traz cliente que paga?" },
+  { chave: "atendimento", rotulo: "Atendimento", pergunta: "Estamos respondendo a tempo?" },
+] as const;
 
-interface Overview {
-  period: { days: number; from: string; to: string };
-  totals: {
-    leads: number;
-    disqualified: number;
-    workable: number;
-    qualified: number;
-    meetings: number;
-    won: number;
-    revenueCents: number;
-    qualificationRate: number | null;
-    closeRate: number | null;
-  };
-  comparacao: {
-    leads: Variacao;
-    qualified: Variacao;
-    meetings: Variacao;
-    won: Variacao;
-    revenueCents: Variacao;
-  };
-  atendimento: {
-    medianaPrimeiraRespostaSegundos: number | null;
-    respondidos: number;
-    semResposta: number;
-    aguardando: number;
-  };
-  byOrigin: OriginBucket[];
-  daily: DailyPoint[];
-  chegadas: { diaSemana: number; faixa: number; leads: number }[];
-  setup: { whatsappConnected: boolean; metaConnected: boolean; trackingLinkCount: number };
-}
+type Aba = (typeof ABAS)[number]["chave"];
 
-const PERIODS = [7, 30, 90];
-
-function plural(quantidade: number, singular: string, muitos: string): string {
-  return `${quantidade} ${quantidade === 1 ? singular : muitos}`;
-}
-
-function formatRate(rate: number | null): string {
-  // Null é "não houve base para calcular" — 0% afirmaria que ninguém converteu.
-  if (rate === null) return "Sem base";
-  return `${Math.round(rate * 100)}%`;
-}
-
-
-
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ days?: string }> }) {
-  const { days: rawDays } = await searchParams;
-  const days = PERIODS.includes(Number(rawDays)) ? Number(rawDays) : 30;
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ days?: string; aba?: string }>;
+}) {
+  const params = await searchParams;
+  const days = PERIODOS.includes(Number(params.days)) ? Number(params.days) : 30;
+  const aba: Aba = ABAS.some((opcao) => opcao.chave === params.aba) ? (params.aba as Aba) : "geral";
 
   const overview = await apiFetch<Overview>(`/analytics/overview?days=${days}`);
-  const { totals, byOrigin, daily, setup, comparacao, atendimento, chegadas } = overview;
+  const { totals, setup } = overview;
 
-  const unattributed = byOrigin.find((bucket) => bucket.key === "unknown");
-  const mostlyUnattributed = totals.leads > 0 && (unattributed?.leads ?? 0) / totals.leads >= 0.5;
-  const peakDay = daily.reduce((best, point) => (point.leads > best.leads ? point : best), daily[0]);
+  const semOrigem = overview.byOrigin.find((bucket) => bucket.key === "unknown");
+  const maioriaSemOrigem = totals.leads > 0 && (semOrigem?.leads ?? 0) / totals.leads >= 0.5;
+
+  const escolhida = ABAS.find((opcao) => opcao.chave === aba)!;
+  const paraAba = (destino: string) => `/dashboard?aba=${destino}&days=${days}`;
 
   return (
     <div className="mx-auto max-w-6xl">
-      <Hero
-        dias={days}
-        periodos={PERIODS}
-        de={overview.period.from.slice(0, 10)}
-        ate={overview.period.to.slice(0, 10)}
-        leads={totals.leads}
-        deltaLeads={comparacao.leads.delta}
-        receitaCentavos={totals.revenueCents}
-        deltaReceita={comparacao.revenueCents.delta}
-        secundarios={[
-          {
-            rotulo: "Aproveitáveis",
-            valor: String(totals.workable),
-            nota: totals.disqualified > 0 ? plural(totals.disqualified, "descartado", "descartados") : undefined,
-          },
-          { rotulo: "Taxa de qualificação", valor: formatRate(totals.qualificationRate) },
-          { rotulo: "Taxa de fechamento", valor: formatRate(totals.closeRate) },
-          {
-            rotulo: "Ticket médio",
-            valor: totals.won > 0 ? formatCentsAsBRL(Math.round(totals.revenueCents / totals.won)) : "Sem base",
-          },
-        ]}
-      />
-
       <AtualizaAoVivo />
 
       {/*
-        O funil vem logo depois da abertura porque é a pergunta que a tela
-        existe para responder: onde some gente entre a mensagem e a venda.
+        Um cabeçalho só, igual em todas as abas: a pergunta muda, o lugar de
+        trocar de período e de aba não.
       */}
-      <div className="surface mt-5 p-6">
-        <h2 className="font-display text-destaque font-semibold tracking-tight text-ink">Onde os leads param</h2>
-        <p className="mb-4 mt-0.5 text-apoio text-ink-mute">
-          A largura de cada disco é a etapa. A parede entre dois discos é quem saiu.
-        </p>
-        <Funil3D
-          etapas={[
-            { rotulo: "Leads", valor: totals.workable },
-            { rotulo: "Qualificados", valor: totals.qualified },
-            { rotulo: "Reuniões", valor: totals.meetings },
-            { rotulo: "Vendas", valor: totals.won },
-          ]}
-        />
-      </div>
-
-      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard
-          rotulo="Qualificados"
-          numero={totals.qualified}
-          delta={comparacao.qualified.delta}
-          anterior={comparacao.qualified.anterior}
-          nota={`de ${totals.workable} aproveitáveis`}
-        />
-        <StatCard
-          rotulo="Reuniões"
-          numero={totals.meetings}
-          delta={comparacao.meetings.delta}
-          anterior={comparacao.meetings.anterior}
-          nota={totals.qualified > 0 ? `${formatRate(totals.meetings / totals.qualified)} dos qualificados` : undefined}
-        />
-        <StatCard
-          rotulo="Vendas"
-          numero={totals.won}
-          delta={comparacao.won.delta}
-          anterior={comparacao.won.anterior}
-          serie={daily.map((d) => d.won)}
-          nota={`${formatRate(totals.closeRate)} dos qualificados`}
-        />
-      </div>
-
-      <div className="surface mt-5 p-6">
-        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+      <header className="mb-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h2 className="font-display text-destaque font-semibold tracking-tight text-ink">Leads e vendas por dia</h2>
-            <p className="mt-0.5 text-apoio text-ink-mute">Passe o mouse para ver um dia específico</p>
-          </div>
-          {/* Rótulo direto no pico: um valor por ponto viraria ruído, e sem
-              nenhum o gráfico dependeria do hover para informar qualquer coisa. */}
-          {peakDay && peakDay.leads > 0 ? (
-            <p className="text-apoio text-ink-mute">
-              Pico: <span className="font-semibold text-ink">{peakDay.leads}</span> em{" "}
-              {new Date(`${peakDay.date}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+            <p className="text-rotulo font-semibold uppercase tracking-[0.14em] text-ink-mute">
+              {formataDia(overview.period.from.slice(0, 10))} a {formataDia(overview.period.to.slice(0, 10))}
             </p>
-          ) : null}
+            <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink">
+              {escolhida.rotulo}
+            </h1>
+            <p className="mt-0.5 text-corpo text-ink-mute">{escolhida.pergunta}</p>
+          </div>
+
+          <GrupoDePilulas
+            ativo={String(days)}
+            opcoes={PERIODOS.map((opcao) => ({
+              chave: String(opcao),
+              rotulo: `${opcao} dias`,
+              href: `/dashboard?aba=${aba}&days=${opcao}`,
+            }))}
+          />
         </div>
 
-        {totals.leads > 0 ? (
-          <>
-            <LeadsAreaChart data={daily} />
-            {/* O tooltip enriquece, não pode ser a única via: a tabela mantém
-                todo valor acessível sem depender de ponteiro. */}
-            <details className="mt-4 border-t border-line/60 pt-3">
-              <summary className="cursor-pointer text-apoio text-ink-mute hover:text-ink-soft">Ver os números</summary>
-              <div className="mt-3 max-h-56 overflow-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="text-xs uppercase text-ink-mute">
-                    <tr>
-                      <th className="py-1 pr-4 font-medium">Dia</th>
-                      <th className="py-1 pr-4 font-medium">Leads</th>
-                      <th className="py-1 font-medium">Vendas</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {daily
-                      .filter((point) => point.leads > 0 || point.won > 0)
-                      .map((point) => (
-                        <tr key={point.date} className="border-t border-line/60">
-                          <td className="py-1 pr-4 text-ink-soft">{point.date.split("-").reverse().join("/")}</td>
-                          <td className="py-1 pr-4 tabular-nums text-ink">{point.leads}</td>
-                          <td className="py-1 tabular-nums text-ink">{point.won}</td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </details>
-          </>
-        ) : (
-          <p className="py-10 text-center text-sm text-ink-mute">Nenhum lead neste período.</p>
-        )}
-      </div>
+        <nav className="mt-5 flex gap-1 border-b border-line" aria-label="Seções do dashboard">
+          {ABAS.map((opcao) => {
+            const ativa = opcao.chave === aba;
+            return (
+              <Link
+                key={opcao.chave}
+                href={paraAba(opcao.chave)}
+                aria-current={ativa ? "page" : undefined}
+                /* Sublinhado e não pílula: a aba pertence ao cabeçalho e
+                   precisa parecer parte dele, não um controle solto. */
+                className={`focus-ring relative -mb-px rounded-t-lg px-3.5 py-2.5 text-corpo font-medium transition-colors duration-200 ease-soft ${
+                  ativa ? "text-ink" : "text-ink-mute hover:text-ink-soft"
+                }`}
+              >
+                {opcao.rotulo}
+                {ativa ? <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-accent" /> : null}
+              </Link>
+            );
+          })}
+        </nav>
+      </header>
+
+      {aba === "geral" ? <AbaVisaoGeral overview={overview} /> : null}
+      {aba === "funil" ? <AbaFunil overview={overview} /> : null}
+      {aba === "origem" ? <AbaOrigem overview={overview} /> : null}
+      {aba === "atendimento" ? <AbaAtendimento overview={overview} /> : null}
 
       {/*
-        Atendimento ganhou painel próprio porque responde a pergunta que mais
-        muda resultado numa operação de WhatsApp: quanto tempo alguém espera
-        para ser atendido. Antes esse número só existia dentro de cada lead.
+        O aviso de origem desconhecida acompanha todas as abas: enquanto a
+        maioria dos leads não tem origem, qualquer número desta tela é lido
+        com uma ressalva que precisa estar à vista.
       */}
-      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="surface p-5">
-          <p className="text-rotulo font-medium uppercase tracking-[0.1em] text-ink-mute">Resposta típica</p>
-          <p className={`mt-2 text-[clamp(1.5rem,3vw,1.75rem)] font-semibold leading-none tabular-nums ${SPEED_TONE_CLASSES[responseSpeedTone(atendimento.medianaPrimeiraRespostaSegundos)]}`}>
-            {formatDuration(atendimento.medianaPrimeiraRespostaSegundos)}
-          </p>
-          {/* Mediana e não média: um lead respondido três dias depois puxaria
-              a média e faria uma operação boa parecer ruim. */}
-          <p className="mt-2 text-rotulo text-ink-mute">Mediana até a primeira resposta</p>
-        </div>
-
-        <div className="surface p-5">
-          <p className="text-rotulo font-medium uppercase tracking-[0.1em] text-ink-mute">Aguardando você</p>
-          <p className="mt-2 flex items-baseline gap-2 text-[clamp(1.5rem,3vw,1.75rem)] font-semibold leading-none tabular-nums text-ink">
-            {atendimento.aguardando}
-            {atendimento.aguardando > 0 ? (
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-60 motion-safe:animate-ping" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
-              </span>
-            ) : null}
-          </p>
-          <Link href="/leads?aguardando=1" className="focus-ring mt-2 inline-block rounded text-rotulo text-ink-mute underline decoration-line underline-offset-4 transition-colors hover:text-ink">
-            Ver na fila
-          </Link>
-        </div>
-
-        <div className="surface p-5">
-          <p className="text-rotulo font-medium uppercase tracking-[0.1em] text-ink-mute">Sem resposta</p>
-          <p className="mt-2 text-[clamp(1.5rem,3vw,1.75rem)] font-semibold leading-none tabular-nums text-ink">{atendimento.semResposta}</p>
-          <p className="mt-2 text-rotulo text-ink-mute">
-            de {atendimento.respondidos + atendimento.semResposta} leads no período
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
-
-
-        <div className="surface p-6">
-          <h2 className="font-display text-destaque font-semibold tracking-tight text-ink">Qual origem fecha melhor</h2>
-          {/* Volume esconde qualidade: a origem que traz mais gente
-              frequentemente não é a que fecha melhor. */}
-          <p className="mb-4 mt-0.5 text-apoio text-ink-mute">Clique num título para reordenar</p>
-          {byOrigin.length > 0 ? (
-            <OriginTable origens={byOrigin} />
-          ) : (
-            <p className="py-8 text-center text-sm text-ink-mute">Nenhum lead neste período.</p>
-          )}
-        </div>
-      </div>
-
-      <div className="surface mt-5 p-6">
-        <h2 className="font-display text-destaque font-semibold tracking-tight text-ink">Quando os leads chegam</h2>
-        <p className="mb-5 mt-0.5 text-apoio text-ink-mute">
-          Por dia da semana e faixa de horário, no horário de Brasília
-        </p>
-        <ArrivalHeatmap celulas={chegadas} />
-      </div>
-
-      {mostlyUnattributed ? (
-        <div className="rounded-2xl border border-amber-300/60 bg-amber-50 p-5 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
+      {maioriaSemOrigem ? (
+        <div className="mt-6 rounded-2xl border border-amber-300/60 bg-amber-50 p-5 text-corpo text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
           <p className="font-medium">A maior parte dos leads está sem origem identificada.</p>
           <p className="mt-1 text-amber-800 dark:text-amber-200/90">
             A origem só é registrada quando a pessoa chega por um anúncio Click-to-WhatsApp ou por um link
-            rastreável. Quem manda mensagem direto para o número não carrega essa evidência, e ela nunca é
-            deduzida por aproximação.
+            rastreável. Quem manda mensagem direto para o número não carrega essa evidência, e ela nunca é deduzida
+            por aproximação.
           </p>
           <ul className="mt-2 space-y-1 text-amber-800 dark:text-amber-200/90">
             {!setup.metaConnected ? (
               <li>
-                ·{" "}
-                <Link href="/integrations/meta" className="underline">
-                  Conecte sua conta Meta
-                </Link>{" "}
-                para identificar leads vindos de anúncios.
+                · <Link href="/integrations/meta" className="underline">Conecte sua conta Meta</Link> para
+                identificar leads vindos de anúncios.
               </li>
             ) : null}
             {setup.trackingLinkCount === 0 ? (
               <li>
-                ·{" "}
-                <Link href="/links" className="underline">
-                  Crie um link rastreável
-                </Link>{" "}
-                para usar na bio e em campanhas.
+                · <Link href="/links" className="underline">Crie um link rastreável</Link> para usar na bio e em
+                campanhas.
               </li>
             ) : null}
             {!setup.whatsappConnected ? (
               <li>
-                ·{" "}
-                <Link href="/integrations/whatsapp" className="underline">
-                  Conecte seu WhatsApp
-                </Link>{" "}
-                para receber novos leads.
+                · <Link href="/integrations/whatsapp" className="underline">Conecte seu WhatsApp</Link> para receber
+                novos leads.
               </li>
             ) : null}
           </ul>
