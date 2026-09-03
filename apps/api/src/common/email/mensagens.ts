@@ -53,6 +53,34 @@ export function senhaAlterada(para: string, nome: string): MensagemDeEmail {
 }
 
 /**
+ * O link que confirma um endereço novo, mandado para ele.
+ *
+ * É o que prova que o endereço existe e é alcançável antes de tudo passar a
+ * depender dele. Sem esta etapa, um erro de digitação virava o login: a
+ * pessoa não conseguia mais entrar e a recuperação ia para uma caixa que não
+ * existe.
+ */
+export function confirmacaoDeEmail(para: string, nome: string, endereco: string): MensagemDeEmail {
+  return {
+    para,
+    assunto: "Confirme seu novo e-mail",
+    texto: [
+      `Olá, ${nome}.`,
+      "",
+      `Este endereço foi indicado como o novo e-mail de acesso de uma conta. Para confirmar, abra:`,
+      "",
+      endereco,
+      "",
+      "O link vale por vinte e quatro horas e só pode ser usado uma vez.",
+      "",
+      "Enquanto não for aberto, nada muda: o acesso continua pelo endereço antigo.",
+      "",
+      "Se você não pediu isso, ignore. Sem esta confirmação, o pedido expira sozinho.",
+    ].join("\n"),
+  };
+}
+
+/**
  * Aviso de troca de e-mail, mandado para o endereço ANTIGO.
  *
  * Para o antigo de propósito. Mandar para o novo avisaria justamente quem fez
@@ -67,7 +95,8 @@ export function emailAlterado(para: string, nome: string, novoEmail: string): Me
     texto: [
       `Olá, ${nome}.`,
       "",
-      `O e-mail de acesso desta conta foi alterado para ${novoEmail}.`,
+      `O e-mail de acesso desta conta foi alterado para ${novoEmail}, e a troca foi`,
+      "confirmada naquele endereço.",
       "",
       "Se foi você, não precisa fazer nada. Este endereço deixa de servir para entrar.",
       "",

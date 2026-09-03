@@ -85,24 +85,23 @@ export async function trocarEmail(
   if (!currentPassword || !newEmail) {
     return { erro: "Preencha a senha atual e o novo e-mail." };
   }
-  /*
-    Digitado duas vezes de propósito. O produto ainda não envia e-mail, então
-    não há confirmação no endereço novo: um erro de digitação vira o login, e
-    a recuperação de senha iria para um endereço que não existe.
-  */
+  // Digitado duas vezes ainda: a confirmação por e-mail já impede um endereço
+  // errado de virar o login, mas repetir aqui poupa a viagem e a espera de
+  // descobrir o erro só quando o link não chega.
   if (newEmail.toLowerCase() !== confirmacao.toLowerCase()) {
     return { erro: "Os dois e-mails não são iguais. Confira antes de salvar." };
   }
 
   try {
-    const tokens = await apiFetch<ParDeTokens>("/auth/email", {
+    // Nenhuma sessão é gravada aqui: a troca não valeu ainda. O endereço só
+    // passa a ser o login quando o link mandado para ele é aberto.
+    await apiFetch<{ message: string }>("/auth/email", {
       method: "PATCH",
       body: JSON.stringify({ currentPassword, newEmail }),
     });
-    await guardaSessao(tokens);
   } catch (error) {
     if (error instanceof ApiRequestError) return { erro: error.body.message };
-    return { erro: "Não foi possível trocar o e-mail." };
+    return { erro: "Não foi possível pedir a troca do e-mail." };
   }
 
   revalidatePath("/settings");

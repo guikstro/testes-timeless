@@ -12,6 +12,7 @@ import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { ChangeEmailDto } from "./dto/change-email.dto";
+import { ConfirmEmailDto } from "./dto/confirm-email.dto";
 
 @Controller("auth")
 export class AuthController {
@@ -91,5 +92,23 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   changeEmail(@CurrentUser() user: AuthenticatedUser, @Body() dto: ChangeEmailDto) {
     return this.authService.changeEmail(user, dto);
+  }
+
+  /**
+   * Confirma a troca do e-mail de acesso.
+   *
+   * Sem sessão de propósito: quem abre o link pode estar no leitor de e-mail
+   * de outro aparelho, onde não há sessão. Quem prova a identidade aqui é o
+   * token, e a senha atual já foi exigida no pedido.
+   *
+   * É POST e não GET porque varredor de link de provedor de e-mail abre GET
+   * sozinho: uma confirmação por GET seria disparada antes de a pessoa ver o
+   * e-mail.
+   */
+  @Throttle({ default: AUTENTICACAO })
+  @Post("confirm-email")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async confirmEmail(@Body() dto: ConfirmEmailDto): Promise<void> {
+    await this.authService.confirmEmail(dto.token);
   }
 }

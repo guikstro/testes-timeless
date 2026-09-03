@@ -76,16 +76,17 @@ export function FormularioDeEmail({ emailAtual }: { emailAtual: string }) {
       </Field>
 
       {/*
-        Este aviso não é formalidade. O produto ainda não envia e-mail, então
-        não há confirmação no endereço novo: um erro de digitação vira o login
-        e a recuperação de senha iria para um endereço que não existe.
+        Deixou de ser aviso de perigo e virou instrução. Antes o endereço novo
+        passava a ser o login na hora, e um erro de digitação trancava a
+        pessoa para fora. Agora nada muda até o link ser aberto no destino,
+        que é o que prova que o endereço existe.
       */}
-      <Aviso tom="atencao">
-        O novo endereço passa a ser o seu login imediatamente, e ainda não enviamos um e-mail de confirmação para
-        ele. Confira letra por letra: com o endereço errado, nem o login nem a recuperação de senha funcionam.
+      <Aviso>
+        Enviamos um link de confirmação para o endereço novo. Nada muda até você abri-lo: o acesso continua pelo
+        endereço atual, e o link vale por um dia.
       </Aviso>
 
-      <Rodape enviando={enviando} estado={estado} rotulo="Trocar e-mail" sucesso="E-mail trocado." />
+      <Rodape enviando={enviando} estado={estado} rotulo="Enviar confirmação" sucesso="Link enviado. Confira o e-mail novo." />
     </form>
   );
 }

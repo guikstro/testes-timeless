@@ -23,6 +23,7 @@ type MockPrisma = {
   membership: Record<string, jest.Mock>;
   refreshToken: Record<string, jest.Mock>;
   passwordResetToken: Record<string, jest.Mock>;
+  emailChangeToken: Record<string, jest.Mock>;
   $transaction: jest.Mock;
 };
 
@@ -39,6 +40,7 @@ function buildPrismaMock(): MockPrisma {
     membership: { create: jest.fn(), findUnique: jest.fn() },
     refreshToken: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     passwordResetToken: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    emailChangeToken: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn(), deleteMany: jest.fn() },
     $transaction: jest.fn(async (arg: unknown) => {
       if (typeof arg === "function") {
         return arg(tx);
@@ -297,37 +299,170 @@ describe("AuthService", () => {
       ...over,
     });
 
+    const dono = {
+      id: "user-1",
+      name: "Ana",
+      email: "antigo@x.com",
+      passwordHash: bcrypt.hashSync("senha-atual", 4),
+      deletedAt: null,
+    };
+
     beforeEach(() => {
-      prisma.user.findUnique.mockResolvedValue({
-        id: "user-1",
-        name: "Ana",
-        email: "antigo@x.com",
-        passwordHash: bcrypt.hashSync("senha-atual", 4),
-        deletedAt: null,
+      // A primeira consulta é o dono da sessão; a segunda confere se o
+      // endereço pedido já está ocupado.
+      prisma.user.findUnique.mockResolvedValueOnce(dono).mockResolvedValueOnce(null);
+    });
+
+    describe("pedido", () => {
+      /*
+        A regressão que motivou a confirmação.
+
+        A troca valia na hora, então um erro de digitação virava o login: a
+        pessoa não conseguia mais entrar, e a recuperação de senha ia para uma
+        caixa que não existe.
+      */
+      it("não troca nada ainda, só registra o pedido", async () => {
+        await service.changeEmail(quem(), { currentPassword: "senha-atual", newEmail: "novo@x.com" });
+
+        expect(prisma.user.update).not.toHaveBeenCalled();
+        expect(prisma.emailChangeToken.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({ userId: "user-1", newEmail: "novo@x.com" }),
+        });
+      });
+
+      it("manda o link de confirmação para o endereço NOVO", async () => {
+        process.env.WEB_APP_URL = "https://app.exemplo.com";
+
+        await service.changeEmail(quem(), { currentPassword: "senha-atual", newEmail: "novo@x.com" });
+
+        expect(email.enfileirar).toHaveBeenCalledWith(
+          expect.objectContaining({ para: "novo@x.com", assunto: "Confirme seu novo e-mail" }),
+        );
+        const enviado = email.enfileirar.mock.calls[0][0] as { texto: string };
+        expect(enviado.texto).toContain("https://app.exemplo.com/confirmar-email?token=");
+      });
+
+      it("cancela um pedido anterior ainda não confirmado", async () => {
+        await service.changeEmail(quem(), { currentPassword: "senha-atual", newEmail: "novo@x.com" });
+
+        // Dois links válidos ao mesmo tempo deixariam o mais antigo utilizável
+        // depois por quem quer que o tenha recebido.
+        expect(prisma.emailChangeToken.deleteMany).toHaveBeenCalledWith({
+          where: { userId: "user-1", usedAt: null },
+        });
+      });
+
+      it("continua exigindo a senha atual", async () => {
+        await expect(
+          service.changeEmail(quem(), { currentPassword: "chute", newEmail: "novo@x.com" }),
+        ).rejects.toThrow("Senha atual incorreta.");
+
+        // A confirmação prova que o endereço existe, não que quem pediu é o
+        // dono da conta. As duas coisas continuam sendo necessárias.
+        expect(prisma.emailChangeToken.create).not.toHaveBeenCalled();
+        expect(email.enfileirar).not.toHaveBeenCalled();
+      });
+
+      it("recusa um endereço já em uso, sem confirmar que ele existe", async () => {
+        prisma.user.findUnique.mockReset();
+        prisma.user.findUnique.mockResolvedValueOnce(dono).mockResolvedValueOnce({ id: "outro" });
+
+        await expect(
+          service.changeEmail(quem(), { currentPassword: "senha-atual", newEmail: "ocupado@x.com" }),
+        ).rejects.toThrow("Não foi possível usar este e-mail.");
+        expect(email.enfileirar).not.toHaveBeenCalled();
+      });
+
+      it("recusa de dentro de uma visita de suporte", async () => {
+        await expect(
+          service.changeEmail(quem({ impersonating: true }), {
+            currentPassword: "senha-atual",
+            newEmail: "novo@x.com",
+          }),
+        ).rejects.toThrow("Não é possível alterar credenciais durante um acesso de suporte.");
       });
     });
 
-    it("avisa o endereço ANTIGO, não o novo", async () => {
-      await service.changeEmail(quem(), { currentPassword: "senha-atual", newEmail: "novo@x.com" });
+    describe("confirmação", () => {
+      function pedidoPendente(over: Record<string, unknown> = {}) {
+        return {
+          id: "tok-1",
+          userId: "user-1",
+          newEmail: "novo@x.com",
+          usedAt: null,
+          expiresAt: new Date(Date.now() + 60_000),
+          user: { ...dono },
+          ...over,
+        };
+      }
 
-      /*
-        Para o antigo de propósito. Mandar para o novo avisaria justamente
-        quem fez a troca, que já sabe. O endereço antigo é o único canal que
-        ainda alcança o dono legítimo depois de uma tomada de conta.
-      */
-      expect(email.enfileirar).toHaveBeenCalledWith(
-        expect.objectContaining({ para: "antigo@x.com", assunto: "O e-mail de acesso da sua conta foi alterado" }),
-      );
-      const enviado = email.enfileirar.mock.calls[0][0] as { texto: string };
-      expect(enviado.texto).toContain("novo@x.com");
-    });
+      it("aplica o endereço novo e derruba as outras sessões", async () => {
+        prisma.emailChangeToken.findUnique.mockResolvedValue(pedidoPendente());
 
-    it("não avisa ninguém quando a troca é recusada", async () => {
-      await expect(
-        service.changeEmail(quem(), { currentPassword: "chute", newEmail: "novo@x.com" }),
-      ).rejects.toThrow("Senha atual incorreta.");
+        await service.confirmEmail("token-cru");
 
-      expect(email.enfileirar).not.toHaveBeenCalled();
+        expect(prisma.user.update).toHaveBeenCalledWith({
+          where: { id: "user-1" },
+          data: { email: "novo@x.com" },
+        });
+        // Se a troca foi feita por quem não devia, é aqui que ele perde os
+        // acessos que já tinha abertos.
+        expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+          where: { userId: "user-1", revokedAt: null },
+          data: { revokedAt: expect.any(Date) },
+        });
+      });
+
+      it("avisa o endereço ANTIGO, e só depois de confirmado", async () => {
+        prisma.emailChangeToken.findUnique.mockResolvedValue(pedidoPendente());
+
+        await service.confirmEmail("token-cru");
+
+        // Mandar para o novo avisaria justamente quem fez a troca, que já
+        // sabe. O antigo é o único canal que ainda alcança o dono legítimo.
+        expect(email.enfileirar).toHaveBeenCalledWith(
+          expect.objectContaining({
+            para: "antigo@x.com",
+            assunto: "O e-mail de acesso da sua conta foi alterado",
+          }),
+        );
+      });
+
+      it("recusa um link já usado", async () => {
+        prisma.emailChangeToken.findUnique.mockResolvedValue(pedidoPendente({ usedAt: new Date() }));
+
+        await expect(service.confirmEmail("token-cru")).rejects.toThrow("inválido ou expirado");
+        expect(prisma.user.update).not.toHaveBeenCalled();
+      });
+
+      it("recusa um link vencido", async () => {
+        prisma.emailChangeToken.findUnique.mockResolvedValue(
+          pedidoPendente({ expiresAt: new Date(Date.now() - 1000) }),
+        );
+
+        await expect(service.confirmEmail("token-cru")).rejects.toThrow("inválido ou expirado");
+      });
+
+      it("recusa um link desconhecido", async () => {
+        prisma.emailChangeToken.findUnique.mockResolvedValue(null);
+
+        await expect(service.confirmEmail("token-inventado")).rejects.toThrow("inválido ou expirado");
+      });
+
+      it("recusa quando o endereço foi tomado entre o pedido e a confirmação", async () => {
+        prisma.emailChangeToken.findUnique.mockResolvedValue(pedidoPendente());
+        prisma.$transaction.mockRejectedValueOnce(
+          new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+            code: "P2002",
+            clientVersion: "test",
+          }),
+        );
+
+        // A conferência no pedido é só cortesia: a garantia é a restrição
+        // única do banco, e a janela entre pedir e confirmar é de um dia.
+        await expect(service.confirmEmail("token-cru")).rejects.toThrow("Não foi possível usar este e-mail.");
+        expect(email.enfileirar).not.toHaveBeenCalled();
+      });
     });
   });
 

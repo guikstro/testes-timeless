@@ -46,7 +46,7 @@ const TELAS = [
 ];
 
 /** Telas públicas: sem sessão, e por isso conferidas à parte. */
-const PUBLICAS = ["/login", "/register", "/esqueci-senha", "/redefinir-senha"];
+const PUBLICAS = ["/login", "/register", "/esqueci-senha", "/redefinir-senha", "/confirmar-email"];
 
 function guardaCookies(resposta, pote) {
   for (const bruto of resposta.headers.getSetCookie?.() ?? []) {

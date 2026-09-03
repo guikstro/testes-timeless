@@ -108,10 +108,8 @@ existisse.
 
 ## Pendências conhecidas
 
-- Confirmação no endereço novo ao trocar o e-mail de acesso — hoje a troca
-  vale na hora e o endereço **antigo** recebe um aviso de que ela aconteceu,
-  o que permite reagir a uma tomada de conta. Falta o passo que impede um
-  endereço digitado errado de virar o login: confirmar antes de valer.
+- Segundo fator na entrada — hoje a conta é protegida só por senha. Com o
+  envio de e-mail funcionando, um código por e-mail já seria viável.
 - Credenciais Meta (App ID/secret, token de sistema, ad account, pixel) e
   WhatsApp (Cloud API token, phone number id, verify token) — já existem
   como variáveis em `.env.example`, mas nenhuma integração ainda as consome.
@@ -145,3 +143,24 @@ precisa chegar e ser lido em qualquer leitor:
 - aviso de senha alterada, para o endereço da conta;
 - aviso de e-mail alterado, para o endereço **antigo** — é o único canal que
   ainda alcança o dono legítimo depois de uma tomada de conta.
+
+### Troca do e-mail de acesso
+
+Pedir a troca não troca nada. O endereço novo fica guardado como pedido, e
+só vira o login quando o link mandado **para ele** é aberto. Antes a troca
+valia na hora, e um erro de digitação tinha consequência definitiva: a pessoa
+não conseguia mais entrar, e a recuperação de senha ia para uma caixa que não
+existe. Confirmar no destino é o que prova que ele é alcançável antes de tudo
+depender dele.
+
+A senha atual continua sendo exigida no pedido, porque a confirmação prova que
+o endereço existe e não que quem pediu é o dono da conta.
+
+Um pedido novo cancela o anterior, e trocar ou redefinir a senha cancela
+qualquer pedido pendente: um pedido de troca esperando confirmação é
+exatamente o rastro que alguém deixaria depois de invadir a conta, para levar
+o login depois. Retomar a senha o desfaz.
+
+A confirmação é POST, e a tela exige um clique. Varredor de link de provedor
+de e-mail abre endereços sozinho: se abrir bastasse, a troca aconteceria antes
+de a pessoa ver a mensagem.

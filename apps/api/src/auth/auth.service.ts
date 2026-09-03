@@ -15,12 +15,20 @@ import { ChangePasswordDto } from "./dto/change-password.dto";
 import { ChangeEmailDto } from "./dto/change-email.dto";
 import { enderecoDaAplicacao } from "../common/configuracao/ambiente";
 import { EmailService } from "../common/email/email.service";
-import { emailAlterado, recuperacaoDeSenha, senhaAlterada } from "../common/email/mensagens";
+import { confirmacaoDeEmail, emailAlterado, recuperacaoDeSenha, senhaAlterada } from "../common/email/mensagens";
 import { AuthenticatedUser, JwtPayload } from "./jwt-payload.interface";
 
 const ACCESS_TOKEN_TTL = "15m";
 const REFRESH_TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 const RESET_TOKEN_TTL_MS = 1000 * 60 * 60; // 1 hour
+/**
+ * Vinte e quatro horas, mais folgado que o de recuperação de senha.
+ *
+ * Recuperar senha é urgente e quem pediu está esperando; confirmar um e-mail
+ * novo não é, e a pessoa pode só abrir aquela caixa no dia seguinte. Enquanto
+ * o link não é aberto, nada muda, então a folga não abre risco nenhum.
+ */
+const EMAIL_CHANGE_TOKEN_TTL_MS = 1000 * 60 * 60 * 24;
 const BCRYPT_ROUNDS = 12;
 
 // Compared against on every login with an unknown e-mail so the bcrypt cost
@@ -276,6 +284,10 @@ export class AuthService {
         where: { userId: stored.userId, revokedAt: null },
         data: { revokedAt: new Date() },
       }),
+      // Um pedido de troca de e-mail pendente é exatamente o que alguém
+      // deixaria para trás depois de invadir a conta: ele esperaria a
+      // confirmação e levaria o login junto. Retomar a senha o cancela.
+      this.prisma.emailChangeToken.deleteMany({ where: { userId: stored.userId, usedAt: null } }),
     ]);
   }
 
@@ -314,6 +326,10 @@ export class AuthService {
         where: { userId: quem.userId, revokedAt: null },
         data: { revokedAt: new Date() },
       }),
+      // Mesmo motivo do `resetPassword`: trocar a senha é a ação de quem
+      // desconfia, e um pedido de troca de e-mail pendente é o rastro que um
+      // invasor deixaria para levar o login depois.
+      this.prisma.emailChangeToken.deleteMany({ where: { userId: quem.userId, usedAt: null } }),
     ]);
 
     // O aviso não é para quem trocou, que já sabe: é para quem NÃO trocou.
@@ -325,15 +341,18 @@ export class AuthService {
   }
 
   /**
-   * Troca o e-mail de acesso.
+   * Pede a troca do e-mail de acesso.
    *
-   * Não existe confirmação no endereço novo porque o produto ainda não envia
-   * e-mail (ver `forgotPassword` e docs/ARCHITECTURE.md). Isso tem uma
-   * consequência que a tela precisa dizer com todas as letras: um endereço
-   * digitado errado passa a ser o login, e a recuperação de senha iria para
-   * ele. A senha atual é exigida por isso, e as outras sessões caem junto.
+   * Pede, não troca. O endereço novo só vira o login quando o link mandado
+   * para ele é aberto. Antes a troca valia na hora, e um erro de digitação
+   * tinha consequência definitiva: o login passava a ser um endereço que não
+   * existe, e a recuperação de senha ia para lá também. Confirmar no destino
+   * é o que prova que ele é alcançável antes de tudo depender dele.
+   *
+   * A senha atual continua sendo exigida, porque a confirmação prova que o
+   * endereço existe e não que quem pediu é o dono da conta.
    */
-  async changeEmail(quem: AuthenticatedUser, dto: ChangeEmailDto): Promise<TokenPair> {
+  async changeEmail(quem: AuthenticatedUser, dto: ChangeEmailDto): Promise<{ message: string }> {
     this.recusaSeForVisita(quem);
     const user = await this.prisma.user.findUnique({ where: { id: quem.userId } });
     if (!user || user.deletedAt) {
@@ -349,35 +368,90 @@ export class AuthService {
       throw new AppException("SAME_EMAIL", "Este já é o seu e-mail.", HttpStatus.BAD_REQUEST);
     }
 
+    // Conferido aqui só para não mandar um e-mail de confirmação que nunca
+    // poderia dar certo. A garantia de verdade continua sendo a restrição
+    // única no banco, na hora de confirmar: entre pedir e confirmar, outra
+    // pessoa pode ter tomado o endereço.
+    const ocupado = await this.prisma.user.findUnique({ where: { email: novoEmail } });
+    if (ocupado) {
+      // Mensagem genérica: dizer "já existe conta com este e-mail"
+      // transformaria esta rota num verificador de quem tem conta aqui.
+      throw new AppException("EMAIL_UNAVAILABLE", "Não foi possível usar este e-mail.", HttpStatus.CONFLICT);
+    }
+
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    await this.prisma.$transaction([
+      // Um pedido novo cancela o anterior. Sem isto, dois links ficariam
+      // válidos ao mesmo tempo, e o mais antigo poderia ser confirmado depois
+      // por quem quer que o tenha recebido.
+      this.prisma.emailChangeToken.deleteMany({ where: { userId: user.id, usedAt: null } }),
+      this.prisma.emailChangeToken.create({
+        data: {
+          userId: user.id,
+          newEmail: novoEmail,
+          tokenHash: hashToken(rawToken),
+          expiresAt: new Date(Date.now() + EMAIL_CHANGE_TOKEN_TTL_MS),
+        },
+      }),
+    ]);
+
+    const endereco = `${enderecoDaAplicacao()}/confirmar-email?token=${rawToken}`;
+    await this.email.enfileirar(confirmacaoDeEmail(novoEmail, user.name, endereco));
+
+    return { message: "Enviamos um link de confirmação para o endereço novo." };
+  }
+
+  /**
+   * Confirma a troca, aplicando o endereço novo.
+   *
+   * Sem sessão de propósito: quem confirma pode estar no leitor de e-mail de
+   * outro aparelho, onde não há sessão aberta. Quem prova a identidade aqui é
+   * o token, e a senha atual já foi exigida no pedido.
+   */
+  async confirmEmail(token: string): Promise<void> {
+    const stored = await this.prisma.emailChangeToken.findUnique({
+      where: { tokenHash: hashToken(token) },
+      include: { user: true },
+    });
+
+    if (!stored || stored.usedAt || stored.expiresAt < new Date() || stored.user.deletedAt) {
+      throw new AppException(
+        "INVALID_EMAIL_TOKEN",
+        "Link de confirmação inválido ou expirado.",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const emailAntigo = stored.user.email;
+
     try {
       await this.prisma.$transaction([
-        this.prisma.user.update({ where: { id: quem.userId }, data: { email: novoEmail } }),
+        this.prisma.user.update({ where: { id: stored.userId }, data: { email: stored.newEmail } }),
+        this.prisma.emailChangeToken.update({ where: { id: stored.id }, data: { usedAt: new Date() } }),
+        // As outras sessões caem: se a troca foi feita por quem não devia, é
+        // aqui que ele perde os acessos que já tinha abertos.
         this.prisma.refreshToken.updateMany({
-          where: { userId: quem.userId, revokedAt: null },
+          where: { userId: stored.userId, revokedAt: null },
           data: { revokedAt: new Date() },
         }),
       ]);
     } catch (error) {
       if (isUniqueConstraintError(error)) {
-        // Mensagem genérica de propósito: dizer "já existe conta com este
-        // e-mail" transforma esta rota num verificador de quem tem conta.
+        // Alguém tomou o endereço entre o pedido e a confirmação.
         throw new AppException("EMAIL_UNAVAILABLE", "Não foi possível usar este e-mail.", HttpStatus.CONFLICT);
       }
       throw error;
     }
 
     /*
-      Para o endereço ANTIGO, de propósito.
+      O aviso vai para o endereço ANTIGO, e sai agora e não no pedido.
 
-      Mandar para o novo avisaria justamente quem fez a troca, que já sabe. O
-      endereço antigo é o único canal que ainda alcança o dono legítimo depois
-      de uma tomada de conta, e sem este aviso a troca é completamente
-      silenciosa para ele. Não substitui a confirmação no endereço novo, que
-      continua faltando, mas fecha o pior dos dois buracos.
+      Agora porque é este o instante em que a conta muda de dono do ponto de
+      vista do acesso. E para o antigo porque mandar para o novo avisaria
+      justamente quem fez a troca, que já sabe: o endereço antigo é o único
+      canal que ainda alcança o dono legítimo depois de uma tomada de conta.
     */
-    await this.email.enfileirar(emailAlterado(user.email, user.name, novoEmail));
-
-    return this.issueTokenPair(user.id, quem.organizationId, quem.role);
+    await this.email.enfileirar(emailAlterado(emailAntigo, stored.user.name, stored.newEmail));
   }
 
 

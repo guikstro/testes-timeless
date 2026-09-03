@@ -32,7 +32,7 @@ describe("FaxinaService", () => {
     });
   }
 
-  it("limpa as três tabelas efêmeras", async () => {
+  it("limpa as tabelas efêmeras", async () => {
     const { servico, prisma } = montar();
 
     const resultado = await servico.executar();
@@ -40,8 +40,14 @@ describe("FaxinaService", () => {
     const sqls = consultas(prisma).map((c) => c.sql).join(" ");
     expect(sqls).toContain("refresh_tokens");
     expect(sqls).toContain("password_reset_tokens");
+    expect(sqls).toContain("email_change_tokens");
     expect(sqls).toContain("notifications");
-    expect(resultado).toEqual({ tokensDeSessao: 0, tokensDeRecuperacao: 0, avisos: 0 });
+    expect(resultado).toEqual({
+      tokensDeSessao: 0,
+      tokensDeRecuperacao: 0,
+      tokensDeTrocaDeEmail: 0,
+      avisos: 0,
+    });
   });
 
   it("nunca toca no que é medição ou histórico do produto", async () => {
@@ -81,7 +87,7 @@ describe("FaxinaService", () => {
     await servico.executar();
 
     // Uma consulta por tabela quando não há nada a apagar.
-    expect(prisma.$executeRaw).toHaveBeenCalledTimes(3);
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(4);
   });
 
   it("usa noventa dias de retenção de avisos por padrão", async () => {
@@ -90,7 +96,7 @@ describe("FaxinaService", () => {
 
     await servico.executar();
 
-    const limiteDosAvisos = consultas(prisma)[2].limite as Date;
+    const limiteDosAvisos = consultas(prisma)[3].limite as Date;
     const dias = Math.round((antes - limiteDosAvisos.getTime()) / 86_400_000);
     expect(dias).toBe(90);
   });
@@ -102,7 +108,7 @@ describe("FaxinaService", () => {
 
     await servico.executar();
 
-    const limiteDosAvisos = consultas(prisma)[2].limite as Date;
+    const limiteDosAvisos = consultas(prisma)[3].limite as Date;
     expect(Math.round((antes - limiteDosAvisos.getTime()) / 86_400_000)).toBe(30);
   });
 
@@ -113,7 +119,7 @@ describe("FaxinaService", () => {
 
     await servico.executar();
 
-    const limiteDosAvisos = consultas(prisma)[2].limite as Date;
+    const limiteDosAvisos = consultas(prisma)[3].limite as Date;
     expect(Math.round((antes - limiteDosAvisos.getTime()) / 86_400_000)).toBe(7);
   });
 });

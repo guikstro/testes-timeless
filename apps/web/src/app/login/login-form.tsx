@@ -40,6 +40,7 @@ export function LoginForm() {
   // Quem acabou de redefinir a senha chega aqui vindo do link do e-mail, e
   // sem uma confirmação a tela de entrada parece que a troca não aconteceu.
   const senhaRedefinida = searchParams.get("senhaRedefinida") === "1";
+  const emailTrocado = searchParams.get("emailTrocado") === "1";
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -152,6 +153,12 @@ export function LoginForm() {
           {senhaRedefinida ? (
             <p role="status" className="animate-rise-in mt-6 border-l-2 border-accent pl-3 text-corpo text-ink-soft">
               Senha alterada. Entre com a nova.
+            </p>
+          ) : null}
+
+          {emailTrocado ? (
+            <p role="status" className="animate-rise-in mt-6 border-l-2 border-accent pl-3 text-corpo text-ink-soft">
+              E-mail confirmado. Entre com o endereço novo.
             </p>
           ) : null}
 

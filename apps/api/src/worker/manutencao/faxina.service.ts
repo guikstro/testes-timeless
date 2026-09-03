@@ -31,6 +31,7 @@ const DIA_EM_MS = 24 * 60 * 60 * 1000;
 export interface ResultadoDaFaxina {
   tokensDeSessao: number;
   tokensDeRecuperacao: number;
+  tokensDeTrocaDeEmail: number;
   avisos: number;
 }
 
@@ -40,7 +41,7 @@ export interface ResultadoDaFaxina {
  * Três tabelas cresciam para sempre. `refresh_tokens` ganha uma linha a cada
  * renovação e nunca perdia nenhuma: com token de acesso de quinze minutos e
  * renovação silenciosa, são umas trinta e cinco mil linhas por pessoa por
- * ano. `password_reset_tokens` idem, com validade de uma hora.
+ * ano. `password_reset_tokens` e `email_change_tokens` idem.
  * `notifications` grava uma linha por membro por evento.
  *
  * O que NÃO é apagado aqui, e de propósito: mensagem, evento de lead, clique
@@ -64,6 +65,7 @@ export class FaxinaService {
       // guardá-lo não protege nada: só ocupa índice.
       tokensDeSessao: await this.apagarEmLotes("refresh_tokens", "expires_at", limiteDeToken),
       tokensDeRecuperacao: await this.apagarEmLotes("password_reset_tokens", "expires_at", limiteDeToken),
+      tokensDeTrocaDeEmail: await this.apagarEmLotes("email_change_tokens", "expires_at", limiteDeToken),
       avisos: await this.apagarEmLotes("notifications", "created_at", limiteDeAviso),
     };
 

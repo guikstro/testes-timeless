@@ -123,6 +123,7 @@ model User {
 
   memberships          Membership[]
   passwordResetTokens  PasswordResetToken[]
+  emailChangeTokens    EmailChangeToken[]
   refreshTokens        RefreshToken[]
   auditLogs            AuditLog[]
   notifications        Notification[]
@@ -171,6 +172,33 @@ model PasswordResetToken {
 
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+/**
+ * Uma troca de e-mail pedida e ainda não confirmada.
+ *
+ * O endereço novo só vira o login quando o link mandado para ele é aberto.
+ * Sem esta etapa, um endereço digitado errado passava a ser o login na hora:
+ * a pessoa não conseguia mais entrar, e a recuperação de senha ia para uma
+ * caixa que não existe. Confirmar no destino é o que prova que o endereço é
+ * alcançável antes de tudo depender dele.
+ *
+ * `newEmail` fica aqui e não em `User` de propósito: enquanto não confirmar,
+ * ele não é atributo da conta, é só um pedido.
+ */
+model EmailChangeToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  newEmail  String    @map("new_email")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_change_tokens")
 }
 
 // ---------------------------------------------------------------------------
