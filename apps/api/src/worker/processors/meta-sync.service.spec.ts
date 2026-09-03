@@ -203,5 +203,30 @@ describe("MetaSyncService", () => {
       await expect(service.sync("org-1")).rejects.toThrow("deu ruim");
       expect(notifications.notificar).not.toHaveBeenCalled();
     });
+
+    it("marca a conexão e avisa quando o token guardado não pode ser decifrado", async () => {
+      const { service, prisma, encryption, notifications } = buildService();
+      prisma.metaConnection.findUnique.mockResolvedValue({
+        organizationId: "org-1",
+        adAccountId: "act_1",
+        status: "CONNECTED",
+        accessTokenEncrypted: "corrompido",
+      });
+      encryption.decrypt.mockImplementation(() => {
+        throw new Error("Malformed encrypted payload");
+      });
+
+      await expect(service.sync("org-1")).rejects.toThrow("Malformed encrypted payload");
+
+      // Antes o decifrar ficava fora do try: toda sincronia falhava, a
+      // conexão continuava dizendo "conectado" e ninguém era avisado.
+      expect(prisma.metaConnection.update).toHaveBeenCalledWith({
+        where: { organizationId: "org-1" },
+        data: expect.objectContaining({ status: "SYNC_FAILED" }),
+      });
+      expect(notifications.notificar).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "sistema.erro" }),
+      );
+    });
   });
 });

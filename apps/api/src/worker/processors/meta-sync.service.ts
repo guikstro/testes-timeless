@@ -35,9 +35,19 @@ export class MetaSyncService {
       return;
     }
 
-    const accessToken = this.encryption.decrypt(connection.accessTokenEncrypted);
-
     try {
+      /*
+        Dentro do try de propósito.
+
+        Estava fora, e isso criava um jeito calado de falhar: se a chave de
+        criptografia mudar ou o token guardado corromper, o decifrar lança
+        antes de qualquer tratamento, a conexão continua marcada como
+        conectada, e ninguém é avisado. Toda sincronia falha e a tela segue
+        dizendo que está tudo bem, que é o pior estado possível para um
+        número que o cliente lê como verdade.
+      */
+      const accessToken = this.encryption.decrypt(connection.accessTokenEncrypted);
+
       const [campaigns, adSets, ads] = await Promise.all([
         this.metaGraphClient.getCampaigns(connection.adAccountId, accessToken),
         this.metaGraphClient.getAdSets(connection.adAccountId, accessToken),

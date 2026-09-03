@@ -10,6 +10,7 @@ import {
   WHATSAPP_EVENTS_QUEUE,
   WHATSAPP_SEND_QUEUE,
 } from "../common/queue/queue.constants";
+import { AgendaDeSincronia } from "./agenda-de-sincronia";
 import { AttributionModule } from "../attribution/attribution.module";
 import { ClassificationModule } from "../classification/classification.module";
 import { ConversionEventsModule } from "../integrations/meta/conversion-events.module";
@@ -43,6 +44,7 @@ import { EvolutionClient } from "../integrations/whatsapp/evolution-client";
     ),
   ],
   providers: [
+    AgendaDeSincronia,
     WhatsAppEventProcessor,
     WhatsAppIngestionService,
     WhatsAppSendProcessor,
