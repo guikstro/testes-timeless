@@ -1,13 +1,20 @@
 import { ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsHexColor, IsInt, IsOptional, IsString, IsUrl, Max, MaxLength, Min, ValidateIf } from "class-validator";
 import { Type } from "class-transformer";
+import { EhFusoConhecido } from "../../common/validation/eh-fuso-conhecido";
 
 export class UpdateOrganizationDto {
   @IsOptional()
   @IsString()
   name?: string;
 
+  /**
+   * Fuso da organização, como `America/Sao_Paulo`. Conferido porque ele vai
+   * direto para o `Intl` em toda conta de horário, e um valor que ele não
+   * reconhece lança em vez de errar de leve.
+   */
   @IsOptional()
   @IsString()
+  @EhFusoConhecido()
   timezone?: string;
 
   /**

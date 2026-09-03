@@ -7,6 +7,8 @@
  * só faz o Google descartar a linha sem avisar ninguém.
  */
 
+import { fusoSeguro } from "../../common/tempo";
+
 export type TipoDeConversao = "QUALIFIED" | "WON";
 
 export interface LeadParaExportar {
@@ -47,7 +49,11 @@ export const DIAS_DESDE_O_CLIQUE = 90;
  * jeito que esperamos, e o arquivo continua correto se for aberto e salvo de
  * novo numa planilha.
  */
-export function formataHorario(instante: Date, fuso: string): string {
+export function formataHorario(instante: Date, fusoPedido: string): string {
+  // Mesma proteção do resto do sistema: um fuso que o `Intl` não reconhece
+  // lança, e aqui isso quebraria a exportação inteira por causa de um campo
+  // de configuração.
+  const fuso = fusoSeguro(fusoPedido);
   const partes = new Intl.DateTimeFormat("en-CA", {
     timeZone: fuso,
     hour12: false,
@@ -67,7 +73,8 @@ export function formataHorario(instante: Date, fuso: string): string {
 }
 
 /** O deslocamento do fuso naquele instante, como `-03:00`. */
-function deslocamento(instante: Date, fuso: string): string {
+function deslocamento(instante: Date, fusoPedido: string): string {
+  const fuso = fusoSeguro(fusoPedido);
   const nomeado = new Intl.DateTimeFormat("en-US", { timeZone: fuso, timeZoneName: "longOffset" })
     .formatToParts(instante)
     .find((parte) => parte.type === "timeZoneName")?.value;

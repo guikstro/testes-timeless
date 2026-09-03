@@ -18,11 +18,66 @@
  *   gasto continua sendo montada em UTC.
  */
 
+import { Logger } from "@nestjs/common";
+
+const logger = new Logger("Tempo");
+
 export const FUSO = "America/Sao_Paulo";
 
 const formatadores = new Map<string, Intl.DateTimeFormat>();
 
-function formatador(fuso: string): Intl.DateTimeFormat {
+/** Fusos já conferidos, para a checagem não ser refeita a cada lead. */
+const conhecidos = new Map<string, boolean>();
+/** Fusos já reclamados, para um valor errado não virar uma linha de log por lead. */
+const jaAvisados = new Set<string>();
+
+/**
+ * Se este ambiente reconhece o fuso.
+ *
+ * A conferência é tentar construir o formatador, e não comparar com uma lista:
+ * assim vale exatamente o que o `Intl` daqui aceita, incluindo apelidos como
+ * `US/Pacific`, em vez de uma cópia da lista que envelhece sozinha.
+ */
+export function fusoConhecido(fuso: string): boolean {
+  const lembrado = conhecidos.get(fuso);
+  if (lembrado !== undefined) return lembrado;
+
+  let valido = true;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: fuso });
+  } catch {
+    valido = false;
+  }
+
+  conhecidos.set(fuso, valido);
+  return valido;
+}
+
+/**
+ * O fuso pedido, ou o padrão quando ele não existe.
+ *
+ * Um fuso desconhecido faz o `Intl` lançar `RangeError`. Como ele vem da
+ * organização e é lido em toda conta de horário, um valor errado gravado uma
+ * vez derrubava o dashboard, a ficha de todo lead e a exportação do Google de
+ * uma vez só, e a única saída era editar o banco na mão.
+ *
+ * A conferência na entrada impede um valor assim de chegar ao banco daqui em
+ * diante. Isto aqui é para o que já estiver gravado: cair no padrão erra por
+ * algumas horas, e lançar erra por inteiro.
+ */
+export function fusoSeguro(fuso: string | null | undefined): string {
+  if (!fuso) return FUSO;
+  if (fusoConhecido(fuso)) return fuso;
+
+  if (!jaAvisados.has(fuso)) {
+    jaAvisados.add(fuso);
+    logger.warn(JSON.stringify({ event: "fuso_desconhecido", fuso, usando: FUSO }));
+  }
+  return FUSO;
+}
+
+function formatador(fusoPedido: string): Intl.DateTimeFormat {
+  const fuso = fusoSeguro(fusoPedido);
   const existente = formatadores.get(fuso);
   if (existente) return existente;
   // Criar um Intl.DateTimeFormat não é barato, e isto roda por lead.
