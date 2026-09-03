@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { OrganizationsService } from "./organizations.service";
 import { UpdateOrganizationDto } from "./dto/update-organization.dto";
 import { UpdateMemberDto } from "./dto/update-member.dto";
+import { EnviarLogoDto } from "./dto/enviar-logo.dto";
 
 @Controller("organizations")
 @UseGuards(JwtAuthGuard)
@@ -48,5 +49,15 @@ export class OrganizationsController {
     @Param("userId", ParseUUIDPipe) userId: string,
   ): Promise<void> {
     await this.organizationsService.removeMember(user, userId);
+  }
+
+  @Post("current/logo")
+  enviarLogo(@CurrentUser() user: AuthenticatedUser, @Body() dto: EnviarLogoDto) {
+    return this.organizationsService.enviarLogo(user.organizationId, dto.arquivo);
+  }
+
+  @Delete("current/logo")
+  removerLogo(@CurrentUser() user: AuthenticatedUser) {
+    return this.organizationsService.removerLogo(user.organizationId);
   }
 }

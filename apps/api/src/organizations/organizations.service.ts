@@ -4,10 +4,15 @@ import { AppException } from "../common/exceptions/app-exception";
 import { MembershipRole } from "@prisma/client";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { UpdateOrganizationDto } from "./dto/update-organization.dto";
+import { ArmazenamentoService } from "./upload/armazenamento.service";
+import { ErroDaImagem, validaImagem } from "./upload/imagem-enviada";
 
 @Injectable()
 export class OrganizationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly armazenamento: ArmazenamentoService,
+  ) {}
 
   /**
    * organizationId always comes from the authenticated JWT, never from a
@@ -53,6 +58,54 @@ export class OrganizationsService {
         ...(dto.googleConversionWon === "" ? { googleConversionWon: null } : {}),
       },
     });
+  }
+
+
+  /** Mensagem por motivo, para a tela dizer o que houve em vez de "falhou". */
+  private static readonly MOTIVO: Record<ErroDaImagem, string> = {
+    FORMATO_INVALIDO: "Arquivo inválido. Envie uma imagem PNG, JPEG ou WebP.",
+    TIPO_NAO_ACEITO: "Formato não aceito. Use PNG, JPEG ou WebP; SVG não é permitido por segurança.",
+    GRANDE_DEMAIS: "A imagem passa de 2 MB. Reduza o tamanho e tente de novo.",
+    CONTEUDO_NAO_CONFERE: "O conteúdo do arquivo não corresponde a uma imagem válida.",
+  };
+
+  /**
+   * Recebe a logo da organização.
+   *
+   * O arquivo anterior é apagado depois de o novo estar gravado e o banco
+   * apontar para ele. Na ordem inversa, uma falha no meio deixaria a
+   * organização apontando para um arquivo que não existe mais, e a logo
+   * sumiria de todas as telas.
+   */
+  async enviarLogo(organizationId: string, arquivo: string) {
+    const atual = await this.getCurrent(organizationId);
+
+    const resultado = validaImagem(arquivo);
+    if (!resultado.ok) {
+      throw new AppException("IMAGEM_INVALIDA", OrganizationsService.MOTIVO[resultado.erro], HttpStatus.BAD_REQUEST);
+    }
+
+    const nome = await this.armazenamento.guardar(resultado.imagem);
+    const base = process.env.PUBLIC_TRACKING_BASE_URL ?? "http://localhost:3001";
+
+    const atualizada = await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { logoUrl: `${base}/uploads/${nome}` },
+    });
+
+    await this.armazenamento.apagarPelaUrl(atual.logoUrl);
+    return atualizada;
+  }
+
+  /** Remove a logo e o arquivo, voltando à inicial do nome. */
+  async removerLogo(organizationId: string) {
+    const atual = await this.getCurrent(organizationId);
+    const atualizada = await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { logoUrl: null },
+    });
+    await this.armazenamento.apagarPelaUrl(atual.logoUrl);
+    return atualizada;
   }
 
   /**

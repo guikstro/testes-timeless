@@ -61,6 +61,10 @@ async function bootstrap() {
     exclude: [
       "health",
       { path: "r/:code", method: RequestMethod.GET },
+      // Imagens enviadas pelo cliente. Fora do prefixo e sem sessão: a logo
+      // aparece em relatório impresso e em tela pública, e exigir token ali
+      // quebraria a imagem sem ganho nenhum.
+      { path: "uploads/:nome", method: RequestMethod.GET },
       { path: "whatsapp-webhook", method: RequestMethod.GET },
       { path: "whatsapp-webhook", method: RequestMethod.POST },
       // Receptor da Evolution API (Fase 8). Mesmo motivo dos dois acima: é um

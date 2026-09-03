@@ -2,6 +2,7 @@ import { OrganizationsService } from "./organizations.service";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { AppException } from "../common/exceptions/app-exception";
+import { ArmazenamentoService } from "./upload/armazenamento.service";
 
 describe("OrganizationsService, gestão da equipe", () => {
   function buildService() {
@@ -17,7 +18,20 @@ describe("OrganizationsService, gestão da equipe", () => {
       auditLog: { create: jest.fn().mockResolvedValue({}) },
       $transaction: jest.fn().mockResolvedValue([]),
     };
-    return { service: new OrganizationsService(prisma as unknown as PrismaService), prisma };
+    const armazenamento = {
+      guardar: jest.fn().mockResolvedValue("abc.png"),
+      apagarPelaUrl: jest.fn().mockResolvedValue(undefined),
+      ler: jest.fn(),
+      etagDe: jest.fn(),
+    };
+    return {
+      service: new OrganizationsService(
+        prisma as unknown as PrismaService,
+        armazenamento as unknown as ArmazenamentoService,
+      ),
+      prisma,
+      armazenamento,
+    };
   }
 
   const quem = (over: Partial<AuthenticatedUser> = {}): AuthenticatedUser => ({
