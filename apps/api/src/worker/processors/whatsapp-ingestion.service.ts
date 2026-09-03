@@ -4,7 +4,7 @@ import { PrismaService } from "../../common/prisma/prisma.service";
 import { normalizePhone } from "../../common/utils/normalize-phone";
 import { isUniqueConstraintError } from "../../common/utils/is-unique-constraint-error";
 import { WhatsAppInboundMessageJob } from "../../common/queue/whatsapp-event.job";
-import { AttributionEngine } from "../../attribution/attribution-engine";
+import { AttributionEngine, AttributionResult } from "../../attribution/attribution-engine";
 import { ConversationClassifierService } from "../../classification/conversation-classifier.service";
 import { ConversionEventsService } from "../../integrations/meta/conversion-events.service";
 import { NotificationsService } from "../../notifications/notifications.service";
@@ -19,6 +19,19 @@ function recorta(texto: string | undefined): string | undefined {
   const limpo = texto.replace(/\s+/g, " ").trim();
   if (limpo.length === 0) return undefined;
   return limpo.length > LIMITE_DA_PREVIA ? `${limpo.slice(0, LIMITE_DA_PREVIA - 1)}…` : limpo;
+}
+
+
+/** A linha de origem, montada num lugar só: ela nasce em dois caminhos. */
+function dadosDaOrigem(organizationId: string, leadId: string, origem: AttributionResult) {
+  return {
+    organizationId,
+    leadId,
+    method: origem.method,
+    confidence: origem.confidence,
+    trackingClickId: origem.trackingClickId,
+    evidence: origem.evidence,
+  };
 }
 
 
@@ -75,24 +88,25 @@ export class WhatsAppIngestionService {
     const normalizedPhone = normalizePhone(job.waId);
     const occurredAt = new Date(job.timestampSeconds * 1000);
 
-    const { lead, wasCreated: leadWasCreated } = await this.findOrCreateLead(
+    const { lead, wasCreated: leadWasCreated, semOrigem } = await this.findOrCreateLead(
       organizationId,
       normalizedPhone,
       job.waId,
       job.profileName,
       occurredAt,
+      job,
     );
 
     if (leadWasCreated) {
-      await this.prisma.leadEvent.create({
-        data: { organizationId, leadId: lead.id, type: "LEAD_CREATED", occurredAt },
-      });
-      // First-touch, computed once from exactly this message's evidence and
-      // never revisited afterward (Section 31) — see AttributionEngine.
-      // Recorded before the Meta Lead event so a same-lead conversion send
-      // can already see the ctwa_clid, if any, on first attempt.
-      await this.attributeLead(organizationId, lead.id, job);
+      // A origem já foi gravada junto do lead, na mesma transação. Aqui fica
+      // só o que não cabe numa transação: enfileirar o evento para a Meta.
       await this.conversionEvents.recordLead(organizationId, lead.id, occurredAt);
+    } else if (semOrigem) {
+      // Rede de segurança. Um lead sem linha de origem é um primeiro toque
+      // que não terminou: ou foi criado antes desta correção, ou escapou da
+      // transação por algum caminho que não previmos. A origem sai desta
+      // mensagem, que é pior que a primeira e muito melhor que nenhuma.
+      await this.completarPrimeiroToque(organizationId, lead.id, job, occurredAt);
     }
 
     const { conversation, wasCreated: conversationWasCreated } = await this.findOrCreateConversation(
@@ -200,42 +214,68 @@ export class WhatsAppIngestionService {
     });
   }
 
-  private async attributeLead(organizationId: string, leadId: string, job: WhatsAppInboundMessageJob): Promise<void> {
-    const result = await this.attributionEngine.resolve({
+  /**
+   * Termina um primeiro toque que ficou pela metade.
+   *
+   * Só roda para um lead que já existe e não tem origem gravada. O evento de
+   * criação não é refeito aqui: ele pertence ao instante em que o lead
+   * nasceu, e inventar um agora contaria uma história errada na linha do
+   * tempo.
+   */
+  private async completarPrimeiroToque(
+    organizationId: string,
+    leadId: string,
+    job: WhatsAppInboundMessageJob,
+    occurredAt: Date,
+  ): Promise<void> {
+    const origem = await this.attributionEngine.resolve({
       organizationId,
       messageText: job.text,
       referral: job.referral,
     });
 
     try {
-      await this.prisma.attribution.create({
-        data: {
-          organizationId,
-          leadId,
-          method: result.method,
-          confidence: result.confidence,
-          trackingClickId: result.trackingClickId,
-          evidence: result.evidence,
-        },
-      });
+      await this.prisma.attribution.create({ data: dadosDaOrigem(organizationId, leadId, origem) });
     } catch (error) {
-      // Defensive only: leadWasCreated is itself race-protected, so this
-      // should never actually fire — but a first-touch attribution must
-      // never be overwritten (Section 31), so if it somehow does, skip.
       if (!isUniqueConstraintError(error)) throw error;
+      // Outra entrega terminou o serviço primeiro. Uma atribuição de primeiro
+      // toque nunca é sobrescrita (Section 31), então aqui não há mais nada
+      // a fazer, nem o evento para a Meta, que é dela.
+      return;
     }
+
+    await this.conversionEvents.recordLead(organizationId, leadId, occurredAt);
   }
 
+  /**
+   * O lead e o seu primeiro toque, indivisíveis.
+   *
+   * Criar o lead, registrar a criação e gravar a origem acontecem na mesma
+   * transação de propósito. Antes eram três escritas soltas atrás de um
+   * `if (acabei de criar o lead)`, e isso tinha uma consequência que não
+   * aparecia em lugar nenhum: se o processo morresse entre a primeira e a
+   * terceira, a retentativa do BullMQ encontrava o lead já criado, concluía
+   * que não havia primeiro toque a fazer, e o lead ficava sem origem para
+   * sempre. Sem erro, sem log, e a origem é o produto inteiro.
+   *
+   * `semOrigem` acompanha o lead existente pelo mesmo motivo: é a marca de um
+   * primeiro toque que não terminou, e vem no mesmo `include` para não custar
+   * uma segunda consulta por mensagem.
+   */
   private async findOrCreateLead(
     organizationId: string,
     normalizedPhone: string,
     rawPhone: string,
     profileName: string | undefined,
     occurredAt: Date,
+    job: WhatsAppInboundMessageJob,
   ) {
-    const existing = await this.prisma.lead.findUnique({
-      where: { organizationId_normalizedPhone: { organizationId, normalizedPhone } },
-    });
+    const chave = { organizationId_normalizedPhone: { organizationId, normalizedPhone } };
+    // Só a presença da linha, nunca o conteúdo: o que interessa aqui é se o
+    // primeiro toque terminou, não qual foi a origem.
+    const comOrigem = { attribution: { select: { id: true } } } as const;
+
+    const existing = await this.prisma.lead.findUnique({ where: chave, include: comOrigem });
 
     if (existing) {
       const updated = await this.prisma.lead.update({
@@ -245,28 +285,49 @@ export class WhatsAppIngestionService {
           ...(profileName && !existing.name ? { name: profileName } : {}),
         },
       });
-      return { lead: updated, wasCreated: false };
+      return { lead: updated, wasCreated: false, semOrigem: !existing.attribution };
     }
 
+    // Resolvida antes de abrir a transação: é leitura, e uma transação
+    // interativa esperando consulta prende uma conexão do pool à toa.
+    const origem = await this.attributionEngine.resolve({
+      organizationId,
+      messageText: job.text,
+      referral: job.referral,
+    });
+
     try {
-      const created = await this.prisma.lead.create({
-        data: {
-          organizationId,
-          normalizedPhone,
-          rawPhone,
-          name: profileName,
-          firstContactAt: occurredAt,
-          lastContactAt: occurredAt,
-        },
+      const created = await this.prisma.$transaction(async (tx) => {
+        const lead = await tx.lead.create({
+          data: {
+            organizationId,
+            normalizedPhone,
+            rawPhone,
+            name: profileName,
+            firstContactAt: occurredAt,
+            lastContactAt: occurredAt,
+          },
+        });
+
+        await tx.leadEvent.create({
+          data: { organizationId, leadId: lead.id, type: "LEAD_CREATED", occurredAt },
+        });
+
+        // Primeiro toque, calculado uma vez só a partir da evidência desta
+        // mensagem e nunca revisto depois (Section 31) — ver AttributionEngine.
+        await tx.attribution.create({ data: dadosDaOrigem(organizationId, lead.id, origem) });
+
+        return lead;
       });
-      return { lead: created, wasCreated: true };
+
+      return { lead: created, wasCreated: true, semOrigem: false };
     } catch (error) {
       if (!isUniqueConstraintError(error)) throw error;
       // Lost the race to another concurrent event for the same phone number.
-      const lead = await this.prisma.lead.findUniqueOrThrow({
-        where: { organizationId_normalizedPhone: { organizationId, normalizedPhone } },
-      });
-      return { lead, wasCreated: false };
+      // Quem ganhou gravou a origem na própria transação, então aqui não há
+      // primeiro toque pendente.
+      const lead = await this.prisma.lead.findUniqueOrThrow({ where: chave, include: comOrigem });
+      return { lead, wasCreated: false, semOrigem: !lead.attribution };
     }
   }
 
@@ -294,8 +355,12 @@ export class WhatsAppIngestionService {
         data: { organizationId, leadId, whatsappConnectionId, startedAt: occurredAt, lastMessageAt: occurredAt },
       });
       return { conversation: created, wasCreated: true };
-    } catch {
-      // Lost a race with a concurrent first message for the same lead.
+    } catch (error) {
+      // Perdeu a corrida para outra primeira mensagem do mesmo lead. Quem
+      // garante que isto é uma corrida, e não um defeito nosso engolido, é a
+      // restrição única no banco: antes dela o `catch` era cego e a criação
+      // simplesmente não falhava, então nasciam duas conversas.
+      if (!isUniqueConstraintError(error)) throw error;
       const conversation = await this.prisma.conversation.findFirstOrThrow({
         where: { leadId, whatsappConnectionId },
       });

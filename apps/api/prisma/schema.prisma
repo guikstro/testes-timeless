@@ -384,6 +384,13 @@ model Conversation {
   whatsappConnection WhatsAppConnection @relation(fields: [whatsappConnectionId], references: [id], onDelete: Cascade)
   messages           Message[]
 
+  /**
+   * Uma conversa por (lead, conexão). A ingestão sempre tratou isto como
+   * verdade, mas sem a restrição no banco duas entregas simultâneas do mesmo
+   * lead criavam duas conversas em silêncio, e a última mensagem da lista
+   * passava a depender de qual delas o Postgres devolvesse primeiro.
+   */
+  @@unique([leadId, whatsappConnectionId])
   @@index([organizationId])
   @@index([leadId])
   @@map("conversations")

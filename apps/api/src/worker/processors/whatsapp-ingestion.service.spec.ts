@@ -32,7 +32,7 @@ const UNKNOWN_ATTRIBUTION = { method: "UNKNOWN", confidence: "NONE", trackingCli
 
 describe("WhatsAppIngestionService", () => {
   function buildPrismaMock() {
-    return {
+    const mock = {
       message: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: "msg-created-1" }) },
       whatsAppConnection: {
         findUnique: jest.fn().mockResolvedValue({
@@ -56,7 +56,14 @@ describe("WhatsAppIngestionService", () => {
       },
       leadEvent: { create: jest.fn() },
       attribution: { create: jest.fn() },
+      // A transação interativa roda o callback com o próprio mock: o que o
+      // teste verifica é quais escritas aconteceram, não o isolamento do
+      // Postgres, que é responsabilidade do banco e não deste código.
+      $transaction: jest.fn(),
     };
+
+    mock.$transaction.mockImplementation((executar: (tx: typeof mock) => unknown) => executar(mock));
+    return mock;
   }
 
   function buildAttributionEngineMock() {
@@ -153,7 +160,7 @@ describe("WhatsAppIngestionService", () => {
 
   it("reuses the same lead for a second message from the same phone (deduplication) — no second LEAD_CREATED", async () => {
     const prisma = buildPrismaMock();
-    const existingLead = { id: "lead-1", name: "João", lastContactAt: new Date("2026-01-01T00:00:00Z") };
+    const existingLead = { id: "lead-1", name: "João", lastContactAt: new Date("2026-01-01T00:00:00Z"), attribution: { id: "attr-1" } };
     prisma.lead.findUnique.mockResolvedValue(existingLead);
     prisma.lead.update.mockResolvedValue(existingLead);
     const existingConversation = { id: "conv-1", lastMessageAt: new Date("2026-01-01T00:00:00Z") };
@@ -173,7 +180,8 @@ describe("WhatsAppIngestionService", () => {
   it("reloads the lead instead of failing when it loses a create race to a concurrent delivery", async () => {
     const prisma = buildPrismaMock();
     prisma.lead.create.mockRejectedValue(uniqueConstraintError());
-    const raceWinnerLead = { id: "lead-from-race", name: "João", lastContactAt: new Date(0) };
+    // Quem ganhou a corrida gravou a origem na própria transação.
+    const raceWinnerLead = { id: "lead-from-race", name: "João", lastContactAt: new Date(0), attribution: { id: "attr-1" } };
     prisma.lead.findUniqueOrThrow.mockResolvedValue(raceWinnerLead);
     prisma.conversation.create.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
     const service = buildService(prisma);
@@ -251,7 +259,7 @@ describe("WhatsAppIngestionService", () => {
 
     it("never resolves or persists attribution for a message from an already-existing lead (first-touch only)", async () => {
       const prisma = buildPrismaMock();
-      const existingLead = { id: "lead-1", name: "João", lastContactAt: new Date(0) };
+      const existingLead = { id: "lead-1", name: "João", lastContactAt: new Date(0), attribution: { id: "attr-1" } };
       prisma.lead.findUnique.mockResolvedValue(existingLead);
       prisma.lead.update.mockResolvedValue(existingLead);
       const existingConversation = { id: "conv-1", lastMessageAt: new Date(0) };
@@ -266,6 +274,70 @@ describe("WhatsAppIngestionService", () => {
 
       expect(attributionEngine.resolve).not.toHaveBeenCalled();
       expect(prisma.attribution.create).not.toHaveBeenCalled();
+    });
+
+    it("grava lead, evento de criação e origem na mesma transação", async () => {
+      const prisma = buildPrismaMock();
+      prisma.lead.create.mockResolvedValue({ id: "lead-1", name: null, lastContactAt: new Date(0) });
+      prisma.conversation.create.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
+      const service = buildService(prisma);
+
+      await service.ingest(buildJob());
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      // As três escritas do primeiro toque saem de dentro do callback da
+      // transação, e é isso que impede um lead sem origem.
+      const dentroDaTransacao = prisma.$transaction.mock.calls[0][0] as unknown;
+      expect(typeof dentroDaTransacao).toBe("function");
+      expect(prisma.attribution.create).toHaveBeenCalledTimes(1);
+    });
+
+    /*
+      A regressão que motivou a transação.
+
+      A ingestão morria entre criar o lead e gravar a origem. Na retentativa o
+      lead já existia, a condição antiga (`acabei de criar o lead`) dava falso,
+      e o lead ficava sem origem para sempre, sem erro em lugar nenhum.
+    */
+    it("termina o primeiro toque de um lead que ficou sem origem", async () => {
+      const prisma = buildPrismaMock();
+      const orfao = { id: "lead-1", name: "João", lastContactAt: new Date(0), attribution: null };
+      prisma.lead.findUnique.mockResolvedValue(orfao);
+      prisma.lead.update.mockResolvedValue(orfao);
+      prisma.conversation.findFirst.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
+      prisma.conversation.update.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
+      const attributionEngine = buildAttributionEngineMock();
+      const conversionEvents = buildConversionEventsMock();
+      const service = buildService(prisma, attributionEngine, buildClassifierMock(), conversionEvents);
+
+      await service.ingest(buildJob({ messageId: "wamid.SEGUNDA" }));
+
+      expect(attributionEngine.resolve).toHaveBeenCalledTimes(1);
+      expect(prisma.attribution.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ leadId: "lead-1", method: "UNKNOWN" }),
+      });
+      expect(conversionEvents.recordLead).toHaveBeenCalledWith("org-1", "lead-1", expect.any(Date));
+      // O evento de criação pertence ao instante em que o lead nasceu, e
+      // inventar um agora contaria uma história errada na linha do tempo.
+      const eventTypes = prisma.leadEvent.create.mock.calls.map((call) => call[0].data.type);
+      expect(eventTypes).not.toContain("LEAD_CREATED");
+    });
+
+    it("não grava a origem duas vezes quando outra entrega termina o primeiro toque antes", async () => {
+      const prisma = buildPrismaMock();
+      const orfao = { id: "lead-1", name: "João", lastContactAt: new Date(0), attribution: null };
+      prisma.lead.findUnique.mockResolvedValue(orfao);
+      prisma.lead.update.mockResolvedValue(orfao);
+      prisma.conversation.findFirst.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
+      prisma.conversation.update.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
+      prisma.attribution.create.mockRejectedValue(uniqueConstraintError());
+      const conversionEvents = buildConversionEventsMock();
+      const service = buildService(prisma, buildAttributionEngineMock(), buildClassifierMock(), conversionEvents);
+
+      await service.ingest(buildJob({ messageId: "wamid.SEGUNDA" }));
+
+      // Quem gravou a origem é quem manda o evento para a Meta.
+      expect(conversionEvents.recordLead).not.toHaveBeenCalled();
     });
 
     it("passes the referral block through to the attribution engine untouched", async () => {
@@ -300,7 +372,7 @@ describe("WhatsAppIngestionService", () => {
 
     it("never records a Meta Lead event for a message from an already-existing lead", async () => {
       const prisma = buildPrismaMock();
-      const existingLead = { id: "lead-1", name: "João", lastContactAt: new Date(0) };
+      const existingLead = { id: "lead-1", name: "João", lastContactAt: new Date(0), attribution: { id: "attr-1" } };
       prisma.lead.findUnique.mockResolvedValue(existingLead);
       prisma.lead.update.mockResolvedValue(existingLead);
       const existingConversation = { id: "conv-1", lastMessageAt: new Date(0) };
@@ -318,7 +390,7 @@ describe("WhatsAppIngestionService", () => {
   describe("classification (Fase 5)", () => {
     it("classifies every message, not just the first, with the current lead and the created message's internal id", async () => {
       const prisma = buildPrismaMock();
-      const existingLead = { id: "lead-1", status: "QUALIFIED", name: "João", lastContactAt: new Date(0) };
+      const existingLead = { id: "lead-1", status: "QUALIFIED", name: "João", lastContactAt: new Date(0), attribution: { id: "attr-1" } };
       prisma.lead.findUnique.mockResolvedValue(existingLead);
       prisma.lead.update.mockResolvedValue(existingLead);
       const existingConversation = { id: "conv-1", lastMessageAt: new Date(0) };
@@ -405,6 +477,7 @@ describe("WhatsAppIngestionService", () => {
         rawPhone: "5585999999999",
         status: "NEW",
         lastContactAt: new Date(0),
+        attribution: { id: "attr-1" },
       };
       prisma.lead.findUnique.mockResolvedValue(existente);
       prisma.lead.update.mockResolvedValue(existente);
