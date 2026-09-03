@@ -2,7 +2,6 @@ import { apiFetch } from "@/lib/api-client";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/skeleton";
-import { BrandForm } from "./brand-form";
 import { CreateRuleForm } from "./create-rule-form";
 import { DeleteRuleButton } from "./delete-rule-button";
 
@@ -20,34 +19,11 @@ const ALVO: Record<ClassificationRule["targetStatus"], { rotulo: string; tom: "i
   WON: { rotulo: "Marca venda", tom: "success" },
 };
 
-interface Organization {
-  name: string;
-  logoUrl: string | null;
-  brandColor: string | null;
-}
-
-export async function AbaGeral() {
-  const [rules, organization] = await Promise.all([
-    apiFetch<ClassificationRule[]>("/classification-rules"),
-    apiFetch<Organization>("/organizations/current"),
-  ]);
+export async function AbaGatilhos() {
+  const rules = await apiFetch<ClassificationRule[]>("/classification-rules");
 
   return (
-    <div className="space-y-5">
-      <Card className="p-6">
-        <CardHeader
-          title="Identidade da empresa"
-          description="A logo e a cor aparecem no menu, nos botões e nos destaques da plataforma."
-          className="mb-6"
-        />
-        <BrandForm
-          organizationName={organization.name}
-          logoUrl={organization.logoUrl}
-          brandColor={organization.brandColor}
-        />
-      </Card>
-
-      <Card className="p-6">
+    <Card className="p-6">
         <CardHeader
           title="Gatilhos de qualificação e venda"
           description="Quando uma mensagem recebida contiver a frase exata, sem diferenciar maiúsculas de minúsculas, o lead muda de estágio sozinho."
@@ -83,7 +59,6 @@ export async function AbaGeral() {
           Prefira frases distintas e específicas. Uma frase genérica como &ldquo;ok&rdquo; qualificaria quase toda
           conversa, e um funil que qualifica todo mundo não separa ninguém.
         </p>
-      </Card>
-    </div>
+    </Card>
   );
 }

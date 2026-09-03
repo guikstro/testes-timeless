@@ -1,14 +1,21 @@
 import { apiFetch } from "@/lib/api-client";
 import { GrupoDePilulas } from "@/components/ui/pill-group";
-import { AbaGeral } from "./aba-geral";
+import { AbaGatilhos } from "./aba-gatilhos";
+import { AbaAparencia } from "./aba-aparencia";
 import { AbaSeguranca } from "./aba-seguranca";
 import { AbaEquipe } from "./aba-equipe";
 import { Papel } from "./team-list";
 
+/*
+  Na ordem em que se usa, e não na ordem em que foram escritas. Gatilhos e
+  equipe mudam toda semana; logo, cor e senha se definem uma vez e quase não
+  se voltam a tocar. Abrir no que se usa mais poupa um clique por visita.
+*/
 const ABAS = [
-  { chave: "geral", rotulo: "Geral" },
-  { chave: "seguranca", rotulo: "Segurança" },
+  { chave: "gatilhos", rotulo: "Gatilhos" },
   { chave: "equipe", rotulo: "Equipe" },
+  { chave: "aparencia", rotulo: "Aparência" },
+  { chave: "seguranca", rotulo: "Segurança" },
 ] as const;
 
 type Aba = (typeof ABAS)[number]["chave"];
@@ -25,7 +32,7 @@ export default async function SettingsPage({
   searchParams: Promise<{ aba?: string }>;
 }) {
   const { aba } = await searchParams;
-  const atual: Aba = ABAS.some((opcao) => opcao.chave === aba) ? (aba as Aba) : "geral";
+  const atual: Aba = ABAS.some((opcao) => opcao.chave === aba) ? (aba as Aba) : "gatilhos";
 
   // A sessão diz quem é você e o que você pode: as três abas dependem disso,
   // então vem antes de escolher o que buscar.
@@ -53,7 +60,8 @@ export default async function SettingsPage({
       </div>
 
       {/* Cada aba busca só o que ela mostra, em vez de a página buscar tudo. */}
-      {atual === "geral" ? <AbaGeral /> : null}
+      {atual === "gatilhos" ? <AbaGatilhos /> : null}
+      {atual === "aparencia" ? <AbaAparencia /> : null}
       {atual === "seguranca" ? (
         <AbaSeguranca emailAtual={sessao.user.email} impersonando={sessao.impersonating} />
       ) : null}

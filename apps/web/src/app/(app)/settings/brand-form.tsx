@@ -9,7 +9,28 @@ import { BrandState, updateBrand } from "./actions";
 
 const initialState: BrandState = {};
 
-const PRESETS = ["#2563EB", "#7C3AED", "#0F766E", "#B45309", "#BE123C", "#0F172A"];
+/**
+ * Doze cores prontas, cobrindo a roda inteira.
+ *
+ * Todas escuras e saturadas o bastante para servirem de acento: um tom claro
+ * demais desaparece sobre o marfim do tema claro, e um tom lavado não
+ * consegue destacar nada. Quem quiser exatamente a cor da própria marca usa o
+ * seletor ao lado; estas existem para quem não tem uma e não quer decidir.
+ */
+const PRESETS: { hex: string; nome: string }[] = [
+  { hex: "#007D5E", nome: "Verde Timeless" },
+  { hex: "#059669", nome: "Esmeralda" },
+  { hex: "#0F766E", nome: "Verde-azulado" },
+  { hex: "#0E7490", nome: "Ciano" },
+  { hex: "#2563EB", nome: "Azul" },
+  { hex: "#4F46E5", nome: "Índigo" },
+  { hex: "#7C3AED", nome: "Roxo" },
+  { hex: "#DB2777", nome: "Rosa" },
+  { hex: "#BE123C", nome: "Carmim" },
+  { hex: "#EA580C", nome: "Laranja" },
+  { hex: "#B45309", nome: "Âmbar" },
+  { hex: "#334155", nome: "Grafite" },
+];
 
 export function BrandForm({
   organizationName,
@@ -24,7 +45,7 @@ export function BrandForm({
   // Estado local só para a prévia: mostrar o resultado antes de salvar evita
   // o ciclo "salva, vê feio, volta, corrige".
   const [url, setUrl] = useState(logoUrl ?? "");
-  const [color, setColor] = useState(brandColor ?? "#2563EB");
+  const [color, setColor] = useState(brandColor ?? "#007D5E");
 
   const preview = brandPalette(color);
 
@@ -58,12 +79,13 @@ export function BrandForm({
               />
               {PRESETS.map((preset) => (
                 <button
-                  key={preset}
+                  key={preset.hex}
                   type="button"
-                  onClick={() => setColor(preset)}
-                  aria-label={`Usar a cor ${preset}`}
-                  aria-pressed={color.toLowerCase() === preset.toLowerCase()}
-                  style={{ backgroundColor: preset }}
+                  onClick={() => setColor(preset.hex)}
+                  title={preset.nome}
+                  aria-label={`Usar a cor ${preset.nome}`}
+                  aria-pressed={color.toLowerCase() === preset.hex.toLowerCase()}
+                  style={{ backgroundColor: preset.hex }}
                   className="focus-ring h-7 w-7 rounded-lg shadow-subtle transition-transform duration-200 ease-soft hover:scale-110 active:scale-95 aria-pressed:ring-2 aria-pressed:ring-ink aria-pressed:ring-offset-2"
                 />
               ))}
