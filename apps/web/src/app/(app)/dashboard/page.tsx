@@ -2,9 +2,10 @@ import Link from "next/link";
 import { AtualizaAoVivo } from "@/components/notifications/atualiza-ao-vivo";
 import { apiFetch } from "@/lib/api-client";
 import { formatCentsAsBRL } from "@/lib/currency";
+import { Hero } from "./hero";
+import { Funil3D } from "./funil-3d";
 import { formatDuration, responseSpeedTone, SPEED_TONE_CLASSES } from "@/lib/duration";
 import { ArrivalHeatmap } from "./arrival-heatmap";
-import { FunnelChart } from "./funnel-chart";
 import { OriginTable } from "./origin-table";
 import { StatCard } from "./stat-card";
 import { DailyPoint, LeadsAreaChart } from "./leads-area-chart";
@@ -59,6 +60,10 @@ interface Overview {
 
 const PERIODS = [7, 30, 90];
 
+function plural(quantidade: number, singular: string, muitos: string): string {
+  return `${quantidade} ${quantidade === 1 ? singular : muitos}`;
+}
+
 function formatRate(rate: number | null): string {
   // Null é "não houve base para calcular" — 0% afirmaria que ninguém converteu.
   if (rate === null) return "Sem base";
@@ -80,47 +85,58 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Dashboard</h1>
-          <AtualizaAoVivo />
-          <p className="mt-0.5 text-sm text-ink-mute">
-            {totals.leads > 0
-              ? `${totals.leads} lead(s) nos últimos ${days} dias`
-              : `Nenhum lead nos últimos ${days} dias`}
-          </p>
-        </div>
-        <div className="flex gap-1 rounded-lg border border-line bg-panel p-1">
-          {PERIODS.map((option) => (
-            <Link
-              key={option}
-              href={`/dashboard?days=${option}`}
-              aria-current={option === days ? "page" : undefined}
-              className={`rounded px-3 py-1 text-sm transition-colors ${
-                option === days ? "bg-ink text-canvas" : "text-ink-soft hover:bg-panel-soft"
-              }`}
-            >
-              {option} dias
-            </Link>
-          ))}
-        </div>
+      <Hero
+        dias={days}
+        periodos={PERIODS}
+        de={overview.period.from.slice(0, 10)}
+        ate={overview.period.to.slice(0, 10)}
+        leads={totals.leads}
+        deltaLeads={comparacao.leads.delta}
+        receitaCentavos={totals.revenueCents}
+        deltaReceita={comparacao.revenueCents.delta}
+        secundarios={[
+          {
+            rotulo: "Aproveitáveis",
+            valor: String(totals.workable),
+            nota: totals.disqualified > 0 ? plural(totals.disqualified, "descartado", "descartados") : undefined,
+          },
+          { rotulo: "Taxa de qualificação", valor: formatRate(totals.qualificationRate) },
+          { rotulo: "Taxa de fechamento", valor: formatRate(totals.closeRate) },
+          {
+            rotulo: "Ticket médio",
+            valor: totals.won > 0 ? formatCentsAsBRL(Math.round(totals.revenueCents / totals.won)) : "Sem base",
+          },
+        ]}
+      />
+
+      <AtualizaAoVivo />
+
+      {/*
+        O funil vem logo depois da abertura porque é a pergunta que a tela
+        existe para responder: onde some gente entre a mensagem e a venda.
+      */}
+      <div className="surface mt-5 p-6">
+        <h2 className="font-display text-destaque font-semibold tracking-tight text-ink">Onde os leads param</h2>
+        <p className="mb-4 mt-0.5 text-apoio text-ink-mute">
+          A largura de cada disco é a etapa. A parede entre dois discos é quem saiu.
+        </p>
+        <Funil3D
+          etapas={[
+            { rotulo: "Leads", valor: totals.workable },
+            { rotulo: "Qualificados", valor: totals.qualified },
+            { rotulo: "Reuniões", valor: totals.meetings },
+            { rotulo: "Vendas", valor: totals.won },
+          ]}
+        />
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <StatCard
-          rotulo="Leads"
-          numero={totals.leads}
-          delta={comparacao.leads.delta}
-          anterior={comparacao.leads.anterior}
-          serie={daily.map((d) => d.leads)}
-          nota={totals.disqualified > 0 ? `${totals.disqualified} descartado(s)` : undefined}
-        />
+      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
           rotulo="Qualificados"
           numero={totals.qualified}
           delta={comparacao.qualified.delta}
           anterior={comparacao.qualified.anterior}
-          nota={`${formatRate(totals.qualificationRate)} de ${totals.workable}`}
+          nota={`de ${totals.workable} aproveitáveis`}
         />
         <StatCard
           rotulo="Reuniões"
@@ -137,26 +153,18 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           serie={daily.map((d) => d.won)}
           nota={`${formatRate(totals.closeRate)} dos qualificados`}
         />
-        <StatCard
-          rotulo="Receita"
-          numero={Math.round(totals.revenueCents / 100)}
-          formato="moeda"
-          delta={comparacao.revenueCents.delta}
-          anterior={Math.round(comparacao.revenueCents.anterior / 100)}
-          nota={totals.won > 0 ? `${formatCentsAsBRL(Math.round(totals.revenueCents / totals.won))} por venda` : undefined}
-        />
       </div>
 
-      <div className="mb-6 rounded-xl border border-line bg-panel p-6">
+      <div className="surface mt-5 p-6">
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
           <div>
-            <h2 className="text-sm font-semibold text-ink">Leads e vendas por dia</h2>
-            <p className="mt-0.5 text-xs text-ink-mute">Passe o mouse para ver um dia específico</p>
+            <h2 className="font-display text-destaque font-semibold tracking-tight text-ink">Leads e vendas por dia</h2>
+            <p className="mt-0.5 text-apoio text-ink-mute">Passe o mouse para ver um dia específico</p>
           </div>
           {/* Rótulo direto no pico: um valor por ponto viraria ruído, e sem
               nenhum o gráfico dependeria do hover para informar qualquer coisa. */}
           {peakDay && peakDay.leads > 0 ? (
-            <p className="text-xs text-ink-mute">
+            <p className="text-apoio text-ink-mute">
               Pico: <span className="font-semibold text-ink">{peakDay.leads}</span> em{" "}
               {new Date(`${peakDay.date}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
             </p>
@@ -169,7 +177,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             {/* O tooltip enriquece, não pode ser a única via: a tabela mantém
                 todo valor acessível sem depender de ponteiro. */}
             <details className="mt-4 border-t border-line/60 pt-3">
-              <summary className="cursor-pointer text-xs text-ink-mute hover:text-ink-soft">Ver os números</summary>
+              <summary className="cursor-pointer text-apoio text-ink-mute hover:text-ink-soft">Ver os números</summary>
               <div className="mt-3 max-h-56 overflow-auto">
                 <table className="w-full text-left text-sm">
                   <thead className="text-xs uppercase text-ink-mute">
@@ -204,10 +212,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         muda resultado numa operação de WhatsApp: quanto tempo alguém espera
         para ser atendido. Antes esse número só existia dentro de cada lead.
       */}
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-line bg-panel p-5 shadow-subtle">
+      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="surface p-5">
           <p className="text-rotulo font-medium uppercase tracking-[0.1em] text-ink-mute">Resposta típica</p>
-          <p className={`mt-2 text-[26px] font-semibold leading-none tabular-nums ${SPEED_TONE_CLASSES[responseSpeedTone(atendimento.medianaPrimeiraRespostaSegundos)]}`}>
+          <p className={`mt-2 text-[clamp(1.5rem,3vw,1.75rem)] font-semibold leading-none tabular-nums ${SPEED_TONE_CLASSES[responseSpeedTone(atendimento.medianaPrimeiraRespostaSegundos)]}`}>
             {formatDuration(atendimento.medianaPrimeiraRespostaSegundos)}
           </p>
           {/* Mediana e não média: um lead respondido três dias depois puxaria
@@ -215,9 +223,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <p className="mt-2 text-rotulo text-ink-mute">Mediana até a primeira resposta</p>
         </div>
 
-        <div className="rounded-2xl border border-line bg-panel p-5 shadow-subtle">
+        <div className="surface p-5">
           <p className="text-rotulo font-medium uppercase tracking-[0.1em] text-ink-mute">Aguardando você</p>
-          <p className="mt-2 flex items-baseline gap-2 text-[26px] font-semibold leading-none tabular-nums text-ink">
+          <p className="mt-2 flex items-baseline gap-2 text-[clamp(1.5rem,3vw,1.75rem)] font-semibold leading-none tabular-nums text-ink">
             {atendimento.aguardando}
             {atendimento.aguardando > 0 ? (
               <span className="relative flex h-2 w-2">
@@ -231,34 +239,23 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </Link>
         </div>
 
-        <div className="rounded-2xl border border-line bg-panel p-5 shadow-subtle">
+        <div className="surface p-5">
           <p className="text-rotulo font-medium uppercase tracking-[0.1em] text-ink-mute">Sem resposta</p>
-          <p className="mt-2 text-[26px] font-semibold leading-none tabular-nums text-ink">{atendimento.semResposta}</p>
+          <p className="mt-2 text-[clamp(1.5rem,3vw,1.75rem)] font-semibold leading-none tabular-nums text-ink">{atendimento.semResposta}</p>
           <p className="mt-2 text-rotulo text-ink-mute">
             de {atendimento.respondidos + atendimento.semResposta} leads no período
           </p>
         </div>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <div className="surface p-6">
-          <h2 className="font-display text-destaque font-semibold tracking-tight text-ink">Onde os leads param</h2>
-          <p className="mb-5 mt-0.5 text-xs text-ink-mute">A queda entre cada etapa do funil</p>
-          <FunnelChart
-            etapas={[
-              { rotulo: "Leads", valor: totals.workable, nota: totals.disqualified > 0 ? `${totals.disqualified} fora` : undefined },
-              { rotulo: "Qualificados", valor: totals.qualified, nota: formatRate(totals.qualificationRate) },
-              { rotulo: "Reuniões", valor: totals.meetings },
-              { rotulo: "Vendas", valor: totals.won, nota: formatRate(totals.closeRate) },
-            ]}
-          />
-        </div>
+      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
+
 
         <div className="surface p-6">
           <h2 className="font-display text-destaque font-semibold tracking-tight text-ink">Qual origem fecha melhor</h2>
           {/* Volume esconde qualidade: a origem que traz mais gente
               frequentemente não é a que fecha melhor. */}
-          <p className="mb-4 mt-0.5 text-xs text-ink-mute">Clique num título para reordenar</p>
+          <p className="mb-4 mt-0.5 text-apoio text-ink-mute">Clique num título para reordenar</p>
           {byOrigin.length > 0 ? (
             <OriginTable origens={byOrigin} />
           ) : (
@@ -267,9 +264,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </div>
       </div>
 
-      <div className="surface mb-6 p-6">
+      <div className="surface mt-5 p-6">
         <h2 className="font-display text-destaque font-semibold tracking-tight text-ink">Quando os leads chegam</h2>
-        <p className="mb-5 mt-0.5 text-xs text-ink-mute">
+        <p className="mb-5 mt-0.5 text-apoio text-ink-mute">
           Por dia da semana e faixa de horário, no horário de Brasília
         </p>
         <ArrivalHeatmap celulas={chegadas} />
