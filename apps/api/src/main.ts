@@ -68,6 +68,10 @@ async function bootstrap() {
   app.setGlobalPrefix("api", {
     exclude: [
       "health",
+      // Cada rota de saúde entra por conta própria: a exclusão é por caminho
+      // exato, então `health` sozinho deixava `health/filas` atrás do
+      // prefixo, onde nenhum monitoramento iria procurar.
+      "health/filas",
       { path: "r/:code", method: RequestMethod.GET },
       // Imagens enviadas pelo cliente. Fora do prefixo e sem sessão: a logo
       // aparece em relatório impresso e em tela pública, e exigir token ali
