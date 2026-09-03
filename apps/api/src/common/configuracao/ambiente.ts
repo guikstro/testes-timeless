@@ -21,6 +21,25 @@ import { Logger } from "@nestjs/common";
  * variáveis uma a cada reinício é a pior forma possível de descobrir isso.
  */
 
+/**
+ * Se este processo está numa máquina de desenvolvimento.
+ *
+ * A pergunta é feita ao contrário de propósito. O código todo perguntava
+ * `NODE_ENV !== "production"`, e isso falha para o lado errado: a variável não
+ * definida, que é exatamente o caso de uma imagem de produção mal configurada,
+ * respondia "é desenvolvimento" e ligava os atalhos de desenvolvimento em
+ * produção. Um deles devolvia o token de recuperação de senha dentro da
+ * resposta da rota pública, o que é tomada de conta para qualquer e-mail
+ * conhecido.
+ *
+ * Agora só é desenvolvimento quem diz que é. Ausente, vazio ou escrito errado
+ * conta como produção, que é o lado seguro de errar.
+ */
+export function ehDesenvolvimento(): boolean {
+  const ambiente = process.env.NODE_ENV?.trim();
+  return ambiente === "development" || ambiente === "test";
+}
+
 export type Processo = "api" | "worker";
 
 interface Exigencia {
@@ -81,7 +100,7 @@ const EXIGENCIAS: Exigencia[] = [
 ];
 
 export function confereAmbiente(processo: Processo, logger = new Logger("Ambiente")): void {
-  const producao = process.env.NODE_ENV === "production";
+  const producao = !ehDesenvolvimento();
   const impedimentos: string[] = [];
   const avisos: string[] = [];
 
@@ -122,7 +141,7 @@ export function confereAmbiente(processo: Processo, logger = new Logger("Ambient
 export function origensPermitidas(): string[] | boolean {
   const configurado = process.env.WEB_APP_URL?.split(",").map((origem) => origem.trim()).filter(Boolean);
   if (configurado && configurado.length > 0) return configurado;
-  return process.env.NODE_ENV !== "production";
+  return ehDesenvolvimento();
 }
 
 /**

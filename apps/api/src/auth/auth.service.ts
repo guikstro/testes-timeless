@@ -13,6 +13,7 @@ import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { ChangeEmailDto } from "./dto/change-email.dto";
+import { ehDesenvolvimento } from "../common/configuracao/ambiente";
 import { AuthenticatedUser, JwtPayload } from "./jwt-payload.interface";
 
 const ACCESS_TOKEN_TTL = "15m";
@@ -238,12 +239,20 @@ export class AuthService {
       },
     });
 
-    // In production this should be delivered via a real EmailProvider (SMTP/SES/Resend).
-    // No provider is configured yet — see docs/ARCHITECTURE.md "Pendências".
-    const isDev = process.env.NODE_ENV !== "production";
+    /*
+      In production this should be delivered via a real EmailProvider
+      (SMTP/SES/Resend). No provider is configured yet — see
+      docs/ARCHITECTURE.md "Pendências".
+
+      A pergunta é "isto é desenvolvimento?", e não "isto não é produção?". A
+      diferença não é estilo: a segunda forma responde sim quando `NODE_ENV`
+      não está definida, que era justamente o caso da imagem de produção deste
+      repositório. Nela, esta rota pública devolvia um token de recuperação
+      válido para qualquer e-mail existente, o que é tomada de conta.
+    */
     return {
       message: "Se o e-mail existir, enviaremos instruções de recuperação.",
-      ...(isDev ? { devToken: rawToken } : {}),
+      ...(ehDesenvolvimento() ? { devToken: rawToken } : {}),
     };
   }
 

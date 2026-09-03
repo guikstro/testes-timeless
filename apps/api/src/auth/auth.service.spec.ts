@@ -33,7 +33,7 @@ function buildPrismaMock(): MockPrisma {
   };
 
   return {
-    user: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
+    user: { findUnique: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
     organization: { findUnique: jest.fn() },
     membership: { create: jest.fn(), findUnique: jest.fn() },
     refreshToken: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
@@ -217,6 +217,59 @@ describe("AuthService", () => {
       await expect(service.login({ email: "ana@example.com", password: "correct-password" })).rejects.toMatchObject({
         response: { code: "NO_ORGANIZATION" },
       });
+    });
+  });
+
+  describe("recuperação de senha", () => {
+    const original = process.env.NODE_ENV;
+    afterEach(() => { process.env.NODE_ENV = original; });
+
+    async function pedirRecuperacao() {
+      prisma.user.findFirst.mockResolvedValue({ id: "user-1", email: "ana@x.com" });
+      prisma.passwordResetToken.create.mockResolvedValue({});
+      return service.forgotPassword({ email: "ana@x.com" });
+    }
+
+    /*
+      A regressão mais grave da revisão.
+
+      O atalho era ligado por `NODE_ENV !== "production"`, e a imagem de
+      produção deste repositório nunca definia `NODE_ENV`. Ou seja: em
+      produção, esta rota pública devolvia um token de recuperação válido para
+      qualquer e-mail existente. Isso é tomada de conta, não vazamento.
+    */
+    it("não devolve o token quando NODE_ENV não está definida", async () => {
+      delete process.env.NODE_ENV;
+
+      expect(await pedirRecuperacao()).not.toHaveProperty("devToken");
+    });
+
+    it("não devolve o token em produção", async () => {
+      process.env.NODE_ENV = "production";
+
+      expect(await pedirRecuperacao()).not.toHaveProperty("devToken");
+    });
+
+    it("não devolve o token com um valor escrito errado", async () => {
+      process.env.NODE_ENV = "prod";
+
+      expect(await pedirRecuperacao()).not.toHaveProperty("devToken");
+    });
+
+    it("devolve o token só quando alguém diz que é desenvolvimento", async () => {
+      process.env.NODE_ENV = "development";
+
+      expect(await pedirRecuperacao()).toHaveProperty("devToken", expect.any(String));
+    });
+
+    it("responde igual para um e-mail que não existe", async () => {
+      process.env.NODE_ENV = "development";
+      prisma.user.findFirst.mockResolvedValue(null);
+
+      const resposta = await service.forgotPassword({ email: "ninguem@x.com" });
+
+      expect(resposta).not.toHaveProperty("devToken");
+      expect(resposta.message).toContain("Se o e-mail existir");
     });
   });
 
