@@ -90,6 +90,14 @@ model Organization {
   campaigns           Campaign[]
   conversionEvents    ConversionEvent[]
   notifications       Notification[]
+  /**
+   * Estas duas guardavam `organization_id` como coluna solta, sem chave
+   * estrangeira. O vínculo existia só na cabeça de quem escreveu o código:
+   * nada impedia uma linha de apontar para uma organização que não existe, e
+   * uma consulta escopada por essa coluna devolveria dado errado em silêncio.
+   */
+  conversations       Conversation[]
+  leadEvents          LeadEvent[]
 
   @@map("organizations")
 }
@@ -380,6 +388,7 @@ model Conversation {
   lastMessageAt        DateTime @default(now()) @map("last_message_at")
   createdAt            DateTime @default(now()) @map("created_at")
 
+  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   lead               Lead               @relation(fields: [leadId], references: [id], onDelete: Cascade)
   whatsappConnection WhatsAppConnection @relation(fields: [whatsappConnectionId], references: [id], onDelete: Cascade)
   messages           Message[]
@@ -472,9 +481,16 @@ model LeadEvent {
    */
   sequence   BigInt        @default(autoincrement())
 
-  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   @@index([leadId, occurredAt])
+  /**
+   * A coluna era usada em filtro sem nenhum índice atrás dela. Com a linha do
+   * tempo crescendo para sempre, qualquer consulta por organização acabaria
+   * varrendo a tabela inteira.
+   */
+  @@index([organizationId, occurredAt])
   @@map("lead_events")
 }
 
