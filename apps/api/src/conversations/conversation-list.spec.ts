@@ -1,106 +1,90 @@
-import { ConversaBruta, MensagemBruta, montaLista, pendentes } from "./conversation-list";
+import { ATRASO_SEGUNDOS, montaItem } from "./conversation-list";
+import type { LinhaDaCaixa } from "./caixa-de-entrada";
 
-const AGORA = new Date("2026-09-02T12:00:00.000Z");
-const minutosAtras = (n: number) => new Date(AGORA.getTime() - n * 60_000);
+const AGORA = new Date("2026-03-01T12:00:00.000Z");
 
-function msg(direction: "INBOUND" | "OUTBOUND", minutos: number, text = "oi"): MensagemBruta {
-  return { direction, type: "TEXT", text, timestamp: minutosAtras(minutos) };
-}
-
-function conversa(over: Partial<ConversaBruta> = {}): ConversaBruta {
+function linha(over: Partial<LinhaDaCaixa> = {}): LinhaDaCaixa {
   return {
-    id: "c1",
-    lastMessageAt: minutosAtras(1),
-    lead: {
-      id: "lead-1",
-      name: "Ana",
-      normalizedPhone: "+5511999999999",
-      rawPhone: "5511999999999",
-      status: "NEW",
-      disqualifiedAt: null,
-    },
-    messages: [],
+    id: "conv-1",
+    lastMessageAt: new Date("2026-03-01T11:50:00.000Z"),
+    leadId: "lead-1",
+    leadName: "Ana",
+    normalizedPhone: "5585999999999",
+    rawPhone: "5585999999999",
+    status: "NEW",
+    disqualifiedAt: null,
+    naoRespondidas: 0,
+    esperaDesde: null,
+    ultimaDirecao: "OUTBOUND",
+    ultimoTipo: "TEXT",
+    ultimoTexto: "Bom dia",
+    ultimaEm: new Date("2026-03-01T11:50:00.000Z"),
     ...over,
   };
 }
 
-describe("pendentes", () => {
-  it("conta as mensagens do lead até esbarrar numa nossa", () => {
-    // Da mais recente para a mais antiga: duas do lead, e antes delas uma
-    // nossa, que encerra a contagem.
-    const lista = pendentes([msg("INBOUND", 1), msg("INBOUND", 5), msg("OUTBOUND", 9), msg("INBOUND", 12)]);
-    expect(lista).toHaveLength(2);
-  });
-
-  it("não conta nada quando a última palavra foi nossa", () => {
-    expect(pendentes([msg("OUTBOUND", 1), msg("INBOUND", 5)])).toHaveLength(0);
-  });
-});
-
-describe("montaLista", () => {
+describe("montaItem", () => {
   it("descreve a conversa com prévia, contagem e espera", () => {
-    const [item] = montaLista(
-      [conversa({ messages: [msg("INBOUND", 10, "Quero saber o preço"), msg("INBOUND", 40), msg("OUTBOUND", 90)] })],
+    const item = montaItem(
+      linha({
+        naoRespondidas: 2,
+        esperaDesde: new Date("2026-03-01T11:00:00.000Z"),
+        ultimaDirecao: "INBOUND",
+        ultimoTexto: "Ainda está aí?",
+      }),
       AGORA,
     );
 
-    expect(item.lastMessage).toEqual({
-      direction: "INBOUND",
-      text: "Quero saber o preço",
-      timestamp: minutosAtras(10).toISOString(),
-    });
+    expect(item.lastMessage).toMatchObject({ direction: "INBOUND", text: "Ainda está aí?" });
     expect(item.unreadCount).toBe(2);
     expect(item.awaitingReply).toBe(true);
-    // Quarenta minutos, e não dez: o lead espera desde a primeira que ficou
-    // sem resposta, não desde a última que ele mandou.
-    expect(item.esperandoHaSegundos).toBe(40 * 60);
+    // Conta desde a primeira sem resposta, não desde a última: se o lead
+    // mandou três mensagens em uma hora, ele espera há uma hora.
+    expect(item.esperandoHaSegundos).toBe(3600);
   });
 
   it("normaliza a prévia para não quebrar a linha da lista", () => {
-    const [item] = montaLista([conversa({ messages: [msg("INBOUND", 1, "  oi\n\n  tudo bem?  ")] })], AGORA);
+    const item = montaItem(linha({ ultimoTexto: "  oi\n\n  tudo   bem?  " }), AGORA);
+
     expect(item.lastMessage?.text).toBe("oi tudo bem?");
   });
 
   it("descreve mensagem sem texto em vez de deixar a linha vazia", () => {
-    const [item] = montaLista(
-      [conversa({ messages: [{ direction: "INBOUND", type: "OTHER", text: null, timestamp: minutosAtras(1) }] })],
-      AGORA,
-    );
+    const item = montaItem(linha({ ultimoTipo: "OTHER", ultimoTexto: null }), AGORA);
+
     expect(item.lastMessage?.text).toBe("Mensagem não textual");
   });
 
   it("aceita conversa ainda sem nenhuma mensagem", () => {
-    const [item] = montaLista([conversa({ messages: [] })], AGORA);
+    const item = montaItem(
+      linha({ ultimaDirecao: null, ultimoTipo: null, ultimoTexto: null, ultimaEm: null }),
+      AGORA,
+    );
+
     expect(item.lastMessage).toBeNull();
-    expect(item.unreadCount).toBe(0);
+    expect(item.awaitingReply).toBe(false);
     expect(item.esperandoHaSegundos).toBeNull();
   });
 
-  it("o filtro de não lidas deixa passar só quem tem mensagem sem resposta", () => {
-    const lista = montaLista(
-      [
-        conversa({ id: "pendente", messages: [msg("INBOUND", 2)] }),
-        conversa({ id: "respondida", messages: [msg("OUTBOUND", 1), msg("INBOUND", 2)] }),
-      ],
-      AGORA,
-      "unread",
-    );
+  it("não inventa espera quando ninguém está esperando", () => {
+    const item = montaItem(linha({ naoRespondidas: 0, esperaDesde: null }), AGORA);
 
-    expect(lista.map((item) => item.id)).toEqual(["pendente"]);
+    expect(item.awaitingReply).toBe(false);
+    expect(item.esperandoHaSegundos).toBeNull();
   });
 
-  it("o filtro de sem resposta separa o que está atrasado do que acabou de chegar", () => {
-    const lista = montaLista(
-      [
-        conversa({ id: "recente", messages: [msg("INBOUND", 5)] }),
-        conversa({ id: "atrasada", messages: [msg("INBOUND", 45)] }),
-      ],
-      AGORA,
-      "awaiting",
-    );
+  it("nunca devolve espera negativa", () => {
+    // O horário vem do relógio do WhatsApp, não do nosso: mensagem com
+    // carimbo no futuro existe, e "esperando há menos vinte segundos" seria
+    // pior que zero.
+    const item = montaItem(linha({ naoRespondidas: 1, esperaDesde: new Date(AGORA.getTime() + 20_000) }), AGORA);
 
-    // Os dois estão sem resposta; só um está esperando há tempo demais. Se os
-    // dois filtros devolvessem o mesmo, um deles não teria razão de existir.
-    expect(lista.map((item) => item.id)).toEqual(["atrasada"]);
+    expect(item.esperandoHaSegundos).toBe(0);
+  });
+
+  it("o limiar de atraso continua sendo meia hora", () => {
+    // É o ponto vermelho da tela, e o número que a literatura de vendas
+    // aponta como queda acentuada de conversão.
+    expect(ATRASO_SEGUNDOS).toBe(30 * 60);
   });
 });

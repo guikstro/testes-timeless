@@ -157,12 +157,19 @@ export function ConversationList({
         )}
 
         {/*
-          Dizer que a lista foi cortada. Sem isto, "não achei" e "não procurei
-          além daqui" viram a mesma frase para quem lê.
+          Dizer que a lista foi cortada, e por qual critério.
+
+          Sem isto, "não achei" e "não procurei além daqui" viram a mesma frase
+          para quem lê. E a frase muda com o filtro porque a ordem muda: em
+          atrasadas a lista vem de quem espera há mais tempo, não de quem
+          escreveu por último, e prometer "mais recentes" ali seria mentir
+          justamente na tela feita para achar quem foi esquecido.
         */}
         {truncado && (
           <p className="border-t border-line/50 px-4 py-3 text-rotulo leading-relaxed text-ink-mute">
-            Mostrando as conversas mais recentes. Use a busca para encontrar uma mais antiga.
+            {filtro === "awaiting"
+              ? "Mostrando quem espera há mais tempo. Use a busca para achar alguém específico."
+              : "Mostrando as conversas mais recentes. Use a busca para encontrar uma mais antiga."}
           </p>
         )}
       </div>

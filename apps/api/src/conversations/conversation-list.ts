@@ -1,34 +1,14 @@
 /**
- * A lista da caixa de entrada, montada a partir das linhas do banco.
+ * A forma da caixa de entrada e como uma linha do banco vira um item da tela.
  *
- * Fica separada do serviço para que a regra de "o que está pendente" possa ser
- * verificada sem banco nenhum. Ela é o coração da tela: erra aqui e o operador
- * responde a conversa errada, ou pior, deixa de responder a certa.
+ * A regra de "o que está pendente" mora no SQL de `caixa-de-entrada.ts`, e não
+ * mais aqui: ela precisa valer antes do corte de duzentas conversas, senão o
+ * filtro esconde justamente quem está esperando há mais tempo. O que sobrou
+ * neste arquivo é formatação.
  */
+import type { LinhaDaCaixa } from "./caixa-de-entrada";
 
 export type EstagioDoLead = "NEW" | "QUALIFIED" | "MEETING_SCHEDULED" | "WON";
-
-export interface MensagemBruta {
-  direction: "INBOUND" | "OUTBOUND";
-  type: "TEXT" | "OTHER";
-  text: string | null;
-  timestamp: Date;
-}
-
-export interface ConversaBruta {
-  id: string;
-  lastMessageAt: Date;
-  lead: {
-    id: string;
-    name: string | null;
-    normalizedPhone: string;
-    rawPhone: string;
-    status: EstagioDoLead;
-    disqualifiedAt: Date | null;
-  };
-  /** As mais recentes primeiro, que é como a contagem de pendentes é feita. */
-  messages: MensagemBruta[];
-}
 
 export interface ItemDaLista {
   id: string;
@@ -58,66 +38,43 @@ export const ATRASO_SEGUNDOS = 30 * 60;
 
 export type FiltroDaCaixa = "all" | "unread" | "awaiting";
 
-/**
- * Quantas mensagens do lead estão sem resposta.
- *
- * Conta de trás para frente até esbarrar numa mensagem nossa. É a definição
- * pragmática de "não lida" sem coluna nova no banco: se respondemos depois,
- * lemos; se não, não.
- */
-export function pendentes(mensagens: MensagemBruta[]): MensagemBruta[] {
-  const acumuladas: MensagemBruta[] = [];
-  for (const mensagem of mensagens) {
-    if (mensagem.direction === "OUTBOUND") break;
-    acumuladas.push(mensagem);
-  }
-  return acumuladas;
-}
-
 /** Texto curto para a prévia, sem quebras de linha atravessando a lista. */
-function previa(mensagem: MensagemBruta | undefined): string | null {
-  if (!mensagem) return null;
-  if (mensagem.type !== "TEXT" || !mensagem.text) return "Mensagem não textual";
-  return mensagem.text.replace(/\s+/g, " ").trim() || null;
+function previa(direcao: string | null, tipo: string | null, texto: string | null): string | null {
+  if (!direcao) return null;
+  if (tipo !== "TEXT" || !texto) return "Mensagem não textual";
+  return texto.replace(/\s+/g, " ").trim() || null;
 }
 
-export function montaLista(
-  conversas: ConversaBruta[],
-  agora: Date,
-  filtro: FiltroDaCaixa = "all",
-): ItemDaLista[] {
-  const itens = conversas.map((conversa): ItemDaLista => {
-    const ultima = conversa.messages[0];
-    const semResposta = pendentes(conversa.messages);
-    const maisAntigaPendente = semResposta[semResposta.length - 1];
-
-    return {
-      id: conversa.id,
-      lead: {
-        id: conversa.lead.id,
-        name: conversa.lead.name,
-        normalizedPhone: conversa.lead.normalizedPhone,
-        status: conversa.lead.status,
-        disqualifiedAt: conversa.lead.disqualifiedAt?.toISOString() ?? null,
-      },
-      lastMessage: ultima
-        ? { direction: ultima.direction, text: previa(ultima), timestamp: ultima.timestamp.toISOString() }
-        : null,
-      unreadCount: semResposta.length,
-      awaitingReply: semResposta.length > 0,
-      // Conta desde a primeira que ficou sem resposta, não desde a última: se
-      // o lead mandou três mensagens em uma hora, ele espera há uma hora.
-      esperandoHaSegundos: maisAntigaPendente
-        ? Math.max(0, Math.round((agora.getTime() - maisAntigaPendente.timestamp.getTime()) / 1000))
-        : null,
-    };
-  });
-
-  if (filtro === "unread") return itens.filter((item) => item.unreadCount > 0);
-  if (filtro === "awaiting") {
-    return itens.filter(
-      (item) => item.esperandoHaSegundos !== null && item.esperandoHaSegundos >= ATRASO_SEGUNDOS,
-    );
-  }
-  return itens;
+/**
+ * Traduz a linha que o banco devolveu no item que a tela desenha.
+ *
+ * Só formatação: a contagem de pendentes, o filtro e a ordem passaram a ser
+ * feitos no banco, porque filtrar depois de cortar em duzentas escondia
+ * justamente as conversas mais abandonadas. Ver `caixa-de-entrada.ts`.
+ */
+export function montaItem(linha: LinhaDaCaixa, agora: Date): ItemDaLista {
+  return {
+    id: linha.id,
+    lead: {
+      id: linha.leadId,
+      name: linha.leadName,
+      normalizedPhone: linha.normalizedPhone,
+      status: linha.status,
+      disqualifiedAt: linha.disqualifiedAt?.toISOString() ?? null,
+    },
+    lastMessage: linha.ultimaDirecao
+      ? {
+          direction: linha.ultimaDirecao,
+          text: previa(linha.ultimaDirecao, linha.ultimoTipo, linha.ultimoTexto),
+          timestamp: (linha.ultimaEm as Date).toISOString(),
+        }
+      : null,
+    unreadCount: linha.naoRespondidas,
+    awaitingReply: linha.naoRespondidas > 0,
+    // Conta desde a primeira que ficou sem resposta, não desde a última: se o
+    // lead mandou três mensagens em uma hora, ele espera há uma hora.
+    esperandoHaSegundos: linha.esperaDesde
+      ? Math.max(0, Math.round((agora.getTime() - linha.esperaDesde.getTime()) / 1000))
+      : null,
+  };
 }
