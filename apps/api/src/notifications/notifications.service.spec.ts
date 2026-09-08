@@ -1,11 +1,19 @@
 const publish = jest.fn().mockResolvedValue(1);
 const quit = jest.fn().mockResolvedValue("OK");
+/**
+ * O dublê precisa aceitar ouvinte.
+ *
+ * Toda conexão de vida longa registra um ouvinte de `error`, e não por zelo:
+ * em Node, um emissor que dispara `error` sem ninguém escutando lança, e a
+ * exceção derruba o processo. Um dublê sem `on` esconderia justamente isso.
+ */
+const on = jest.fn().mockReturnThis();
 
 // O serviço abre a própria conexão no construtor. Trocá-la por um dublê é o
 // que permite testar a publicação sem um Redis de verdade no caminho.
 jest.mock("ioredis", () => ({
   __esModule: true,
-  default: jest.fn().mockImplementation(() => ({ publish, quit })),
+  default: jest.fn().mockImplementation(() => ({ publish, quit, on })),
 }));
 
 import { NotificationsService } from "./notifications.service";

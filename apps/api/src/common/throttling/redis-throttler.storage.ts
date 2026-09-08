@@ -2,7 +2,7 @@ import { Injectable, OnModuleDestroy } from "@nestjs/common";
 import type { ThrottlerStorage } from "@nestjs/throttler";
 import type { ThrottlerStorageRecord } from "@nestjs/throttler/dist/throttler-storage-record.interface";
 import Redis from "ioredis";
-import { getRedisConnectionOptions } from "../queue/redis-connection";
+import { criaConexaoRedis } from "../queue/redis-connection";
 
 /**
  * Contagem do limite de requisições no Redis, e não na memória do processo.
@@ -26,11 +26,14 @@ export class RedisThrottlerStorage implements ThrottlerStorage, OnModuleDestroy 
   private readonly redis: Redis;
 
   constructor() {
-    this.redis = new Redis(getRedisConnectionOptions());
+    this.redis = criaConexaoRedis("Throttler");
   }
 
   async onModuleDestroy(): Promise<void> {
-    await this.redis.quit();
+    // Encerrar uma conexão que já está caindo não pode derrubar o
+    // desligamento: o `quit` rejeita os comandos pendentes, e essa rejeição
+    // sem dono aborta o processo inteiro no meio da saída.
+    await this.redis.quit().catch(() => undefined);
   }
 
   async increment(

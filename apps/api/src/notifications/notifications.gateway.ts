@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
 import Redis from "ioredis";
 import { Observable, Subject } from "rxjs";
-import { getRedisConnectionOptions } from "../common/queue/redis-connection";
+import { criaConexaoRedis } from "../common/queue/redis-connection";
 import { canalDaOrganizacao, NotificationEvent } from "./notification-event";
 
 interface Assinatura {
@@ -34,11 +34,8 @@ export class NotificationsGateway implements OnModuleDestroy {
   private readonly porOrganizacao = new Map<string, Assinatura>();
 
   constructor() {
-    this.assinante = new Redis(getRedisConnectionOptions());
+    this.assinante = criaConexaoRedis("NotificationsGateway");
     this.assinante.on("message", (canal, conteudo) => this.distribuir(canal, conteudo));
-    this.assinante.on("error", (erro) =>
-      this.logger.error(JSON.stringify({ event: "notifications_subscriber_error", error: String(erro) })),
-    );
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -57,7 +54,10 @@ export class NotificationsGateway implements OnModuleDestroy {
     }
     this.porOrganizacao.clear();
 
-    await this.assinante.quit();
+    // Encerrar uma conexão que já está caindo não pode derrubar o
+    // desligamento: o `quit` rejeita os comandos pendentes, e essa rejeição
+    // sem dono aborta o processo inteiro no meio da saída.
+    await this.assinante.quit().catch(() => undefined);
   }
 
   /** Eventos de uma organização, enquanto alguém estiver ouvindo. */

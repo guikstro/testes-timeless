@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
 import Redis from "ioredis";
 import { PrismaService } from "../common/prisma/prisma.service";
-import { getRedisConnectionOptions } from "../common/queue/redis-connection";
+import { criaConexaoRedis } from "../common/queue/redis-connection";
 import { canalDaOrganizacao, NotificationEvent } from "./notification-event";
 
 /** Teto de uma página do histórico, para uma caixa antiga não virar uma consulta enorme. */
@@ -13,11 +13,14 @@ export class NotificationsService implements OnModuleDestroy {
   private readonly publicador: Redis;
 
   constructor(private readonly prisma: PrismaService) {
-    this.publicador = new Redis(getRedisConnectionOptions());
+    this.publicador = criaConexaoRedis("NotificationsService");
   }
 
   async onModuleDestroy(): Promise<void> {
-    await this.publicador.quit();
+    // Encerrar uma conexão que já está caindo não pode derrubar o
+    // desligamento: o `quit` rejeita os comandos pendentes, e essa rejeição
+    // sem dono aborta o processo inteiro no meio da saída.
+    await this.publicador.quit().catch(() => undefined);
   }
 
   /**

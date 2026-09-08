@@ -1,6 +1,6 @@
 import { Injectable, OnModuleDestroy } from "@nestjs/common";
 import Redis from "ioredis";
-import { getRedisConnectionOptions } from "../common/queue/redis-connection";
+import { criaConexaoRedis } from "../common/queue/redis-connection";
 
 /**
  * Uma conexão só, reaproveitada, para a checagem de saúde.
@@ -19,7 +19,7 @@ export class ConexaoDeSaude implements OnModuleDestroy {
   private readonly cliente: Redis;
 
   constructor() {
-    this.cliente = new Redis(getRedisConnectionOptions());
+    this.cliente = criaConexaoRedis("Saude");
   }
 
   async ping(): Promise<void> {
@@ -27,6 +27,9 @@ export class ConexaoDeSaude implements OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
-    await this.cliente.quit();
+    // Encerrar uma conexão que já está caindo não pode derrubar o
+    // desligamento: o `quit` rejeita os comandos pendentes, e essa rejeição
+    // sem dono aborta o processo inteiro no meio da saída.
+    await this.cliente.quit().catch(() => undefined);
   }
 }
