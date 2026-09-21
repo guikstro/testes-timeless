@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable, Logger } from "@nestjs/common";
+import { HttpStatus, Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { WhatsAppConnection } from "@prisma/client";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { EncryptionService } from "../../common/encryption/encryption.service";
@@ -8,9 +8,10 @@ import { normalizePhone } from "../../common/utils/normalize-phone";
 import { ConnectWhatsAppDto } from "./dto/connect-whatsapp.dto";
 import { EvolutionClient } from "./evolution-client";
 import { EvolutionApiError } from "./evolution-api-error";
+import { conferenciaDoWebhook } from "./conferencia-do-webhook";
 
 @Injectable()
-export class WhatsAppConnectionsService {
+export class WhatsAppConnectionsService implements OnModuleInit {
   private readonly logger = new Logger(WhatsAppConnectionsService.name);
 
   constructor(
@@ -18,6 +19,80 @@ export class WhatsAppConnectionsService {
     private readonly encryption: EncryptionService,
     private readonly evolution: EvolutionClient,
   ) {}
+
+  /**
+   * Na subida, confere o webhook de toda instância já conectada.
+   *
+   * É a metade que faltou quando `base64: false` entrou: a correção valia
+   * para instâncias criadas dali em diante, e as que já existiam seguiram
+   * mandando mídia embutida por semanas, perdendo toda mensagem com anexo
+   * grande. Corrigir o caminho de criação não corrige quem já passou por ele.
+   *
+   * Sem `await` na subida de propósito: a API não pode depender da Evolution
+   * estar de pé para aceitar requisição. Se a conferência falhar, ela fica no
+   * log e a próxima subida tenta de novo.
+   */
+  onModuleInit(): void {
+    void this.reconciliaWebhooks();
+  }
+
+  async reconciliaWebhooks(): Promise<void> {
+    let conexoes;
+    try {
+      conexoes = await this.prisma.whatsAppConnection.findMany({
+        where: { provider: "EVOLUTION", instanceName: { not: null } },
+        select: { organizationId: true, instanceName: true },
+      });
+    } catch (error) {
+      this.logger.warn(`Não foi possível listar conexões para conferir webhooks: ${(error as Error).message}`);
+      return;
+    }
+
+    for (const conexao of conexoes) {
+      await this.reconciliaWebhookDe(conexao.instanceName!, conexao.organizationId);
+    }
+  }
+
+  /**
+   * Confere uma instância e só escreve quando há o que corrigir.
+   *
+   * Ler antes de escrever não é economia de rede: é o que faz o log dizer
+   * alguma coisa. Regravar sempre deixaria "webhook corrigido" em toda subida,
+   * e a linha que importa se perderia no meio das que não importam.
+   */
+  private async reconciliaWebhookDe(instanceName: string, organizationId: string): Promise<void> {
+    let urlEsperada: string;
+    try {
+      urlEsperada = this.webhookUrl();
+    } catch {
+      // Sem as variáveis configuradas não há o que conferir contra.
+      return;
+    }
+
+    try {
+      const motivos = conferenciaDoWebhook(await this.evolution.lerWebhook(instanceName), urlEsperada);
+      if (motivos.length === 0) return;
+
+      await this.evolution.defineWebhook(instanceName, urlEsperada);
+      this.logger.warn(
+        JSON.stringify({
+          event: "webhook_da_evolution_corrigido",
+          organizationId,
+          instanceName,
+          motivos,
+        }),
+      );
+    } catch (error) {
+      this.logger.warn(
+        JSON.stringify({
+          event: "webhook_da_evolution_nao_conferido",
+          organizationId,
+          instanceName,
+          message: (error as Error).message,
+        }),
+      );
+    }
+  }
 
   async getCurrent(organizationId: string) {
     return this.redact(await this.prisma.whatsAppConnection.findUnique({ where: { organizationId } }));
@@ -175,6 +250,9 @@ export class WhatsAppConnectionsService {
 
     if (state === "open") {
       await this.markConnected(connection);
+      // Uma sessão que reabre é a segunda chance de corrigir um registro
+      // errado, para a instância não esperar a próxima subida da API.
+      await this.reconciliaWebhookDe(connection.instanceName!, connection.organizationId);
       return;
     }
 

@@ -33,6 +33,75 @@ describe("EvolutionClient", () => {
     expect(body.webhook.events).toEqual(["MESSAGES_UPSERT", "CONNECTION_UPDATE"]);
   });
 
+  describe("conferir o webhook de uma instância que já existe", () => {
+    it("lê o registro atual, incluindo se a mídia vem embutida", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse({
+          url: "http://api:3001/whatsapp-webhook/evolution/secret",
+          enabled: true,
+          webhookBase64: true,
+          webhookByEvents: false,
+          events: ["MESSAGES_UPSERT"],
+        }),
+      );
+      const client = new EvolutionClient();
+
+      await expect(client.lerWebhook("org-1")).resolves.toEqual({
+        url: "http://api:3001/whatsapp-webhook/evolution/secret",
+        habilitado: true,
+        base64: true,
+        porEvento: false,
+        eventos: ["MESSAGES_UPSERT"],
+      });
+    });
+
+    it("trata instância sem webhook como null, e não como registro vazio", async () => {
+      // A Evolution responde `{}` nesse caso. Devolver um objeto com campos
+      // indefinidos faria a conferência comparar lixo com lixo.
+      fetchMock.mockResolvedValue(jsonResponse({}));
+      const client = new EvolutionClient();
+
+      await expect(client.lerWebhook("org-1")).resolves.toBeNull();
+    });
+
+    it("regrava o webhook sem mídia embutida e com os eventos deste produto", async () => {
+      fetchMock.mockResolvedValue(jsonResponse({}));
+      const client = new EvolutionClient();
+
+      await client.defineWebhook("org-1", "http://api:3001/whatsapp-webhook/evolution/secret");
+
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe("http://evolution-test:8080/webhook/set/org-1");
+      const { webhook } = JSON.parse((init as RequestInit).body as string);
+      expect(webhook).toEqual({
+        enabled: true,
+        url: "http://api:3001/whatsapp-webhook/evolution/secret",
+        byEvents: false,
+        // O campo que custava 5% das mensagens recebidas quando vinha `true`.
+        base64: false,
+        events: ["MESSAGES_UPSERT", "CONNECTION_UPDATE"],
+      });
+    });
+
+    it("cria instância nova com a mesma configuração que a conferência exige", async () => {
+      // Se os dois caminhos divergirem, instância nova nasce com um defeito
+      // que a conferência vai "corrigir" na subida seguinte, para sempre.
+      fetchMock.mockResolvedValue(jsonResponse({}));
+      const client = new EvolutionClient();
+
+      await client.createInstance("org-1", "http://api:3001/whatsapp-webhook/evolution/secret");
+      const criacao = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string).webhook;
+
+      fetchMock.mockClear();
+      await client.defineWebhook("org-1", "http://api:3001/whatsapp-webhook/evolution/secret");
+      const regravacao = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string).webhook;
+
+      expect(criacao.base64).toBe(regravacao.base64);
+      expect(criacao.byEvents).toBe(regravacao.byEvents);
+      expect(criacao.events).toEqual(regravacao.events);
+    });
+  });
+
   it("sends the api key as a header on every request", async () => {
     fetchMock.mockResolvedValue(jsonResponse({ instance: { state: "open" } }));
     const client = new EvolutionClient();

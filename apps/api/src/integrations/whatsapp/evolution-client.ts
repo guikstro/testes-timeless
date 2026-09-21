@@ -21,6 +21,22 @@ export interface EvolutionQrCode {
   code: string | null;
 }
 
+/**
+ * O que a Evolution tem registrado como webhook de uma instância.
+ *
+ * Existe para poder *conferir* o registro, e não só escrevê-lo: uma instância
+ * criada por uma versão antiga do produto carrega a configuração daquela
+ * versão para sempre, porque nada nunca volta para corrigi-la.
+ */
+export interface EvolutionWebhookRegistrado {
+  url: string;
+  habilitado: boolean;
+  /** Mídia embutida no payload. Ver `CONFIGURACAO_DO_WEBHOOK`. */
+  base64: boolean;
+  porEvento: boolean;
+  eventos: string[];
+}
+
 export interface EvolutionSendResult {
   /** Id da mensagem no WhatsApp (`3EB0...`), usado como `Message.externalId`. */
   externalId: string;
@@ -32,6 +48,29 @@ export interface EvolutionSendResult {
  * apontar a um servidor de teste local nos e2e, sem mockar métodos — mesma
  * técnica usada no `MetaGraphClient` (Fase 6).
  */
+/**
+ * A configuração que toda instância deste produto precisa ter — uma só, num
+ * lugar só.
+ *
+ * Estava duplicada dentro de `createInstance` e em nenhum outro lugar, que é
+ * o mesmo que dizer que valia apenas para instâncias novas. As antigas ficavam
+ * com o que tinham no dia em que nasceram.
+ *
+ * `base64: false` é a parte que custa mensagem quando está errada: o parser lê
+ * texto, chave, timestamp e o contexto do anúncio, nunca a mídia. Pedir base64
+ * embute a imagem/áudio/vídeo inteiros em todo payload, e a inflação de 4/3 da
+ * codificação leva um vídeo comum a estourar o limite do body parser. Aí a
+ * requisição morre antes de qualquer código nosso rodar, e some a mensagem
+ * inteira, não só o anexo: remetente, texto e horário juntos.
+ */
+export const CONFIGURACAO_DO_WEBHOOK = {
+  byEvents: false,
+  base64: false,
+  // Só o que o pipeline consome: mensagem nova e mudança de conexão.
+  // Presença/typing/contatos gerariam tráfego constante sem uso.
+  events: ["MESSAGES_UPSERT", "CONNECTION_UPDATE"],
+} as const;
+
 @Injectable()
 export class EvolutionClient {
   private readonly baseUrl = process.env.EVOLUTION_API_URL ?? DEFAULT_BASE_URL;
@@ -47,19 +86,46 @@ export class EvolutionClient {
       instanceName,
       qrcode: true,
       integration: "WHATSAPP-BAILEYS",
-      webhook: {
-        url: webhookUrl,
-        byEvents: false,
-        // O parser lê texto, chave, timestamp e o contexto do anúncio — nunca
-        // a mídia. Pedir base64 embutia a imagem/áudio inteiros em todo
-        // payload, estourando o limite do body parser e fazendo a API rejeitar
-        // a mensagem com 413: a conversa se perdia por causa de um anexo que
-        // não usamos.
-        base64: false,
-        // Só o que o pipeline consome: mensagem nova e mudança de conexão.
-        // Presença/typing/contatos gerariam tráfego constante sem uso.
-        events: ["MESSAGES_UPSERT", "CONNECTION_UPDATE"],
-      },
+      webhook: { url: webhookUrl, ...CONFIGURACAO_DO_WEBHOOK },
+    });
+  }
+
+  /**
+   * Lê o webhook registrado para a instância, ou `null` se não houver nenhum.
+   *
+   * A Evolution responde `{}` quando a instância existe mas nunca teve
+   * webhook, então "sem registro" e "instância sem webhook" chegam iguais aqui
+   * e recebem a mesma resposta: `null`, que quem chama trata como "precisa
+   * registrar".
+   */
+  async lerWebhook(instanceName: string): Promise<EvolutionWebhookRegistrado | null> {
+    const body = await this.request<{
+      url?: string;
+      enabled?: boolean;
+      webhookBase64?: boolean;
+      webhookByEvents?: boolean;
+      events?: string[];
+    }>("GET", `/webhook/find/${encodeURIComponent(instanceName)}`);
+
+    if (!body?.url) return null;
+    return {
+      url: body.url,
+      habilitado: body.enabled !== false,
+      base64: body.webhookBase64 === true,
+      porEvento: body.webhookByEvents === true,
+      eventos: body.events ?? [],
+    };
+  }
+
+  /**
+   * Regrava o webhook da instância com a configuração atual do produto.
+   *
+   * Idempotente do lado da Evolution: a rota substitui o registro inteiro, não
+   * mescla, então chamar duas vezes deixa o mesmo estado.
+   */
+  async defineWebhook(instanceName: string, webhookUrl: string): Promise<void> {
+    await this.request("POST", `/webhook/set/${encodeURIComponent(instanceName)}`, {
+      webhook: { enabled: true, url: webhookUrl, ...CONFIGURACAO_DO_WEBHOOK },
     });
   }
 

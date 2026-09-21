@@ -12,7 +12,7 @@ function uniqueConstraintError(): Prisma.PrismaClientKnownRequestError {
 describe("WhatsAppConnectionsService", () => {
   function buildService() {
     const prisma = {
-      whatsAppConnection: { findUnique: jest.fn(), upsert: jest.fn(), update: jest.fn() },
+      whatsAppConnection: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]), upsert: jest.fn(), update: jest.fn() },
     };
     const encryption = {
       encrypt: jest.fn((value: string) => `encrypted(${value})`),
@@ -26,6 +26,8 @@ describe("WhatsAppConnectionsService", () => {
       sendText: jest.fn(),
       logout: jest.fn(),
       deleteInstance: jest.fn(),
+      lerWebhook: jest.fn(),
+      defineWebhook: jest.fn(),
     };
     const service = new WhatsAppConnectionsService(
       prisma as unknown as PrismaService,
@@ -124,5 +126,78 @@ describe("WhatsAppConnectionsService", () => {
     prisma.whatsAppConnection.findUnique.mockResolvedValue(null);
 
     await expect(service.disconnect("org-1")).rejects.toThrow(AppException);
+  });
+  /*
+    A instância conectada antes de `base64: false` existir seguiu mandando a
+    mídia embutida em todo payload, e toda mensagem com anexo grande morria no
+    body parser antes de chegar ao controller. Corrigir o caminho de criação
+    não alcança quem já passou por ele — por isso a conferência.
+  */
+  describe("conferência do webhook das instâncias que já existem", () => {
+    const CONECTADA = { organizationId: "org-1", instanceName: "org-1" };
+
+    beforeEach(() => {
+      process.env.EVOLUTION_WEBHOOK_URL = "https://api.exemplo.com/whatsapp-webhook/evolution";
+      process.env.EVOLUTION_WEBHOOK_TOKEN = "segredo";
+    });
+
+    const URL_ESPERADA = "https://api.exemplo.com/whatsapp-webhook/evolution/segredo";
+
+    function registrado(over: Record<string, unknown> = {}) {
+      return {
+        url: URL_ESPERADA,
+        habilitado: true,
+        base64: false,
+        porEvento: false,
+        eventos: ["MESSAGES_UPSERT", "CONNECTION_UPDATE"],
+        ...over,
+      };
+    }
+
+    it("regrava a instância que ainda manda mídia embutida", async () => {
+      const { service, prisma, evolution } = buildService();
+      prisma.whatsAppConnection.findMany.mockResolvedValue([CONECTADA]);
+      evolution.lerWebhook.mockResolvedValue(registrado({ base64: true }));
+
+      await service.reconciliaWebhooks();
+
+      expect(evolution.defineWebhook).toHaveBeenCalledWith("org-1", URL_ESPERADA);
+    });
+
+    it("não escreve nada quando o registro já está certo", async () => {
+      // Regravar sempre deixaria "webhook corrigido" em toda subida, e a
+      // linha que importa se perderia entre as que não importam.
+      const { service, prisma, evolution } = buildService();
+      prisma.whatsAppConnection.findMany.mockResolvedValue([CONECTADA]);
+      evolution.lerWebhook.mockResolvedValue(registrado());
+
+      await service.reconciliaWebhooks();
+
+      expect(evolution.defineWebhook).not.toHaveBeenCalled();
+    });
+
+    it("segue para a próxima instância quando uma falha", async () => {
+      // Uma instância apagada do lado da Evolution não pode impedir que as
+      // outras sejam conferidas.
+      const { service, prisma, evolution } = buildService();
+      prisma.whatsAppConnection.findMany.mockResolvedValue([
+        { organizationId: "org-sumida", instanceName: "sumida" },
+        CONECTADA,
+      ]);
+      evolution.lerWebhook
+        .mockRejectedValueOnce(new Error("instance does not exist"))
+        .mockResolvedValueOnce(registrado({ base64: true }));
+
+      await service.reconciliaWebhooks();
+
+      expect(evolution.defineWebhook).toHaveBeenCalledWith("org-1", URL_ESPERADA);
+    });
+
+    it("não derruba a subida quando o banco não responde", async () => {
+      const { service, prisma } = buildService();
+      prisma.whatsAppConnection.findMany.mockRejectedValue(new Error("sem banco"));
+
+      await expect(service.reconciliaWebhooks()).resolves.toBeUndefined();
+    });
   });
 });

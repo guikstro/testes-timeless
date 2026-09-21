@@ -55,6 +55,41 @@ export class HttpExceptionFilter implements ExceptionFilter {
       }
     }
 
+    /*
+      Corpo maior que o limite do body parser.
+
+      Sem este ramo virava 500 com pilha de dez quadros, e o log dizia "erro
+      não tratado" para algo que é o contrário disso: o limite funcionando.
+      O custo não era cosmético. Uma instância da Evolution mandando mídia
+      embutida derrubou 5% das mensagens recebidas por semanas, e ninguém viu,
+      porque a linha se parecia com qualquer outro defeito interno.
+
+      Agora é 413, que é o que o cliente precisa ler, e uma linha só, com o
+      tamanho e o limite, que é o que alguém precisa contar.
+    */
+    const grandeDemais = corpoGrandeDemais(exception);
+    if (grandeDemais) {
+      this.logger.warn(
+        JSON.stringify({
+          event: "corpo_grande_demais",
+          requestId: request.idDaRequisicao,
+          method: request.method,
+          path: request.url,
+          // `length` é o Content-Length declarado; vem indefinido em envio
+          // por chunks, e aí só o limite é conhecido.
+          bytesRecebidos: grandeDemais.length,
+          limite: grandeDemais.limit,
+        }),
+      );
+
+      response.status(HttpStatus.PAYLOAD_TOO_LARGE).json({
+        code: "PAYLOAD_TOO_LARGE",
+        message: "O corpo da requisição passou do tamanho máximo aceito.",
+        requestId: request.idDaRequisicao,
+      });
+      return;
+    }
+
     const requestId = request.idDaRequisicao;
 
     /*
@@ -104,4 +139,11 @@ function defaultCodeForStatus(status: number): string {
     default:
       return "ERROR";
   }
+}
+
+/** Erro do body-parser quando o corpo passa do limite, e não qualquer 413. */
+function corpoGrandeDemais(exception: unknown): { length?: number; limit?: number } | null {
+  if (typeof exception !== "object" || exception === null) return null;
+  const erro = exception as { type?: string; length?: number; limit?: number };
+  return erro.type === "entity.too.large" ? { length: erro.length, limit: erro.limit } : null;
 }
