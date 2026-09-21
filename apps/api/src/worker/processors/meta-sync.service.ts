@@ -108,13 +108,56 @@ export class MetaSyncService {
       const range = this.lastNDaysRange(INSIGHTS_LOOKBACK_DAYS);
       const insights = await this.metaGraphClient.getInsights(connection.adAccountId, accessToken, range);
 
+      const adRows = await this.prisma.ad.findMany({ where: { adSet: { campaign: { organizationId } } } });
+      const adIdByExternalId = new Map(adRows.map((a) => [a.externalId, a.id]));
+
+      /*
+        O total da campanha é somado da resposta, não da tabela de anúncios.
+
+        As linhas agora vêm no nível do anúncio, e mais de uma cai na mesma
+        campanha e no mesmo dia. Gravar uma a uma como antes faria o total da
+        campanha virar o gasto do último anúncio do laço, o que é uma
+        corrupção silenciosa de um número que o cliente usa para decidir
+        investimento.
+
+        E a soma parte daqui, e não das linhas que conseguimos casar, porque a
+        conta pode devolver gasto de anúncio que já não existe mais: somar só o
+        reconhecido encolheria o total sem ninguém perceber.
+      */
+      const totalPorCampanhaEDia = new Map<string, number>();
+
       for (const insight of insights) {
-        const campaignId = campaignIdByExternalId.get(insight.campaign_id);
+        const dia = insight.date_start;
+        const centavos = Math.round(Number(insight.spend) * 100);
+        if (!Number.isFinite(centavos)) continue;
+
+        const chave = `${insight.campaign_id}|${dia}`;
+        totalPorCampanhaEDia.set(chave, (totalPorCampanhaEDia.get(chave) ?? 0) + centavos);
+
+        // O detalhe por anúncio só existe para anúncio que conhecemos. Um id
+        // que não casa entra no total da campanha acima e para por aí.
+        const adId = insight.ad_id ? adIdByExternalId.get(insight.ad_id) : undefined;
+        if (!adId) continue;
+
+        const dados = {
+          spendCents: centavos,
+          impressions: Number(insight.impressions ?? 0) || 0,
+          clicks: Number(insight.clicks ?? 0) || 0,
+        };
+        await this.prisma.adInsight.upsert({
+          where: { adId_date: { adId, date: new Date(dia) } },
+          create: { adId, date: new Date(dia), ...dados },
+          update: dados,
+        });
+      }
+
+      for (const [chave, spendCents] of totalPorCampanhaEDia) {
+        const [externalId, dia] = chave.split("|");
+        const campaignId = campaignIdByExternalId.get(externalId);
         if (!campaignId) continue;
-        const spendCents = Math.round(Number(insight.spend) * 100);
         await this.prisma.adSpend.upsert({
-          where: { campaignId_date: { campaignId, date: new Date(insight.date_start) } },
-          create: { campaignId, date: new Date(insight.date_start), spendCents },
+          where: { campaignId_date: { campaignId, date: new Date(dia) } },
+          create: { campaignId, date: new Date(dia), spendCents },
           update: { spendCents },
         });
       }

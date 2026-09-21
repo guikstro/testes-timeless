@@ -46,10 +46,22 @@ export class MetaGraphClient {
     return this.fetchAllPages<MetaAd>(url);
   }
 
+  /**
+   * Desempenho diário, pedido no nível do anúncio.
+   *
+   * Era pedido no nível da campanha, e por isso o produto sabia qual criativo
+   * trouxe cada lead mas não quanto ele custou. Uma chamada só resolve os dois
+   * níveis: o gasto por anúncio vem direto, e o da campanha sai da soma destas
+   * mesmas linhas por `campaign_id`.
+   *
+   * Impressões e cliques não custam chamada extra e separam dois diagnósticos
+   * que o gasto sozinho confunde: o anúncio não está sendo visto, ou está
+   * sendo visto e ninguém clica.
+   */
   async getInsights(adAccountId: string, accessToken: string, range: InsightsRange): Promise<MetaInsight[]> {
     const url = this.buildUrl(`/${adAccountId}/insights`, accessToken, {
-      level: "campaign",
-      fields: "campaign_id,spend",
+      level: "ad",
+      fields: "campaign_id,adset_id,ad_id,spend,impressions,clicks",
       time_increment: "1",
       time_range: JSON.stringify({ since: range.since, until: range.until }),
     });

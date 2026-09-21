@@ -68,10 +68,19 @@ function startMockMetaServer(): Promise<{ server: http.Server; baseUrl: string }
       }
 
       if (url.pathname === "/act_123/insights") {
+        /*
+          Linhas no nível do anúncio, como a Meta devolve com `level=ad`.
+
+          A campanha c1 vem quebrada em dois anúncios: é o caso que prova que
+          o total dela é somado, e não sobrescrito pela última linha do laço.
+          A última linha carrega um anúncio que não existe na conta, para o
+          gasto dele contar no total mesmo sem ter detalhe próprio.
+        */
         res.end(
           JSON.stringify({
             data: [
-              { campaign_id: "c1", spend: "750.00", date_start: "2026-08-20" },
+              { campaign_id: "c1", adset_id: "as1", ad_id: "ad1", spend: "500.00", impressions: "9000", clicks: "310", date_start: "2026-08-20" },
+              { campaign_id: "c1", adset_id: "as1", ad_id: "ad-apagado", spend: "250.00", date_start: "2026-08-20" },
               { campaign_id: "c2", spend: "250.50", date_start: "2026-08-20" },
             ],
           }),
@@ -185,7 +194,17 @@ describe("Meta Ads sync (e2e, against a local Graph API double)", () => {
     const spend = await waitFor(() =>
       prisma.adSpend.findUnique({ where: { campaignId_date: { campaignId: campaign1.id, date: new Date("2026-08-20") } } }),
     );
+    // Quinhentos do anúncio conhecido mais duzentos e cinquenta do apagado: o
+    // total da campanha soma as linhas, e inclui gasto de anúncio que já não
+    // existe na conta. Somar só o reconhecido encolheria o total em silêncio.
     expect(spend.spendCents).toBe(75000);
+
+    const desempenho = await waitFor(() =>
+      prisma.adInsight.findUnique({ where: { adId_date: { adId: ad.id, date: new Date("2026-08-20") } } }),
+    );
+    expect(desempenho.spendCents).toBe(50000);
+    expect(desempenho.impressions).toBe(9000);
+    expect(desempenho.clicks).toBe(310);
 
     const connection = await request(app.getHttpServer())
       .get("/api/integrations/meta")

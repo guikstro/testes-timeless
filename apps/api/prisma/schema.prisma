@@ -751,7 +751,8 @@ model Ad {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  adSet AdSet @relation(fields: [adSetId], references: [id], onDelete: Cascade)
+  adSet    AdSet       @relation(fields: [adSetId], references: [id], onDelete: Cascade)
+  insights AdInsight[]
 
   @@unique([adSetId, externalId])
   @@index([adSetId])
@@ -759,10 +760,43 @@ model Ad {
 }
 
 /**
- * Daily granularity at campaign level (Section 51/70: dashboards need to
- * filter investment by date range via `spend_date`). AdSet/Ad-level spend
- * history is deferred until Phase 8's actual drill-down reporting needs it
- * — see docs/META_ADS.md.
+ * Desempenho diário de um anúncio.
+ *
+ * É o nível em que a decisão de verdade acontece: desligar um criativo ruim
+ * na segunda-feira, em vez de desligar a campanha inteira no fim do mês. O
+ * gasto por campanha sozinho não permite isso, e o produto já sabia qual
+ * anúncio trouxe cada lead — faltava o custo nesse mesmo nível.
+ *
+ * Impressões e cliques entram porque vêm na mesma chamada e separam dois
+ * diagnósticos que o gasto sozinho confunde: o anúncio não está sendo visto,
+ * ou está sendo visto e ninguém clica.
+ */
+model AdInsight {
+  id          String   @id @default(uuid())
+  adId        String   @map("ad_id")
+  date        DateTime @db.Date
+  spendCents  Int      @map("spend_cents")
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  ad Ad @relation(fields: [adId], references: [id], onDelete: Cascade)
+
+  @@unique([adId, date])
+  @@index([date])
+  @@map("ad_insights")
+}
+
+/**
+ * Gasto diário por campanha.
+ *
+ * Continua existindo mesmo agora que há gasto por anúncio, e o total NÃO é
+ * somado a partir da tabela de anúncios: ele vem da resposta da Meta,
+ * agrupada por campanha. A diferença importa porque a conta pode devolver
+ * gasto de anúncio que já não existe mais, e somar só o que conseguimos casar
+ * faria o total da campanha encolher em silêncio — um número que o cliente
+ * usa para decidir investimento.
  */
 model AdSpend {
   id          String   @id @default(uuid())

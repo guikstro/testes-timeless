@@ -103,21 +103,49 @@ describe("MetaGraphClient", () => {
   });
 
   it("requests insights with a daily breakdown over the given date range", async () => {
-    fetchMock.mockResolvedValue(
-      jsonResponse({ data: [{ campaign_id: "c1", spend: "123.45", date_start: "2026-08-01" }] }),
-    );
+    const linha = {
+      campaign_id: "c1",
+      ad_id: "ad1",
+      spend: "123.45",
+      impressions: "900",
+      clicks: "31",
+      date_start: "2026-08-01",
+    };
+    fetchMock.mockResolvedValue(jsonResponse({ data: [linha] }));
     const client = new MetaGraphClient();
 
     const insights = await client.getInsights("act_123", "token-abc", { since: "2026-08-01", until: "2026-08-07" });
 
-    expect(insights).toEqual([{ campaign_id: "c1", spend: "123.45", date_start: "2026-08-01" }]);
+    expect(insights).toEqual([linha]);
     const requestedUrl = new URL(fetchMock.mock.calls[0][0] as string);
-    expect(requestedUrl.searchParams.get("level")).toBe("campaign");
     expect(requestedUrl.searchParams.get("time_increment")).toBe("1");
     expect(JSON.parse(requestedUrl.searchParams.get("time_range")!)).toEqual({
       since: "2026-08-01",
       until: "2026-08-07",
     });
+  });
+
+  it("pede os números no nível do anúncio, com o id da campanha junto", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ data: [] }));
+    const client = new MetaGraphClient();
+
+    await client.getInsights("act_123", "token-abc", { since: "2026-08-01", until: "2026-08-07" });
+
+    const requestedUrl = new URL(fetchMock.mock.calls[0][0] as string);
+    // No nível do anúncio porque o produto já sabe qual criativo trouxe cada
+    // lead, e sem isto nunca saberia quanto ele custou.
+    expect(requestedUrl.searchParams.get("level")).toBe("ad");
+
+    const campos = requestedUrl.searchParams.get("fields")!.split(",");
+    expect(campos).toContain("ad_id");
+    // O id da campanha vem junto porque o total dela é somado destas linhas, e
+    // não da nossa tabela de anúncios: a conta pode devolver gasto de anúncio
+    // que já não existe mais, e somar só o reconhecido encolheria o total.
+    expect(campos).toContain("campaign_id");
+    // Impressões e cliques não custam chamada extra e separam "não está sendo
+    // visto" de "é visto e ninguém clica".
+    expect(campos).toContain("impressions");
+    expect(campos).toContain("clicks");
   });
 
   describe("sendConversionEvent (Fase 7)", () => {

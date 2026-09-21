@@ -11,8 +11,9 @@ describe("MetaSyncService", () => {
       metaConnection: { findUnique: jest.fn(), update: jest.fn() },
       campaign: { upsert: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
       adSet: { upsert: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
-      ad: { upsert: jest.fn() },
+      ad: { upsert: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
       adSpend: { upsert: jest.fn() },
+      adInsight: { upsert: jest.fn() },
     };
     const encryption = { decrypt: jest.fn((value: string) => value.replace("encrypted(", "").replace(")", "")) };
     const metaGraphClient = {
@@ -125,6 +126,104 @@ describe("MetaSyncService", () => {
       where: { campaignId_date: { campaignId: "internal-campaign-1", date: new Date("2026-08-01") } },
       create: { campaignId: "internal-campaign-1", date: new Date("2026-08-01"), spendCents: 12345 },
       update: { spendCents: 12345 },
+    });
+  });
+
+  describe("desempenho por anúncio", () => {
+    it("pede os números com a janela recente, uma vez por sincronia", async () => {
+      const { service, prisma, metaGraphClient } = buildService();
+      prisma.metaConnection.findUnique.mockResolvedValue(connectionRow());
+
+      await service.sync("org-1");
+
+      // O produto já sabia qual anúncio trouxe cada lead; sem estes números
+      // no mesmo nível, nunca saberia quanto ele custou.
+      expect(metaGraphClient.getInsights).toHaveBeenCalledTimes(1);
+      expect(metaGraphClient.getInsights).toHaveBeenCalledWith(
+        "act_123",
+        "real-token",
+        expect.objectContaining({ since: expect.any(String), until: expect.any(String) }),
+      );
+    });
+
+    /*
+      A regressão que este desenho podia introduzir.
+
+      As linhas passaram a vir por anúncio, e várias caem na mesma campanha e
+      no mesmo dia. Gravando uma a uma, como antes, o total da campanha
+      viraria o gasto do último anúncio do laço — corrupção silenciosa de um
+      número que o cliente usa para decidir investimento.
+    */
+    it("soma os anúncios no total da campanha, em vez de sobrescrever", async () => {
+      const { service, prisma, metaGraphClient } = buildService();
+      prisma.metaConnection.findUnique.mockResolvedValue(connectionRow());
+      prisma.campaign.findMany.mockResolvedValue([{ id: "interna-1", externalId: "c1" }]);
+      prisma.ad.findMany.mockResolvedValue([
+        { id: "anuncio-a", externalId: "ad1" },
+        { id: "anuncio-b", externalId: "ad2" },
+      ]);
+      metaGraphClient.getInsights.mockResolvedValue([
+        { campaign_id: "c1", ad_id: "ad1", spend: "100.00", date_start: "2026-08-01" },
+        { campaign_id: "c1", ad_id: "ad2", spend: "50.50", date_start: "2026-08-01" },
+      ]);
+
+      await service.sync("org-1");
+
+      expect(prisma.adSpend.upsert).toHaveBeenCalledTimes(1);
+      expect(prisma.adSpend.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ update: { spendCents: 15050 } }),
+      );
+    });
+
+    it("guarda o gasto, as impressões e os cliques de cada anúncio", async () => {
+      const { service, prisma, metaGraphClient } = buildService();
+      prisma.metaConnection.findUnique.mockResolvedValue(connectionRow());
+      prisma.campaign.findMany.mockResolvedValue([{ id: "interna-1", externalId: "c1" }]);
+      prisma.ad.findMany.mockResolvedValue([{ id: "anuncio-a", externalId: "ad1" }]);
+      metaGraphClient.getInsights.mockResolvedValue([
+        { campaign_id: "c1", ad_id: "ad1", spend: "34.00", impressions: "1200", clicks: "48", date_start: "2026-08-01" },
+      ]);
+
+      await service.sync("org-1");
+
+      expect(prisma.adInsight.upsert).toHaveBeenCalledWith({
+        where: { adId_date: { adId: "anuncio-a", date: new Date("2026-08-01") } },
+        create: { adId: "anuncio-a", date: new Date("2026-08-01"), spendCents: 3400, impressions: 1200, clicks: 48 },
+        update: { spendCents: 3400, impressions: 1200, clicks: 48 },
+      });
+    });
+
+    it("conta no total da campanha o gasto de anúncio que já não existe mais", async () => {
+      const { service, prisma, metaGraphClient } = buildService();
+      prisma.metaConnection.findUnique.mockResolvedValue(connectionRow());
+      prisma.campaign.findMany.mockResolvedValue([{ id: "interna-1", externalId: "c1" }]);
+      // Nenhum anúncio casa: o apagado saiu da conta mas o gasto dele existiu.
+      prisma.ad.findMany.mockResolvedValue([]);
+      metaGraphClient.getInsights.mockResolvedValue([
+        { campaign_id: "c1", ad_id: "apagado", spend: "80.00", date_start: "2026-08-01" },
+      ]);
+
+      await service.sync("org-1");
+
+      // Somar só o que conseguimos casar encolheria o total em silêncio.
+      expect(prisma.adSpend.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ update: { spendCents: 8000 } }),
+      );
+      expect(prisma.adInsight.upsert).not.toHaveBeenCalled();
+    });
+
+    it("mantém os dias separados", async () => {
+      const { service, prisma, metaGraphClient } = buildService();
+      prisma.metaConnection.findUnique.mockResolvedValue(connectionRow());
+      prisma.campaign.findMany.mockResolvedValue([{ id: "interna-1", externalId: "c1" }]);
+      metaGraphClient.getInsights.mockResolvedValue([
+        { campaign_id: "c1", ad_id: "ad1", spend: "10.00", date_start: "2026-08-01" },
+        { campaign_id: "c1", ad_id: "ad1", spend: "20.00", date_start: "2026-08-02" },
+      ]);
+
+      await service.sync("org-1");
+
+      expect(prisma.adSpend.upsert).toHaveBeenCalledTimes(2);
     });
   });
 

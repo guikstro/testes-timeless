@@ -20,9 +20,24 @@ export interface MetaAd {
   adset_id: string;
 }
 
+/**
+ * Uma linha de desempenho, pedida no nível do anúncio.
+ *
+ * `campaign_id` vem junto de propósito: o total por campanha é somado daqui,
+ * e não da nossa tabela de anúncios. A conta pode devolver gasto de anúncio
+ * que já não existe mais, e somar só o que conseguimos casar faria o total da
+ * campanha encolher em silêncio.
+ *
+ * `ad_id` é opcional porque nem toda linha devolvida traz um: uma conta sem
+ * anúncio no período pode devolver a linha agregada sem ele.
+ */
 export interface MetaInsight {
   campaign_id: string;
+  adset_id?: string;
+  ad_id?: string;
   spend: string; // Meta returns this as a decimal string, e.g. "123.45"
+  impressions?: string;
+  clicks?: string;
   date_start: string; // "YYYY-MM-DD"
 }
 
