@@ -23,6 +23,7 @@ import { MetaConnectionsModule } from "./integrations/meta/meta-connections.modu
 import { CampaignsModule } from "./campaigns/campaigns.module";
 import { AdminModule } from "./admin/admin.module";
 import { AnalyticsModule } from "./analytics/analytics.module";
+import { BudgetsModule } from "./budgets/budgets.module";
 import { NotificationsStreamModule } from "./notifications/notifications-stream.module";
 import { ConversationsModule } from "./conversations/conversations.module";
 import { TelemetriaModule } from "./telemetria/telemetria.module";
@@ -57,6 +58,7 @@ import { GoogleConversionsModule } from "./integrations/google/google-conversion
     CampaignsModule,
     AdminModule,
     AnalyticsModule,
+    BudgetsModule,
     NotificationsStreamModule,
     ConversationsModule,
     GoogleConversionsModule,

@@ -18,6 +18,11 @@ import { MetricsMessage, computeLeadMetrics } from "../leads/lead-metrics";
 import { AtendimentoDoLead, atendimentoPorLead } from "./atendimento-por-lead";
 import { expedienteDa, SELECAO_DE_EXPEDIENTE } from "../common/expediente-da-organizacao";
 import { extractAdIds } from "../leads/ad-references";
+import {
+  agregaDesempenhoPorAnuncio,
+  GastoDoAnuncio,
+  LeadDoAnuncio,
+} from "./desempenho-por-anuncio";
 import { fimDoDia, inicioDoDia } from "../common/tempo";
 import {
   agregaDesempenhoPorCampanha,
@@ -293,5 +298,114 @@ export class AnalyticsService {
       campanhas.filter((campanha) => campanha.spend.length > 0 || comAtividade.has(campanha.externalId)),
       atribuidos,
     );
+  }
+
+  /**
+   * Desempenho por anúncio, numa janela.
+   *
+   * A consulta de leads é a mesma do desempenho por campanha, de propósito: o
+   * clique guarda os três ids, então trocar o agrupamento não custa consulta
+   * nenhuma e garante que os dois níveis contem a mesma história. Se um lead
+   * aparece numa campanha aqui e não lá, é defeito, não arredondamento.
+   */
+  async desempenhoPorAnuncio(organizationId: string, janela: Janela) {
+    const de = inicioDoDia(janela.de);
+    const ate = fimDoDia(janela.ate);
+    const deDia = new Date(`${janela.de}T00:00:00.000Z`);
+    const ateDia = new Date(`${janela.ate}T00:00:00.000Z`);
+
+    const [linhas, leads, conexao] = await Promise.all([
+      this.prisma.adInsight.findMany({
+        // O escopo desce pela campanha: anúncio e conjunto não carregam
+        // organização, e filtrar aqui é o que impede alcançar a conta alheia.
+        where: { date: { gte: deDia, lte: ateDia }, ad: { adSet: { campaign: { organizationId } } } },
+        select: {
+          spendCents: true,
+          impressions: true,
+          clicks: true,
+          ad: {
+            select: {
+              id: true,
+              externalId: true,
+              name: true,
+              status: true,
+              adSet: { select: { campaign: { select: { name: true } } } },
+            },
+          },
+        },
+      }),
+      this.prisma.lead.findMany({
+        where: { organizationId, firstContactAt: { gte: de, lte: ate } },
+        select: {
+          qualifiedAt: true,
+          wonAt: true,
+          sale: { select: { amountCents: true } },
+          attribution: {
+            select: {
+              evidence: true,
+              trackingClick: { select: { campaignId: true, adsetId: true, adId: true } },
+            },
+          },
+        },
+      }),
+      /*
+        De quando é o número, e se a fonte dele está de pé.
+
+        Sem isto a tela mostra um gasto sem dizer de quando ele é, e a
+        sincronia roda de hora em hora e pode estar quebrada: o painel
+        continuaria exibindo o valor velho com cara de atual. Um filtro ou uma
+        procedência não declarada é a causa mais comum de discussão numa
+        reunião com o cliente.
+      */
+      this.prisma.metaConnection.findUnique({
+        where: { organizationId },
+        select: { status: true, lastSyncedAt: true, lastSyncError: true },
+      }),
+    ]);
+
+    // As linhas vêm por dia; a tela quer o período. A soma acontece aqui e
+    // não no banco porque o nome do anúncio e da campanha vêm na mesma
+    // viagem, e agrupar no SQL exigiria repeti-los em cada linha.
+    const porAnuncio = new Map<string, GastoDoAnuncio>();
+    for (const linha of linhas) {
+      const chave = linha.ad.externalId;
+      const atual = porAnuncio.get(chave);
+      if (atual) {
+        atual.spendCents += linha.spendCents;
+        atual.impressions += linha.impressions;
+        atual.clicks += linha.clicks;
+        continue;
+      }
+      porAnuncio.set(chave, {
+        adId: linha.ad.id,
+        externalId: linha.ad.externalId,
+        name: linha.ad.name,
+        status: linha.ad.status,
+        campanha: linha.ad.adSet.campaign.name,
+        spendCents: linha.spendCents,
+        impressions: linha.impressions,
+        clicks: linha.clicks,
+      });
+    }
+
+    const atribuidos: LeadDoAnuncio[] = leads.map((lead) => ({
+      adExternalId: extractAdIds(lead.attribution).adId,
+      qualifiedAt: lead.qualifiedAt,
+      wonAt: lead.wonAt,
+      sale: lead.sale,
+    }));
+
+    return {
+      periodo: janela,
+      ...agregaDesempenhoPorAnuncio([...porAnuncio.values()], atribuidos),
+      procedencia: {
+        fonte: conexao ? "Meta Ads" : null,
+        sincronizadoEm: conexao?.lastSyncedAt?.toISOString() ?? null,
+        // A tela precisa distinguir "nunca sincronizou" de "sincronizou e
+        // quebrou": o segundo significa que o número na tela está velho.
+        status: conexao?.status ?? null,
+        erro: conexao?.lastSyncError ?? null,
+      },
+    };
   }
 }

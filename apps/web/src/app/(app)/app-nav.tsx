@@ -91,6 +91,16 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
+    href: "/investimento",
+    label: "Investimento",
+    icon: (
+      <svg {...ICON_PROPS}>
+        <path d="M12 2v20" />
+        <path d="M17 6.5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+      </svg>
+    ),
+  },
+  {
     href: "/links",
     label: "Links",
     icon: (

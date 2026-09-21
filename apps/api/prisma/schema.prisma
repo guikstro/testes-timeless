@@ -90,6 +90,7 @@ model Organization {
   campaigns           Campaign[]
   conversionEvents    ConversionEvent[]
   notifications       Notification[]
+  budgets             Budget[]
   /**
    * Estas duas guardavam `organization_id` como coluna solta, sem chave
    * estrangeira. O vínculo existia só na cabeça de quem escreveu o código:
@@ -757,6 +758,39 @@ model Ad {
   @@unique([adSetId, externalId])
   @@index([adSetId])
   @@map("ads")
+}
+
+/**
+ * A verba combinada com o cliente.
+ *
+ * Declarada aqui, e não lida da Meta, e isso é escolha e não limitação. A
+ * API expõe com segurança o teto da conta e o total já gasto, mas o saldo
+ * pré-pago daquelas contas que recebem crédito por PIX ou boleto não sai
+ * limpo para todo tipo de conta. Mais do que isso: o número que a agência
+ * precisa mostrar costuma ser o combinado com o cliente, que vale também
+ * para o Google e para campanha lançada à mão, e não o estado de cobrança
+ * de uma plataforma só.
+ *
+ * `ate` é opcional porque as duas formas reais são diferentes: verba mensal
+ * tem fim de mês, e depósito de crédito vale até acabar.
+ */
+model Budget {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  /** Dia civil em que a verba passa a valer. */
+  startsOn       DateTime  @map("starts_on") @db.Date
+  /** Null é "até acabar, ou até a próxima verba começar". */
+  endsOn         DateTime? @map("ends_on") @db.Date
+  amountCents    Int       @map("amount_cents")
+  /** Como o cliente chama esta verba. Ex.: "Setembro", "Crédito de lançamento". */
+  label          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, startsOn])
+  @@map("budgets")
 }
 
 /**

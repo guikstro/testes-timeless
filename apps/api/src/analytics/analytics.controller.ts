@@ -41,4 +41,19 @@ export class AnalyticsController {
       comparacao,
     );
   }
+
+  /**
+   * Desempenho por anúncio: o que cada criativo custou e o que ele trouxe.
+   *
+   * Rota separada da de campanhas porque responde outra pergunta. A de
+   * campanhas diz onde o dinheiro está indo; esta diz qual criativo desligar.
+   */
+  @Get("anuncios")
+  anuncios(@CurrentUser() user: AuthenticatedUser, @Query() query: CampanhasQueryDto) {
+    if (query.de > query.ate) {
+      throw new AppException("VALIDATION_ERROR", "A data inicial não pode ser depois da final.", HttpStatus.BAD_REQUEST);
+    }
+
+    return this.analyticsService.desempenhoPorAnuncio(user.organizationId, { de: query.de, ate: query.ate });
+  }
 }

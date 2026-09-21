@@ -31,6 +31,7 @@ const TELAS = [
   "/dashboard",
   "/leads",
   "/campanhas",
+  "/investimento",
   "/conversas",
   "/relatorio",
   // Com parâmetro também: é por ali que a janela de período é lida, e foi
