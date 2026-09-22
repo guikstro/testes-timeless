@@ -30,6 +30,26 @@ export interface DesempenhoDoAnuncio {
   retorno: number | null;
 }
 
+/** Um dia do extrato. `gastoCentavos` é null nos dias que ainda não aconteceram. */
+export interface DiaDeGasto {
+  dia: string;
+  gastoCentavos: number | null;
+  acumuladoCentavos: number | null;
+}
+
+export type MetodoDeIdentificacao = "CTWA_REFERRAL" | "TRACKING_LINK" | "UNKNOWN";
+
+/** Até onde a identificação de origem chega, e o que fica de fora dela. */
+export interface Identificacao {
+  total: number;
+  atePeloAnuncio: number;
+  deAnuncioDesconhecido: number;
+  semNivelDeAnuncio: number;
+  semOrigem: number;
+  porMetodo: Record<MetodoDeIdentificacao, number>;
+  coberturaPorCento: number | null;
+}
+
 export interface Anuncios {
   periodo: { de: string; ate: string };
   anuncios: DesempenhoDoAnuncio[];
@@ -41,6 +61,8 @@ export interface Anuncios {
     receitaCentavos: number;
     semRetorno: number;
   };
+  porDia: DiaDeGasto[];
+  identificacao: Identificacao;
   /** De onde o número veio e de quando ele é. Ver o rodapé da tela. */
   procedencia: {
     fonte: string | null;

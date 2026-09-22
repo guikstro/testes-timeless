@@ -10,7 +10,14 @@ import { FormularioDaVerba } from "./formulario-da-verba";
  * duas de forma diferente: sem verba, o painel convida a declarar uma em vez
  * de mostrar zero, que seria um número inventado.
  */
-export function PainelDaVerba({ situacao }: { situacao: SituacaoDaVerba | null }) {
+export function PainelDaVerba({
+  situacao,
+  gastoDeHoje,
+}: {
+  situacao: SituacaoDaVerba | null;
+  /** Quanto saiu hoje. Null quando o dia ainda não foi sincronizado. */
+  gastoDeHoje: number | null;
+}) {
   if (!situacao) {
     return (
       <section className="surface p-6 sm:p-8">
@@ -57,6 +64,16 @@ export function PainelDaVerba({ situacao }: { situacao: SituacaoDaVerba | null }
 
         <dl className="flex flex-wrap gap-x-8 gap-y-3">
           <Apoio rotulo="Já investido" valor={formatCentsAsBRL(situacao.gastoCentavos)} />
+          {/*
+            O gasto de hoje é a pergunta de quem abre esta tela no meio do dia,
+            e é o número que uma área de cobrança mostra primeiro. Null quando
+            a sincronia ainda não cobriu o dia: zero afirmaria que os anúncios
+            estão parados.
+          */}
+          <Apoio
+            rotulo="Hoje"
+            valor={gastoDeHoje === null ? "Ainda sem medida" : formatCentsAsBRL(gastoDeHoje)}
+          />
           <Apoio
             rotulo="Ritmo por dia"
             // Ritmo zero não é ritmo: enquanto nada foi gasto, ele é desconhecido.

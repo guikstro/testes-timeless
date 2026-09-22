@@ -23,7 +23,10 @@ import {
   GastoDoAnuncio,
   LeadDoAnuncio,
 } from "./desempenho-por-anuncio";
-import { fimDoDia, inicioDoDia } from "../common/tempo";
+import { fimDoDia, inicioDoDia, diaCivilLocal, FUSO } from "../common/tempo";
+import { gastoPorDia } from "./gasto-por-dia";
+import { identificacaoDosLeads, LeadIdentificado, MetodoDeIdentificacao } from "./identificacao-dos-leads";
+import { completaIdsDoAnuncio, HierarquiaDoAnuncio } from "./vinculo-do-anuncio";
 import {
   agregaDesempenhoPorCampanha,
   CampanhaComparada,
@@ -199,6 +202,39 @@ export class AnalyticsService {
   }
 
   /**
+   * De cada anúncio sincronizado, a que conjunto e campanha ele pertence.
+   *
+   * Uma consulta só para todos os leads da janela, em vez de uma por lead. O
+   * escopo desce pela campanha porque `Ad` e `AdSet` não carregam
+   * organização: filtrar aqui, dentro da consulta, é o que impede um id de
+   * outra conta de resolver para o nome da campanha dela.
+   */
+  private async hierarquiaDosAnuncios(
+    organizationId: string,
+    externalIds: string[],
+  ): Promise<Map<string, HierarquiaDoAnuncio>> {
+    if (externalIds.length === 0) return new Map();
+
+    const anuncios = await this.prisma.ad.findMany({
+      where: { externalId: { in: externalIds }, adSet: { campaign: { organizationId } } },
+      select: {
+        externalId: true,
+        adSet: { select: { externalId: true, campaign: { select: { externalId: true } } } },
+      },
+    });
+
+    return new Map(
+      anuncios.map((anuncio) => [
+        anuncio.externalId,
+        {
+          campaignExternalId: anuncio.adSet.campaign.externalId,
+          adSetExternalId: anuncio.adSet.externalId,
+        },
+      ]),
+    );
+  }
+
+  /**
    * Desempenho por campanha em dois períodos escolhidos à mão.
    *
    * Períodos livres, e não uma janela de "últimos N dias", porque uma
@@ -281,10 +317,22 @@ export class AnalyticsService {
       }),
     ]);
 
-    const atribuidos: LeadAtribuido[] = leads.map((lead) => ({
-      // A mesma extração usada na ficha do lead: o id da campanha vem da
-      // coluna do clique ou, no caso do CTWA, só do JSON de evidência.
-      campaignExternalId: extractAdIds(lead.attribution).campaignId,
+    /*
+      Sobe do anúncio para a campanha antes de agregar.
+
+      Sem isto, todo lead vindo de Click-to-WhatsApp entrava com campanha nula
+      e sumia deste relatório, embora a ficha do próprio lead mostrasse o nome
+      da campanha: a Meta manda só o id do anúncio no referral, e a hierarquia
+      só estava sendo resolvida na tela do lead.
+    */
+    const idsBrutos = leads.map((lead) => extractAdIds(lead.attribution));
+    const hierarquia = await this.hierarquiaDosAnuncios(
+      organizationId,
+      [...new Set(idsBrutos.map((ids) => ids.adId).filter((id): id is string => id !== null))],
+    );
+
+    const atribuidos: LeadAtribuido[] = leads.map((lead, i) => ({
+      campaignExternalId: completaIdsDoAnuncio(idsBrutos[i], hierarquia).campaignId,
       qualifiedAt: lead.qualifiedAt,
       wonAt: lead.wonAt,
       sale: lead.sale,
@@ -320,6 +368,7 @@ export class AnalyticsService {
         // organização, e filtrar aqui é o que impede alcançar a conta alheia.
         where: { date: { gte: deDia, lte: ateDia }, ad: { adSet: { campaign: { organizationId } } } },
         select: {
+          date: true,
           spendCents: true,
           impressions: true,
           clicks: true,
@@ -342,6 +391,11 @@ export class AnalyticsService {
           sale: { select: { amountCents: true } },
           attribution: {
             select: {
+              // O método entra aqui para a tela poder dizer *como* cada lead
+              // foi identificado. Sem ele, "sem anúncio" vira uma categoria só
+              // e some a diferença entre não ter evidência e ter evidência que
+              // não chega ao nível do criativo.
+              method: true,
               evidence: true,
               trackingClick: { select: { campaignId: true, adsetId: true, adId: true } },
             },
@@ -395,9 +449,44 @@ export class AnalyticsService {
       sale: lead.sale,
     }));
 
+    /*
+      Quantos leads a tabela acima consegue de fato mostrar.
+
+      Sem esta conta a tela engana de um jeito específico: o lead que não pôde
+      ser ligado a um anúncio não aparece em linha nenhuma, e o cliente lê
+      "estes anúncios trouxeram doze leads" quando a verdade é "doze dos
+      quarenta puderam ser ligados a um anúncio".
+
+      `anuncioConhecido` compara contra os anúncios que gastaram na janela,
+      que é exatamente o conjunto de linhas desenhadas na tabela.
+    */
+    const identificados: LeadIdentificado[] = leads.map((lead) => {
+      const adExternalId = extractAdIds(lead.attribution).adId;
+      return {
+        metodo: (lead.attribution?.method as MetodoDeIdentificacao | undefined) ?? null,
+        adExternalId,
+        anuncioConhecido: adExternalId !== null && porAnuncio.has(adExternalId),
+      };
+    });
+
     return {
       periodo: janela,
       ...agregaDesempenhoPorAnuncio([...porAnuncio.values()], atribuidos),
+      identificacao: identificacaoDosLeads(identificados),
+      /*
+        O extrato dia a dia, montado das mesmas linhas já carregadas acima:
+        `adInsight` vem por anúncio e por dia, e a soma por dia não custa outra
+        viagem ao banco.
+
+        O "hoje" é o dia de Brasília, porque é o dia do cliente que olha a
+        tela. As datas de gasto, essas, são dia civil em UTC e não podem passar
+        por conversão nenhuma.
+      */
+      porDia: gastoPorDia(
+        linhas.map((linha) => ({ date: linha.date, spendCents: linha.spendCents })),
+        janela,
+        diaCivilLocal(new Date(), FUSO),
+      ),
       procedencia: {
         fonte: conexao ? "Meta Ads" : null,
         sincronizadoEm: conexao?.lastSyncedAt?.toISOString() ?? null,

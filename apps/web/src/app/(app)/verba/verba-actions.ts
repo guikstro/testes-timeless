@@ -40,7 +40,7 @@ export async function salvarVerba(
     return { erro: "Não foi possível salvar a verba." };
   }
 
-  revalidatePath("/investimento");
+  revalidatePath("/verba");
   return { okEm: Date.now() };
 }
 
@@ -50,5 +50,5 @@ export async function removerVerba(id: string): Promise<void> {
   } catch {
     // A tela relista de qualquer forma; falhar aqui não pode derrubar a ação.
   }
-  revalidatePath("/investimento");
+  revalidatePath("/verba");
 }

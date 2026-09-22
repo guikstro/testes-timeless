@@ -289,4 +289,84 @@ describe("Meta Ads sync (e2e, against a local Graph API double)", () => {
       .expect(200);
     expect(campaigns.body).toEqual([]);
   });
+
+  /*
+    O lead de Click-to-WhatsApp precisa aparecer no desempenho por campanha.
+
+    A Meta manda só o id do anúncio no referral da mensagem, nunca a campanha.
+    Enquanto o relatório lia o id da campanha direto da evidência, todo lead
+    vindo do caminho de evidência mais forte deste produto entrava com campanha
+    nula e sumia daqui, embora a ficha do próprio lead mostrasse o nome da
+    campanha, porque lá a hierarquia já era resolvida pelo anúncio.
+
+    Este teste vive no nível de banco de propósito: o que se prova é a subida
+    anúncio -> conjunto -> campanha usando as linhas sincronizadas, e um teste
+    de unidade com mapa na mão não provaria isso.
+  */
+  it("conta o lead de clique para o WhatsApp na campanha do anúncio, que a Meta não manda", async () => {
+    const lead = await prisma.lead.create({
+      data: {
+        organizationId: orgId,
+        normalizedPhone: "5585911112222",
+        rawPhone: "+55 85 91111-2222",
+        firstContactAt: new Date("2026-08-20T13:00:00.000Z"),
+        lastContactAt: new Date("2026-08-20T13:00:00.000Z"),
+      },
+    });
+
+    await prisma.attribution.create({
+      data: {
+        organizationId: orgId,
+        leadId: lead.id,
+        method: "CTWA_REFERRAL",
+        confidence: "HIGH",
+        // Sem clique e sem campanha: é exatamente o que a Meta entrega.
+        evidence: { ctwaClid: "clid-abc", adId: "ad1" },
+      },
+    });
+
+    const porCampanha = await request(app.getHttpServer())
+      .get("/api/analytics/campanhas?de=2026-08-01&ate=2026-08-31")
+      .set("Authorization", `Bearer ${orgToken}`)
+      .expect(200);
+
+    const campanha = porCampanha.body.campanhas.find((c: { externalId: string }) => c.externalId === "c1");
+    expect(campanha.atual.leads).toBe(1);
+    // E não cai no balde de "nenhuma campanha reivindica este lead", que é
+    // onde ele estava indo parar.
+    expect(porCampanha.body.semCampanha.atual).toBe(0);
+
+    // E continua aparecendo no nível do anúncio, que é onde a decisão acontece.
+    const porAnuncio = await request(app.getHttpServer())
+      .get("/api/analytics/anuncios?de=2026-08-01&ate=2026-08-31")
+      .set("Authorization", `Bearer ${orgToken}`)
+      .expect(200);
+
+    expect(porAnuncio.body.anuncios.find((a: { externalId: string }) => a.externalId === "ad1").leads).toBe(1);
+    expect(porAnuncio.body.semAnuncio).toBe(0);
+
+    // E a tela sabe dizer que este lead está coberto pela tabela.
+    expect(porAnuncio.body.identificacao).toMatchObject({
+      total: 1,
+      atePeloAnuncio: 1,
+      semOrigem: 0,
+      coberturaPorCento: 100,
+    });
+    expect(porAnuncio.body.identificacao.porMetodo.CTWA_REFERRAL).toBe(1);
+  });
+
+  it("monta o extrato com um dia por dia do período, sem inventar zero no futuro", async () => {
+    const resposta = await request(app.getHttpServer())
+      .get("/api/analytics/anuncios?de=2026-08-01&ate=2026-08-31")
+      .set("Authorization", `Bearer ${orgToken}`)
+      .expect(200);
+
+    expect(resposta.body.porDia).toHaveLength(31);
+
+    const comGasto = resposta.body.porDia.find((d: { dia: string }) => d.dia === "2026-08-20");
+    expect(comGasto.gastoCentavos).toBe(50000);
+
+    // Agosto já passou inteiro, então nenhum dia dele está sem medida.
+    expect(resposta.body.porDia.every((d: { gastoCentavos: number | null }) => d.gastoCentavos !== null)).toBe(true);
+  });
 });

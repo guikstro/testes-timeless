@@ -31,7 +31,9 @@ const TELAS = [
   "/dashboard",
   "/leads",
   "/campanhas",
-  "/investimento",
+  "/verba",
+  // Com período, porque é onde o extrato diário e a identificação são montados.
+  "/verba?de=2026-09-01&ate=2026-09-30",
   "/conversas",
   "/relatorio",
   // Com parâmetro também: é por ali que a janela de período é lida, e foi

@@ -3,27 +3,49 @@ import { intervaloDoMes, leIntervalo, mesAtual, formataDia } from "@/lib/periodo
 import { formatCentsAsBRL } from "@/lib/currency";
 import { GrupoDePilulas } from "@/components/ui/pill-group";
 import { PainelDaVerba } from "./painel-da-verba";
+import { ExtratoDiario } from "./extrato-diario";
 import { TabelaDeAnuncios } from "./tabela-de-anuncios";
+import { Identificacao } from "./identificacao";
+import { HistoricoDeVerbas } from "./historico-de-verbas";
 import { Procedencia } from "./procedencia";
-import { Anuncios, SituacaoDaVerba } from "./tipos";
+import { Anuncios, SituacaoDaVerba, Verba } from "./tipos";
 
 interface Busca {
   de?: string;
   ate?: string;
 }
 
-export default async function InvestimentoPage({ searchParams }: { searchParams: Promise<Busca> }) {
+/**
+ * A verba: quanto foi combinado, quanto já saiu, em que dia saiu e por qual
+ * anúncio.
+ *
+ * A ordem das seções é a ordem das perguntas, não a ordem em que elas foram
+ * construídas:
+ *
+ *   1. Quanto sobra e até quando dá.      (o painel)
+ *   2. Como o dinheiro saiu ao longo do mês. (o extrato)
+ *   3. Para onde ele foi.                  (a tabela por anúncio)
+ *   4. De quanto disso dá para ter certeza. (a identificação)
+ *   5. O que foi combinado, e quando.       (o histórico)
+ *   6. De onde vêm estes números.           (a procedência)
+ *
+ * A identificação vem logo depois da tabela de propósito: ela é a ressalva da
+ * tabela, e ressalva que aparece no fim da página chega tarde demais.
+ */
+export default async function VerbaPage({ searchParams }: { searchParams: Promise<Busca> }) {
   const params = await searchParams;
 
   // Sem período na URL, o mês corrente: é o que se quer ver ao abrir a tela.
   const agora = mesAtual();
   const periodo = leIntervalo(params.de, params.ate) ?? intervaloDoMes(agora.ano, agora.mes);
 
-  const [verba, dados] = await Promise.all([
+  const [situacao, verbas, dados] = await Promise.all([
     apiFetch<SituacaoDaVerba | null>("/verbas/resumo"),
+    apiFetch<Verba[]>("/verbas"),
     apiFetch<Anuncios>(`/analytics/anuncios?de=${periodo.de}&ate=${periodo.ate}`),
   ]);
 
+  const hoje = hojeEmBrasilia();
   const mesesRecentes = ultimosMeses(6);
 
   return (
@@ -34,9 +56,7 @@ export default async function InvestimentoPage({ searchParams }: { searchParams:
             <p className="text-rotulo font-semibold uppercase tracking-[0.14em] text-ink-mute">
               {formataDia(periodo.de)} a {formataDia(periodo.ate)}
             </p>
-            <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink">
-              Investimento
-            </h1>
+            <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink">Verba</h1>
             {/*
               O subtítulo conclui em vez de descrever: com números na mão, ele
               diz o que aconteceu no período, não o nome da tela.
@@ -49,17 +69,19 @@ export default async function InvestimentoPage({ searchParams }: { searchParams:
             opcoes={mesesRecentes.map((mes) => ({
               chave: `${mes.de}|${mes.ate}`,
               rotulo: mes.rotulo,
-              href: `/investimento?de=${mes.de}&ate=${mes.ate}`,
+              href: `/verba?de=${mes.de}&ate=${mes.ate}`,
             }))}
           />
         </div>
       </header>
 
-      <PainelDaVerba situacao={verba} />
+      <PainelDaVerba situacao={situacao} gastoDeHoje={gastoDeHoje(dados, hoje)} />
+
+      <ExtratoDiario dias={dados.porDia} />
 
       <section className="space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className="font-display text-xl font-semibold tracking-tight text-ink">Por anúncio</h2>
+          <h2 className="font-display text-xl font-semibold tracking-tight text-ink">Para onde foi</h2>
           {dados.totais.semRetorno > 0 ? (
             <p className="text-corpo text-ink-mute">
               <span className="font-medium text-ink">{dados.totais.semRetorno}</span>{" "}
@@ -73,6 +95,10 @@ export default async function InvestimentoPage({ searchParams }: { searchParams:
         <TabelaDeAnuncios anuncios={dados.anuncios} />
       </section>
 
+      <Identificacao dados={dados.identificacao} />
+
+      <HistoricoDeVerbas verbas={verbas} hoje={hoje} />
+
       <Procedencia dados={dados} periodo={periodo} />
     </div>
   );
@@ -81,9 +107,8 @@ export default async function InvestimentoPage({ searchParams }: { searchParams:
 /**
  * A conclusão do período em uma linha.
  *
- * Um título que descreve ("Investimento") obriga a ler a tela inteira para
- * saber o que houve. Com um número e uma comparação, a primeira linha já
- * conclui.
+ * Um título que descreve ("Verba") obriga a ler a tela inteira para saber o
+ * que houve. Com um número e uma comparação, a primeira linha já conclui.
  */
 function resumoEmUmaLinha(dados: Anuncios): string {
   const { gastoCentavos, leads, vendas } = dados.totais;
@@ -98,6 +123,22 @@ function resumoEmUmaLinha(dados: Anuncios): string {
   const porLead = formatCentsAsBRL(Math.round(gastoCentavos / leads));
   const venda = vendas > 0 ? `, ${vendas} ${vendas === 1 ? "virou cliente" : "viraram clientes"}` : "";
   return `${formatCentsAsBRL(gastoCentavos)} investidos, ${leads} ${leads === 1 ? "lead" : "leads"} a ${porLead} cada${venda}.`;
+}
+
+/**
+ * Quanto saiu hoje.
+ *
+ * Null em dois casos que a tela precisa tratar igual, porque nos dois o número
+ * não existe: hoje está fora do período que se está olhando (um mês passado),
+ * e a sincronia ainda não cobriu o dia.
+ */
+function gastoDeHoje(dados: Anuncios, hoje: string): number | null {
+  return dados.porDia.find((dia) => dia.dia === hoje)?.gastoCentavos ?? null;
+}
+
+/** O dia do cliente, que é o de Brasília, e não o do servidor. */
+function hojeEmBrasilia(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 }
 
 /** Os últimos meses, para trocar de período sem digitar data. */

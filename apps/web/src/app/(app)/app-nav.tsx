@@ -91,12 +91,16 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
-    href: "/investimento",
-    label: "Investimento",
+    href: "/verba",
+    label: "Verba",
+    // Carteira, e não cifrão: o cifrão diz "dinheiro" e serve para metade das
+    // telas de qualquer produto. A carteira diz "o quanto você tem", que é a
+    // pergunta desta.
     icon: (
       <svg {...ICON_PROPS}>
-        <path d="M12 2v20" />
-        <path d="M17 6.5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+        <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H18a1 1 0 0 1 1 1v2" />
+        <path d="M3 7.5v9A2.5 2.5 0 0 0 5.5 19H19a1 1 0 0 0 1-1v-3" />
+        <path d="M21 9.5h-4a2.5 2.5 0 0 0 0 5h4a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1z" />
       </svg>
     ),
   },
