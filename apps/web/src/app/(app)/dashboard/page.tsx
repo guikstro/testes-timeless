@@ -7,6 +7,8 @@ import { AbaVisaoGeral } from "./aba-visao-geral";
 import { AbaFunil } from "./aba-funil";
 import { AbaOrigem } from "./aba-origem";
 import { AbaAtendimento } from "./aba-atendimento";
+import { Procedencia } from "./procedencia";
+import { concluiAtendimento, concluiFunil, concluiOrigem, concluiVisaoGeral } from "./conclusao";
 import { Overview } from "./tipos";
 
 const PERIODOS = [7, 30, 90];
@@ -20,10 +22,10 @@ const PERIODOS = [7, 30, 90];
  * pergunta não aparece.
  */
 const ABAS = [
-  { chave: "geral", rotulo: "Visão geral", pergunta: "Quanto entrou, e melhorou?" },
-  { chave: "funil", rotulo: "Funil", pergunta: "Onde as pessoas somem?" },
-  { chave: "origem", rotulo: "Origem", pergunta: "O que traz cliente que paga?" },
-  { chave: "atendimento", rotulo: "Atendimento", pergunta: "Estamos respondendo a tempo?" },
+  { chave: "geral", rotulo: "Visão geral", conclui: concluiVisaoGeral },
+  { chave: "funil", rotulo: "Funil", conclui: concluiFunil },
+  { chave: "origem", rotulo: "Origem", conclui: concluiOrigem },
+  { chave: "atendimento", rotulo: "Atendimento", conclui: concluiAtendimento },
 ] as const;
 
 type Aba = (typeof ABAS)[number]["chave"];
@@ -63,7 +65,15 @@ export default async function DashboardPage({
             <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink">
               {escolhida.rotulo}
             </h1>
-            <p className="mt-0.5 text-corpo text-ink-mute">{escolhida.pergunta}</p>
+            {/*
+              O subtítulo conclui, não pergunta.
+
+              Ele era a pergunta que a aba responde ("Quanto entrou, e
+              melhorou?"), e uma pergunta na abertura obriga a ler a tela
+              inteira para chegar a uma resposta que já cabia na primeira
+              linha. O título diz o assunto; esta linha diz o que aconteceu.
+            */}
+            <p className="mt-0.5 text-corpo text-ink-mute">{escolhida.conclui(overview)}</p>
           </div>
 
           <GrupoDePilulas
@@ -104,9 +114,13 @@ export default async function DashboardPage({
       {aba === "atendimento" ? <AbaAtendimento overview={overview} /> : null}
 
       {/*
-        O aviso de origem desconhecida acompanha todas as abas: enquanto a
-        maioria dos leads não tem origem, qualquer número desta tela é lido
-        com uma ressalva que precisa estar à vista.
+        O alerta continua sendo para quando está ruim de verdade.
+
+        A cobertura em si passou a ser dita sempre, no rodapé de procedência:
+        com um limiar de metade, 49% sem origem não mostrava nada e quem lia a
+        aba de origem acreditava estar vendo o quadro inteiro. O alerta aqui
+        acrescenta o que fazer a respeito, que é outra coisa, e por isso ele
+        continua condicionado.
       */}
       {maioriaSemOrigem ? (
         <div className="mt-6 rounded-2xl border border-amber-300/60 bg-amber-50 p-5 text-corpo text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
@@ -138,6 +152,8 @@ export default async function DashboardPage({
           </ul>
         </div>
       ) : null}
+
+      <Procedencia overview={overview} />
     </div>
   );
 }
