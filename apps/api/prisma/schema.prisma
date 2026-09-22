@@ -23,6 +23,60 @@ enum MembershipRole {
  * Não confundir com `MembershipRole`: aquele é o papel de alguém DENTRO de
  * uma organização cliente; este é o papel de quem opera a plataforma.
  */
+/**
+ * Segundo fator de um usuário, em TOTP.
+ * Tabela própria, e não colunas em `User`, porque o segredo tem um ciclo de
+ * vida que o usuário não tem: ele existe *antes* de o fator estar ativo,
+ * durante a inscrição, e precisa poder ser descartado sem tocar na conta.
+ * `confirmadoEm` nulo quer dizer "gerado e ainda não provado", que é um
+ * estado em que o login NÃO deve pedir o código: exigir um fator que a pessoa
+ * ainda não terminou de configurar tranca a conta.
+ */
+model UserMfa {
+  id               String    @id @default(uuid())
+  userId           String    @unique @map("user_id")
+  /**
+   * Cifrado com a mesma chave dos demais segredos de terceiros. Nunca sai daqui em texto.
+   */
+  secretEncrypted  String    @map("secret_encrypted")
+  confirmadoEm     DateTime? @map("confirmado_em")
+  /**
+   * O último passo de trinta segundos que já foi aceito.
+   * É o que impede reuso: um código visto por cima do ombro vale por até um
+   * minuto e meio se ninguém guardar qual janela já foi gasta.
+   */
+  ultimoPassoUsado Int?      @map("ultimo_passo_usado")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_mfa")
+}
+
+/**
+ * Código de recuperação, para quando o telefone se perde.
+ * Guardado como hash SHA-256, e não com bcrypt, e a diferença tem razão: o
+ * bcrypt existe para tornar caro adivinhar segredo escolhido por gente, que é
+ * pouco entrópico. Estes são cento e vinte e oito bits de aleatório gerados
+ * aqui, onde não há o que adivinhar, e conferir dez deles com bcrypt a cada
+ * tentativa custaria caro sem comprar segurança nenhuma.
+ * A linha não é apagada ao ser usada, é marcada: a pessoa precisa poder ver
+ * que restam três de dez, e um código sumido não conta história nenhuma.
+ */
+model MfaRecoveryCode {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  codeHash  String    @unique @map("code_hash")
+  usadoEm   DateTime? @map("usado_em")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("mfa_recovery_codes")
+}
+
 enum PlatformRole {
   /**
    * Atendimento: lista os clientes e entra nas contas para dar suporte.
@@ -135,6 +189,8 @@ model User {
   auditLogs           AuditLog[]
   notifications       Notification[]
   mudancasNoAnuncio   MudancaNoAnuncio[]
+  mfa                 UserMfa?
+  mfaRecoveryCodes    MfaRecoveryCode[]
 
   @@map("users")
 }
@@ -723,6 +779,7 @@ model MetaConnection {
    * completamente o sentido.
    */
   /**
+   * /**
    * /** Código numérico da Meta. Ver `leituraDoStatusDaConta`.
    */
   accountStatus    Int?      @map("account_status")
