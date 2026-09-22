@@ -1,4 +1,4 @@
-import { gastoPorDia, picoDiario } from "./gasto-por-dia";
+import { gastoPorDia, medidoAte, picoDiario } from "./gasto-por-dia";
 
 const dia = (d: string) => new Date(`${d}T00:00:00.000Z`);
 
@@ -88,5 +88,45 @@ describe("picoDiario", () => {
 
   it("devolve zero quando não houve gasto nenhum", () => {
     expect(picoDiario(gastoPorDia([], { de: "2026-09-01", ate: "2026-09-02" }, "2026-09-02"))).toBe(0);
+  });
+});
+
+describe("medidoAte", () => {
+  const linhas = [
+    { date: dia("2026-09-18"), spendCents: 1 },
+    { date: dia("2026-09-20"), spendCents: 1 },
+  ];
+
+  /*
+    O caso que motivou esta função: é meio-dia, a rodada de hoje ainda não
+    passou, e a tela mostrava "Hoje R$ 0,00" para uma conta com anúncios
+    rodando desde de manhã. Zero ali é uma afirmação que ninguém mediu.
+  */
+  it("para no último dia que a fonte alcançou, e não em hoje", () => {
+    expect(medidoAte(linhas, "2026-09-20", "2026-09-22")).toBe("2026-09-20");
+  });
+
+  it("alcança hoje quando a sincronia rodou hoje", () => {
+    expect(medidoAte(linhas, "2026-09-22", "2026-09-22")).toBe("2026-09-22");
+  });
+
+  it("usa o último gasto lançado quando ele passa da última sincronia", () => {
+    // Gasto também entra por importação de planilha, que não mexe no carimbo
+    // da sincronia da Meta.
+    expect(medidoAte(linhas, "2026-09-10", "2026-09-22")).toBe("2026-09-20");
+  });
+
+  it("nunca passa de hoje", () => {
+    // Relógio adiantado do lado da Meta não pode fazer a tela afirmar amanhã.
+    expect(medidoAte(linhas, "2026-09-30", "2026-09-22")).toBe("2026-09-22");
+  });
+
+  it("devolve null quando nada foi medido", () => {
+    expect(medidoAte([], null, "2026-09-22")).toBeNull();
+  });
+
+  it("sem nada medido, nenhum dia da série ganha número", () => {
+    const dias = gastoPorDia([], { de: "2026-09-01", ate: "2026-09-03" }, null);
+    expect(dias.every((d) => d.gastoCentavos === null)).toBe(true);
   });
 });

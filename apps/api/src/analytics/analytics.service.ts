@@ -24,7 +24,7 @@ import {
   LeadDoAnuncio,
 } from "./desempenho-por-anuncio";
 import { fimDoDia, inicioDoDia, diaCivilLocal, FUSO } from "../common/tempo";
-import { gastoPorDia } from "./gasto-por-dia";
+import { gastoPorDia, medidoAte } from "./gasto-por-dia";
 import { identificacaoDosLeads, LeadIdentificado, MetodoDeIdentificacao } from "./identificacao-dos-leads";
 import { completaIdsDoAnuncio, HierarquiaDoAnuncio } from "./vinculo-do-anuncio";
 import {
@@ -469,6 +469,8 @@ export class AnalyticsService {
       };
     });
 
+    const gastosDiarios = linhas.map((linha) => ({ date: linha.date, spendCents: linha.spendCents }));
+
     return {
       periodo: janela,
       ...agregaDesempenhoPorAnuncio([...porAnuncio.values()], atribuidos),
@@ -478,14 +480,22 @@ export class AnalyticsService {
         `adInsight` vem por anúncio e por dia, e a soma por dia não custa outra
         viagem ao banco.
 
-        O "hoje" é o dia de Brasília, porque é o dia do cliente que olha a
-        tela. As datas de gasto, essas, são dia civil em UTC e não podem passar
-        por conversão nenhuma.
+        O limite da medição não é hoje, é até onde a fonte chegou: se a
+        sincronia parou anteontem, os dois últimos dias não gastaram zero, eles
+        não foram medidos. Ver `medidoAte`.
+
+        Dois tipos de data convivem nesta chamada e não podem ser confundidos.
+        `lastSyncedAt` é instante e vira dia civil no fuso do cliente; as datas
+        de gasto já são dia civil em UTC e não passam por conversão nenhuma.
       */
       porDia: gastoPorDia(
-        linhas.map((linha) => ({ date: linha.date, spendCents: linha.spendCents })),
+        gastosDiarios,
         janela,
-        diaCivilLocal(new Date(), FUSO),
+        medidoAte(
+          gastosDiarios,
+          conexao?.lastSyncedAt ? diaCivilLocal(conexao.lastSyncedAt, FUSO) : null,
+          diaCivilLocal(new Date(), FUSO),
+        ),
       ),
       procedencia: {
         fonte: conexao ? "Meta Ads" : null,
