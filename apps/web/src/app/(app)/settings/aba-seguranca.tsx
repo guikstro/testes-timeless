@@ -3,6 +3,14 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/skeleton";
 import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
 import { FormularioDeEmail, FormularioDeSenha } from "./security-forms";
+import { SegundaEtapa } from "./mfa-forms";
+
+interface SituacaoDoMfa {
+  ativo: boolean;
+  pendente: boolean;
+  codigosRestantes: number;
+  exigido: boolean;
+}
 
 interface SupportAccess {
   id: string;
@@ -17,7 +25,10 @@ export async function AbaSeguranca({
   emailAtual: string;
   impersonando: boolean;
 }) {
-  const acessos = await apiFetch<SupportAccess[]>("/organizations/current/support-accesses");
+  const [acessos, mfa] = await Promise.all([
+    apiFetch<SupportAccess[]>("/organizations/current/support-accesses"),
+    apiFetch<SituacaoDoMfa>("/auth/mfa"),
+  ]);
 
   return (
     <div className="space-y-5">
@@ -35,6 +46,22 @@ export async function AbaSeguranca({
         </Card>
       ) : (
         <>
+          {/*
+            Antes da senha, de propósito.
+
+            Trocar senha é manutenção; ligar o segundo fator é a única coisa
+            nesta tela que muda o que acontece quando alguém descobre a senha.
+            É o item mais importante e fica na primeira posição.
+          */}
+          <Card className="p-6">
+            <CardHeader
+              title="Verificação em duas etapas"
+              description="Um código de seis dígitos do seu celular, além da senha, toda vez que você entrar."
+              className="mb-5"
+            />
+            <SegundaEtapa situacao={mfa} />
+          </Card>
+
           <Card className="p-6">
             <CardHeader
               title="Senha"

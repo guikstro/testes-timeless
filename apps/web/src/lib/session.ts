@@ -8,6 +8,18 @@ export const REFRESH_TOKEN_COOKIE = "refresh_token";
  * organização visitada, e eles são httpOnly — o navegador não consegue
  * recuperá-los por conta própria.
  */
+/**
+ * O desafio do segundo fator, entre a senha e o código.
+ *
+ * Em cookie httpOnly e não na resposta: ele vale uma sessão inteira quando
+ * trocado, e devolvê-lo ao JavaScript da página o exporia a qualquer script
+ * que rodasse ali. A página só precisa saber que o código é necessário, não
+ * qual é o desafio.
+ */
+export const MFA_CHALLENGE_COOKIE = "mfa_challenge";
+/** Dois minutos, o mesmo prazo do token no servidor. */
+export const MFA_CHALLENGE_MAX_AGE = 120;
+
 export const ADMIN_ACCESS_TOKEN_COOKIE = "admin_access_token";
 export const ADMIN_REFRESH_TOKEN_COOKIE = "admin_refresh_token";
 

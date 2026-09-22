@@ -5,6 +5,8 @@ import {
   ACCESS_TOKEN_MAX_AGE,
   REFRESH_TOKEN_COOKIE,
   REFRESH_TOKEN_MAX_AGE,
+  MFA_CHALLENGE_COOKIE,
+  MFA_CHALLENGE_MAX_AGE,
   SESSION_COOKIE_OPTIONS,
 } from "@/lib/session";
 
@@ -26,6 +28,27 @@ export async function POST(request: NextRequest) {
 
   if (!backendResponse.ok) {
     return NextResponse.json(body, { status: backendResponse.status });
+  }
+
+  /*
+    Conta com segundo fator: a senha bateu e nenhuma sessão foi emitida.
+
+    O desafio vai para um cookie httpOnly, e não para o corpo da resposta:
+    trocado por um código, ele vira sessão completa, e entregá-lo ao
+    JavaScript da página o exporia a qualquer script que rodasse ali. A página
+    só precisa saber que falta o código.
+
+    Sem este ramo, o handler gravava `undefined` nos cookies de sessão e
+    respondia `ok`, o que fazia a tela seguir para o painel e ser devolvida ao
+    login — com o efeito colateral de pular o segundo fator inteiro.
+  */
+  if (body?.mfaObrigatorio) {
+    const desafio = NextResponse.json({ mfaObrigatorio: true });
+    desafio.cookies.set(MFA_CHALLENGE_COOKIE, body.desafio, {
+      ...SESSION_COOKIE_OPTIONS,
+      maxAge: MFA_CHALLENGE_MAX_AGE,
+    });
+    return desafio;
   }
 
   // Busca o nome com o token recém-emitido para a tela de entrada poder

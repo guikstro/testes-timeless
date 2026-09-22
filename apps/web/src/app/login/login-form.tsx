@@ -32,6 +32,16 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [nome, setNome] = useState<string | null>(null);
+  /*
+    Segunda etapa da entrada.
+
+    Um estado, e não outra tela: a pessoa está no meio de entrar, e mandá-la
+    para outra rota faria o botão de voltar do navegador quebrar o fluxo. O
+    desafio em si nunca chega aqui, ele vive num cookie httpOnly gravado pelo
+    servidor.
+  */
+  const [pedindoCodigo, setPedindoCodigo] = useState(false);
+  const [codigo, setCodigo] = useState("");
 
   // Depois da montagem, nunca durante a renderização no servidor: o servidor
   // não tem acesso ao armazenamento do navegador, e ler ali quebraria a
@@ -60,11 +70,55 @@ export function LoginForm() {
         return;
       }
 
+      const body = await response.json().catch(() => null);
+
+      // Senha certa e sessão nenhuma: falta o segundo fator.
+      if (body?.mfaObrigatorio) {
+        setPedindoCodigo(true);
+        return;
+      }
+
       // Só grava depois de a entrada dar certo, então o nome guardado é
       // sempre de quem provou ser quem diz ser neste navegador.
-      const body = await response.json().catch(() => null);
       gravarUltimoNome(body?.firstName ?? null);
 
+      router.push(searchParams.get("next") ?? "/dashboard");
+      router.refresh();
+    } catch {
+      setError("Sem conexão com o servidor.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function confirmarCodigo(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/auth/mfa/completar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codigo }),
+      });
+
+      if (!response.ok) {
+        setError(await readErrorMessage(response));
+        // Desafio vencido devolve à senha: insistir no código com o cookie
+        // morto deixaria a pessoa tentando algo que não pode dar certo.
+        if (response.status === 401) {
+          const body = await response.clone().json().catch(() => null);
+          if (body?.code === "DESAFIO_EXPIRADO") {
+            setPedindoCodigo(false);
+            setCodigo("");
+          }
+        }
+        return;
+      }
+
+      const body = await response.json().catch(() => null);
+      gravarUltimoNome(body?.firstName ?? null);
       router.push(searchParams.get("next") ?? "/dashboard");
       router.refresh();
     } catch {
@@ -163,6 +217,79 @@ export function LoginForm() {
             </p>
           ) : null}
 
+          {pedindoCodigo ? (
+            /*
+              Segunda etapa: só o código.
+
+              O e-mail e a senha saem da tela porque já foram aceitos, e
+              deixá-los visíveis convidaria a corrigi-los, o que não é mais
+              possível sem recomeçar.
+            */
+            <form onSubmit={confirmarCodigo} className="animate-rise-in mt-10 flex flex-col gap-7">
+              <div>
+                <label
+                  htmlFor="login-codigo"
+                  className="mb-1.5 block text-apoio font-medium uppercase tracking-[0.12em] text-ink-mute"
+                >
+                  Código de verificação
+                </label>
+                <input
+                  id="login-codigo"
+                  // `one-time-code` é o que faz o iPhone e o Android
+                  // oferecerem o código do autenticador no teclado.
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  autoFocus
+                  required
+                  placeholder="000000"
+                  value={codigo}
+                  onChange={(event) => setCodigo(event.target.value)}
+                  className={`${field} font-mono tracking-[0.4em]`}
+                />
+                <p className="mt-2 text-corpo text-ink-mute">
+                  Os seis dígitos do seu aplicativo autenticador. Sem o aparelho em mãos, use um dos códigos de
+                  recuperação que você guardou.
+                </p>
+              </div>
+
+              {error ? (
+                <p role="alert" className="animate-rise-in border-l-2 border-red-500 pl-3 text-corpo text-red-600 dark:text-red-400">
+                  {error}
+                </p>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={loading}
+                aria-busy={loading || undefined}
+                className="focus-ring group mt-1 inline-flex h-14 items-center justify-between gap-3 rounded-full bg-accent px-7 text-destaque font-semibold text-accent-contrast transition-all duration-300 ease-soft hover:brightness-110 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60"
+              >
+                <span>{loading ? "Confirmando" : "Confirmar"}</span>
+                {loading ? (
+                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" className="opacity-30" />
+                    <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px] transition-transform duration-300 ease-soft group-hover:translate-x-1" aria-hidden>
+                    <path d="M5 12h14M13 6l6 6-6 6" />
+                  </svg>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPedindoCodigo(false);
+                  setCodigo("");
+                  setError(null);
+                }}
+                className="focus-ring -mt-3 self-start rounded text-corpo text-ink-mute underline decoration-line underline-offset-4 transition-colors hover:text-ink"
+              >
+                Voltar
+              </button>
+            </form>
+          ) : (
           <form onSubmit={handleSubmit} className="mt-10 flex flex-col gap-7">
             <div className="relative">
               <label htmlFor="login-email" className="mb-1.5 block text-apoio font-medium uppercase tracking-[0.12em] text-ink-mute">
@@ -258,13 +385,16 @@ export function LoginForm() {
               )}
             </button>
           </form>
+          )}
 
+          {pedindoCodigo ? null : (
           <p className="mt-8 text-corpo text-ink-mute">
             Não tem conta?{" "}
             <Link href="/register" className="focus-ring rounded font-medium text-ink underline decoration-line underline-offset-4 transition-colors hover:decoration-accent">
               Criar organização
             </Link>
           </p>
+          )}
         </div>
       </main>
 
