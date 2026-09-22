@@ -17,6 +17,9 @@ import { HttpExceptionFilter } from "../src/common/filters/http-exception.filter
  * MetaGraphClient/MetaSyncService code paths run over real HTTP, against a
  * faithful double, rather than mocking the service methods themselves.
  */
+/** O que o dublê recebeu em cada escrita, para os testes conferirem o corpo. */
+const escritasRecebidas: Array<{ id: string; corpo: Record<string, string> }> = [];
+
 function startMockMetaServer(): Promise<{ server: http.Server; baseUrl: string }> {
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
@@ -85,6 +88,33 @@ function startMockMetaServer(): Promise<{ server: http.Server; baseUrl: string }
             ],
           }),
         );
+        return;
+      }
+
+      /*
+        Escrita: `POST /{id}`, que é como a Graph API altera status e
+        orçamento nos três níveis.
+
+        `ad-sem-permissao` devolve o código 200 da Meta, que é o documentado
+        para "requires extended permission". É o caso mais comum de falha
+        real aqui, e precisa chegar até a tela com esse nome.
+      */
+      if (req.method === "POST" && /^\/[A-Za-z0-9_-]+$/.test(url.pathname)) {
+        let corpo = "";
+        req.on("data", (pedaco) => (corpo += pedaco));
+        req.on("end", () => {
+          if (url.pathname === "/ad-sem-permissao") {
+            res.statusCode = 403;
+            res.end(
+              JSON.stringify({
+                error: { message: "(#200) Requires extended permission: ads_management", code: 200 },
+              }),
+            );
+            return;
+          }
+          escritasRecebidas.push({ id: url.pathname.slice(1), corpo: JSON.parse(corpo || "{}") });
+          res.end(JSON.stringify({ success: true }));
+        });
         return;
       }
 
@@ -369,4 +399,196 @@ describe("Meta Ads sync (e2e, against a local Graph API double)", () => {
     // Agosto já passou inteiro, então nenhum dia dele está sem medida.
     expect(resposta.body.porDia.every((d: { gastoCentavos: number | null }) => d.gastoCentavos !== null)).toBe(true);
   });
+
+  /*
+    Controle de escrita.
+
+    Aqui a chamada sai de verdade pela rede até o dublê, então o que se prova
+    não é que um mock foi chamado: é o contrato inteiro, do papel de quem
+    clicou ao corpo que chega na Graph API.
+  */
+  describe("escrever na conta de anúncios", () => {
+    beforeEach(() => {
+      escritasRecebidas.length = 0;
+    });
+
+    it("pausa o anúncio, manda o status para a Meta e guarda quem fez", async () => {
+      const resposta = await request(app.getHttpServer())
+        .post("/api/controle-de-anuncios/anuncios/ad1/pausar")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .expect(201);
+
+      expect(resposta.body).toMatchObject({ alterado: true, status: "PAUSED" });
+      expect(escritasRecebidas).toEqual([{ id: "ad1", corpo: expect.objectContaining({ status: "PAUSED" }) }]);
+
+      // A cópia local muda junto, senão a tela volta mostrando o estado antigo.
+      const ad = await prisma.ad.findFirst({ where: { externalId: "ad1", adSet: { campaign: { organizationId: orgId } } } });
+      expect(ad!.status).toBe("PAUSED");
+
+      const historico = await request(app.getHttpServer())
+        .get("/api/controle-de-anuncios/historico")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .expect(200);
+      expect(historico.body[0]).toMatchObject({
+        externalId: "ad1",
+        nome: "Rescisão Indireta - Vídeo 01",
+        acao: "PAUSAR",
+        de: "ACTIVE",
+        para: "PAUSED",
+        erro: null,
+      });
+      expect(historico.body[0].aplicadoEm).not.toBeNull();
+    });
+
+    it("pausar o que já está pausado não escreve nada e não polui o histórico", async () => {
+      /*
+        Anúncio próprio, e não `ad1`.
+
+        `ad1` está na listagem do dublê como ACTIVE, e a sincronia disparada
+        pela escrita anterior o devolve para ACTIVE a qualquer momento. O que
+        se prova aqui é a regra de "já está no estado pedido", não o resultado
+        de uma corrida com a fila.
+      */
+      const adSet = await prisma.adSet.findFirst({ where: { externalId: "as1", campaign: { organizationId: orgId } } });
+      await prisma.ad.create({
+        data: { adSetId: adSet!.id, externalId: "ad-ja-pausado", name: "Já pausado", status: "PAUSED", lastSyncedAt: new Date() },
+      });
+
+      const antes = (
+        await request(app.getHttpServer())
+          .get("/api/controle-de-anuncios/historico")
+          .set("Authorization", `Bearer ${orgToken}`)
+      ).body.length;
+
+      const resposta = await request(app.getHttpServer())
+        .post("/api/controle-de-anuncios/anuncios/ad-ja-pausado/pausar")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .expect(201);
+
+      expect(resposta.body.alterado).toBe(false);
+      expect(escritasRecebidas).toHaveLength(0);
+
+      const depois = (
+        await request(app.getHttpServer())
+          .get("/api/controle-de-anuncios/historico")
+          .set("Authorization", `Bearer ${orgToken}`)
+      ).body.length;
+      expect(depois).toBe(antes);
+    });
+
+    it("reativa o anúncio", async () => {
+      // Anúncio próprio pelo mesmo motivo do teste acima: `ad1` volta a ACTIVE
+      // sozinho quando a sincronia disparada pela escrita anterior roda.
+      const adSet = await prisma.adSet.findFirst({ where: { externalId: "as1", campaign: { organizationId: orgId } } });
+      await prisma.ad.create({
+        data: { adSetId: adSet!.id, externalId: "ad-para-ativar", name: "Para ativar", status: "PAUSED", lastSyncedAt: new Date() },
+      });
+
+      await request(app.getHttpServer())
+        .post("/api/controle-de-anuncios/anuncios/ad-para-ativar/ativar")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .expect(201);
+
+      expect(escritasRecebidas).toEqual([
+        { id: "ad-para-ativar", corpo: expect.objectContaining({ status: "ACTIVE" }) },
+      ]);
+    });
+
+    it("manda o orçamento diário em centavos", async () => {
+      // O erro mais caro que este caminho poderia cometer é mandar reais.
+      await request(app.getHttpServer())
+        .patch("/api/controle-de-anuncios/conjuntos/as1/orcamento")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .send({ valorCentavos: 30_000 })
+        .expect(200);
+
+      expect(escritasRecebidas).toEqual([{ id: "as1", corpo: expect.objectContaining({ daily_budget: "30000" }) }]);
+    });
+
+    it("recusa o orçamento que estoura a verba combinada, sem chamar a Meta", async () => {
+      await request(app.getHttpServer())
+        .post("/api/verbas")
+        .set("Authorization", `Bearer ${orgToken}`)
+        /*
+          Com fim declarado de propósito.
+
+          Verba sem fim vale até acabar, e por isso nenhum diário a estoura
+          "antes do prazo": ali o veredicto é aviso, não bloqueio. O bloqueio
+          existe quando há um prazo para não cumprir.
+        */
+        .send({ de: hojeCivil(), ate: daquiATresDias(), valorCentavos: 10_000, rotulo: "Curta" })
+        .expect(201);
+
+      const recusa = await request(app.getHttpServer())
+        .patch("/api/controle-de-anuncios/conjuntos/as1/orcamento")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .send({ valorCentavos: 900_000 })
+        .expect(400);
+
+      expect(recusa.body.code).toBe("ORCAMENTO_ESTOURA_VERBA");
+      expect(escritasRecebidas).toHaveLength(0);
+
+      // E passa quando o estouro é confirmado de propósito.
+      await request(app.getHttpServer())
+        .patch("/api/controle-de-anuncios/conjuntos/as1/orcamento")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .send({ valorCentavos: 900_000, confirmarEstouro: true })
+        .expect(200);
+      expect(escritasRecebidas).toHaveLength(1);
+    });
+
+    it("diz que falta ads_management, em vez de só dizer que falhou", async () => {
+      // O anúncio precisa existir do nosso lado para a chamada chegar na Meta.
+      const adSet = await prisma.adSet.findFirst({ where: { externalId: "as1", campaign: { organizationId: orgId } } });
+      await prisma.ad.create({
+        data: { adSetId: adSet!.id, externalId: "ad-sem-permissao", name: "Sem permissão", status: "ACTIVE", lastSyncedAt: new Date() },
+      });
+
+      const resposta = await request(app.getHttpServer())
+        .post("/api/controle-de-anuncios/anuncios/ad-sem-permissao/pausar")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .expect(403);
+
+      expect(resposta.body.code).toBe("SEM_ADS_MANAGEMENT");
+
+      // E a tentativa falha fica registrada, com o motivo.
+      const historico = await request(app.getHttpServer())
+        .get("/api/controle-de-anuncios/historico")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .expect(200);
+      const linha = historico.body.find((l: { externalId: string }) => l.externalId === "ad-sem-permissao");
+      expect(linha.aplicadoEm).toBeNull();
+      expect(linha.erro).toContain("ads_management");
+    });
+
+    it("não deixa uma organização pausar o anúncio de outra", async () => {
+      const outra = await request(app.getHttpServer()).post("/api/auth/register").send({
+        name: "User D",
+        email: "user-d@meta-ads-e2e.local",
+        password: "password123",
+        organizationName: "Meta Ads E2E Org D",
+      });
+
+      // Mesma resposta de "não existe": distinguir revelaria que o id é de alguém.
+      const resposta = await request(app.getHttpServer())
+        .post("/api/controle-de-anuncios/anuncios/ad1/pausar")
+        .set("Authorization", `Bearer ${outra.body.accessToken}`)
+        .expect(404);
+
+      expect(resposta.body.code).toBe("NAO_ENCONTRADO");
+      expect(escritasRecebidas).toHaveLength(0);
+    });
+  });
 });
+
+/** Hoje em Brasília, como dia civil, que é o fuso em que a verba é contada. */
+function hojeCivil(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
+/** Três dias à frente, em dia civil de Brasília. */
+function daquiATresDias(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 3);
+  return d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}

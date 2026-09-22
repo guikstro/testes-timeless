@@ -39,11 +39,19 @@ export default async function VerbaPage({ searchParams }: { searchParams: Promis
   const agora = mesAtual();
   const periodo = leIntervalo(params.de, params.ate) ?? intervaloDoMes(agora.ano, agora.mes);
 
-  const [situacao, verbas, dados] = await Promise.all([
+  const [situacao, verbas, dados, sessao] = await Promise.all([
     apiFetch<SituacaoDaVerba | null>("/verbas/resumo"),
     apiFetch<Verba[]>("/verbas"),
     apiFetch<Anuncios>(`/analytics/anuncios?de=${periodo.de}&ate=${periodo.ate}`),
+    apiFetch<{ role: "OWNER" | "ADMIN" | "MEMBER" }>("/auth/session"),
   ]);
+
+  /*
+    Quem atende lê tudo e não escreve nada. Esconder o botão é cortesia: a
+    trava de verdade está no servidor, que confere papel, escopo e verba antes
+    de tocar na conta.
+  */
+  const podeControlar = sessao.role === "OWNER" || sessao.role === "ADMIN";
 
   const hoje = hojeEmBrasilia();
   const mesesRecentes = ultimosMeses(6);
@@ -92,7 +100,7 @@ export default async function VerbaPage({ searchParams }: { searchParams: Promis
           ) : null}
         </div>
 
-        <TabelaDeAnuncios anuncios={dados.anuncios} />
+        <TabelaDeAnuncios anuncios={dados.anuncios} podeControlar={podeControlar} />
       </section>
 
       <Identificacao dados={dados.identificacao} />

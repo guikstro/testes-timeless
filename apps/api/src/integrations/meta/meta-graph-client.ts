@@ -74,6 +74,70 @@ export class MetaGraphClient {
    * Same error envelope as the rest of the Graph API, so it reuses the same
    * `MetaApiError` parsing/classification (token expired, rate limited).
    */
+  /**
+   * Escreve na conta: muda o status de uma campanha, conjunto ou anúncio.
+   *
+   * A Graph API usa `POST /{id}` para os três níveis, com o mesmo corpo. O
+   * nível não muda a chamada, mas muda o alcance: pausar uma campanha derruba
+   * tudo abaixo dela, e é por isso que quem chama precisa dizer o que está
+   * fazendo em vez de mandar um id solto.
+   *
+   * Precisa de `ads_management` no token. Sem essa permissão a Meta devolve
+   * código 200 (sem relação com HTTP 200), que `MetaApiError` preserva para a
+   * camada acima conseguir dizer *qual* é o problema em vez de "falhou".
+   */
+  async atualizarStatus(
+    externalId: string,
+    accessToken: string,
+    status: "ACTIVE" | "PAUSED",
+  ): Promise<void> {
+    await this.escreve(externalId, accessToken, { status });
+  }
+
+  /**
+   * Muda o orçamento diário de um conjunto de anúncios.
+   *
+   * Em centavos, que é como a Meta trabalha para BRL: `daily_budget` vai na
+   * menor unidade da moeda da conta. Mandar reais aqui multiplicaria o
+   * orçamento do cliente por cem, e é literalmente o erro mais caro que este
+   * arquivo pode cometer.
+   *
+   * Só no conjunto, e não na campanha: campanha com orçamento por campanha
+   * (CBO) distribui sozinha entre os conjuntos, e escrever nos dois lugares
+   * produz um estado que a Meta recusa ou ignora sem avisar.
+   */
+  async atualizarOrcamentoDiario(
+    adSetExternalId: string,
+    accessToken: string,
+    centavos: number,
+  ): Promise<void> {
+    await this.escreve(adSetExternalId, accessToken, { daily_budget: String(centavos) });
+  }
+
+  private async escreve(
+    externalId: string,
+    accessToken: string,
+    campos: Record<string, string>,
+  ): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/${externalId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...campos, access_token: accessToken }),
+    });
+    const body = await response.json();
+    this.throwIfError(response, body);
+
+    /*
+      A Meta responde `{"success": true}` e, em alguns objetos, só o id. Um
+      corpo sem nenhum dos dois, com HTTP 200, é ambíguo demais para ser
+      tratado como sucesso: quem chama vai gravar "aplicado" no histórico.
+    */
+    const confirmado = body as { success?: boolean; id?: string };
+    if (confirmado.success === false) {
+      throw new MetaApiError(undefined, undefined, "A Meta recusou a alteração sem explicar o motivo.", 502);
+    }
+  }
+
   async sendConversionEvent(
     pixelId: string,
     accessToken: string,

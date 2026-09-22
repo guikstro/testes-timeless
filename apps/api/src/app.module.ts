@@ -24,6 +24,7 @@ import { CampaignsModule } from "./campaigns/campaigns.module";
 import { AdminModule } from "./admin/admin.module";
 import { AnalyticsModule } from "./analytics/analytics.module";
 import { BudgetsModule } from "./budgets/budgets.module";
+import { ControleDeAnunciosModule } from "./integrations/meta/controle-de-anuncios.module";
 import { NotificationsStreamModule } from "./notifications/notifications-stream.module";
 import { ConversationsModule } from "./conversations/conversations.module";
 import { TelemetriaModule } from "./telemetria/telemetria.module";
@@ -55,6 +56,7 @@ import { GoogleConversionsModule } from "./integrations/google/google-conversion
     LeadsModule,
     ClassificationModule,
     MetaConnectionsModule,
+    ControleDeAnunciosModule,
     CampaignsModule,
     AdminModule,
     AnalyticsModule,

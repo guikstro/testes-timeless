@@ -20,23 +20,26 @@ enum MembershipRole {
 /**
  * Níveis do operador da plataforma (Fase 9.2). Ordenados por poder: tudo que
  * o SUPPORT faz, o ADMIN também faz.
- *
  * Não confundir com `MembershipRole`: aquele é o papel de alguém DENTRO de
  * uma organização cliente; este é o papel de quem opera a plataforma.
  */
 enum PlatformRole {
-  /** Atendimento: lista os clientes e entra nas contas para dar suporte. */
+  /**
+   * Atendimento: lista os clientes e entra nas contas para dar suporte.
+   */
   SUPPORT
-  /** Tudo do SUPPORT, mais promover, rebaixar e revogar outros operadores. */
+  /**
+   * Tudo do SUPPORT, mais promover, rebaixar e revogar outros operadores.
+   */
   ADMIN
 }
 
 model Organization {
-  id        String   @id @default(uuid())
-  name      String
-  slug      String   @unique
-  timezone  String   @default("America/Fortaleza")
-  currency  String   @default("BRL")
+  id       String @id @default(uuid())
+  name     String
+  slug     String @unique
+  timezone String @default("America/Fortaleza")
+  currency String @default("BRL")
 
   /**
    * Marca da organização na interface (Fase 12). Guardamos a URL, não o
@@ -44,12 +47,13 @@ model Organization {
    * conteúdo — e o ganho para o cliente é o mesmo.
    */
   logoUrl    String? @map("logo_url")
-  /** Cor de acento em hex (#RRGGBB). Null usa o acento padrão do produto. */
+  /**
+   * Cor de acento em hex (#RRGGBB). Null usa o acento padrão do produto.
+   */
   brandColor String? @map("brand_color")
 
   /**
    * Nomes das ações de conversão no Google Ads, para a exportação offline.
-   *
    * Guardados porque precisam bater exatamente com o que existe na conta do
    * cliente: o Google casa a linha do arquivo pelo nome, e um acento ou uma
    * maiúscula fora do lugar faz a linha ser descartada em silêncio. Redigitar
@@ -60,23 +64,25 @@ model Organization {
 
   /**
    * Horário de atendimento, para o tempo de resposta parar de mentir.
-   *
    * Sem isto, um lead que chega às 23h e é respondido às 9h aparece como dez
    * horas de espera, e o número que o produto mais destaca acusa descaso de
    * quem simplesmente não atende de madrugada.
-   *
    * Desligado por padrão de propósito: ligar muda como todo histórico é lido,
    * e essa é uma decisão de quem usa, não um padrão que se herda sem saber.
    */
-  expedienteAtivo    Boolean @default(false) @map("expediente_ativo")
-  /** Dias atendidos. 0 é domingo, como no Date do JavaScript. */
-  expedienteDias     Int[]   @default([1, 2, 3, 4, 5]) @map("expediente_dias")
-  /** Minutos desde a meia-noite, no fuso da organização. */
-  expedienteInicio   Int     @default(540) @map("expediente_inicio")
-  expedienteFim      Int     @default(1080) @map("expediente_fim")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  expedienteAtivo  Boolean   @default(false) @map("expediente_ativo")
+  /**
+   * Dias atendidos. 0 é domingo, como no Date do JavaScript.
+   */
+  expedienteDias   Int[]     @default([1, 2, 3, 4, 5]) @map("expediente_dias")
+  /**
+   * Minutos desde a meia-noite, no fuso da organização.
+   */
+  expedienteInicio Int       @default(540) @map("expediente_inicio")
+  expedienteFim    Int       @default(1080) @map("expediente_fim")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  deletedAt        DateTime? @map("deleted_at")
 
   memberships         Membership[]
   trackingLinks       TrackingLink[]
@@ -91,6 +97,7 @@ model Organization {
   conversionEvents    ConversionEvent[]
   notifications       Notification[]
   budgets             Budget[]
+  mudancasNoAnuncio   MudancaNoAnuncio[]
   /**
    * Estas duas guardavam `organization_id` como coluna solta, sem chave
    * estrangeira. O vínculo existia só na cabeça de quem escreveu o código:
@@ -104,30 +111,30 @@ model Organization {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String   @map("password_hash")
+  id           String        @id @default(uuid())
+  email        String        @unique
+  passwordHash String        @map("password_hash")
   name         String
   /**
    * Fase 9: nível do operador da plataforma (nós), não do cliente. É um eixo
    * ACIMA de `MembershipRole`, que só vale dentro de uma organização — um
    * operador enxerga todas as organizações e entra em qualquer uma, mesmo
    * sem ter Membership nenhuma.
-   *
    * `null` significa "usuário comum", que é o caso da esmagadora maioria:
    * ser operador é a exceção, e nunca é concedido por cadastro público.
    */
   platformRole PlatformRole? @map("platform_role")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-  deletedAt    DateTime? @map("deleted_at")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  deletedAt    DateTime?     @map("deleted_at")
 
-  memberships          Membership[]
-  passwordResetTokens  PasswordResetToken[]
-  emailChangeTokens    EmailChangeToken[]
-  refreshTokens        RefreshToken[]
-  auditLogs            AuditLog[]
-  notifications        Notification[]
+  memberships         Membership[]
+  passwordResetTokens PasswordResetToken[]
+  emailChangeTokens   EmailChangeToken[]
+  refreshTokens       RefreshToken[]
+  auditLogs           AuditLog[]
+  notifications       Notification[]
+  mudancasNoAnuncio   MudancaNoAnuncio[]
 
   @@map("users")
 }
@@ -177,13 +184,11 @@ model PasswordResetToken {
 
 /**
  * Uma troca de e-mail pedida e ainda não confirmada.
- *
  * O endereço novo só vira o login quando o link mandado para ele é aberto.
  * Sem esta etapa, um endereço digitado errado passava a ser o login na hora:
  * a pessoa não conseguia mais entrar, e a recuperação de senha ia para uma
  * caixa que não existe. Confirmar no destino é o que prova que o endereço é
  * alcançável antes de tudo depender dele.
- *
  * `newEmail` fica aqui e não em `User` de propósito: enquanto não confirmar,
  * ele não é atributo da conta, é só um pedido.
  */
@@ -269,11 +274,17 @@ model TrackingClick {
 // ---------------------------------------------------------------------------
 
 enum AttributionMethod {
-  /** Meta's own `referral.ctwa_clid` on a Click-to-WhatsApp ad message — the strongest possible evidence, given directly by Meta. */
+  /**
+   * Meta's own `referral.ctwa_clid` on a Click-to-WhatsApp ad message — the strongest possible evidence, given directly by Meta.
+   */
   CTWA_REFERRAL
-  /** Our own reference token, embedded in a wa.me redirect's prefilled text, matched back to a TrackingClick. */
+  /**
+   * Our own reference token, embedded in a wa.me redirect's prefilled text, matched back to a TrackingClick.
+   */
   TRACKING_LINK
-  /** No usable evidence was present on the lead's first message. Never guessed — see docs/ATTRIBUTION.md. */
+  /**
+   * No usable evidence was present on the lead's first message. Never guessed — see docs/ATTRIBUTION.md.
+   */
   UNKNOWN
 }
 
@@ -285,12 +296,16 @@ enum AttributionConfidence {
 model Attribution {
   id              String                @id @default(uuid())
   organizationId  String                @map("organization_id")
-  /** One row per lead: first-touch, computed once at lead creation, never overwritten by later messages (Section 31). */
+  /**
+   * One row per lead: first-touch, computed once at lead creation, never overwritten by later messages (Section 31).
+   */
   leadId          String                @unique @map("lead_id")
   method          AttributionMethod
   confidence      AttributionConfidence
   trackingClickId String?               @unique @map("tracking_click_id")
-  /** Raw snapshot of the evidence used, for audit ("why was this lead attributed to this campaign?" — Section 46). */
+  /**
+   * Raw snapshot of the evidence used, for audit ("why was this lead attributed to this campaign?" — Section 46).
+   */
   evidence        Json?
   attributedAt    DateTime              @default(now()) @map("attributed_at")
   createdAt       DateTime              @default(now()) @map("created_at")
@@ -313,14 +328,20 @@ model Attribution {
  * idêntico para os dois — só muda como a mensagem chega e como ela sai.
  */
 enum WhatsAppProvider {
-  /** WhatsApp Business Cloud API oficial da Meta (Fase 3). Sem risco de banimento, exige verificação de negócio. */
+  /**
+   * WhatsApp Business Cloud API oficial da Meta (Fase 3). Sem risco de banimento, exige verificação de negócio.
+   */
   CLOUD_API
-  /** Evolution API (QR Code, protocolo do WhatsApp Web). Conecta em minutos, mas é não-oficial — ver docs/WHATSAPP.md. */
+  /**
+   * Evolution API (QR Code, protocolo do WhatsApp Web). Conecta em minutos, mas é não-oficial — ver docs/WHATSAPP.md.
+   */
   EVOLUTION
 }
 
 enum WhatsAppConnectionStatus {
-  /** Só EVOLUTION: instância criada, aguardando o usuário ler o QR Code. */
+  /**
+   * Só EVOLUTION: instância criada, aguardando o usuário ler o QR Code.
+   */
   PENDING_QR
   CONNECTED
   DISCONNECTED
@@ -345,7 +366,9 @@ model WhatsAppConnection {
    */
   instanceName String? @unique @map("instance_name")
 
-  /** Desconhecido até o QR ser lido (EVOLUTION), por isso nullable — a Meta já informa no ato da conexão. */
+  /**
+   * Desconhecido até o QR ser lido (EVOLUTION), por isso nullable — a Meta já informa no ato da conexão.
+   */
   displayPhoneNumber   String? @map("display_phone_number")
   accessTokenEncrypted String? @map("access_token_encrypted")
 
@@ -364,36 +387,37 @@ model WhatsAppConnection {
 enum LeadStatus {
   NEW
   QUALIFIED
-  /** Entre qualificar e vender: existe horário combinado com o lead (Fase 11). */
+  /**
+   * Entre qualificar e vender: existe horário combinado com o lead (Fase 11).
+   */
   MEETING_SCHEDULED
   WON
 }
 
 model Lead {
-  id              String     @id @default(uuid())
-  organizationId  String     @map("organization_id")
-  normalizedPhone String     @map("normalized_phone")
-  rawPhone        String     @map("raw_phone")
-  name            String?
-  status          LeadStatus @default(NEW)
-  firstContactAt  DateTime   @map("first_contact_at")
-  lastContactAt   DateTime   @map("last_contact_at")
-  qualifiedAt     DateTime?  @map("qualified_at")
-  meetingScheduledAt DateTime? @map("meeting_scheduled_at")
-  wonAt           DateTime?  @map("won_at")
+  id                 String     @id @default(uuid())
+  organizationId     String     @map("organization_id")
+  normalizedPhone    String     @map("normalized_phone")
+  rawPhone           String     @map("raw_phone")
+  name               String?
+  status             LeadStatus @default(NEW)
+  firstContactAt     DateTime   @map("first_contact_at")
+  lastContactAt      DateTime   @map("last_contact_at")
+  qualifiedAt        DateTime?  @map("qualified_at")
+  meetingScheduledAt DateTime?  @map("meeting_scheduled_at")
+  wonAt              DateTime?  @map("won_at")
 
   /**
    * Desqualificação é uma saída lateral do funil, não mais um degrau nele —
    * por isso um campo próprio, e não um valor de `status` (Fase 11).
-   *
    * Assim o lead preserva o estágio até onde chegou antes de ser descartado
    * ("estava qualificado quando desistiu" é diferente de "nunca engajou"), e
    * a desqualificação pode ser desfeita se a pessoa voltar.
    */
   disqualifiedAt     DateTime? @map("disqualified_at")
   disqualifiedReason String?   @map("disqualified_reason")
-  createdAt       DateTime   @default(now()) @map("created_at")
-  updatedAt       DateTime   @updatedAt @map("updated_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
 
   organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   conversations    Conversation[]
@@ -444,13 +468,21 @@ enum MessageType {
   OTHER
 }
 
-/** Só faz sentido para OUTBOUND — uma mensagem INBOUND, por definição, já chegou. */
+/**
+ * Só faz sentido para OUTBOUND — uma mensagem INBOUND, por definição, já chegou.
+ */
 enum OutboundStatus {
-  /** Persistida e enfileirada, ainda não aceita pelo provider. */
+  /**
+   * Persistida e enfileirada, ainda não aceita pelo provider.
+   */
   PENDING
-  /** O provider aceitou e devolveu o id externo real. */
+  /**
+   * O provider aceitou e devolveu o id externo real.
+   */
   SENT
-  /** Todas as tentativas de envio falharam — `sendError` guarda o motivo real. */
+  /**
+   * Todas as tentativas de envio falharam — `sendError` guarda o motivo real.
+   */
   FAILED
 }
 
@@ -488,18 +520,20 @@ enum LeadEventType {
   SALE_DETECTED
   REVENUE_DETECTED
   DISQUALIFIED
-  /** Um lead desqualificado voltou a andar no funil (Fase 11). */
+  /**
+   * Um lead desqualificado voltou a andar no funil (Fase 11).
+   */
   REACTIVATED
 }
 
 model LeadEvent {
-  id         String        @id @default(uuid())
-  organizationId String    @map("organization_id")
-  leadId     String        @map("lead_id")
-  type       LeadEventType
-  metadata   Json?
-  occurredAt DateTime      @default(now()) @map("occurred_at")
-  createdAt  DateTime      @default(now()) @map("created_at")
+  id             String        @id @default(uuid())
+  organizationId String        @map("organization_id")
+  leadId         String        @map("lead_id")
+  type           LeadEventType
+  metadata       Json?
+  occurredAt     DateTime      @default(now()) @map("occurred_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
   /**
    * Ordem de inserção real, para desempatar a linha do tempo. Vários eventos
    * de uma mesma mensagem compartilham o `occurredAt` dela (que vem do
@@ -508,7 +542,7 @@ model LeadEvent {
    * devolvia ordem arbitrária e a tela chegava a mostrar a venda antes da
    * mensagem que a originou.
    */
-  sequence   BigInt        @default(autoincrement())
+  sequence       BigInt        @default(autoincrement())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
@@ -566,12 +600,18 @@ enum ClassifierType {
 model Sale {
   id                String         @id @default(uuid())
   organizationId    String         @map("organization_id")
-  /** One sale per lead in this phase — a lead is either won or not (Section 16). */
+  /**
+   * One sale per lead in this phase — a lead is either won or not (Section 16).
+   */
   leadId            String         @unique @map("lead_id")
-  /** Cents, never float (Section 48). Null until a value can be confirmed — never guessed (Section 109). */
+  /**
+   * Cents, never float (Section 48). Null until a value can be confirmed — never guessed (Section 109).
+   */
   amountCents       Int?           @map("amount_cents")
   classifierType    ClassifierType @map("classifier_type")
-  /** The message whose trigger phrase caused this, when detected automatically. */
+  /**
+   * The message whose trigger phrase caused this, when detected automatically.
+   */
   evidenceMessageId String?        @map("evidence_message_id")
   detectedAt        DateTime       @map("detected_at")
   createdAt         DateTime       @default(now()) @map("created_at")
@@ -595,7 +635,9 @@ enum AuditAction {
   LEAD_DISQUALIFIED
   LEAD_REACTIVATED
   CONNECTION_CHANGED
-  /** Um operador da plataforma entrou na organização (Fase 9). Registrado sempre, sem exceção. */
+  /**
+   * Um operador da plataforma entrou na organização (Fase 9). Registrado sempre, sem exceção.
+   */
   IMPERSONATION_STARTED
   /**
    * Mudanças na equipe. Ficam auditadas porque tirar alguém de uma conta é
@@ -606,7 +648,9 @@ enum AuditAction {
   MEMBER_REMOVED
 }
 
-/** Section 65 — who changed what, with a before/after snapshot, for any manual correction. */
+/**
+ * Section 65 — who changed what, with a before/after snapshot, for any manual correction.
+ */
 model AuditLog {
   id             String      @id @default(uuid())
   organizationId String      @map("organization_id")
@@ -632,18 +676,26 @@ model AuditLog {
 enum MetaConnectionStatus {
   CONNECTED
   DISCONNECTED
-  /** Meta's error code 190 — the access token needs to be replaced (Section 53). */
+  /**
+   * Meta's error code 190 — the access token needs to be replaced (Section 53).
+   */
   TOKEN_EXPIRED
-  /** The last sync attempt failed for a reason other than an expired token. */
+  /**
+   * The last sync attempt failed for a reason other than an expired token.
+   */
   SYNC_FAILED
 }
 
 model MetaConnection {
   id                   String               @id @default(uuid())
   organizationId       String               @unique @map("organization_id")
-  /** Meta's ad account id, e.g. "act_123456789" — the routing key for every Graph API call this connection makes. */
+  /**
+   * Meta's ad account id, e.g. "act_123456789" — the routing key for every Graph API call this connection makes.
+   */
   adAccountId          String               @map("ad_account_id")
-  /** Required (unlike WhatsApp's optional token): every sync call needs it. Encrypted at rest — never sent back to the frontend. */
+  /**
+   * Required (unlike WhatsApp's optional token): every sync call needs it. Encrypted at rest — never sent back to the frontend.
+   */
   accessTokenEncrypted String               @map("access_token_encrypted")
   status               MetaConnectionStatus @default(CONNECTED)
   lastSyncedAt         DateTime?            @map("last_synced_at")
@@ -653,7 +705,9 @@ model MetaConnection {
   createdAt            DateTime             @default(now()) @map("created_at")
   updatedAt            DateTime             @updatedAt @map("updated_at")
 
-  /** Set only once CAPI is configured (Section: Fase 7 is a separate setup step from ads reporting). Null means events are recorded but never sent yet. */
+  /**
+   * Set only once CAPI is configured (Section: Fase 7 is a separate setup step from ads reporting). Null means events are recorded but never sent yet.
+   */
   pixelId                  String?   @map("pixel_id")
   capiAccessTokenEncrypted String?   @map("capi_access_token_encrypted")
   capiConfiguredAt         DateTime? @map("capi_configured_at")
@@ -669,6 +723,73 @@ model MetaConnection {
  * UUID we mint ourselves is, and because we need a stable internal id that
  * survives even if Meta's id format or meaning ever changed.
  */
+/**
+ * O nível da hierarquia da Meta em que a mudança foi aplicada.
+ */
+enum NivelDoAnuncio {
+  CAMPANHA
+  CONJUNTO
+  ANUNCIO
+}
+
+enum AcaoNoAnuncio {
+  PAUSAR
+  ATIVAR
+  ORCAMENTO_DIARIO
+}
+
+/**
+ * Registro de toda escrita que este produto faz na conta de anúncios.
+ * Existe porque escrever na conta move o dinheiro do cliente, e o rastro não
+ * pode depender do log da Meta: lá aparece quem é o aplicativo, não quem
+ * clicou aqui dentro. Numa conversa sobre "quem pausou meu melhor anúncio na
+ * sexta", é esta tabela que responde.
+ * A linha nasce ANTES da chamada e é fechada depois, e não o contrário. Se a
+ * escrita falhar no meio, ou a resposta se perder, fica registrado que a
+ * tentativa existiu: uma mudança aplicada na Meta sem linha nenhuma aqui seria
+ * o pior resultado possível.
+ */
+model MudancaNoAnuncio {
+  id             String         @id @default(uuid())
+  organizationId String         @map("organization_id")
+  /**
+   * Quem agiu. Nulo só para mudança feita pelo próprio sistema, nunca para
+   * esconder autoria. Numa impersonação é o operador da plataforma que fica
+   * aqui, e não alguém do cliente.
+   */
+  userId         String?        @map("user_id")
+  nivel          NivelDoAnuncio
+  /**
+   * Id na Meta do objeto alterado.
+   */
+  externalId     String         @map("external_id")
+  /**
+   * O nome no momento da ação.
+   * Copiado, e não buscado por relação: o anúncio pode ser renomeado ou
+   * apagado depois, e um histórico que muda junto com o presente não serve
+   * para reconstituir o que foi feito.
+   */
+  nome           String
+  acao           AcaoNoAnuncio
+  /**
+   * Estado antes e depois, em texto, porque status e orçamento não têm o mesmo tipo.
+   */
+  de             String?
+  para           String?
+  /**
+   * Preenchido quando a Meta confirmou. Nulo enquanto a tentativa não fechou.
+   */
+  aplicadoEm     DateTime?      @map("aplicado_em")
+  erro           String?
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@map("mudancas_no_anuncio")
+}
+
 enum AdPlatform {
   META
   GOOGLE
@@ -676,17 +797,15 @@ enum AdPlatform {
 
 /**
  * De onde a campanha veio.
- *
  * Sem isto um id do Google e um da Meta são indistinguíveis na mesma tabela, e
  * qualquer número separado por canal sai errado. É o pré-requisito de tudo
  * relacionado a Google Ads, e por isso vem primeiro.
  */
 model Campaign {
-  id             String    @id @default(uuid())
-  organizationId String    @map("organization_id")
+  id             String     @id @default(uuid())
+  organizationId String     @map("organization_id")
   /**
    * O id da campanha na plataforma de origem.
-   *
    * Único POR ORGANIZAÇÃO, e não no sistema inteiro. Era global, e isso tinha
    * duas consequências entre clientes diferentes: registrar uma campanha
    * manual com um id já usado revelava que outra organização o usava, e
@@ -694,24 +813,23 @@ model Campaign {
    * campo, escreveria o nome da campanha de um cliente dentro da linha de
    * outro, porque o ramo de atualização não mexe na organização.
    */
-  externalId     String    @map("external_id")
+  externalId     String     @map("external_id")
   name           String
   status         String
   platform       AdPlatform @default(META)
 
   /**
    * Campanha registrada à mão, sem vir de sincronização.
-   *
    * A API do Google Ads exige um token de desenvolvedor aprovado por eles, o
    * que leva semanas e não depende de nós. Registrar manualmente permite medir
    * custo por lead e retorno do Google desde já; quando a API entrar, ela passa
    * a atualizar estas mesmas linhas em vez de criar outras.
    */
-  manual         Boolean   @default(false)
+  manual Boolean @default(false)
 
-  lastSyncedAt   DateTime  @map("last_synced_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  lastSyncedAt DateTime @map("last_synced_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   adSets       AdSet[]
@@ -725,7 +843,9 @@ model Campaign {
 model AdSet {
   id           String   @id @default(uuid())
   campaignId   String   @map("campaign_id")
-  /** Único dentro da campanha, pelo mesmo motivo do `externalId` dela. */
+  /**
+   * Único dentro da campanha, pelo mesmo motivo do `externalId` dela.
+   */
   externalId   String   @map("external_id")
   name         String
   status       String
@@ -744,7 +864,9 @@ model AdSet {
 model Ad {
   id           String   @id @default(uuid())
   adSetId      String   @map("ad_set_id")
-  /** Único dentro do conjunto, pelo mesmo motivo do `externalId` da campanha. */
+  /**
+   * Único dentro do conjunto, pelo mesmo motivo do `externalId` da campanha.
+   */
   externalId   String   @map("external_id")
   name         String
   status       String
@@ -762,7 +884,6 @@ model Ad {
 
 /**
  * A verba combinada com o cliente.
- *
  * Declarada aqui, e não lida da Meta, e isso é escolha e não limitação. A
  * API expõe com segurança o teto da conta e o total já gasto, mas o saldo
  * pré-pago daquelas contas que recebem crédito por PIX ou boleto não sai
@@ -770,19 +891,24 @@ model Ad {
  * precisa mostrar costuma ser o combinado com o cliente, que vale também
  * para o Google e para campanha lançada à mão, e não o estado de cobrança
  * de uma plataforma só.
- *
  * `ate` é opcional porque as duas formas reais são diferentes: verba mensal
  * tem fim de mês, e depósito de crédito vale até acabar.
  */
 model Budget {
   id             String    @id @default(uuid())
   organizationId String    @map("organization_id")
-  /** Dia civil em que a verba passa a valer. */
+  /**
+   * Dia civil em que a verba passa a valer.
+   */
   startsOn       DateTime  @map("starts_on") @db.Date
-  /** Null é "até acabar, ou até a próxima verba começar". */
+  /**
+   * Null é "até acabar, ou até a próxima verba começar".
+   */
   endsOn         DateTime? @map("ends_on") @db.Date
   amountCents    Int       @map("amount_cents")
-  /** Como o cliente chama esta verba. Ex.: "Setembro", "Crédito de lançamento". */
+  /**
+   * Como o cliente chama esta verba. Ex.: "Setembro", "Crédito de lançamento".
+   */
   label          String?
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
@@ -795,12 +921,10 @@ model Budget {
 
 /**
  * Desempenho diário de um anúncio.
- *
  * É o nível em que a decisão de verdade acontece: desligar um criativo ruim
  * na segunda-feira, em vez de desligar a campanha inteira no fim do mês. O
  * gasto por campanha sozinho não permite isso, e o produto já sabia qual
  * anúncio trouxe cada lead — faltava o custo nesse mesmo nível.
- *
  * Impressões e cliques entram porque vêm na mesma chamada e separam dois
  * diagnósticos que o gasto sozinho confunde: o anúncio não está sendo visto,
  * ou está sendo visto e ninguém clica.
@@ -824,7 +948,6 @@ model AdInsight {
 
 /**
  * Gasto diário por campanha.
- *
  * Continua existindo mesmo agora que há gasto por anúncio, e o total NÃO é
  * somado a partir da tabela de anúncios: ele vem da resposta da Meta,
  * agrupada por campanha. A diferença importa porque a conta pode devolver
@@ -833,12 +956,12 @@ model AdInsight {
  * usa para decidir investimento.
  */
 model AdSpend {
-  id          String   @id @default(uuid())
-  campaignId  String   @map("campaign_id")
-  date        DateTime @db.Date
-  spendCents  Int      @map("spend_cents")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id         String   @id @default(uuid())
+  campaignId String   @map("campaign_id")
+  date       DateTime @db.Date
+  spendCents Int      @map("spend_cents")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
@@ -858,13 +981,21 @@ enum ConversionEventType {
 }
 
 enum ConversionEventStatus {
-  /** Created, queued, not yet successfully sent. */
+  /**
+   * Created, queued, not yet successfully sent.
+   */
   PENDING
-  /** Delivered to Meta — terminal, never re-sent (Meta itself dedupes on event_id, but we never even try again). */
+  /**
+   * Delivered to Meta — terminal, never re-sent (Meta itself dedupes on event_id, but we never even try again).
+   */
   SENT
-  /** At least one attempt failed and BullMQ scheduled a retry with backoff — not yet the final attempt. */
+  /**
+   * At least one attempt failed and BullMQ scheduled a retry with backoff — not yet the final attempt.
+   */
   RETRYING
-  /** The job's last configured attempt failed — terminal until the organization reconfigures the connection (see MetaConnectionsService.connectCapi, which re-enqueues PENDING/FAILED events). */
+  /**
+   * The job's last configured attempt failed — terminal until the organization reconfigures the connection (see MetaConnectionsService.connectCapi, which re-enqueues PENDING/FAILED events).
+   */
   FAILED
 }
 
@@ -882,7 +1013,9 @@ model ConversionEvent {
   leadId         String                @map("lead_id")
   type           ConversionEventType
   status         ConversionEventStatus @default(PENDING)
-  /** Cents, never float (Section 48). Only set for PURCHASE. */
+  /**
+   * Cents, never float (Section 48). Only set for PURCHASE.
+   */
   valueCents     Int?                  @map("value_cents")
   currency       String?
   occurredAt     DateTime              @map("occurred_at")
@@ -902,20 +1035,20 @@ model ConversionEvent {
 
 /**
  * Aviso já entregue, guardado para quem não estava com a tela aberta.
- *
  * Uma linha por pessoa, e não uma linha por organização com `userId` nulo:
  * o estado de leitura é de quem lê. Com uma linha só para todos, o operador
  * que marcasse como lida faria o aviso sumir da caixa do colega, que talvez
  * nem tivesse visto. A coluna continua opcional para um eventual aviso do
  * sistema que não pertença a ninguém em particular.
- *
  * O tempo real é o canal principal; esta tabela é a memória dele.
  */
 model Notification {
   id             String   @id @default(uuid())
   organizationId String   @map("organization_id")
   userId         String?  @map("user_id")
-  /** Mesmo vocabulário do canal em tempo real: lead.created, lead.won, etc. */
+  /**
+   * Mesmo vocabulário do canal em tempo real: lead.created, lead.won, etc.
+   */
   type           String
   title          String
   body           String?

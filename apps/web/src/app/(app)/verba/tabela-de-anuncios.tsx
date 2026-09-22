@@ -1,5 +1,6 @@
 import { formatCentsAsBRL } from "@/lib/currency";
 import { DesempenhoDoAnuncio } from "./tipos";
+import { BotaoDePausa } from "./botao-de-pausa";
 
 /**
  * O desempenho de cada criativo.
@@ -8,7 +9,17 @@ import { DesempenhoDoAnuncio } from "./tipos";
  * anúncio que leva mais dinheiro é o que mais importa acertar, mesmo indo
  * bem. Alfabética seria desistir de informar.
  */
-export function TabelaDeAnuncios({ anuncios }: { anuncios: DesempenhoDoAnuncio[] }) {
+export function TabelaDeAnuncios({
+  anuncios,
+  podeControlar,
+}: {
+  anuncios: DesempenhoDoAnuncio[];
+  /**
+   * Mostra a coluna de controle. Cortesia, não segurança: quem decide se a
+   * escrita acontece é o servidor, que confere papel, escopo e verba.
+   */
+  podeControlar: boolean;
+}) {
   if (anuncios.length === 0) {
     return (
       <div className="surface p-8 text-center">
@@ -34,6 +45,7 @@ export function TabelaDeAnuncios({ anuncios }: { anuncios: DesempenhoDoAnuncio[]
               <th className="px-4 py-3 text-right font-semibold">Clientes</th>
               <th className="px-4 py-3 text-right font-semibold">Por cliente</th>
               <th className="px-4 py-3 text-right font-semibold">Retorno</th>
+              {podeControlar ? <th className="px-4 py-3 text-right font-semibold">Controle</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -86,6 +98,15 @@ export function TabelaDeAnuncios({ anuncios }: { anuncios: DesempenhoDoAnuncio[]
                       </span>
                     )}
                   </td>
+                  {podeControlar ? (
+                    <td className="px-4 py-3 text-right">
+                      <BotaoDePausa
+                        externalId={anuncio.externalId}
+                        nome={anuncio.name}
+                        pausado={anuncio.status.toUpperCase() !== "ACTIVE"}
+                      />
+                    </td>
+                  ) : null}
                 </tr>
               );
             })}
