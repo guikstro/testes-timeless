@@ -7,6 +7,7 @@ import { AppException } from "../../common/exceptions/app-exception";
 import { isUniqueConstraintError } from "../../common/utils/is-unique-constraint-error";
 import { META_SYNC_QUEUE } from "../../common/queue/queue.constants";
 import { MetaSyncJob } from "../../common/queue/meta-sync.job";
+import { montaSaudeDaConta, SaudeDaConta } from "./saude-da-conta";
 import { ConnectMetaDto } from "./dto/connect-meta.dto";
 import { ConnectMetaCapiDto } from "./dto/connect-meta-capi.dto";
 import { ConversionEventsService } from "./conversion-events.service";
@@ -25,6 +26,36 @@ export class MetaConnectionsService {
   }
 
   /** Idempotent, same pattern as WhatsApp (Fase 3): reconnecting reuses the same row, never orphans synced campaigns. */
+  /**
+   * A saúde da conta de anúncios, como a Meta a reporta.
+   *
+   * Lida do banco, não da Meta na hora: a tela não pode depender de uma
+   * chamada externa para desenhar, e a sincronia já grava isto de hora em
+   * hora. `lidoEm` diz de quando é, que é o que permite a tela ser honesta
+   * quando o dado está velho.
+   */
+  async saudeDaConta(organizationId: string): Promise<SaudeDaConta | null> {
+    const conexao = await this.prisma.metaConnection.findUnique({
+      where: { organizationId },
+      select: {
+        accountName: true,
+        currency: true,
+        accountStatus: true,
+        spendCapCents: true,
+        amountSpentCents: true,
+        balanceCents: true,
+        healthSyncedAt: true,
+        status: true,
+      },
+    });
+
+    // Sem conexão não há conta cuja saúde relatar, e isso não é uma conta
+    // doente: a tela trata como convite a conectar.
+    if (!conexao || conexao.status === "DISCONNECTED") return null;
+
+    return montaSaudeDaConta(conexao);
+  }
+
   async connect(organizationId: string, dto: ConnectMetaDto) {
     const accessTokenEncrypted = this.encryption.encrypt(dto.accessToken);
 

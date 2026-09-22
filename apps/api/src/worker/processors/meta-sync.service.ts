@@ -3,6 +3,7 @@ import { PrismaService } from "../../common/prisma/prisma.service";
 import { EncryptionService } from "../../common/encryption/encryption.service";
 import { MetaGraphClient, InsightsRange } from "../../integrations/meta/meta-graph-client";
 import { MetaApiError } from "../../integrations/meta/meta-api-error";
+import { normalizaRespostaDaConta } from "../../integrations/meta/saude-da-conta";
 import { NotificationsService } from "../../notifications/notifications.service";
 
 const INSIGHTS_LOOKBACK_DAYS = 7;
@@ -162,13 +163,36 @@ export class MetaSyncService {
         });
       }
 
+      /*
+        A saúde da conta entra na mesma rodada, e a falha dela não derruba a
+        sincronia.
+
+        São dois assuntos com pesos diferentes: sem o gasto a tela mente sobre
+        números; sem a saúde ela apenas deixa de mostrar um aviso. Deixar a
+        segunda derrubar a primeira trocaria um problema pequeno por um
+        grande.
+      */
+      const saude = await this.leSaudeDaConta(connection.adAccountId, accessToken);
+
       await this.prisma.metaConnection.update({
         where: { organizationId },
-        data: { status: "CONNECTED", lastSyncedAt: now, lastSyncError: null },
+        data: { status: "CONNECTED", lastSyncedAt: now, lastSyncError: null, ...saude },
       });
     } catch (error) {
       await this.handleSyncError(organizationId, error);
       throw error; // let BullMQ retry per the job's configured attempts/backoff
+    }
+  }
+
+  private async leSaudeDaConta(adAccountId: string, accessToken: string) {
+    try {
+      return normalizaRespostaDaConta(await this.metaGraphClient.getAccountHealth(adAccountId, accessToken));
+    } catch (erro) {
+      // Sem leitura nova, as colunas ficam como estavam e `healthSyncedAt`
+      // continua apontando para a última que funcionou: a tela precisa poder
+      // dizer de quando é o dado, e não fingir que ele é de agora.
+      this.logger.warn(`Não foi possível ler a saúde da conta ${adAccountId}: ${(erro as Error).message}`);
+      return {};
     }
   }
 

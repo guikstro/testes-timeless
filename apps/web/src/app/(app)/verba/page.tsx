@@ -8,7 +8,8 @@ import { TabelaDeAnuncios } from "./tabela-de-anuncios";
 import { Identificacao } from "./identificacao";
 import { HistoricoDeVerbas } from "./historico-de-verbas";
 import { Procedencia } from "./procedencia";
-import { Anuncios, SituacaoDaVerba, Verba } from "./tipos";
+import { SaudeDaContaMeta } from "./saude-da-conta";
+import { Anuncios, SaudeDaConta, SituacaoDaVerba, Verba } from "./tipos";
 
 interface Busca {
   de?: string;
@@ -39,11 +40,12 @@ export default async function VerbaPage({ searchParams }: { searchParams: Promis
   const agora = mesAtual();
   const periodo = leIntervalo(params.de, params.ate) ?? intervaloDoMes(agora.ano, agora.mes);
 
-  const [situacao, verbas, dados, sessao] = await Promise.all([
+  const [situacao, verbas, dados, sessao, saude] = await Promise.all([
     apiFetch<SituacaoDaVerba | null>("/verbas/resumo"),
     apiFetch<Verba[]>("/verbas"),
     apiFetch<Anuncios>(`/analytics/anuncios?de=${periodo.de}&ate=${periodo.ate}`),
     apiFetch<{ role: "OWNER" | "ADMIN" | "MEMBER" }>("/auth/session"),
+    apiFetch<SaudeDaConta | null>("/integrations/meta/saude"),
   ]);
 
   /*
@@ -82,6 +84,12 @@ export default async function VerbaPage({ searchParams }: { searchParams: Promis
           />
         </div>
       </header>
+
+      {/*
+        Acima do painel de propósito: com a conta parada, nenhum número abaixo
+        quer dizer o que parece querer.
+      */}
+      <SaudeDaContaMeta saude={saude} />
 
       <PainelDaVerba situacao={situacao} gastoDeHoje={gastoDeHoje(dados, hoje)} />
 

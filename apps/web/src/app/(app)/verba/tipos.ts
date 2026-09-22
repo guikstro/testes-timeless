@@ -72,6 +72,28 @@ export interface Anuncios {
   };
 }
 
+export interface StatusDaConta {
+  codigo: number;
+  rotulo: string;
+  gravidade: "ok" | "atencao" | "parada";
+  oQueFazer: string | null;
+}
+
+/** O que a Meta diz da conta de anúncios. Null quando não há conexão. */
+export interface SaudeDaConta {
+  nome: string | null;
+  moeda: string | null;
+  status: StatusDaConta | null;
+  tetoCentavos: number | null;
+  /** Acumulado contra o teto, **não** o gasto do período. */
+  acumuladoCentavos: number | null;
+  restanteDoTetoCentavos: number | null;
+  tetoConsumidoPorCento: number | null;
+  saldoCentavos: number | null;
+  lidoEm: string | null;
+  gravidade: "ok" | "atencao" | "parada";
+}
+
 export interface Verba {
   id: string;
   startsOn: string;

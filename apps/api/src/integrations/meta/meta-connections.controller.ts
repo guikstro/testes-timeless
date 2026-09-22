@@ -24,6 +24,17 @@ export class MetaConnectionsController {
     res.json(result);
   }
 
+  /**
+   * A saúde da conta: estado, teto de gasto e saldo, como a Meta reporta.
+   *
+   * Rota separada da conexão porque responde outra pergunta. A de conexão diz
+   * se o vínculo existe; esta diz se o dinheiro do outro lado está de pé.
+   */
+  @Get("saude")
+  saude(@CurrentUser() user: AuthenticatedUser) {
+    return this.metaConnectionsService.saudeDaConta(user.organizationId);
+  }
+
   @Post("connect")
   connect(@CurrentUser() user: AuthenticatedUser, @Body() dto: ConnectMetaDto) {
     return this.metaConnectionsService.connect(user.organizationId, dto);

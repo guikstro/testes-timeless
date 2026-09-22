@@ -38,6 +38,27 @@ function startMockMetaServer(): Promise<{ server: http.Server; baseUrl: string }
         return;
       }
 
+      /*
+        O objeto da conta, que é o que `getAccountHealth` pede.
+
+        `spend_cap: "0"` de propósito: na Meta isso quer dizer SEM TETO, e é a
+        armadilha que este caminho precisa atravessar sem virar "teto
+        esgotado". `balance` vem ausente, como numa conta pós-paga.
+      */
+      if (url.pathname === "/act_123" && req.method === "GET") {
+        res.end(
+          JSON.stringify({
+            id: "act_123",
+            name: "Timeless Co.",
+            currency: "BRL",
+            account_status: 1,
+            spend_cap: "0",
+            amount_spent: "123456",
+          }),
+        );
+        return;
+      }
+
       if (url.pathname === "/act_123/campaigns") {
         if (url.searchParams.get("after") === "page2") {
           res.end(JSON.stringify({ data: [{ id: "c2", name: "Campanha Instagram", status: "ACTIVE" }] }));
@@ -577,6 +598,69 @@ describe("Meta Ads sync (e2e, against a local Graph API double)", () => {
 
       expect(resposta.body.code).toBe("NAO_ENCONTRADO");
       expect(escritasRecebidas).toHaveLength(0);
+    });
+  });
+
+  describe("saúde da conta", () => {
+    it("lê estado, moeda e nome da conta na mesma rodada de sincronia", async () => {
+      const saude = await waitFor(async () => {
+        const resposta = await request(app.getHttpServer())
+          .get("/api/integrations/meta/saude")
+          .set("Authorization", `Bearer ${orgToken}`);
+        return resposta.body?.lidoEm ? resposta.body : null;
+      });
+
+      expect(saude).toMatchObject({
+        nome: "Timeless Co.",
+        moeda: "BRL",
+        gravidade: "ok",
+        status: { codigo: 1, rotulo: "Ativa", oQueFazer: null },
+      });
+    });
+
+    /*
+      A armadilha que o dublê reproduz: `spend_cap: "0"` na Meta quer dizer
+      SEM TETO. Lido como limite, a tela diria que a conta está esgotada
+      justamente quando ela não tem limite nenhum.
+    */
+    it("não lê teto zero como teto esgotado", async () => {
+      const resposta = await request(app.getHttpServer())
+        .get("/api/integrations/meta/saude")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .expect(200);
+
+      expect(resposta.body.tetoCentavos).toBeNull();
+      expect(resposta.body.tetoConsumidoPorCento).toBeNull();
+      expect(resposta.body.restanteDoTetoCentavos).toBeNull();
+      expect(resposta.body.gravidade).toBe("ok");
+    });
+
+    it("trata campo ausente como não lido, e não como saldo zero", async () => {
+      // Conta pós-paga não tem `balance`. Zero ali acenderia alarme falso de
+      // veiculação parada.
+      const resposta = await request(app.getHttpServer())
+        .get("/api/integrations/meta/saude")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .expect(200);
+
+      expect(resposta.body.saldoCentavos).toBeNull();
+      expect(resposta.body.gravidade).toBe("ok");
+    });
+
+    it("devolve null para quem não conectou a Meta, em vez de uma conta doente", async () => {
+      const outra = await request(app.getHttpServer()).post("/api/auth/register").send({
+        name: "User E",
+        email: "user-e@meta-ads-e2e.local",
+        password: "password123",
+        organizationName: "Meta Ads E2E Org E",
+      });
+
+      const resposta = await request(app.getHttpServer())
+        .get("/api/integrations/meta/saude")
+        .set("Authorization", `Bearer ${outra.body.accessToken}`)
+        .expect(200);
+
+      expect(resposta.body).toEqual({});
     });
   });
 });

@@ -712,6 +712,36 @@ model MetaConnection {
   capiAccessTokenEncrypted String?   @map("capi_access_token_encrypted")
   capiConfiguredAt         DateTime? @map("capi_configured_at")
 
+  /**
+   * A saúde da conta, como a própria Meta a reporta.
+   * Guardada aqui em vez de buscada a cada abertura de tela por dois motivos:
+   * a tela não pode depender de uma chamada externa para desenhar, e a
+   * sincronia já roda de hora em hora com o token na mão.
+   * Todos anuláveis, e isso é a parte importante: nulo significa "nunca foi
+   * lido", que é diferente de zero. Um teto de gasto igual a zero, na Meta,
+   * quer dizer *sem teto*, e tratá-lo como limite esgotado inverteria
+   * completamente o sentido.
+   */
+  /**
+   * /** Código numérico da Meta. Ver `leituraDoStatusDaConta`.
+   */
+  accountStatus    Int?      @map("account_status")
+  /**
+   * Teto de gasto em centavos. Zero na Meta quer dizer sem teto; aqui isso vira null.
+   */
+  spendCapCents    Int?      @map("spend_cap_cents")
+  /**
+   * Gasto acumulado contra o teto. Não é o gasto do mês.
+   */
+  amountSpentCents Int?      @map("amount_spent_cents")
+  /**
+   * Saldo de pré-pago, quando a conta é desse tipo.
+   */
+  balanceCents     Int?      @map("balance_cents")
+  currency         String?
+  accountName      String?   @map("account_name")
+  healthSyncedAt   DateTime? @map("health_synced_at")
+
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@map("meta_connections")

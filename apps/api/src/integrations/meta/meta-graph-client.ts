@@ -11,6 +11,16 @@ import {
   MetaPagedResponse,
 } from "./meta-graph-types";
 
+/** O objeto da conta de anúncios, com os campos que este produto lê. */
+export interface MetaAccountHealth {
+  name?: string;
+  currency?: string;
+  account_status?: number;
+  spend_cap?: string;
+  amount_spent?: string;
+  balance?: string;
+}
+
 const DEFAULT_BASE_URL = "https://graph.facebook.com/v21.0";
 
 export interface InsightsRange {
@@ -74,6 +84,26 @@ export class MetaGraphClient {
    * Same error envelope as the rest of the Graph API, so it reuses the same
    * `MetaApiError` parsing/classification (token expired, rate limited).
    */
+  /**
+   * A saúde da conta, direto do objeto da conta de anúncios.
+   *
+   * Uma chamada só, sem paginação, porque é um objeto e não uma coleção.
+   *
+   * `spend_cap` e `amount_spent` andam em par e precisam ser pedidos juntos:
+   * o teto sozinho não diz quanto falta, e o acumulado sozinho não diz contra
+   * o quê. `balance` só existe em conta pré-paga e vem ausente nas outras,
+   * que é diferente de vir zero.
+   */
+  async getAccountHealth(adAccountId: string, accessToken: string): Promise<MetaAccountHealth> {
+    const url = this.buildUrl(`/${adAccountId}`, accessToken, {
+      fields: "name,currency,account_status,spend_cap,amount_spent,balance",
+    });
+    const response = await fetch(url);
+    const body = await response.json();
+    this.throwIfError(response, body);
+    return body as MetaAccountHealth;
+  }
+
   /**
    * Escreve na conta: muda o status de uma campanha, conjunto ou anúncio.
    *
