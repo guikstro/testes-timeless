@@ -6,15 +6,41 @@ import { Test, TestingModule } from "@nestjs/testing";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { PrismaService } from "../src/common/prisma/prisma.service";
+import { EncryptionService } from "../src/common/encryption/encryption.service";
+import { geraSegredo } from "../src/auth/mfa/totp";
 import { HttpExceptionFilter } from "../src/common/filters/http-exception.filter";
 
 function decodeJwt(accessToken: string): { sub: string; organizationId: string; impersonating?: true } {
   return JSON.parse(Buffer.from(accessToken.split(".")[1], "base64").toString("utf8"));
 }
 
+/**
+ * Liga o segundo fator para um operador, direto no banco.
+ *
+ * A administração exige verificação em duas etapas, e é a porta dela que
+ * cobra isso. Como esta suíte concede o acesso de operador escrevendo no
+ * banco, ela precisa configurar o fator do mesmo jeito: o fluxo de inscrição
+ * em si tem suíte própria em `mfa.e2e-spec.ts`.
+ *
+ * O segredo é irrelevante aqui, porque nenhum código chega a ser conferido
+ * nestes testes. O que importa é `confirmadoEm` preenchido.
+ */
+async function daSegundoFator(
+  prisma: PrismaService,
+  encryption: EncryptionService,
+  userId: string,
+): Promise<void> {
+  await prisma.userMfa.upsert({
+    where: { userId },
+    create: { userId, secretEncrypted: encryption.encrypt(geraSegredo()), confirmadoEm: new Date() },
+    update: { confirmadoEm: new Date() },
+  });
+}
+
 describe("Administração da plataforma (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let encryption: EncryptionService;
   /** Assina tokens forjados nos testes de prazo, usando a mesma chave da aplicação. */
   let jwtService: JwtService;
 
@@ -33,6 +59,7 @@ describe("Administração da plataforma (e2e)", () => {
     await app.init();
 
     prisma = moduleRef.get(PrismaService);
+    encryption = moduleRef.get(EncryptionService);
     jwtService = moduleRef.get(JwtService);
 
     await prisma.organization.deleteMany({ where: { name: { contains: "Admin E2E" } } });
@@ -86,6 +113,7 @@ describe("Administração da plataforma (e2e)", () => {
       // Direto no banco porque este é o bootstrap: o primeiro ADMIN não tem
       // quem o promova pela API (as rotas de gestão exigem já ser ADMIN).
       await prisma.user.update({ where: { id: adminUserId }, data: { platformRole: "ADMIN" } });
+      await daSegundoFator(prisma, encryption, adminUserId);
     });
 
     it("lista as organizações com as métricas do painel", async () => {
@@ -195,6 +223,7 @@ describe("Administração da plataforma (e2e)", () => {
         .expect(403);
 
       await prisma.user.update({ where: { id: adminUserId }, data: { platformRole: "ADMIN" } });
+      await daSegundoFator(prisma, encryption, adminUserId);
     });
 
     it("recusa uma organização inexistente", async () => {
@@ -311,6 +340,10 @@ describe("Administração da plataforma (e2e)", () => {
           .expect(200);
 
         expect(response.body).toMatchObject({ id: supportUserId, platformRole: "SUPPORT" });
+
+        // Promover dá o papel; a administração ainda exige o segundo fator.
+        // O fluxo de inscrição tem suíte própria em `mfa.e2e-spec.ts`.
+        await daSegundoFator(prisma, encryption, supportUserId);
       });
 
       it("o SUPPORT enxerga os clientes e entra neles — é o trabalho dele", async () => {
@@ -390,6 +423,7 @@ describe("Administração da plataforma (e2e)", () => {
 
         // Restaura o estado para os testes seguintes.
         await prisma.user.update({ where: { id: adminUserId }, data: { platformRole: "ADMIN" } });
+      await daSegundoFator(prisma, encryption, adminUserId);
         await prisma.user.update({ where: { id: supportUserId }, data: { platformRole: "SUPPORT" } });
       });
 

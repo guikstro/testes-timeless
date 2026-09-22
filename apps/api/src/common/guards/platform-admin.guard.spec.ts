@@ -35,14 +35,14 @@ describe("PlatformAdminGuard", () => {
 
   it("allows a platform admin through", async () => {
     const { guard, prisma } = buildGuard();
-    prisma.user.findUnique.mockResolvedValue({ platformRole: "ADMIN", deletedAt: null });
+    prisma.user.findUnique.mockResolvedValue({ platformRole: "ADMIN", deletedAt: null, mfa: { confirmadoEm: new Date() } });
 
     await expect(guard.canActivate(contextFor(admin))).resolves.toBe(true);
   });
 
   it("rejects an authenticated user who is not a platform admin", async () => {
     const { guard, prisma } = buildGuard();
-    prisma.user.findUnique.mockResolvedValue({ platformRole: null, deletedAt: null });
+    prisma.user.findUnique.mockResolvedValue({ platformRole: null, deletedAt: null, mfa: { confirmadoEm: new Date() } });
 
     await expect(guard.canActivate(contextFor(admin))).rejects.toThrow(AppException);
   });
@@ -60,19 +60,19 @@ describe("PlatformAdminGuard", () => {
    */
   it("reads the flag from the database on every request, never from the token", async () => {
     const { guard, prisma } = buildGuard();
-    prisma.user.findUnique.mockResolvedValue({ platformRole: "ADMIN", deletedAt: null });
+    prisma.user.findUnique.mockResolvedValue({ platformRole: "ADMIN", deletedAt: null, mfa: { confirmadoEm: new Date() } });
 
     await guard.canActivate(contextFor(admin));
 
     expect(prisma.user.findUnique).toHaveBeenCalledWith({
       where: { id: "admin-1" },
-      select: { platformRole: true, deletedAt: true },
+      select: { platformRole: true, deletedAt: true, mfa: { select: { confirmadoEm: true } } },
     });
   });
 
   it("rejects a soft-deleted user even if the flag is still set", async () => {
     const { guard, prisma } = buildGuard();
-    prisma.user.findUnique.mockResolvedValue({ platformRole: "ADMIN", deletedAt: new Date() });
+    prisma.user.findUnique.mockResolvedValue({ platformRole: "ADMIN", deletedAt: new Date(), mfa: { confirmadoEm: new Date() } });
 
     await expect(guard.canActivate(contextFor(admin))).rejects.toThrow(AppException);
   });
@@ -106,14 +106,14 @@ describe("PlatformAdminGuard", () => {
      */
     it("accepts any operator on a route with no required level", async () => {
       const { guard, prisma } = buildGuard(undefined);
-      prisma.user.findUnique.mockResolvedValue({ platformRole: "SUPPORT", deletedAt: null });
+      prisma.user.findUnique.mockResolvedValue({ platformRole: "SUPPORT", deletedAt: null, mfa: { confirmadoEm: new Date() } });
 
       await expect(guard.canActivate(contextFor(admin))).resolves.toBe(true);
     });
 
     it("rejects a SUPPORT operator on a route that requires ADMIN", async () => {
       const { guard, prisma } = buildGuard("ADMIN");
-      prisma.user.findUnique.mockResolvedValue({ platformRole: "SUPPORT", deletedAt: null });
+      prisma.user.findUnique.mockResolvedValue({ platformRole: "SUPPORT", deletedAt: null, mfa: { confirmadoEm: new Date() } });
 
       await expect(guard.canActivate(contextFor(admin))).rejects.toMatchObject({
         response: { code: "INSUFFICIENT_PLATFORM_ROLE" },
@@ -122,7 +122,7 @@ describe("PlatformAdminGuard", () => {
 
     it("accepts an ADMIN on a route that requires ADMIN", async () => {
       const { guard, prisma } = buildGuard("ADMIN");
-      prisma.user.findUnique.mockResolvedValue({ platformRole: "ADMIN", deletedAt: null });
+      prisma.user.findUnique.mockResolvedValue({ platformRole: "ADMIN", deletedAt: null, mfa: { confirmadoEm: new Date() } });
 
       await expect(guard.canActivate(contextFor(admin))).resolves.toBe(true);
     });
@@ -130,19 +130,52 @@ describe("PlatformAdminGuard", () => {
     /** Os níveis são hierárquicos: tudo que o SUPPORT faz, o ADMIN também faz. */
     it("accepts an ADMIN on a route that only requires SUPPORT", async () => {
       const { guard, prisma } = buildGuard("SUPPORT");
-      prisma.user.findUnique.mockResolvedValue({ platformRole: "ADMIN", deletedAt: null });
+      prisma.user.findUnique.mockResolvedValue({ platformRole: "ADMIN", deletedAt: null, mfa: { confirmadoEm: new Date() } });
 
       await expect(guard.canActivate(contextFor(admin))).resolves.toBe(true);
     });
 
     it("exposes the level on the request so the controller does not query again", async () => {
       const { guard, prisma } = buildGuard();
-      prisma.user.findUnique.mockResolvedValue({ platformRole: "SUPPORT", deletedAt: null });
+      prisma.user.findUnique.mockResolvedValue({ platformRole: "SUPPORT", deletedAt: null, mfa: { confirmadoEm: new Date() } });
       const user = { ...admin };
 
       await guard.canActivate(contextFor(user));
 
       expect(user.platformRole).toBe("SUPPORT");
+    });
+  });
+  /*
+    Operador sem segundo fator perde a administração, e só ela.
+
+    A exigência mora nesta porta, e não no login, para o operador continuar
+    usando a própria conta como qualquer usuário enquanto não configura. Exigir
+    no login trancaria para fora do produto inteiro quem já tinha conta antes
+    da mudança.
+  */
+  describe("segundo fator obrigatório para operadores", () => {
+    it("recusa operador sem segundo fator configurado", async () => {
+      const { guard, prisma } = buildGuard();
+      prisma.user.findUnique.mockResolvedValue({ platformRole: "ADMIN", deletedAt: null, mfa: null });
+
+      await expect(guard.canActivate(contextFor(admin))).rejects.toMatchObject({
+        response: { code: "MFA_OBRIGATORIO" },
+      });
+    });
+
+    it("recusa inscrição começada e não confirmada", async () => {
+      // Segredo gerado e nunca provado é configuração pela metade: não vale
+      // como fator.
+      const { guard, prisma } = buildGuard();
+      prisma.user.findUnique.mockResolvedValue({
+        platformRole: "ADMIN",
+        deletedAt: null,
+        mfa: { confirmadoEm: null },
+      });
+
+      await expect(guard.canActivate(contextFor(admin))).rejects.toMatchObject({
+        response: { code: "MFA_OBRIGATORIO" },
+      });
     });
   });
 });

@@ -4,6 +4,8 @@ import * as bcrypt from "bcrypt";
 import * as crypto from "crypto";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { AppException } from "../common/exceptions/app-exception";
+import { MembershipRole } from "@prisma/client";
+import { MfaService } from "./mfa/mfa.service";
 import { slugify } from "../common/utils/slugify";
 import { hashToken } from "../common/utils/hash-token";
 import { isUniqueConstraintError } from "../common/utils/is-unique-constraint-error";
@@ -41,12 +43,36 @@ interface TokenPair {
   refreshToken: string;
 }
 
+/**
+ * O que o login devolve quando a conta tem segundo fator.
+ *
+ * Nenhum token de sessão sai daqui: só uma permissão curta para apresentar o
+ * código. Emitir a sessão antes do segundo fator e "completar" depois faria o
+ * fator ser um aviso, não uma tranca.
+ */
+export interface DesafioDeSegundoFator {
+  mfaObrigatorio: true;
+  desafio: string;
+}
+
+export type ResultadoDeLogin = TokenPair | DesafioDeSegundoFator;
+
+/**
+ * Dois minutos para digitar seis dígitos já lidos do telefone.
+ *
+ * Curto de propósito: este token vale uma sessão inteira quando trocado, e
+ * uma janela generosa aqui é uma janela para quem tiver a senha esperar
+ * alguém desbloquear o telefone.
+ */
+const DESAFIO_MFA_TTL = "2m";
+
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly email: EmailService,
+    private readonly mfa: MfaService,
   ) {}
 
   async register(dto: RegisterDto): Promise<TokenPair> {
@@ -99,14 +125,17 @@ export class AuthService {
     return this.issueTokenPair(result.user.id, result.membership.organizationId, result.membership.role);
   }
 
-  async login(dto: LoginDto): Promise<TokenPair> {
+  async login(dto: LoginDto): Promise<ResultadoDeLogin> {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
       // Vínculo com organização apagada não conta. Sem este filtro, entrar
       // funcionava e a sessão morria logo depois em `getSession`, que confere
       // isto: o resultado era um login que dava certo e uma tela que dizia
       // "sessão inválida", sem nada explicando por quê.
-      include: { memberships: { where: { organization: { deletedAt: null } } } },
+      include: {
+        memberships: { where: { organization: { deletedAt: null } } },
+        mfa: { select: { confirmadoEm: true } },
+      },
     });
 
     const passwordMatches = await bcrypt.compare(dto.password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
@@ -137,7 +166,76 @@ export class AuthService {
       );
     }
 
+    /*
+      Com segundo fator ativo, o login para aqui.
+
+      `confirmadoEm` nulo não conta: um segredo gerado e nunca provado é uma
+      configuração pela metade, e exigi-lo trancaria quem fechou a aba no meio
+      da inscrição.
+    */
+    if (user.mfa?.confirmadoEm) {
+      return {
+        mfaObrigatorio: true,
+        desafio: await this.jwt.signAsync(
+          { sub: user.id, organizationId: membership.organizationId, role: membership.role, proposito: "mfa" },
+          { expiresIn: DESAFIO_MFA_TTL },
+        ),
+      };
+    }
+
     return this.issueTokenPair(user.id, membership.organizationId, membership.role);
+  }
+
+  /**
+   * Troca o desafio pelo par de tokens, contra um código válido.
+   *
+   * O desafio carrega organização e papel decididos no login, e não os aceita
+   * de fora: sem isso, quem tivesse um desafio poderia pedir sessão em
+   * qualquer organização.
+   */
+  async completarLogin(desafio: string, codigo: string): Promise<TokenPair> {
+    let payload: { sub: string; organizationId: string; role: MembershipRole; proposito?: string };
+    try {
+      payload = await this.jwt.verifyAsync(desafio);
+    } catch {
+      throw new AppException(
+        "DESAFIO_EXPIRADO",
+        "O tempo para confirmar o código acabou. Entre de novo.",
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
+    // Um token de sessão não serve como desafio, e vice-versa: sem esta
+    // conferência, um access token roubado pularia o segundo fator.
+    if (payload.proposito !== "mfa") {
+      throw new AppException("DESAFIO_INVALIDO", "Requisição inválida.", HttpStatus.UNAUTHORIZED);
+    }
+
+    if (!(await this.mfa.confereSegundoFator(payload.sub, codigo))) {
+      throw new AppException(
+        "MFA_CODIGO_INVALIDO",
+        "Código inválido. Use o código atual do aplicativo ou um código de recuperação.",
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
+    return this.issueTokenPair(payload.sub, payload.organizationId, payload.role);
+  }
+
+  /**
+   * Desliga o segundo fator: senha e código, os dois.
+   *
+   * Só o código bastaria para quem estivesse com a sessão aberta, e só a senha
+   * bastaria para quem a tivesse roubado. Exigir os dois é o que faz desligar
+   * custar o mesmo que o fator protege.
+   */
+  async desativarMfa(userId: string, senha: string, codigo: string): Promise<void> {
+    const usuario = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!usuario || !(await bcrypt.compare(senha, usuario.passwordHash))) {
+      throw new AppException("INVALID_CREDENTIALS", "Senha incorreta.", HttpStatus.UNAUTHORIZED);
+    }
+
+    await this.mfa.desativar(userId, codigo);
   }
 
   async refresh(refreshToken: string): Promise<TokenPair> {

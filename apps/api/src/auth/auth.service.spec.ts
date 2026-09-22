@@ -5,6 +5,7 @@ import { AuthService } from "./auth.service";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { AuthenticatedUser } from "./jwt-payload.interface";
 import { AppException } from "../common/exceptions/app-exception";
+import { MfaService } from "./mfa/mfa.service";
 import { EmailService } from "../common/email/email.service";
 
 // bcrypt's native binding exports non-configurable properties, so
@@ -55,12 +56,19 @@ describe("AuthService", () => {
   let jwt: JwtService;
   let service: AuthService;
   let email: { enfileirar: jest.Mock };
+  let mfa: { confereSegundoFator: jest.Mock; desativar: jest.Mock };
 
   beforeEach(() => {
     prisma = buildPrismaMock();
     jwt = new JwtService({ secret: "test-secret" });
     email = { enfileirar: jest.fn().mockResolvedValue(undefined) };
-    service = new AuthService(prisma as unknown as PrismaService, jwt, email as unknown as EmailService);
+    mfa = { confereSegundoFator: jest.fn().mockResolvedValue(true), desativar: jest.fn() };
+    service = new AuthService(
+      prisma as unknown as PrismaService,
+      jwt,
+      email as unknown as EmailService,
+      mfa as unknown as MfaService,
+    );
   });
 
   describe("register", () => {
@@ -183,7 +191,10 @@ describe("AuthService", () => {
       // inválida", sem nada explicando por quê.
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { email: "ana@example.com" },
-        include: { memberships: { where: { organization: { deletedAt: null } } } },
+        include: {
+          memberships: { where: { organization: { deletedAt: null } } },
+          mfa: { select: { confirmadoEm: true } },
+        },
       });
     });
 
@@ -209,9 +220,12 @@ describe("AuthService", () => {
       });
 
       const result = await service.login({ email: "ana@example.com", password: "correct-password" });
-      expect(result.accessToken).toEqual(expect.any(String));
+      // Sem segundo fator configurado, o login devolve a sessão direto.
+      expect(result).not.toHaveProperty("mfaObrigatorio");
+      const tokens = result as { accessToken: string; refreshToken: string };
+      expect(tokens.accessToken).toEqual(expect.any(String));
 
-      const payload = jwt.decode(result.accessToken) as { organizationId: string };
+      const payload = jwt.decode(tokens.accessToken) as { organizationId: string };
       expect(payload.organizationId).toBe("org-1");
     });
 

@@ -28,6 +28,11 @@ const ROLE_RANK: Record<PlatformRole, number> = { SUPPORT: 1, ADMIN: 2 };
  * Também recusa uma sessão que já está impersonando: de dentro de um cliente
  * não se enxerga nem se entra em outro, o que impede encadear impersonações
  * e obriga o operador a voltar à própria conta antes de trocar de cliente.
+ *
+ * E exige segundo fator, que para operadores é obrigatório. A exigência fica
+ * nesta porta e não no login: assim o operador continua usando a própria conta
+ * normalmente e só perde o acesso à administração até configurar, em vez de
+ * ser trancado para fora do produto por uma migração.
  */
 @Injectable()
 export class PlatformAdminGuard implements CanActivate {
@@ -54,13 +59,33 @@ export class PlatformAdminGuard implements CanActivate {
 
     const record = await this.prisma.user.findUnique({
       where: { id: user.userId },
-      select: { platformRole: true, deletedAt: true },
+      select: { platformRole: true, deletedAt: true, mfa: { select: { confirmadoEm: true } } },
     });
 
     if (!record?.platformRole || record.deletedAt) {
       // Mesma mensagem para "não é operador" e "não existe": não confirmar a
       // existência da rota para quem não deveria alcançá-la.
       throw new AppException("FORBIDDEN", "Acesso restrito.", HttpStatus.FORBIDDEN);
+    }
+
+    /*
+      Segundo fator é obrigatório para operar a plataforma, e a exigência mora
+      aqui de propósito.
+
+      Aqui, e não no login: o operador continua usando a própria conta como
+      qualquer usuário, só não alcança a administração enquanto não configurar.
+      Exigir no login trancaria para fora do produto inteiro quem já tinha
+      conta antes desta mudança, o que é uma migração que quebra gente.
+
+      Para clientes o fator é opcional, e é por isso que a regra é sobre
+      `platformRole` e não sobre o usuário em geral.
+    */
+    if (!record.mfa?.confirmadoEm) {
+      throw new AppException(
+        "MFA_OBRIGATORIO",
+        "A administração exige verificação em duas etapas. Configure em Configurações, Segurança.",
+        HttpStatus.FORBIDDEN,
+      );
     }
 
     // Sem decorator, basta ser operador (o nível menos privilegiado).

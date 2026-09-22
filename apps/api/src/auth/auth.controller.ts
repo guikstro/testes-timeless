@@ -7,6 +7,7 @@ import { AuthenticatedUser } from "./jwt-payload.interface";
 import { AuthService } from "./auth.service";
 import { RegisterDto } from "./dto/register.dto";
 import { LoginDto } from "./dto/login.dto";
+import { CompletarLoginDto } from "./mfa/dto/mfa.dto";
 import { RefreshTokenDto } from "./dto/refresh-token.dto";
 import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
@@ -42,6 +43,18 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  /**
+   * Troca o desafio do segundo fator pela sessão.
+   *
+   * Pública como o login, e com o mesmo limite: é onde seis dígitos são
+   * tentados, e um limite frouxo aqui anula o fator.
+   */
+  @Post("mfa/completar")
+  @Throttle({ default: AUTENTICACAO })
+  completarLogin(@Body() dto: CompletarLoginDto) {
+    return this.authService.completarLogin(dto.desafio, dto.codigo);
   }
 
   @Post("refresh")
