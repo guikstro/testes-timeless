@@ -184,6 +184,9 @@ services:
       # container), so this must resolve on the Docker network, not the host —
       # "localhost" here would point at the web container itself, not the api one.
       NEXT_PUBLIC_API_URL: http://api:3001/api
+      # Endereço que o NAVEGADOR alcança, para o link do menu levar a lugar
+      # nenhum dentro da rede do Docker.
+      NEXT_PUBLIC_ADMIN_URL: ${ADMIN_APP_URL:-http://localhost:3002}
       TZ: America/Sao_Paulo
       PORT: 3000
     ports:
@@ -196,6 +199,40 @@ services:
       - /app/apps/web/node_modules
       - /app/node_modules
     command: sh -c "pnpm --filter web dev"
+
+  # A administração da plataforma, num endereço próprio.
+  #
+  # Serviço separado, e não um caminho dentro do `web`, porque é disso que a
+  # separação se trata: origem diferente significa cookie diferente, e uma
+  # falha de script no site do cliente não alcança a sessão de quem opera a
+  # plataforma inteira.
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      target: dev
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Resolvido na rede do Docker: "localhost" aqui apontaria para o próprio
+      # contêiner da administração, não para a api.
+      NEXT_PUBLIC_API_URL: http://api:3001/api
+      # Para onde mandar o navegador ao entrar num cliente. Este precisa ser o
+      # endereço que o NAVEGADOR alcança, e não o da rede interna.
+      NEXT_PUBLIC_WEB_APP_URL: ${WEB_APP_URL:-http://localhost:3000}
+      TZ: America/Sao_Paulo
+      PORT: 3002
+    ports:
+      - "3002:3002"
+    depends_on:
+      - api
+    volumes:
+      - ./apps/admin:/app/apps/admin
+      - ./packages:/app/packages
+      - /app/apps/admin/node_modules
+      - /app/node_modules
+    command: sh -c "pnpm --filter admin dev"
 
 volumes:
   backups:

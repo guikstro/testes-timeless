@@ -20,6 +20,14 @@ export const MFA_CHALLENGE_COOKIE = "mfa_challenge";
 /** Dois minutos, o mesmo prazo do token no servidor. */
 export const MFA_CHALLENGE_MAX_AGE = 120;
 
+/*
+  Resquício do tempo em que a administração morava aqui dentro.
+
+  Estes cookies guardavam a sessão do operador enquanto ele visitava um
+  cliente. A administração tem site próprio agora e nada mais os escreve, mas
+  navegadores que passaram pelo fluxo antigo ainda os têm. Continuam
+  declarados só para o logout poder apagá-los.
+*/
 export const ADMIN_ACCESS_TOKEN_COOKIE = "admin_access_token";
 export const ADMIN_REFRESH_TOKEN_COOKIE = "admin_refresh_token";
 

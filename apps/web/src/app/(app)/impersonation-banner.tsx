@@ -28,6 +28,12 @@ export function ImpersonationHairline() {
 /**
  * Botão de saída, no rodapé da barra lateral junto dos outros controles de
  * sessão. É onde a pessoa já procura por "sair", em vez de flutuar numa faixa.
+ *
+ * O que ele faz mudou quando a administração virou site próprio. Antes, ele
+ * restaurava a sessão do operador a partir de cookies estacionados aqui.
+ * Agora não há o que restaurar: a sessão do operador nunca saiu do site da
+ * administração, que continua aberto na aba de onde ele veio. Sair daqui é
+ * só encerrar a sessão deste cliente.
  */
 export function LeaveClientButton({ collapsedLabelClassName = "" }: { collapsedLabelClassName?: string }) {
   const [pending, setPending] = useState(false);
@@ -37,24 +43,16 @@ export function LeaveClientButton({ collapsedLabelClassName = "" }: { collapsedL
     setError(null);
     setPending(true);
 
-    const response = await fetch("/api/admin/stop-impersonating", { method: "POST" });
-
-    if (!response.ok) {
-      const body = await response.json().catch(() => null);
-      if (body?.reason === "ADMIN_SESSION_EXPIRED") {
-        // A sessão de operador expirou aqui dentro; os cookies já foram
-        // limpos, então o caminho é refazer o login.
-        window.location.href = "/login";
-        return;
-      }
-      setError("Não foi possível sair.");
-      setPending(false);
-      return;
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // A revogação no servidor é o ideal; sair da tela é o mínimo, e falhar
+      // no primeiro não pode prender o operador dentro do cliente.
     }
 
-    // Recarregamento completo pelo mesmo motivo da entrada: a identidade da
-    // sessão mudou nos cookies e o shell precisa ser refeito com ela.
-    window.location.href = "/admin";
+    // Recarregamento completo: a sessão morreu nos cookies e o shell precisa
+    // ser refeito sem ela.
+    window.location.href = "/login?motivo=saiu-do-cliente";
   }
 
   return (
@@ -63,14 +61,14 @@ export function LeaveClientButton({ collapsedLabelClassName = "" }: { collapsedL
         type="button"
         onClick={() => void leave()}
         disabled={pending}
-        title="Sair do cliente"
+        title="Encerrar a visita a este cliente"
         aria-busy={pending || undefined}
         className="focus-ring flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-amber-700 transition-all duration-200 ease-soft hover:bg-amber-500/10 active:scale-[0.98] disabled:opacity-50 dark:text-amber-400"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0" aria-hidden>
           <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
         </svg>
-        <span className={collapsedLabelClassName}>{pending ? "Saindo" : "Sair do cliente"}</span>
+        <span className={collapsedLabelClassName}>{pending ? "Saindo" : "Encerrar visita"}</span>
       </button>
       {error ? <p className={`px-3 text-xs text-red-600 ${collapsedLabelClassName}`}>{error}</p> : null}
     </>

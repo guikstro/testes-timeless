@@ -47,7 +47,7 @@ export default function ErroDaAdministracao({
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
         <Button onClick={() => reset()}>Tentar de novo</Button>
         <Link
-          href="/admin"
+          href="/"
           className="focus-ring inline-flex h-11 items-center rounded-full px-4 text-corpo font-medium text-ink-soft transition-colors hover:text-ink"
         >
           Voltar para os clientes

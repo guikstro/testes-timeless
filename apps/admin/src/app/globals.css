@@ -1,0 +1,153 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * Identidade Timeless.
+ *
+ * Os valores vêm das artes da marca (Basic Branding), não de escolha minha:
+ * marfim #FFF9ED e quase-preto #030403 são exatamente o fundo claro e o fundo
+ * escuro dos logotipos; #F0EADF é o creme do logotipo sobre escuro.
+ *
+ * Tudo aqui é papel, não tom — `ink` é "a cor do texto", e o que ela vale
+ * muda entre os temas. As telas nunca citam um tom diretamente, então nenhuma
+ * delas precisa saber se está no claro ou no escuro.
+ */
+:root {
+  color-scheme: light;
+
+  --canvas: 255 249 237;
+  --panel: 255 255 255;
+  --panel-soft: 250 245 235;
+  --line: 226 219 205;
+
+  /* Altura da faixa do topo. A caixa de entrada desconta isto para ocupar
+     o resto da janela, e um número solto nos dois lugares separaria. */
+  --faixa-do-topo: 45px;
+
+  --ink: 12 11 10;
+  --ink-soft: 82 76 68;
+  --ink-mute: 133 125 113;
+
+  /**
+   * Verde da marca, medido no material do Creative Studio. Cada tema recebe
+   * o seu passo do mesmo tom — não o mesmo valor invertido: o que lê sobre
+   * marfim some sobre o preto, e o que brilha no escuro esmaece no claro.
+   */
+  --accent: 0 125 94;
+  --accent-contrast: 255 255 255;
+
+  --brand: 0 125 94;
+  --brand-soft: 232 242 238;
+  --brand-ink: 0 95 71;
+
+  /**
+   * Séries dos gráficos. Valores validados para daltonismo, com um passo por
+   * tema: a mesma tinta que lê sobre marfim desaparece sobre o preto.
+   */
+  --serie-1: 42 120 214;
+  --serie-2: 235 104 52;
+  --grade: 226 219 205;
+  --guia: 148 141 128;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --canvas: 3 4 3;
+  --panel: 20 20 19;
+  --panel-soft: 28 28 26;
+  --line: 48 47 44;
+
+  --ink: 240 234 223;
+  --ink-soft: 176 169 157;
+  --ink-mute: 130 124 114;
+
+  --accent: 0 168 123;
+  --accent-contrast: 3 4 3;
+
+  --brand: 0 168 123;
+  --brand-soft: 10 38 30;
+  --brand-ink: 108 226 184;
+
+  --serie-1: 57 135 229;
+  --serie-2: 217 89 38;
+  --grade: 48 47 44;
+  --guia: 130 124 114;
+}
+
+body {
+  @apply bg-canvas text-ink antialiased;
+  font-feature-settings: "cv02", "cv03", "cv04", "ss01";
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+@layer components {
+  .surface {
+    @apply rounded-2xl border border-line/70 bg-panel shadow-card;
+  }
+
+  .glass {
+    @apply border border-line/50 bg-panel/70 shadow-lifted backdrop-blur-xl backdrop-saturate-150;
+  }
+
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/40 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas;
+  }
+}
+
+/**
+ * Quem pediu menos movimento recebe menos movimento — inclusive nas animações
+ * de entrada, que são as que incomodam quem tem sensibilidade vestibular.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+  Impressão.
+
+  O relatório é feito para virar PDF pela impressão do navegador, o que
+  dispensa biblioteca de PDF no servidor e sai com as fontes e a cor da marca
+  já aplicadas. Para isso a moldura do aplicativo precisa sumir: menu, faixa
+  do topo e fundo vivo não pertencem ao documento que o cliente recebe.
+*/
+@media print {
+  aside,
+  nav,
+  [data-imprimir="esconder"] {
+    display: none !important;
+  }
+
+  /* Fundo branco e tinta preta: economiza tinta e evita o cinza chapado que
+     a impressora produz ao tentar reproduzir o marfim. */
+  :root {
+    --canvas: 255 255 255;
+    --panel: 255 255 255;
+    --panel-soft: 246 246 244;
+    --ink: 17 17 17;
+    --ink-soft: 51 51 51;
+    --ink-mute: 102 102 102;
+    --line: 214 214 210;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  main {
+    /* Sem a barra lateral, o conteúdo ocupa a folha inteira. */
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}

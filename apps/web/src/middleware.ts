@@ -9,9 +9,10 @@ import {
 } from "@/lib/session";
 
 // "/webhooks" saiu: a tela nunca existiu e o link quebrado no menu foi
-// removido na Fase 9. "/admin" entrou para a renovação silenciosa de sessão
-// abaixo também valer no painel do operador da plataforma.
-const PROTECTED_PREFIXES = ["/dashboard", "/conversas", "/leads", "/links", "/integrations", "/settings", "/campanhas", "/verba", "/relatorio", "/notifications", "/admin"];
+// removido na Fase 9. "/admin" saiu quando a administração virou site
+// próprio, com sessão, cookies e middleware dela — este aqui não a alcança
+// mais, e manter o caminho na lista daria a impressão de que alcança.
+const PROTECTED_PREFIXES = ["/dashboard", "/conversas", "/leads", "/links", "/integrations", "/settings", "/campanhas", "/verba", "/relatorio", "/notifications"];
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
 
 export async function middleware(request: NextRequest) {
@@ -82,6 +83,5 @@ export const config = {
     "/verba/:path*",
     "/relatorio/:path*",
     "/notifications/:path*",
-    "/admin/:path*",
   ],
 };

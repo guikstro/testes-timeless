@@ -146,8 +146,19 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+/**
+ * A administração vive noutro endereço, com login próprio.
+ *
+ * O link continua aqui porque só aparece para quem já é operador, e tirá-lo
+ * obrigaria a guardar a URL em algum lugar. Mas é uma âncora comum e não um
+ * `Link`: o destino é outra origem, e o roteador do Next não navega para
+ * fora. Abre em aba nova, porque a sessão deste site não vale lá e voltar
+ * seria refazer o login daqui.
+ */
+const ENDERECO_DA_ADMINISTRACAO = process.env.NEXT_PUBLIC_ADMIN_URL ?? "http://localhost:3002";
+
 const ADMIN_ITEM: NavItem = {
-  href: "/admin",
+  href: ENDERECO_DA_ADMINISTRACAO,
   label: "Administração",
   icon: (
     <svg {...ICON_PROPS}>
@@ -182,7 +193,25 @@ export function AppNav({
     "group-has-[:focus-visible]:opacity-100 group-data-[pinned=true]:opacity-100";
 
   function renderItem(item: NavItem, extraClasses = "") {
-    const active = isActive(pathname, item.href);
+    const externo = item.href.startsWith("http");
+    const active = !externo && isActive(pathname, item.href);
+
+    if (externo) {
+      return (
+        <a
+          key={item.href}
+          href={item.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={item.label}
+          className={`focus-ring group/item relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-ink-soft transition-all duration-200 ease-soft hover:bg-panel-soft/80 hover:text-ink active:scale-[0.98] ${extraClasses}`}
+        >
+          {item.icon}
+          <span className={label}>{item.label}</span>
+        </a>
+      );
+    }
+
     return (
       <Link
         key={item.href}

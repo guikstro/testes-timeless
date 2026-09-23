@@ -1,6 +1,4 @@
 import { apiFetch } from "@/lib/api-client";
-import { LeaveClientNotice } from "../leave-client-notice";
-import { estaDentroDeCliente } from "../guard";
 
 interface ImpersonationEntry {
   id: string;
@@ -20,9 +18,6 @@ interface Paginated<T> {
  * é, na prática, um acesso sem controle.
  */
 export default async function ImpersonationLogPage() {
-  if (await estaDentroDeCliente()) {
-    return <LeaveClientNotice />;
-  }
 
   const data = await apiFetch<Paginated<ImpersonationEntry>>("/admin/impersonations?limit=50");
 
