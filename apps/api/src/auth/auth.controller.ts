@@ -8,6 +8,9 @@ import { AuthService } from "./auth.service";
 import { RegisterDto } from "./dto/register.dto";
 import { LoginDto } from "./dto/login.dto";
 import { CompletarLoginDto } from "./mfa/dto/mfa.dto";
+import { ResgatarEntregaDto } from "./dto/resgatar-entrega.dto";
+import { EntregaDeSessaoService } from "../admin/entrega/entrega-de-sessao.service";
+import { AppException } from "../common/exceptions/app-exception";
 import { RefreshTokenDto } from "./dto/refresh-token.dto";
 import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
@@ -17,7 +20,9 @@ import { ConfirmEmailDto } from "./dto/confirm-email.dto";
 
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService,
+    private readonly entregas: EntregaDeSessaoService,
+  ) {}
 
   /**
    * Contexto da sessão para o shell da aplicação: quem é o usuário, em qual
@@ -55,6 +60,30 @@ export class AuthController {
   @Throttle({ default: AUTENTICACAO })
   completarLogin(@Body() dto: CompletarLoginDto) {
     return this.authService.completarLogin(dto.desafio, dto.codigo);
+  }
+
+  /**
+   * Troca o código de entrega pela sessão.
+   *
+   * Pública porque quem a chama é o site do cliente, antes de existir sessão
+   * nenhuma ali. A autenticação está no próprio código: ele é aleatório, vale
+   * um minuto e some no primeiro resgate.
+   *
+   * Limite apertado pelo mesmo motivo do login: é uma porta que emite sessão.
+   */
+  @Post("entrega")
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: AUTENTICACAO })
+  async entrega(@Body() dto: ResgatarEntregaDto) {
+    const sessao = await this.entregas.resgata(dto.codigo);
+    if (!sessao) {
+      throw new AppException(
+        "ENTREGA_INVALIDA",
+        "Este acesso expirou ou já foi usado. Volte à administração e entre no cliente de novo.",
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+    return sessao;
   }
 
   @Post("refresh")

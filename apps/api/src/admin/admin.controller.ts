@@ -19,6 +19,7 @@ import { RequiresPlatformRole } from "../common/decorators/platform-role.decorat
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { PaginationQueryDto } from "../common/dto/pagination.dto";
 import { AdminService } from "./admin.service";
+import { EntregaDeSessaoService } from "./entrega/entrega-de-sessao.service";
 import { ListOrganizationsDto } from "./dto/list-organizations.dto";
 import { UpsertOperatorDto } from "./dto/upsert-operator.dto";
 
@@ -30,7 +31,10 @@ import { UpsertOperatorDto } from "./dto/upsert-operator.dto";
 @Controller("admin")
 @UseGuards(JwtAuthGuard, PlatformAdminGuard)
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly entregas: EntregaDeSessaoService,
+  ) {}
 
   @Get("organizations")
   listOrganizations(@Query() query: ListOrganizationsDto) {
@@ -40,6 +44,29 @@ export class AdminController {
   @Post("organizations/:id/impersonate")
   impersonate(@CurrentUser() user: AuthenticatedUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.adminService.impersonate(user.userId, id);
+  }
+
+  /**
+   * Entrar num cliente a partir do site da administração.
+   *
+   * Devolve um código de uso único, e não os tokens: a administração vive
+   * noutra origem e não consegue gravar cookie para o site do cliente. Ela
+   * manda o navegador para lá com o código, e é lá que ele vira sessão.
+   *
+   * Separada de `impersonate` em vez de substituí-la: aquela continua sendo o
+   * contrato de quem já a usa, e trocar a forma de uma rota existente
+   * quebraria consumidor sem aviso.
+   */
+  @Post("organizations/:id/entrada")
+  async entrada(@CurrentUser() user: AuthenticatedUser, @Param("id", ParseUUIDPipe) id: string) {
+    const sessao = await this.adminService.impersonate(user.userId, id);
+    return {
+      organization: sessao.organization,
+      entrega: await this.entregas.cria({
+        accessToken: sessao.accessToken,
+        refreshToken: sessao.refreshToken,
+      }),
+    };
   }
 
   @Get("impersonations")
