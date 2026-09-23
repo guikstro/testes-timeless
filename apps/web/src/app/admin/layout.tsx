@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { apiFetch, ApiRequestError } from "@/lib/api-client";
 import { LeaveClientNotice } from "./leave-client-notice";
+import { ExigeSegundoFator } from "./exige-segundo-fator";
 
 interface SessionContext {
   user: { id: string; name: string; email: string; platformRole: "SUPPORT" | "ADMIN" | null };
@@ -35,6 +36,22 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // exceção para algo que se resolve com um botão.
   if (session.impersonating) {
     return <LeaveClientNotice />;
+  }
+
+  /*
+    Segundo fator, conferido aqui e não deixado estourar lá dentro.
+
+    A `PlatformAdminGuard` recusa toda rota de administração sem ele, e sem
+    esta conferência a primeira página a chamar a API quebrava com rastro de
+    pilha. É a mesma situação da impersonação: regra prevista, com saída
+    conhecida, merece tela e não exceção.
+
+    `/auth/mfa` não passa pelo guard, então ela responde mesmo para quem ainda
+    não pode entrar — é justamente por isso que dá para perguntar.
+  */
+  const mfa = await apiFetch<{ ativo: boolean; pendente: boolean }>("/auth/mfa");
+  if (!mfa.ativo) {
+    return <ExigeSegundoFator pendente={mfa.pendente} />;
   }
 
   return (
