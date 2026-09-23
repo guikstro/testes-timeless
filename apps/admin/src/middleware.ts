@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cabecalhoDoIp } from "@/lib/ip-do-cliente";
+import { cabecalhosDoCliente } from "@/lib/ip-do-cliente";
 import {
   ACCESS_MAX_AGE,
   ADMIN_ACCESS_COOKIE,
@@ -58,7 +58,7 @@ export async function middleware(request: NextRequest) {
     try {
       const resposta = await fetch(`${API_URL}/auth/refresh`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...cabecalhoDoIp(request) },
+        headers: { "Content-Type": "application/json", ...cabecalhosDoCliente(request) },
         body: JSON.stringify({ refreshToken: refresh }),
       });
 

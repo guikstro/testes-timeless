@@ -15,6 +15,7 @@ describe("OrganizationsService, gestão da equipe", () => {
         count: jest.fn().mockResolvedValue(1),
       },
       refreshToken: { updateMany: jest.fn() },
+      sessao: { updateMany: jest.fn() },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
       $transaction: jest.fn().mockResolvedValue([]),
     };
@@ -89,13 +90,27 @@ describe("OrganizationsService, gestão da equipe", () => {
       await service.removeMember(quem(), "outro");
 
       const operacoes = prisma.$transaction.mock.calls[0][0];
-      expect(operacoes).toHaveLength(3);
+      expect(operacoes).toHaveLength(4);
       expect(prisma.membership.delete).toHaveBeenCalled();
       // A conta continua existindo: leads, mensagens e auditoria apontam para
       // ela, e apagá-la reescreveria o histórico de quem fez o quê.
+
+      // Só as renovações desta organização, mais as antigas sem sessão, que
+      // não têm como dizer de qual organização são.
       expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
-        where: { userId: "outro", revokedAt: null },
+        where: {
+          userId: "outro",
+          revokedAt: null,
+          OR: [{ sessaoId: null }, { sessao: { organizationId: "org-1" } }],
+        },
         data: { revokedAt: expect.any(Date) },
+      });
+      // E a sessão, para o token de acesso cair na hora. Só a desta
+      // organização: a pessoa pode pertencer a outras, e ser removida daqui
+      // não é motivo para perder o acesso de lá.
+      expect(prisma.sessao.updateMany).toHaveBeenCalledWith({
+        where: { userId: "outro", organizationId: "org-1", encerradaEm: null },
+        data: { encerradaEm: expect.any(Date), motivoDoEncerramento: "removido da organização" },
       });
       expect(prisma.auditLog.create).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ action: "MEMBER_REMOVED", userId: "eu" }) }),

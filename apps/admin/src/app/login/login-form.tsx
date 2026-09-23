@@ -100,6 +100,12 @@ export function LoginDaAdministracao() {
     }
   }
 
+  const MOTIVOS: Record<string, string> = {
+    "sessao-encerrada": "Sua sessão foi encerrada. Entre de novo.",
+    "sem-acesso": "Esta conta não opera a plataforma.",
+  };
+  const motivo = MOTIVOS[searchParams.get("motivo") ?? ""];
+
   const campo =
     "h-12 w-full rounded-xl border border-line bg-panel px-3.5 text-corpo text-ink transition-colors " +
     "placeholder:text-ink-mute/50 focus:border-accent focus:outline-none";
@@ -113,6 +119,12 @@ export function LoginDaAdministracao() {
         <p className="mt-1.5 text-corpo leading-relaxed text-ink-mute">
           Acesso restrito a quem opera a plataforma. Esta não é a entrada dos clientes.
         </p>
+
+        {motivo && !pedindoCodigo ? (
+          <p role="status" className="mt-6 border-l-2 border-accent pl-3 text-corpo text-ink-soft">
+            {motivo}
+          </p>
+        ) : null}
 
         {pedindoCodigo ? (
           <form onSubmit={confirmar} className="mt-8 space-y-5">

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cabecalhoDoIp } from "@/lib/ip-do-cliente";
+import { cabecalhosDoCliente } from "@/lib/ip-do-cliente";
 import { ADMIN_MFA_COOKIE, COOKIE_OPTIONS, MFA_MAX_AGE } from "@/lib/session";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
 
   const resposta = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecalhoDoIp(request) },
+    headers: { "Content-Type": "application/json", ...cabecalhosDoCliente(request) },
     body: JSON.stringify(payload),
     cache: "no-store",
   });

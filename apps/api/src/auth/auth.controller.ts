@@ -17,6 +17,7 @@ import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { ChangeEmailDto } from "./dto/change-email.dto";
 import { ConfirmEmailDto } from "./dto/confirm-email.dto";
+import { Contexto, ContextoDoCliente } from "./sessoes/contexto-do-cliente";
 
 @Controller("auth")
 export class AuthController {
@@ -39,15 +40,15 @@ export class AuthController {
 
   @Throttle({ default: AUTENTICACAO })
   @Post("register")
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  register(@Body() dto: RegisterDto, @Contexto() contexto: ContextoDoCliente) {
+    return this.authService.register(dto, contexto);
   }
 
   @Throttle({ default: AUTENTICACAO })
   @Post("login")
   @HttpCode(HttpStatus.OK)
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  login(@Body() dto: LoginDto, @Contexto() contexto: ContextoDoCliente) {
+    return this.authService.login(dto, contexto);
   }
 
   /**
@@ -58,8 +59,8 @@ export class AuthController {
    */
   @Post("mfa/completar")
   @Throttle({ default: AUTENTICACAO })
-  completarLogin(@Body() dto: CompletarLoginDto) {
-    return this.authService.completarLogin(dto.desafio, dto.codigo);
+  completarLogin(@Body() dto: CompletarLoginDto, @Contexto() contexto: ContextoDoCliente) {
+    return this.authService.completarLogin(dto.desafio, dto.codigo, contexto);
   }
 
   /**
@@ -88,8 +89,8 @@ export class AuthController {
 
   @Post("refresh")
   @HttpCode(HttpStatus.OK)
-  refresh(@Body() dto: RefreshTokenDto) {
-    return this.authService.refresh(dto.refreshToken);
+  refresh(@Body() dto: RefreshTokenDto, @Contexto() contexto: ContextoDoCliente) {
+    return this.authService.refresh(dto.refreshToken, contexto);
   }
 
   /**
@@ -125,8 +126,12 @@ export class AuthController {
   @Post("change-password")
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
-  changePassword(@CurrentUser() user: AuthenticatedUser, @Body() dto: ChangePasswordDto) {
-    return this.authService.changePassword(user, dto);
+  changePassword(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ChangePasswordDto,
+    @Contexto() contexto: ContextoDoCliente,
+  ) {
+    return this.authService.changePassword(user, dto, contexto);
   }
 
   @Throttle({ default: CREDENCIAL })

@@ -240,9 +240,30 @@ export class OrganizationsService {
       }),
       // As sessões abertas dela caem junto: sem isto, quem foi removido
       // continuaria dentro do sistema até o token expirar.
+      /*
+        Só as sessões desta organização, e não todas as da pessoa.
+
+        Ela pode pertencer a outras, e ser removida daqui não é motivo para
+        perder o acesso de lá. A revogação antiga não tinha como distinguir,
+        porque a renovação não sabe de organização nenhuma; a sessão sabe.
+
+        As renovações sem sessão, de antes desta mudança, continuam caindo
+        todas: sem saber a organização delas, derrubar é o lado seguro.
+      */
       this.prisma.refreshToken.updateMany({
-        where: { userId: alvoUserId, revokedAt: null },
+        where: {
+          userId: alvoUserId,
+          revokedAt: null,
+          OR: [{ sessaoId: null }, { sessao: { organizationId: quem.organizationId } }],
+        },
         data: { revokedAt: new Date() },
+      }),
+      // E a sessão, não só a renovação: sem isto o token de acesso de quem foi
+      // removido seguia valendo por até quinze minutos, que é o que o
+      // comentário acima prometia que não aconteceria.
+      this.prisma.sessao.updateMany({
+        where: { userId: alvoUserId, organizationId: quem.organizationId, encerradaEm: null },
+        data: { encerradaEm: new Date(), motivoDoEncerramento: "removido da organização" },
       }),
       this.prisma.auditLog.create({
         data: {

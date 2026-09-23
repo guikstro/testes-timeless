@@ -53,6 +53,20 @@ export function LoginForm() {
   const senhaRedefinida = searchParams.get("senhaRedefinida") === "1";
   const emailTrocado = searchParams.get("emailTrocado") === "1";
 
+  /*
+    Por que a pessoa voltou para cá sem ter pedido.
+
+    Ser devolvido ao login sem explicação parece defeito. Com a frase certa,
+    a sessão encerrada em outro aparelho vira uma confirmação de que o botão
+    funcionou, e o código de entrada vencido vira instrução em vez de mistério.
+  */
+  const MOTIVOS: Record<string, string> = {
+    "sessao-encerrada": "Sua sessão foi encerrada. Entre de novo para continuar.",
+    "entrada-expirada": "Este acesso ao cliente expirou ou já foi usado. Volte à administração e entre de novo.",
+    "saiu-do-cliente": "Visita ao cliente encerrada. A administração continua aberta na outra aba.",
+  };
+  const motivo = MOTIVOS[searchParams.get("motivo") ?? ""];
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
@@ -204,6 +218,12 @@ export function LoginForm() {
               Cada lead, do anúncio à venda, com a origem provada, nunca deduzida.
             </p>
           )}
+
+          {motivo ? (
+            <p role="status" className="animate-rise-in mt-6 border-l-2 border-accent pl-3 text-corpo text-ink-soft">
+              {motivo}
+            </p>
+          ) : null}
 
           {senhaRedefinida ? (
             <p role="status" className="animate-rise-in mt-6 border-l-2 border-accent pl-3 text-corpo text-ink-soft">

@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { ADMIN_ACCESS_COOKIE } from "./session";
 
@@ -16,6 +17,30 @@ export class ApiRequestError extends Error {
   ) {
     super(body.message);
     this.name = "ApiRequestError";
+  }
+}
+
+/**
+ * Os 401 que querem dizer "esta sessão acabou", e só esses.
+ *
+ * A distinção importa porque nem todo 401 é sobre a sessão: código de segundo
+ * fator errado e senha errada também respondem 401, e mandar a pessoa para o
+ * login por ter digitado um dígito errado seria absurdo.
+ */
+const SESSAO_ACABOU = new Set(["UNAUTHORIZED", "SESSAO_ENCERRADA", "IMPERSONATION_EXPIRED"]);
+
+/**
+ * Sessão acabada vira ida ao login, de qualquer lugar.
+ *
+ * No App Router a página busca dados em paralelo com o layout. O layout já
+ * redirecionava num 401, mas a página podia tomá-lo antes e cair na tela de
+ * erro. Era o que aconteceria no aparelho cuja sessão foi encerrada de outro:
+ * em vez de voltar ao login, ele veria "esta tela não carregou". Tratar aqui
+ * cobre toda chamada, sem cada página precisar lembrar.
+ */
+function redirecionaSeASessaoAcabou(status: number, codigo: string | undefined): void {
+  if (status === 401 && codigo && SESSAO_ACABOU.has(codigo)) {
+    redirect("/login?motivo=sessao-encerrada");
   }
 }
 
@@ -46,6 +71,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const body = texto ? JSON.parse(texto) : null;
 
   if (!response.ok) {
+    redirecionaSeASessaoAcabou(response.status, (body as ApiError | null)?.code);
     throw new ApiRequestError(
       (body as ApiError) ?? { code: "UNKNOWN", message: "Erro desconhecido." },
       response.status,

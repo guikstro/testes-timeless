@@ -1,13 +1,21 @@
 import { NextRequest } from "next/server";
 
 /**
- * Repassa o IP de quem está entrando, e não o do contêiner.
+ * Repassa à API quem está do outro lado, e não o contêiner.
  *
- * Sem isso o limite de tentativas da API conta todo mundo num balde só, e o
+ * O IP, para o limite de tentativas contar cada operador separado: sem ele, o
  * limite de login da administração, que é a porta mais sensível do sistema,
- * passa a ser compartilhado entre todos os operadores.
+ * seria um balde só para todos. E o navegador, para a tela de sessões mostrar
+ * de onde cada uma foi aberta.
  */
-export function cabecalhoDoIp(request: NextRequest): Record<string, string> {
-  const encaminhado = request.headers.get("x-forwarded-for");
-  return encaminhado ? { "x-forwarded-for": encaminhado } : {};
+export function cabecalhosDoCliente(request: NextRequest): Record<string, string> {
+  const cabecalhos: Record<string, string> = {};
+
+  const encaminhado = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  if (encaminhado) cabecalhos["X-Forwarded-For"] = encaminhado;
+
+  const navegador = request.headers.get("user-agent");
+  if (navegador) cabecalhos["X-Client-User-Agent"] = navegador.slice(0, 400);
+
+  return cabecalhos;
 }

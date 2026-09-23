@@ -25,6 +25,15 @@ export interface JwtPayload {
   impersonationExpiresAt?: number;
   /** Unique per issuance — guarantees access/refresh tokens never collide even when minted in the same second. */
   jti: string;
+  /**
+   * A sessão a que este token pertence. Conferida a cada requisição, para
+   * encerrar uma sessão valer na hora e não quinze minutos depois.
+   *
+   * Opcional só por causa dos tokens emitidos antes das sessões existirem:
+   * eles vencem sozinhos em no máximo quinze minutos, e a renovação deles já
+   * nasce com sessão.
+   */
+  sid?: string;
 }
 
 export interface AuthenticatedUser {
@@ -33,6 +42,8 @@ export interface AuthenticatedUser {
   role: MembershipRole;
   /** True quando esta sessão é um operador da plataforma agindo dentro de um cliente. */
   impersonating: boolean;
+  /** A sessão desta requisição. É por ela que a tela sabe qual é "este aparelho". */
+  sessaoId?: string;
   /**
    * Preenchido pelo `PlatformAdminGuard` a partir do banco, nunca do token —
    * só existe nas rotas de administração, e evita uma segunda consulta no

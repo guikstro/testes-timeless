@@ -25,8 +25,24 @@ export function ipDoCliente(request: NextRequest): string | null {
   return real || null;
 }
 
-/** Cabeçalhos a acrescentar numa chamada à API, para ela ver o cliente e não o site. */
-export function cabecalhoDoIp(request: NextRequest): Record<string, string> {
+/**
+ * Cabeçalhos a acrescentar numa chamada à API, para ela ver quem está do
+ * outro lado e não o site.
+ *
+ * O IP, para o limite de tentativas contar cada pessoa separada. E o
+ * navegador, para a tela de sessões mostrar "Chrome no macOS": quem chama a
+ * API é este servidor, e o `User-Agent` dele diria "Node" em toda sessão. Vai
+ * num cabeçalho próprio para não se confundir com o do servidor, que é o que
+ * o `User-Agent` de verdade desta chamada é.
+ */
+export function cabecalhosDoCliente(request: NextRequest): Record<string, string> {
+  const cabecalhos: Record<string, string> = {};
+
   const ip = ipDoCliente(request);
-  return ip ? { "X-Forwarded-For": ip } : {};
+  if (ip) cabecalhos["X-Forwarded-For"] = ip;
+
+  const navegador = request.headers.get("user-agent");
+  if (navegador) cabecalhos["X-Client-User-Agent"] = navegador.slice(0, 400);
+
+  return cabecalhos;
 }

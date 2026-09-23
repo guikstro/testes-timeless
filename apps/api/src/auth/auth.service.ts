@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
 import * as crypto from "crypto";
@@ -6,6 +6,8 @@ import { PrismaService } from "../common/prisma/prisma.service";
 import { AppException } from "../common/exceptions/app-exception";
 import { MembershipRole } from "@prisma/client";
 import { MfaService } from "./mfa/mfa.service";
+import { decideRenovacao } from "./sessoes/decide-renovacao";
+import { ContextoDoCliente } from "./sessoes/contexto-do-cliente";
 import { slugify } from "../common/utils/slugify";
 import { hashToken } from "../common/utils/hash-token";
 import { isUniqueConstraintError } from "../common/utils/is-unique-constraint-error";
@@ -68,6 +70,8 @@ const DESAFIO_MFA_TTL = "2m";
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
@@ -75,7 +79,7 @@ export class AuthService {
     private readonly mfa: MfaService,
   ) {}
 
-  async register(dto: RegisterDto): Promise<TokenPair> {
+  async register(dto: RegisterDto, contexto?: ContextoDoCliente): Promise<TokenPair> {
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) {
       throw new AppException("EMAIL_ALREADY_IN_USE", "Este e-mail já está em uso.", HttpStatus.CONFLICT);
@@ -122,10 +126,12 @@ export class AuthService {
       throw error;
     }
 
-    return this.issueTokenPair(result.user.id, result.membership.organizationId, result.membership.role);
+    return this.issueTokenPair(result.user.id, result.membership.organizationId, result.membership.role, undefined, {
+      contexto,
+    });
   }
 
-  async login(dto: LoginDto): Promise<ResultadoDeLogin> {
+  async login(dto: LoginDto, contexto?: ContextoDoCliente): Promise<ResultadoDeLogin> {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
       // Vínculo com organização apagada não conta. Sem este filtro, entrar
@@ -183,7 +189,7 @@ export class AuthService {
       };
     }
 
-    return this.issueTokenPair(user.id, membership.organizationId, membership.role);
+    return this.issueTokenPair(user.id, membership.organizationId, membership.role, undefined, { contexto });
   }
 
   /**
@@ -193,7 +199,7 @@ export class AuthService {
    * de fora: sem isso, quem tivesse um desafio poderia pedir sessão em
    * qualquer organização.
    */
-  async completarLogin(desafio: string, codigo: string): Promise<TokenPair> {
+  async completarLogin(desafio: string, codigo: string, contexto?: ContextoDoCliente): Promise<TokenPair> {
     let payload: { sub: string; organizationId: string; role: MembershipRole; proposito?: string };
     try {
       payload = await this.jwt.verifyAsync(desafio);
@@ -219,7 +225,7 @@ export class AuthService {
       );
     }
 
-    return this.issueTokenPair(payload.sub, payload.organizationId, payload.role);
+    return this.issueTokenPair(payload.sub, payload.organizationId, payload.role, undefined, { contexto });
   }
 
   /**
@@ -238,12 +244,47 @@ export class AuthService {
     await this.mfa.desativar(userId, codigo);
   }
 
-  async refresh(refreshToken: string): Promise<TokenPair> {
+  async refresh(refreshToken: string, contexto?: ContextoDoCliente): Promise<TokenPair> {
     const tokenHash = hashToken(refreshToken);
-    const stored = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
+    const stored = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash },
+      include: { sessao: { select: { id: true, encerradaEm: true } } },
+    });
 
-    if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
+    const veredicto = decideRenovacao(stored);
+
+    /*
+      Token reapresentado depois de rotacionado: alguém tem uma cópia.
+
+      Não dá para saber se do outro lado está quem roubou ou quem foi roubado,
+      e por isso a sessão inteira cai. A pessoa legítima entra de novo; quem
+      roubou perde o que tinha. Ver `decideRenovacao` para a carência que
+      impede isso de disparar numa corrida inocente entre duas abas.
+    */
+    if (veredicto === "reuso" && stored?.sessaoId) {
+      await this.prisma.$transaction([
+        this.prisma.sessao.update({
+          where: { id: stored.sessaoId },
+          data: { encerradaEm: new Date(), motivoDoEncerramento: "renovação reaproveitada" },
+        }),
+        this.prisma.refreshToken.updateMany({
+          where: { sessaoId: stored.sessaoId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        }),
+      ]);
+      this.logger.warn(
+        JSON.stringify({ event: "sessao_encerrada_por_reuso", userId: stored.userId, sessaoId: stored.sessaoId }),
+      );
+    }
+
+    if (veredicto !== "valido" || !stored) {
       throw new AppException("INVALID_REFRESH_TOKEN", "Sessão expirada. Faça login novamente.", HttpStatus.UNAUTHORIZED);
+    }
+
+    // Encerrada por outra via, pela tela de sessões ou por troca de senha:
+    // a renovação que sobrou não pode ressuscitá-la.
+    if (stored.sessao?.encerradaEm) {
+      throw new AppException("INVALID_REFRESH_TOKEN", "Sessão encerrada. Faça login novamente.", HttpStatus.UNAUTHORIZED);
     }
 
     let payload: JwtPayload;
@@ -289,7 +330,13 @@ export class AuthService {
         throw new AppException("INVALID_REFRESH_TOKEN", "Sessão expirada. Faça login novamente.", HttpStatus.UNAUTHORIZED);
       }
 
-      return this.issueTokenPair(payload.sub, payload.organizationId, payload.role, impersonation);
+      return this.issueTokenPair(
+        payload.sub,
+        payload.organizationId,
+        payload.role,
+        impersonation,
+        stored.sessaoId ? { id: stored.sessaoId } : { contexto },
+      );
     }
 
     /*
@@ -315,15 +362,37 @@ export class AuthService {
       throw new AppException("INVALID_REFRESH_TOKEN", "Sessão expirada. Faça login novamente.", HttpStatus.UNAUTHORIZED);
     }
 
-    return this.issueTokenPair(payload.sub, payload.organizationId, vinculo.role);
+    // Linha de antes das sessões existirem ganha sessão aqui, na primeira
+    // renovação: quem já estava logado não é expulso pela mudança.
+    return this.issueTokenPair(
+      payload.sub,
+      payload.organizationId,
+      vinculo.role,
+      undefined,
+      stored.sessaoId ? { id: stored.sessaoId } : { contexto },
+    );
   }
 
   async logout(refreshToken: string): Promise<void> {
     const tokenHash = hashToken(refreshToken);
+    const stored = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash },
+      select: { sessaoId: true },
+    });
+
     await this.prisma.refreshToken.updateMany({
       where: { tokenHash, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+
+    // Sair encerra a sessão, e não só a renovação: o token de acesso deste
+    // aparelho precisa parar de valer agora, não daqui a quinze minutos.
+    if (stored?.sessaoId) {
+      await this.prisma.sessao.updateMany({
+        where: { id: stored.sessaoId, encerradaEm: null },
+        data: { encerradaEm: new Date(), motivoDoEncerramento: "saiu" },
+      });
+    }
   }
 
   /**
@@ -382,6 +451,7 @@ export class AuthService {
         where: { userId: stored.userId, revokedAt: null },
         data: { revokedAt: new Date() },
       }),
+      this.encerraSessoesDe(stored.userId, "senha redefinida"),
       // Um pedido de troca de e-mail pendente é exatamente o que alguém
       // deixaria para trás depois de invadir a conta: ele esperaria a
       // confirmação e levaria o login junto. Retomar a senha o cancela.
@@ -401,7 +471,11 @@ export class AuthService {
    * desconfia de alguém. Um par novo de tokens é devolvido para quem trocou
    * continuar onde está, em vez de ser expulso pela própria ação.
    */
-  async changePassword(quem: AuthenticatedUser, dto: ChangePasswordDto): Promise<TokenPair> {
+  async changePassword(
+    quem: AuthenticatedUser,
+    dto: ChangePasswordDto,
+    contexto?: ContextoDoCliente,
+  ): Promise<TokenPair> {
     this.recusaSeForVisita(quem);
     const user = await this.prisma.user.findUnique({ where: { id: quem.userId } });
     if (!user || user.deletedAt) {
@@ -424,6 +498,9 @@ export class AuthService {
         where: { userId: quem.userId, revokedAt: null },
         data: { revokedAt: new Date() },
       }),
+      // Todas, inclusive a desta aba: ela ganha uma sessão nova logo abaixo, e
+      // começar do zero é mais simples de provar que manter uma exceção.
+      this.encerraSessoesDe(quem.userId, "senha trocada"),
       // Mesmo motivo do `resetPassword`: trocar a senha é a ação de quem
       // desconfia, e um pedido de troca de e-mail pendente é o rastro que um
       // invasor deixaria para levar o login depois.
@@ -435,7 +512,7 @@ export class AuthService {
     // de na próxima vez que tentar entrar.
     await this.email.enfileirar(senhaAlterada(user.email, user.name));
 
-    return this.issueTokenPair(user.id, quem.organizationId, quem.role);
+    return this.issueTokenPair(user.id, quem.organizationId, quem.role, undefined, { contexto });
   }
 
   /**
@@ -532,6 +609,7 @@ export class AuthService {
           where: { userId: stored.userId, revokedAt: null },
           data: { revokedAt: new Date() },
         }),
+        this.encerraSessoesDe(stored.userId, "e-mail trocado"),
       ]);
     } catch (error) {
       if (isUniqueConstraintError(error)) {
@@ -608,16 +686,49 @@ export class AuthService {
    * Público (não privado) porque o módulo de administração precisa emitir o
    * par de tokens da organização em que o operador está entrando.
    */
+  /**
+   * Emite o par de tokens, dentro de uma sessão.
+   *
+   * `sessao` diz qual: `{ id }` continua uma que já existe, que é o caso da
+   * renovação; `{ contexto }` abre uma nova, com o navegador e o IP de quem
+   * entrou. Sem nenhum dos dois abre uma nova sem contexto, que é o caso das
+   * poucas chamadas que não têm a requisição em mãos.
+   */
   async issueTokenPair(
     userId: string,
     organizationId: string,
     role: JwtPayload["role"],
     impersonation?: { expiresAt: number },
+    sessao?: { id: string } | { contexto?: ContextoDoCliente },
   ): Promise<TokenPair> {
+    let sessaoId: string;
+
+    if (sessao && "id" in sessao) {
+      sessaoId = sessao.id;
+      await this.prisma.sessao.update({
+        where: { id: sessaoId },
+        data: { ultimaAtividadeEm: new Date() },
+      });
+    } else {
+      const contexto = sessao && "contexto" in sessao ? sessao.contexto : undefined;
+      const criada = await this.prisma.sessao.create({
+        data: {
+          userId,
+          organizationId,
+          impersonando: impersonation !== undefined,
+          userAgent: contexto?.userAgent ?? null,
+          ip: contexto?.ip ?? null,
+        },
+        select: { id: true },
+      });
+      sessaoId = criada.id;
+    }
+
     const claims = {
       sub: userId,
       organizationId,
       role,
+      sid: sessaoId,
       ...(impersonation
         ? { impersonating: true as const, impersonationExpiresAt: impersonation.expiresAt }
         : {}),
@@ -635,11 +746,28 @@ export class AuthService {
     await this.prisma.refreshToken.create({
       data: {
         userId,
+        sessaoId,
         tokenHash: hashToken(refreshToken),
         expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
       },
     });
 
     return { accessToken, refreshToken };
+  }
+
+  /**
+   * Encerra as sessões de um usuário, com o motivo.
+   *
+   * Devolve a operação em vez de executá-la, para entrar nas transações que já
+   * existem. Os cinco lugares que revogam sessão faziam isso só com a
+   * renovação, e todos prometiam no comentário que "as outras sessões caem".
+   * Nenhum cumpria por inteiro: o token de acesso seguia valendo até quinze
+   * minutos. Encerrar a sessão é o que o derruba na próxima requisição.
+   */
+  encerraSessoesDe(userId: string, motivo: string, exceto?: string) {
+    return this.prisma.sessao.updateMany({
+      where: { userId, encerradaEm: null, ...(exceto ? { id: { not: exceto } } : {}) },
+      data: { encerradaEm: new Date(), motivoDoEncerramento: motivo },
+    });
   }
 }

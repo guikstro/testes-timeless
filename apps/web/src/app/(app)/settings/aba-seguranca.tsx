@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/ui/skeleton";
 import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
 import { FormularioDeEmail, FormularioDeSenha } from "./security-forms";
 import { SegundaEtapa } from "./mfa-forms";
+import { ListaDeSessoes, Sessao } from "./lista-de-sessoes";
 
 interface SituacaoDoMfa {
   ativo: boolean;
@@ -25,9 +26,10 @@ export async function AbaSeguranca({
   emailAtual: string;
   impersonando: boolean;
 }) {
-  const [acessos, mfa] = await Promise.all([
+  const [acessos, mfa, sessoes] = await Promise.all([
     apiFetch<SupportAccess[]>("/organizations/current/support-accesses"),
     apiFetch<SituacaoDoMfa>("/auth/mfa"),
+    apiFetch<Sessao[]>("/auth/sessoes"),
   ]);
 
   return (
@@ -60,6 +62,23 @@ export async function AbaSeguranca({
               className="mb-5"
             />
             <SegundaEtapa situacao={mfa} />
+          </Card>
+
+          {/*
+            Logo depois do segundo fator, antes da senha.
+
+            É a pergunta de quem desconfia de alguma coisa: "onde a minha conta
+            está aberta agora?". Se a resposta tiver um aparelho que a pessoa
+            não reconhece, a próxima ação é encerrar e trocar a senha, nessa
+            ordem, e a tela as coloca nessa ordem.
+          */}
+          <Card className="p-6">
+            <CardHeader
+              title="Sessões"
+              description="Onde a sua conta está aberta agora. Encerrar derruba o acesso daquele aparelho na hora."
+              className="mb-5"
+            />
+            <ListaDeSessoes sessoes={sessoes} />
           </Card>
 
           <Card className="p-6">

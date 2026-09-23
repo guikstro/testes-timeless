@@ -25,6 +25,7 @@ type MockPrisma = {
   refreshToken: Record<string, jest.Mock>;
   passwordResetToken: Record<string, jest.Mock>;
   emailChangeToken: Record<string, jest.Mock>;
+  sessao: Record<string, jest.Mock>;
   $transaction: jest.Mock;
 };
 
@@ -42,6 +43,13 @@ function buildPrismaMock(): MockPrisma {
     refreshToken: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     passwordResetToken: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     emailChangeToken: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn(), deleteMany: jest.fn() },
+    // Toda emissão de token abre ou continua uma sessão.
+    sessao: {
+      create: jest.fn().mockResolvedValue({ id: "sessao-1" }),
+      update: jest.fn().mockResolvedValue({ id: "sessao-1" }),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      findUnique: jest.fn(),
+    },
     $transaction: jest.fn(async (arg: unknown) => {
       if (typeof arg === "function") {
         return arg(tx);

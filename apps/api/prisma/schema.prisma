@@ -191,6 +191,7 @@ model User {
   mudancasNoAnuncio   MudancaNoAnuncio[]
   mfa                 UserMfa?
   mfaRecoveryCodes    MfaRecoveryCode[]
+  sessoes             Sessao[]
 
   @@map("users")
 }
@@ -210,17 +211,72 @@ model Membership {
   @@map("memberships")
 }
 
+/**
+ * Uma sessão: o que a pessoa chama de "estar logada num aparelho".
+ * Existe porque o refresh token não serve para isso. Cada renovação revoga a
+ * linha e cria outra, então uma semana de uso num notebook vira centenas de
+ * linhas em `refresh_tokens`, e nenhuma delas é "o notebook". A sessão é a
+ * identidade estável que atravessa as renovações, e é ela que aparece na tela
+ * e que se encerra.
+ * O `id` vai dentro do token de acesso, como `sid`, e é conferido a cada
+ * requisição. Sem isso, encerrar uma sessão revogaria só a renovação e o
+ * token de acesso seguiria valendo até quinze minutos — que é exatamente o
+ * cenário em que alguém aperta o botão: sessão roubada.
+ */
+model Sessao {
+  id                   String    @id @default(uuid())
+  userId               String    @map("user_id")
+  organizationId       String    @map("organization_id")
+  criadaEm             DateTime  @default(now()) @map("criada_em")
+  /**
+   * Atualizada na renovação, não em toda requisição.
+   * Escrever no banco a cada clique para mostrar "ativa há 3 minutos" em vez
+   * de "ativa há 15" seria pagar muito por uma precisão que ninguém usa. A
+   * tela diz a granularidade em vez de fingir outra.
+   */
+  ultimaAtividadeEm    DateTime  @default(now()) @map("ultima_atividade_em")
+  /**
+   * Navegador e sistema, como o navegador se apresentou. Só para exibição.
+   */
+  userAgent            String?   @map("user_agent")
+  /**
+   * Dado pessoal: sai junto com a sessão na faxina, não fica para sempre.
+   */
+  ip                   String?
+  impersonando         Boolean   @default(false)
+  encerradaEm          DateTime? @map("encerrada_em")
+  /**
+   * Por que acabou. Numa conversa sobre acesso indevido, "como" importa tanto quanto "quando".
+   */
+  motivoDoEncerramento String?   @map("motivo_do_encerramento")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+
+  @@index([userId, encerradaEm])
+  @@map("sessoes")
+}
+
 model RefreshToken {
   id        String    @id @default(uuid())
   userId    String    @map("user_id")
+  /**
+   * A sessão a que esta renovação pertence.
+   * Nulo nas linhas de antes das sessões existirem. A primeira renovação de
+   * uma dessas cria a sessão, então quem já estava logado não é expulso pela
+   * mudança.
+   */
+  sessaoId  String?   @map("sessao_id")
   tokenHash String    @unique @map("token_hash")
   expiresAt DateTime  @map("expires_at")
   revokedAt DateTime? @map("revoked_at")
   createdAt DateTime  @default(now()) @map("created_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessao Sessao? @relation(fields: [sessaoId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([sessaoId])
   @@map("refresh_tokens")
 }
 
@@ -779,6 +835,7 @@ model MetaConnection {
    * completamente o sentido.
    */
   /**
+   * /**
    * /**
    * /** Código numérico da Meta. Ver `leituraDoStatusDaConta`.
    */

@@ -31,7 +31,19 @@ describe("EncryptionService", () => {
     const service = new EncryptionService();
     const encrypted = service.encrypt("original-value");
     const [iv, authTag, ciphertext] = encrypted.split(":");
-    const tampered = `${iv}:${authTag}:${ciphertext.slice(0, -2)}ff`;
+
+    /*
+      Inverte o último byte em vez de trocá-lo por um valor fixo.
+
+      Trocava por "ff", e isso falhava uma vez a cada 256 execuções: quando o
+      último byte já era ff, o texto "adulterado" saía idêntico ao original, a
+      decifração funcionava e o teste acusava um defeito que não existia.
+      Inverter os bits garante que o byte muda, sempre.
+    */
+    const ultimo = parseInt(ciphertext.slice(-2), 16);
+    const invertido = (ultimo ^ 0xff).toString(16).padStart(2, "0");
+    const tampered = `${iv}:${authTag}:${ciphertext.slice(0, -2)}${invertido}`;
+    expect(tampered).not.toBe(encrypted);
 
     expect(() => service.decrypt(tampered)).toThrow();
   });

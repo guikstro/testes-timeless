@@ -6,6 +6,8 @@ import { AuthService } from "./auth.service";
 import { MfaModule } from "./mfa/mfa.module";
 import { AdminModule } from "../admin/admin.module";
 import { JwtStrategy } from "./strategies/jwt.strategy";
+import { SessoesController } from "./sessoes/sessoes.controller";
+import { SessoesService } from "./sessoes/sessoes.service";
 
 @Module({
   imports: [
@@ -16,8 +18,8 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
       secret: process.env.JWT_SECRET,
     }),
   ],
-  controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  controllers: [AuthController, SessoesController],
+  providers: [AuthService, JwtStrategy, SessoesService],
   exports: [AuthService],
 })
 export class AuthModule {}

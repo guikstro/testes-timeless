@@ -28,7 +28,22 @@ const LOTES_POR_EXECUCAO = 200;
 
 const DIA_EM_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Trinta dias sem atividade, e a sessão sai.
+ *
+ * A sessão guarda IP e navegador, que são dado pessoal, e depois que ela acaba
+ * eles só servem para uma coisa: investigar um acesso indevido recente.
+ * Trinta dias cobrem essa conversa. Além disso é dado guardado sem uso, que é
+ * o que a lei pede para não fazer.
+ *
+ * Conta pela última atividade, e não pelo encerramento, para pegar também a
+ * sessão abandonada: a de um notebook esquecido nunca é encerrada, só para de
+ * renovar, e ficaria para sempre se a regra dependesse de `encerrada_em`.
+ */
+const RETENCAO_DE_SESSAO_EM_DIAS = 30;
+
 export interface ResultadoDaFaxina {
+  sessoes: number;
   tokensDeSessao: number;
   tokensDeRecuperacao: number;
   tokensDeTrocaDeEmail: number;
@@ -60,7 +75,12 @@ export class FaxinaService {
     const limiteDeToken = new Date(agora - FOLGA_DE_TOKEN_EM_DIAS * DIA_EM_MS);
     const limiteDeAviso = new Date(agora - this.retencaoDeAvisosEmDias() * DIA_EM_MS);
 
+    const limiteDeSessao = new Date(agora - RETENCAO_DE_SESSAO_EM_DIAS * DIA_EM_MS);
+
     const resultado: ResultadoDaFaxina = {
+      // Antes dos tokens: apagar a sessão leva as renovações dela junto, pela
+      // chave estrangeira, e a rodada dos tokens encontra menos o que fazer.
+      sessoes: await this.apagarEmLotes("sessoes", "ultima_atividade_em", limiteDeSessao),
       // Um token vencido é recusado antes de qualquer consulta ao banco, então
       // guardá-lo não protege nada: só ocupa índice.
       tokensDeSessao: await this.apagarEmLotes("refresh_tokens", "expires_at", limiteDeToken),

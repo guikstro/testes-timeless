@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cabecalhoDoIp } from "@/lib/ip-do-cliente";
+import { cabecalhosDoCliente } from "@/lib/ip-do-cliente";
 import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from "@/lib/session";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   try {
     const resposta = await fetch(`${API_URL}/auth/confirm-email`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...cabecalhoDoIp(request) },
+      headers: { "Content-Type": "application/json", ...cabecalhosDoCliente(request) },
       body: corpo,
       cache: "no-store",
     });
