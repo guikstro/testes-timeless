@@ -33,6 +33,7 @@ interface Overview {
 }
 
 interface Investimento {
+  id: string;
   name: string;
   platform: "META" | "GOOGLE";
   diasComGasto: number;
@@ -134,6 +135,7 @@ export default async function RelatorioPage({
     investimento: investimentos
       .filter((campanha) => campanha.totalCents > 0)
       .map((campanha) => ({
+        id: campanha.id,
         campanha: campanha.name,
         plataforma: campanha.platform === "GOOGLE" ? "Google Ads" : "Meta Ads",
         totalCentavos: campanha.totalCents,

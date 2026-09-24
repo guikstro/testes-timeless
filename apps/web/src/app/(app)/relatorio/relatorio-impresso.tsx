@@ -31,7 +31,9 @@ export interface DadosDoRelatorio {
   anterior: { leads: number; vendas: number; receitaCentavos: number };
   atendimento: { medianaSegundos: number | null; semResposta: number; respondidos: number };
   origens: { nome: string; leads: number; vendas: number; receitaCentavos: number }[];
-  investimento: { campanha: string; plataforma: string; totalCentavos: number; dias: number }[];
+  // O id, e não o nome, identifica a linha: a Meta aceita duas campanhas com o
+  // mesmo nome, e é comum duplicar uma para testar sem renomear.
+  investimento: { id: string; campanha: string; plataforma: string; totalCentavos: number; dias: number }[];
 }
 
 function variacao(atual: number, anterior: number): string | null {
@@ -113,7 +115,7 @@ export function RelatorioImpresso({ dados }: { dados: DadosDoRelatorio }) {
             </thead>
             <tbody>
               {dados.investimento.map((linha) => (
-                <tr key={linha.campanha} className="border-b border-line/60 last:border-0">
+                <tr key={linha.id} className="border-b border-line/60 last:border-0">
                   <td className="py-2 text-corpo text-ink">{linha.campanha}</td>
                   <td className="py-2 text-apoio text-ink-mute">{linha.plataforma}</td>
                   <td className="py-2 text-right text-apoio tabular-nums text-ink-soft">{linha.dias}</td>
