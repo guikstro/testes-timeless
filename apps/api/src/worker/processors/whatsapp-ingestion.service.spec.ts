@@ -39,9 +39,13 @@ describe("WhatsAppIngestionService", () => {
           id: "conn-1",
           organizationId: "org-1",
           phoneNumberId: "phone-1",
+          // Os testes abaixo descrevem o recebimento em si, então a regra é a
+          // que deixa tudo entrar. A regra tem os seus próprios testes.
+          organization: { origemDosLeads: "TODOS" },
         }),
         update: jest.fn(),
       },
+      mensagemForaDaRegra: { upsert: jest.fn() },
       lead: {
         findUnique: jest.fn().mockResolvedValue(null),
         findUniqueOrThrow: jest.fn(),
@@ -501,6 +505,99 @@ describe("WhatsAppIngestionService", () => {
       expect(notifications.notificar).toHaveBeenCalledWith(
         expect.objectContaining({ type: "lead.won", title: "Venda registrada: Ana" }),
       );
+    });
+  });
+
+  describe("regra de quem vira lead", () => {
+    function comRegra(regra: "TRAFEGO_PAGO" | "RASTREADO" | "TODOS") {
+      const prisma = buildPrismaMock();
+      prisma.whatsAppConnection.findUnique.mockResolvedValue({
+        id: "conn-1",
+        organizationId: "org-1",
+        phoneNumberId: "phone-1",
+        organization: { origemDosLeads: regra },
+      });
+      return prisma;
+    }
+
+    it("no tráfego pago, não grava nada de quem escreveu direto, só conta", async () => {
+      const prisma = comRegra("TRAFEGO_PAGO");
+      await buildService(prisma).ingest(buildJob());
+
+      expect(prisma.lead.create).not.toHaveBeenCalled();
+      expect(prisma.conversation.create).not.toHaveBeenCalled();
+      expect(prisma.message.create).not.toHaveBeenCalled();
+      expect(prisma.mensagemForaDaRegra.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({ organizationId: "org-1", quantidade: 1 }),
+          update: { quantidade: { increment: 1 } },
+        }),
+      );
+    });
+
+    it("a contagem não carrega telefone nem texto", async () => {
+      const prisma = comRegra("TRAFEGO_PAGO");
+      await buildService(prisma).ingest(buildJob());
+
+      const gravado = JSON.stringify(prisma.mensagemForaDaRegra.upsert.mock.calls[0][0]);
+      expect(gravado).not.toContain(buildJob().waId);
+      expect(gravado).not.toContain(buildJob().text ?? "texto-ausente");
+    });
+
+    it("no tráfego pago, cria o lead de quem veio pelo anúncio da Meta", async () => {
+      const prisma = comRegra("TRAFEGO_PAGO");
+      prisma.lead.create.mockResolvedValue({ id: "lead-1", status: "NEW" });
+      prisma.conversation.create.mockResolvedValue({ id: "conv-1" });
+      const attributionEngine = buildAttributionEngineMock();
+      attributionEngine.resolve.mockResolvedValue({
+        method: "CTWA_REFERRAL",
+        confidence: "HIGH",
+        trackingClickId: null,
+        evidence: { ctwaClid: "clid", adId: "ad-1" },
+      });
+
+      await buildService(prisma, attributionEngine).ingest(buildJob());
+
+      expect(prisma.lead.create).toHaveBeenCalledTimes(1);
+      expect(prisma.mensagemForaDaRegra.upsert).not.toHaveBeenCalled();
+    });
+
+    it("quem já é lead continua entrando, mesmo sem marca de anúncio", async () => {
+      const prisma = comRegra("TRAFEGO_PAGO");
+      const existente = { id: "lead-1", status: "NEW", lastContactAt: new Date(0), name: "Ana", attribution: { id: "a" } };
+      prisma.lead.findUnique.mockResolvedValue(existente);
+      prisma.lead.update.mockResolvedValue(existente);
+      prisma.conversation.findFirst.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
+      prisma.conversation.update.mockResolvedValue({ id: "conv-1" });
+
+      await buildService(prisma).ingest(buildJob());
+
+      expect(prisma.message.create).toHaveBeenCalledTimes(1);
+      expect(prisma.mensagemForaDaRegra.upsert).not.toHaveBeenCalled();
+    });
+
+    it("link da bio fica fora do tráfego pago e entra no rastreado", async () => {
+      const deLink = {
+        method: "TRACKING_LINK",
+        confidence: "HIGH",
+        trackingClickId: "click-1",
+        evidence: { trackingLinkId: "link-1" },
+        clique: { utmMedium: "bio", gclid: null, fbclid: null, ctwaClid: null, campaignId: null, adId: null },
+      };
+
+      const pago = comRegra("TRAFEGO_PAGO");
+      const motorPago = buildAttributionEngineMock();
+      motorPago.resolve.mockResolvedValue(deLink);
+      await buildService(pago, motorPago).ingest(buildJob());
+      expect(pago.lead.create).not.toHaveBeenCalled();
+
+      const rastreado = comRegra("RASTREADO");
+      rastreado.lead.create.mockResolvedValue({ id: "lead-2", status: "NEW" });
+      rastreado.conversation.create.mockResolvedValue({ id: "conv-2" });
+      const motorRastreado = buildAttributionEngineMock();
+      motorRastreado.resolve.mockResolvedValue(deLink);
+      await buildService(rastreado, motorRastreado).ingest(buildJob());
+      expect(rastreado.lead.create).toHaveBeenCalledTimes(1);
     });
   });
 });

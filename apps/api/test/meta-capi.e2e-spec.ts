@@ -168,6 +168,13 @@ describe("Meta Conversions API — Lead/QualifiedLead/Purchase end to end (e2e)"
       .set("Authorization", `Bearer ${orgToken}`)
       .send({ phoneNumberId: "phone-meta-capi-e2e", displayPhoneNumber: "+55 85 90000-0001" })
       .expect(201);
+    // Esta suíte testa o recebimento, e não a regra de quem vira lead:
+    // com a regra padrão, só mensagem de anúncio viraria lead.
+    await request(app.getHttpServer())
+      .patch("/api/integrations/whatsapp/regra")
+      .set("Authorization", `Bearer ${orgToken}`)
+      .send({ origemDosLeads: "TODOS" })
+      .expect(200);
 
     await request(app.getHttpServer())
       .post("/api/integrations/meta/connect")
@@ -315,6 +322,13 @@ describe("Meta Conversions API — Lead/QualifiedLead/Purchase end to end (e2e)"
       .set("Authorization", `Bearer ${otherToken}`)
       .send({ phoneNumberId: "phone-meta-capi-e2e-invalid", displayPhoneNumber: "+55 85 90000-0002" })
       .expect(201);
+    // Esta suíte testa o recebimento, e não a regra de quem vira lead:
+    // com a regra padrão, só mensagem de anúncio viraria lead.
+    await request(app.getHttpServer())
+      .patch("/api/integrations/whatsapp/regra")
+      .set("Authorization", `Bearer ${otherToken}`)
+      .send({ origemDosLeads: "TODOS" })
+      .expect(200);
     await request(app.getHttpServer())
       .post("/api/integrations/meta/connect")
       .set("Authorization", `Bearer ${otherToken}`)
@@ -386,6 +400,13 @@ describe("Meta Conversions API — Lead/QualifiedLead/Purchase end to end (e2e)"
       .set("Authorization", `Bearer ${otherToken}`)
       .send({ phoneNumberId: "phone-meta-capi-e2e-none", displayPhoneNumber: "+55 85 90000-0003" })
       .expect(201);
+    // Esta suíte testa o recebimento, e não a regra de quem vira lead:
+    // com a regra padrão, só mensagem de anúncio viraria lead.
+    await request(app.getHttpServer())
+      .patch("/api/integrations/whatsapp/regra")
+      .set("Authorization", `Bearer ${otherToken}`)
+      .send({ origemDosLeads: "TODOS" })
+      .expect(200);
 
     const payload = buildMessagePayload({
       phoneNumberId: "phone-meta-capi-e2e-none",

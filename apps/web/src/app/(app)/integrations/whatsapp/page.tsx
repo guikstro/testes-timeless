@@ -2,6 +2,8 @@ import { apiFetch } from "@/lib/api-client";
 import { ConnectWhatsAppForm } from "./connect-form";
 import { DisconnectButton } from "./disconnect-button";
 import { QrConnect } from "./qr-connect";
+import { RegraDeLeads } from "./regra-de-leads";
+import { OrigemDosLeads } from "./actions";
 
 interface WhatsAppConnection {
   id: string;
@@ -34,7 +36,12 @@ const PROVIDER_LABELS: Record<WhatsAppConnection["provider"], string> = {
 };
 
 export default async function WhatsAppIntegrationPage() {
-  const connection = await apiFetch<WhatsAppConnection | null>("/integrations/whatsapp");
+  const [connection, regra] = await Promise.all([
+    apiFetch<WhatsAppConnection | null>("/integrations/whatsapp"),
+    apiFetch<{ origemDosLeads: OrigemDosLeads; foraDaRegra: { dias: number; mensagens: number } }>(
+      "/integrations/whatsapp/regra",
+    ),
+  ]);
   const isConnected = connection?.status === "CONNECTED";
 
   return (
@@ -67,6 +74,14 @@ export default async function WhatsAppIntegrationPage() {
         ) : (
           <p className="text-sm text-ink-soft">Nenhum número conectado ainda.</p>
         )}
+      </div>
+
+      {/*
+        Antes da conexão, e não escondida depois dela: quem vai ler o QR Code
+        precisa saber antes o que o sistema vai registrar do número.
+      */}
+      <div className="mb-8">
+        <RegraDeLeads atual={regra.origemDosLeads} foraDaRegra={regra.foraDaRegra} />
       </div>
 
       {isConnected ? null : (

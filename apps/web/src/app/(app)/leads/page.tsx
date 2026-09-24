@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
 import { AvisoDeMedicao } from "@/components/aviso-de-medicao";
 import { conexaoDoWhatsApp } from "@/lib/conexao-do-whatsapp";
@@ -23,6 +24,12 @@ interface PaginatedResult<T> {
  */
 const POR_COLUNA = 60;
 
+const DESCRICAO_DA_REGRA = {
+  TRAFEGO_PAGO: "Só quem chegou pelos seus anúncios, com a campanha de origem.",
+  RASTREADO: "Quem chegou pelos anúncios ou pelos links rastreáveis, com a origem de cada um.",
+  TODOS: "Todas as conversas que chegaram pelo WhatsApp, com a origem quando ela existe.",
+} as const;
+
 export default async function LeadsPage({
   searchParams,
 }: {
@@ -46,6 +53,12 @@ export default async function LeadsPage({
     conexaoDoWhatsApp(),
   ]);
 
+  // A regra muda o que "lead" quer dizer nesta tela, então ela é dita aqui.
+  // Uma falha na leitura só tira a frase, e não a tela.
+  const regra = await apiFetch<{ origemDosLeads: "TRAFEGO_PAGO" | "RASTREADO" | "TODOS" }>(
+    "/integrations/whatsapp/regra",
+  ).catch(() => null);
+
   const totalGeral = colunas.reduce((soma, coluna) => soma + coluna.total, 0);
   const mostrados = colunas.reduce((soma, coluna) => soma + coluna.itens.length, 0);
   const filtrando = Boolean(params.search || soAguardando);
@@ -55,7 +68,12 @@ export default async function LeadsPage({
   return (
     <div className="mx-auto max-w-[100rem]">
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Leads</h1>
-      <p className="mb-6 mt-1 text-sm text-ink-mute">Cada conversa que chegou pelo WhatsApp, com a origem provada.</p>
+      <p className="mb-6 mt-1 text-sm text-ink-mute">
+        {regra ? DESCRICAO_DA_REGRA[regra.origemDosLeads] : "Cada conversa que chegou pelo WhatsApp, com a origem provada."}{" "}
+        <Link href="/integrations/whatsapp" className="font-medium text-ink-soft underline underline-offset-2 hover:text-ink">
+          Mudar a regra
+        </Link>
+      </p>
 
       <AvisoDeMedicao medicao={medicao} desde={conexao ? inicioDaMedicao(conexao) : null} />
 

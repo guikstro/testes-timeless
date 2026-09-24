@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { extractAttributionToken } from "../common/utils/extract-attribution-token";
+import { CliqueDeOrigem } from "./origem-do-trafego";
 
 export interface MessageReferral {
   ctwaClid?: string;
@@ -21,6 +22,11 @@ export interface AttributionResult {
   confidence: "HIGH" | "NONE";
   trackingClickId: string | null;
   evidence: Prisma.InputJsonValue | typeof Prisma.JsonNull;
+  /**
+   * O clique que gerou a mensagem, quando houve. Não é gravado: serve para
+   * decidir se o contato vira lead, e o que dele importa já está na evidência.
+   */
+  clique?: CliqueDeOrigem;
 }
 
 /**
@@ -71,6 +77,14 @@ export class AttributionEngine {
             utmCampaign: click.utmCampaign,
             campaignId: click.campaignId,
             adsetId: click.adsetId,
+            adId: click.adId,
+          },
+          clique: {
+            utmMedium: click.utmMedium,
+            gclid: click.gclid,
+            fbclid: click.fbclid,
+            ctwaClid: click.ctwaClid,
+            campaignId: click.campaignId,
             adId: click.adId,
           },
         };

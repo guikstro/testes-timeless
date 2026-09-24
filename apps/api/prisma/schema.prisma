@@ -124,42 +124,52 @@ model Organization {
    * Desligado por padrão de propósito: ligar muda como todo histórico é lido,
    * e essa é uma decisão de quem usa, não um padrão que se herda sem saber.
    */
-  expedienteAtivo  Boolean   @default(false) @map("expediente_ativo")
+  expedienteAtivo  Boolean @default(false) @map("expediente_ativo")
   /**
    * Dias atendidos. 0 é domingo, como no Date do JavaScript.
    */
-  expedienteDias   Int[]     @default([1, 2, 3, 4, 5]) @map("expediente_dias")
+  expedienteDias   Int[]   @default([1, 2, 3, 4, 5]) @map("expediente_dias")
   /**
    * Minutos desde a meia-noite, no fuso da organização.
    */
-  expedienteInicio Int       @default(540) @map("expediente_inicio")
-  expedienteFim    Int       @default(1080) @map("expediente_fim")
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt        DateTime  @updatedAt @map("updated_at")
-  deletedAt        DateTime? @map("deleted_at")
+  expedienteInicio Int     @default(540) @map("expediente_inicio")
+  expedienteFim    Int     @default(1080) @map("expediente_fim")
 
-  memberships         Membership[]
-  trackingLinks       TrackingLink[]
-  whatsappConnection  WhatsAppConnection?
-  leads               Lead[]
-  attributions        Attribution[]
-  classificationRules ClassificationRule[]
-  sales               Sale[]
-  auditLogs           AuditLog[]
-  metaConnection      MetaConnection?
-  campaigns           Campaign[]
-  conversionEvents    ConversionEvent[]
-  notifications       Notification[]
-  budgets             Budget[]
-  mudancasNoAnuncio   MudancaNoAnuncio[]
+  /**
+   * Quem vira lead quando escreve no WhatsApp conectado.
+   * O número do cliente recebe de tudo: cliente antigo, fornecedor, família.
+   * Para medir tráfego, só interessa quem chegou pelo anúncio, e guardar o
+   * resto seria guardar conversa alheia sem motivo, o que num escritório de
+   * advocacia é conversa sob sigilo. O padrão é o tráfego pago.
+   */
+  origemDosLeads OrigemDosLeads @default(TRAFEGO_PAGO) @map("origem_dos_leads")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  deletedAt      DateTime?      @map("deleted_at")
+
+  memberships          Membership[]
+  trackingLinks        TrackingLink[]
+  whatsappConnection   WhatsAppConnection?
+  mensagensForaDaRegra MensagemForaDaRegra[]
+  leads                Lead[]
+  attributions         Attribution[]
+  classificationRules  ClassificationRule[]
+  sales                Sale[]
+  auditLogs            AuditLog[]
+  metaConnection       MetaConnection?
+  campaigns            Campaign[]
+  conversionEvents     ConversionEvent[]
+  notifications        Notification[]
+  budgets              Budget[]
+  mudancasNoAnuncio    MudancaNoAnuncio[]
   /**
    * Estas duas guardavam `organization_id` como coluna solta, sem chave
    * estrangeira. O vínculo existia só na cabeça de quem escreveu o código:
    * nada impedia uma linha de apontar para uma organização que não existe, e
    * uma consulta escopada por essa coluna devolveria dado errado em silêncio.
    */
-  conversations       Conversation[]
-  leadEvents          LeadEvent[]
+  conversations        Conversation[]
+  leadEvents           LeadEvent[]
 
   @@map("organizations")
 }
@@ -691,6 +701,40 @@ enum ClassificationTarget {
  * false-positive tradeoff this implies (Section 108) and why operators
  * should prefer distinctive multi-word phrases.
  */
+enum OrigemDosLeads {
+  /**
+   * Só quem chega por anúncio pago: hoje o da Meta, depois o do Google.
+   */
+  TRAFEGO_PAGO
+  /**
+   * Anúncio pago ou qualquer link rastreável, como a bio do Instagram.
+   */
+  RASTREADO
+  /**
+   * Qualquer pessoa que escrever.
+   */
+  TODOS
+}
+
+/**
+ * Quantas mensagens de primeiro contato ficaram fora da regra, por dia.
+ * Só o número, de propósito: nem telefone, nem nome, nem texto. É o bastante
+ * para a tela dizer quanto está sendo deixado de fora, que é a pergunta de
+ * quem decide se a regra está certa, sem guardar a conversa que a regra
+ * existe para não guardar.
+ */
+model MensagemForaDaRegra {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  dia            DateTime @db.Date
+  quantidade     Int      @default(0)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, dia])
+  @@map("mensagens_fora_da_regra")
+}
+
 model ClassificationRule {
   id             String               @id @default(uuid())
   organizationId String               @map("organization_id")
@@ -835,6 +879,7 @@ model MetaConnection {
    * completamente o sentido.
    */
   /**
+   * /**
    * /**
    * /**
    * /**

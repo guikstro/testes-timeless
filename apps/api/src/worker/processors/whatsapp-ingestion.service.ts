@@ -8,6 +8,9 @@ import { AttributionEngine, AttributionResult } from "../../attribution/attribut
 import { ConversationClassifierService } from "../../classification/conversation-classifier.service";
 import { ConversionEventsService } from "../../integrations/meta/conversion-events.service";
 import { NotificationsService } from "../../notifications/notifications.service";
+import { OrigemDosLeads } from "@prisma/client";
+import { origemDaMensagem, viraLead } from "../../attribution/origem-do-trafego";
+import { diaCivilLocal } from "../../common/tempo";
 import { ANUNCIO_POR_ESTAGIO } from "../../notifications/notification-event";
 
 
@@ -68,6 +71,7 @@ export class WhatsAppIngestionService {
         job.provider === "CLOUD_API"
           ? { phoneNumberId: job.routingKey }
           : { instanceName: job.routingKey },
+      include: { organization: { select: { origemDosLeads: true } } },
     });
     if (!connection) {
       // We genuinely don't know which tenant this belongs to — there is
@@ -88,14 +92,31 @@ export class WhatsAppIngestionService {
     const normalizedPhone = normalizePhone(job.waId);
     const occurredAt = new Date(job.timestampSeconds * 1000);
 
-    const { lead, wasCreated: leadWasCreated, semOrigem } = await this.findOrCreateLead(
+    const encontrado = await this.findOrCreateLead(
       organizationId,
       normalizedPhone,
       job.waId,
       job.profileName,
       occurredAt,
       job,
+      connection.organization.origemDosLeads,
     );
+
+    if (!encontrado) {
+      // Fora da regra: nada desta mensagem é gravado, nem o telefone. Só a
+      // contagem do dia, para a tela dizer quanto está ficando de fora.
+      await this.contaForaDaRegra(organizationId, occurredAt);
+      this.logger.log(
+        JSON.stringify({
+          event: "primeiro_contato_fora_da_regra",
+          organizationId,
+          regra: connection.organization.origemDosLeads,
+        }),
+      );
+      return;
+    }
+
+    const { lead, wasCreated: leadWasCreated, semOrigem } = encontrado;
 
     if (leadWasCreated) {
       // A origem já foi gravada junto do lead, na mesma transação. Aqui fica
@@ -269,6 +290,7 @@ export class WhatsAppIngestionService {
     profileName: string | undefined,
     occurredAt: Date,
     job: WhatsAppInboundMessageJob,
+    regra: OrigemDosLeads,
   ) {
     const chave = { organizationId_normalizedPhone: { organizationId, normalizedPhone } };
     // Só a presença da linha, nunca o conteúdo: o que interessa aqui é se o
@@ -295,6 +317,17 @@ export class WhatsAppIngestionService {
       messageText: job.text,
       referral: job.referral,
     });
+
+    /*
+      A regra só decide o primeiro contato. Quem já é lead passou por ela
+      quando chegou, e as mensagens seguintes dele entram sempre, com ou sem
+      marca de anúncio: é a mesma conversa.
+    */
+    const deOnde = origemDaMensagem({
+      anuncioDaMeta: origem.method === "CTWA_REFERRAL",
+      clique: origem.clique ?? null,
+    });
+    if (!viraLead(regra, deOnde)) return null;
 
     try {
       const created = await this.prisma.$transaction(async (tx) => {
@@ -329,6 +362,19 @@ export class WhatsAppIngestionService {
       const lead = await this.prisma.lead.findUniqueOrThrow({ where: chave, include: comOrigem });
       return { lead, wasCreated: false, semOrigem: !lead.attribution };
     }
+  }
+
+  /**
+   * Soma uma mensagem fora da regra no dia de Brasília. Upsert com incremento,
+   * para duas mensagens simultâneas não se perderem uma na outra.
+   */
+  private async contaForaDaRegra(organizationId: string, occurredAt: Date): Promise<void> {
+    const dia = new Date(`${diaCivilLocal(occurredAt)}T00:00:00.000Z`);
+    await this.prisma.mensagemForaDaRegra.upsert({
+      where: { organizationId_dia: { organizationId, dia } },
+      create: { organizationId, dia, quantidade: 1 },
+      update: { quantidade: { increment: 1 } },
+    });
   }
 
   private async findOrCreateConversation(

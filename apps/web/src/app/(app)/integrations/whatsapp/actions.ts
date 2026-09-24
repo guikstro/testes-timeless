@@ -77,3 +77,35 @@ export async function pollQrCode(): Promise<QrCodeState | { error: string }> {
 export async function refreshWhatsAppPage(): Promise<void> {
   revalidatePath("/integrations/whatsapp");
 }
+
+export type OrigemDosLeads = "TRAFEGO_PAGO" | "RASTREADO" | "TODOS";
+
+export interface RegraDeLeadsState {
+  error?: string;
+  salvoEm?: number;
+}
+
+const ORIGENS: OrigemDosLeads[] = ["TRAFEGO_PAGO", "RASTREADO", "TODOS"];
+
+export async function mudaRegraDeLeads(
+  _prevState: RegraDeLeadsState,
+  formData: FormData,
+): Promise<RegraDeLeadsState> {
+  const origemDosLeads = String(formData.get("origemDosLeads") ?? "") as OrigemDosLeads;
+  if (!ORIGENS.includes(origemDosLeads)) {
+    return { error: "Escolha uma das opções." };
+  }
+
+  try {
+    await apiFetch("/integrations/whatsapp/regra", {
+      method: "PATCH",
+      body: JSON.stringify({ origemDosLeads }),
+    });
+  } catch (error) {
+    if (error instanceof ApiRequestError) return { error: error.body.message };
+    return { error: "Não foi possível salvar a regra." };
+  }
+
+  revalidatePath("/integrations/whatsapp");
+  return { salvoEm: Date.now() };
+}

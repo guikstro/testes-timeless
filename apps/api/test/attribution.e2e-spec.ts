@@ -118,6 +118,13 @@ describe("Attribution engine — click to lead (e2e)", () => {
       .set("Authorization", `Bearer ${orgToken}`)
       .send({ phoneNumberId: "phone-attribution-e2e", displayPhoneNumber: "+55 85 90000-0000" })
       .expect(201);
+    // Esta suíte testa o recebimento, e não a regra de quem vira lead:
+    // com a regra padrão, só mensagem de anúncio viraria lead.
+    await request(app.getHttpServer())
+      .patch("/api/integrations/whatsapp/regra")
+      .set("Authorization", `Bearer ${orgToken}`)
+      .send({ origemDosLeads: "TODOS" })
+      .expect(200);
   });
 
   afterAll(async () => {
@@ -309,5 +316,99 @@ describe("Attribution engine — click to lead (e2e)", () => {
       .set("Authorization", `Bearer ${orgToken}`)
       .expect(200);
     expect(detail.body.attribution.trackingClick.trackingLink.name).toBe("Anúncio Rescisão Indireta");
+  });
+
+  describe("regra de quem vira lead: só tráfego pago", () => {
+    async function envia(opts: Parameters<typeof buildMessagePayload>[0]) {
+      const { raw, signature } = signPayload(buildMessagePayload(opts));
+      await request(app.getHttpServer())
+        .post("/whatsapp-webhook")
+        .set("Content-Type", "application/json")
+        .set("X-Hub-Signature-256", signature)
+        .send(raw)
+        .expect(200);
+    }
+
+    beforeAll(async () => {
+      await request(app.getHttpServer())
+        .patch("/api/integrations/whatsapp/regra")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .send({ origemDosLeads: "TRAFEGO_PAGO" })
+        .expect(200);
+    });
+
+    afterAll(async () => {
+      await request(app.getHttpServer())
+        .patch("/api/integrations/whatsapp/regra")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .send({ origemDosLeads: "TODOS" })
+        .expect(200);
+    });
+
+    it("quem escreve direto não vira lead, e só a contagem do dia sobe", async () => {
+      // Agora, e não uma data fixa: a contagem da tela olha os últimos trinta dias.
+      const agora = Math.floor(Date.now() / 1000);
+      await envia({
+        phoneNumberId: "phone-attribution-e2e",
+        from: "5585977770000",
+        messageId: "wamid.FORA-001",
+        text: "Oi, é a minha tia, me liga",
+        timestamp: agora,
+      });
+
+      const contagem = await waitFor(() => prisma.mensagemForaDaRegra.findFirst({ where: { organizationId: orgId } }));
+      expect(contagem.quantidade).toBeGreaterThanOrEqual(1);
+
+      const lead = await prisma.lead.findUnique({
+        where: { organizationId_normalizedPhone: { organizationId: orgId, normalizedPhone: "+5585977770000" } },
+      });
+      expect(lead).toBeNull();
+      expect(await prisma.message.findUnique({ where: { externalId: "wamid.FORA-001" } })).toBeNull();
+
+      const regra = await request(app.getHttpServer())
+        .get("/api/integrations/whatsapp/regra")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .expect(200);
+      expect(regra.body.origemDosLeads).toBe("TRAFEGO_PAGO");
+      expect(regra.body.foraDaRegra.mensagens).toBeGreaterThanOrEqual(1);
+    });
+
+    it("quem chega pelo anúncio da Meta vira lead, e as mensagens seguintes dele entram sem marca", async () => {
+      const agora = Math.floor(Date.now() / 1000);
+      await envia({
+        phoneNumberId: "phone-attribution-e2e",
+        from: "5585988880000",
+        messageId: "wamid.ANUNCIO-001",
+        text: "Vi o anúncio sobre insalubridade",
+        timestamp: agora,
+        referral: { ctwa_clid: "ctwa.regra.1", source_id: "ad-regra", headline: "Insalubridade" },
+      });
+
+      const lead = await waitFor(() =>
+        prisma.lead.findUnique({
+          where: { organizationId_normalizedPhone: { organizationId: orgId, normalizedPhone: "+5585988880000" } },
+        }),
+      );
+
+      await envia({
+        phoneNumberId: "phone-attribution-e2e",
+        from: "5585988880000",
+        messageId: "wamid.ANUNCIO-002",
+        text: "Pode me ligar amanhã?",
+        timestamp: agora + 60,
+      });
+
+      const seguinte = await waitFor(() => prisma.message.findUnique({ where: { externalId: "wamid.ANUNCIO-002" } }));
+      const conversa = await prisma.conversation.findUniqueOrThrow({ where: { id: seguinte.conversationId } });
+      expect(conversa.leadId).toBe(lead.id);
+    });
+
+    it("recusa uma regra que não existe", async () => {
+      await request(app.getHttpServer())
+        .patch("/api/integrations/whatsapp/regra")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .send({ origemDosLeads: "QUALQUER" })
+        .expect(400);
+    });
   });
 });

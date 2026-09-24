@@ -128,6 +128,13 @@ describe("WhatsApp webhook → queue → worker → lead (e2e)", () => {
       .set("Authorization", `Bearer ${orgToken}`)
       .send({ phoneNumberId: "phone-e2e-1", displayPhoneNumber: "+55 85 90000-0000" })
       .expect(201);
+    // Esta suíte testa o recebimento, e não a regra de quem vira lead:
+    // com a regra padrão, só mensagem de anúncio viraria lead.
+    await request(app.getHttpServer())
+      .patch("/api/integrations/whatsapp/regra")
+      .set("Authorization", `Bearer ${orgToken}`)
+      .send({ origemDosLeads: "TODOS" })
+      .expect(200);
   });
 
   afterAll(async () => {

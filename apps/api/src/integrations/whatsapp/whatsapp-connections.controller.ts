@@ -1,10 +1,11 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Res, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, Res, UseGuards } from "@nestjs/common";
 import { Response } from "express";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { AuthenticatedUser } from "../../auth/jwt-payload.interface";
 import { WhatsAppConnectionsService } from "./whatsapp-connections.service";
 import { ConnectWhatsAppDto } from "./dto/connect-whatsapp.dto";
+import { RegraDeLeadsDto } from "./dto/regra-de-leads.dto";
 
 @Controller("integrations/whatsapp")
 @UseGuards(JwtAuthGuard)
@@ -23,6 +24,21 @@ export class WhatsAppConnectionsController {
   async getCurrent(@CurrentUser() user: AuthenticatedUser, @Res() res: Response): Promise<void> {
     const result = await this.whatsappConnectionsService.getCurrent(user.organizationId);
     res.json(result);
+  }
+
+  /**
+   * Quem vira lead quando escreve, e quanto ficou de fora nos últimos trinta
+   * dias. Fica aqui, e não nas configurações gerais, porque é uma decisão
+   * sobre o que o WhatsApp conectado recebe.
+   */
+  @Get("regra")
+  regra(@CurrentUser() user: AuthenticatedUser) {
+    return this.whatsappConnectionsService.regra(user.organizationId);
+  }
+
+  @Patch("regra")
+  mudaRegra(@CurrentUser() user: AuthenticatedUser, @Body() dto: RegraDeLeadsDto) {
+    return this.whatsappConnectionsService.mudaRegra(user.organizationId, dto.origemDosLeads);
   }
 
   @Post("connect")

@@ -8,6 +8,11 @@ import { normalizePhone } from "../../common/utils/normalize-phone";
 import { ConnectWhatsAppDto } from "./dto/connect-whatsapp.dto";
 import { EvolutionClient } from "./evolution-client";
 import { EvolutionApiError } from "./evolution-api-error";
+import { OrigemDosLeads } from "@prisma/client";
+import { hojeLocal } from "../../common/tempo";
+
+/** A janela da contagem do que ficou fora da regra. */
+const DIAS_DA_CONTAGEM = 30;
 import { conferenciaDoWebhook } from "./conferencia-do-webhook";
 
 @Injectable()
@@ -92,6 +97,32 @@ export class WhatsAppConnectionsService implements OnModuleInit {
         }),
       );
     }
+  }
+
+  async regra(organizationId: string) {
+    const desde = new Date(`${hojeLocal()}T00:00:00.000Z`);
+    desde.setUTCDate(desde.getUTCDate() - (DIAS_DA_CONTAGEM - 1));
+
+    const [organizacao, fora] = await Promise.all([
+      this.prisma.organization.findUniqueOrThrow({
+        where: { id: organizationId },
+        select: { origemDosLeads: true },
+      }),
+      this.prisma.mensagemForaDaRegra.aggregate({
+        where: { organizationId, dia: { gte: desde } },
+        _sum: { quantidade: true },
+      }),
+    ]);
+
+    return {
+      origemDosLeads: organizacao.origemDosLeads,
+      foraDaRegra: { dias: DIAS_DA_CONTAGEM, mensagens: fora._sum.quantidade ?? 0 },
+    };
+  }
+
+  async mudaRegra(organizationId: string, origemDosLeads: OrigemDosLeads) {
+    await this.prisma.organization.update({ where: { id: organizationId }, data: { origemDosLeads } });
+    return this.regra(organizationId);
   }
 
   async getCurrent(organizationId: string) {
