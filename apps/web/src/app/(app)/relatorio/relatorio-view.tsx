@@ -23,6 +23,7 @@ export function RelatorioView({
   prompt,
   nomeArquivo,
   days,
+  aviso,
 }: {
   dados: DadosDoRelatorio;
   /** O bloco de texto que vai dentro do prompt, mostrado na aba da IA. */
@@ -30,6 +31,8 @@ export function RelatorioView({
   prompt: string;
   nomeArquivo: string;
   days: number;
+  /** Aviso de que os números de lead não são medida. Não vai para a impressão. */
+  aviso?: React.ReactNode;
 }) {
   const [aba, setAba] = useState<"pronto" | "ia">("pronto");
 
@@ -41,6 +44,8 @@ export function RelatorioView({
         <p className="mb-5 mt-1 text-corpo text-ink-mute">
           Pronto para enviar, com os números reais do período.
         </p>
+
+        {aviso}
 
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">

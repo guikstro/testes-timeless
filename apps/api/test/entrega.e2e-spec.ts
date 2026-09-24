@@ -33,6 +33,16 @@ describe("Entrega de sessão entre origens (e2e)", () => {
     organizationName: "Org Cliente Entrega",
   };
 
+  // Declarada aqui, e não dentro do teste, para entrar na limpeza: ficava de
+  // uma rodada para a outra, e a segunda rodada batia no e-mail já usado, não
+  // recebia token e falhava com 401 em vez do 403 que o teste confere.
+  const comum = {
+    name: "Comum",
+    email: "comum@entrega-e2e.local",
+    password: "senha-bem-comprida-123",
+    organizationName: "Org Comum Entrega",
+  };
+
   let tokenDoOperador: string;
   let orgDoCliente: string;
 
@@ -47,7 +57,7 @@ describe("Entrega de sessão entre origens (e2e)", () => {
     prisma = moduleRef.get(PrismaService);
     const encryption = moduleRef.get(EncryptionService);
 
-    for (const conta of [operador, cliente]) {
+    for (const conta of [operador, cliente, comum]) {
       await prisma.organization.deleteMany({ where: { name: conta.organizationName } });
       await prisma.user.deleteMany({ where: { email: conta.email } });
     }
@@ -147,12 +157,7 @@ describe("Entrega de sessão entre origens (e2e)", () => {
   });
 
   it("recusa a entrada de quem não é operador", async () => {
-    const outro = await request(app.getHttpServer()).post("/api/auth/register").send({
-      name: "Comum",
-      email: "comum@entrega-e2e.local",
-      password: "senha-bem-comprida-123",
-      organizationName: "Org Comum Entrega",
-    });
+    const outro = await request(app.getHttpServer()).post("/api/auth/register").send(comum).expect(201);
 
     await request(app.getHttpServer())
       .post(`/api/admin/organizations/${orgDoCliente}/entrada`)

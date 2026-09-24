@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
+import { conexaoDoWhatsApp } from "@/lib/conexao-do-whatsapp";
 import { BotaoCopiar } from "@/components/ui/copy-button";
 import { EmptyState } from "@/components/ui/skeleton";
 import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
@@ -24,20 +26,61 @@ interface PaginatedResult<T> {
 }
 
 export default async function LinksPage() {
-  const { items } = await apiFetch<PaginatedResult<TrackingLinkListItem>>("/tracking-links?limit=50");
+  const [{ items }, conexao] = await Promise.all([
+    apiFetch<PaginatedResult<TrackingLinkListItem>>("/tracking-links?limit=50"),
+    conexaoDoWhatsApp(),
+  ]);
 
   const totalDeCliques = items.reduce((soma, item) => soma + item._count.clicks, 0);
 
   return (
     <div className="mx-auto max-w-5xl">
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Links rastreáveis</h1>
-      <p className="mb-6 mt-1 text-corpo text-ink-mute">
-        Cada link carrega a origem do clique até o WhatsApp. É o que liga um lead à campanha que o trouxe.
+      <p className="mb-6 mt-1 max-w-2xl text-corpo text-ink-mute">
+        Um endereço para colar onde a pessoa clica para falar com você. Quando ela manda a mensagem, o sistema sabe de
+        onde ela veio.
       </p>
 
-      <div className="mb-6">
+      {/*
+        A tela induzia a criar link para tudo, inclusive para o anúncio da Meta
+        que abre o WhatsApp, que é o caso mais comum e o único que dispensa
+        link: a Meta manda o anúncio junto da mensagem. Dizer isso antes do
+        formulário poupa um link que nunca seria clicado.
+      */}
+      <div className="mb-6 grid gap-3 md:grid-cols-2">
+        <div className="surface p-5">
+          <p className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">Não precisa de link</p>
+          <p className="mt-2 text-corpo font-medium text-ink">Anúncio da Meta que abre o WhatsApp</p>
+          <p className="mt-1 text-apoio leading-relaxed text-ink-mute">
+            A Meta manda qual anúncio foi junto com a primeira mensagem, e o sistema liga o lead à campanha sozinho.
+            {conexao === null || conexao?.status !== "CONNECTED" ? (
+              <>
+                {" "}
+                Para isso o WhatsApp precisa estar{" "}
+                <Link href="/integrations/whatsapp" className="font-medium text-ink underline underline-offset-2">
+                  conectado
+                </Link>
+                .
+              </>
+            ) : null}
+          </p>
+        </div>
+        <div className="surface p-5">
+          <p className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">Use um link</p>
+          <p className="mt-2 text-corpo font-medium text-ink">Google, bio do Instagram, stories, site, e-mail</p>
+          <p className="mt-1 text-apoio leading-relaxed text-ink-mute">
+            Nesses lugares ninguém avisa de onde a pessoa veio. O link avisa: cada clique fica registrado, e vira lead
+            quando a pessoa manda a primeira mensagem.
+          </p>
+        </div>
+      </div>
+
+      <h2 className="mb-3 font-display text-lg font-semibold tracking-tight text-ink">Criar um link</h2>
+      <div className="mb-8">
         <CreateLinkForm />
       </div>
+
+      <h2 className="mb-3 font-display text-lg font-semibold tracking-tight text-ink">Seus links</h2>
 
       {items.length === 0 ? (
         <div className="surface">
@@ -49,7 +92,7 @@ export default async function LinksPage() {
               </svg>
             }
             title="Nenhum link criado ainda"
-            description="Crie um link acima e use ele no anúncio. Sem ele, o lead chega sem origem e a campanha fica sem crédito pela venda."
+            description="Os links que você criar aparecem aqui, com o botão de copiar e quantos cliques cada um teve."
           />
         </div>
       ) : (
@@ -60,7 +103,7 @@ export default async function LinksPage() {
                 <thead>
                   <tr className="border-b border-line text-rotulo font-semibold uppercase tracking-[0.09em] text-ink-mute">
                     <th className="px-4 py-3 font-semibold">Nome</th>
-                    <th className="px-4 py-3 font-semibold">Link para usar no anúncio</th>
+                    <th className="px-4 py-3 font-semibold">Link para colar</th>
                     <th className="px-4 py-3 font-semibold">Destino</th>
                     <th className="px-4 py-3 text-right font-semibold">Cliques</th>
                     <th className="px-4 py-3 text-right font-semibold">Criado</th>

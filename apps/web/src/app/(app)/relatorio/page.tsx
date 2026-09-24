@@ -1,4 +1,7 @@
 import { apiFetch } from "@/lib/api-client";
+import { AvisoDeMedicao } from "@/components/aviso-de-medicao";
+import { conexaoDoWhatsApp } from "@/lib/conexao-do-whatsapp";
+import { inicioDaMedicao, medicaoDeLeads } from "@/lib/medicao-de-leads";
 import { montaBlocoDeDados } from "@/lib/relatorio/dados";
 import { montaPrompt } from "@/lib/relatorio/prompt";
 import { RelatorioView } from "./relatorio-view";
@@ -52,10 +55,11 @@ export default async function RelatorioPage({
   const params = await searchParams;
   const days = periodoValido(params.days);
 
-  const [overview, investimentos, organizacao] = await Promise.all([
+  const [overview, investimentos, organizacao, conexao] = await Promise.all([
     apiFetch<Overview>(`/analytics/overview?days=${days}`),
     apiFetch<Investimento[]>(`/campaigns/investimento?days=${days}`),
     apiFetch<Organizacao>("/organizations/current"),
+    conexaoDoWhatsApp(),
   ]);
 
   const inicio = overview.period.from.slice(0, 10);
@@ -144,6 +148,21 @@ export default async function RelatorioPage({
   };
 
   return (
-    <RelatorioView dados={dados} bloco={bloco} prompt={prompt} nomeArquivo={nomeArquivo} days={days} />
+    <RelatorioView
+      dados={dados}
+      bloco={bloco}
+      prompt={prompt}
+      nomeArquivo={nomeArquivo}
+      days={days}
+      aviso={
+        // Um relatório para o cliente com "nenhum lead" num período em que o
+        // WhatsApp nem recebia seria a afirmação falsa mais cara do produto:
+        // é o documento que o cliente leva para decidir se continua.
+        <AvisoDeMedicao
+          medicao={medicaoDeLeads({ conexao, ate: fim, leads: overview.totals.leads })}
+          desde={conexao ? inicioDaMedicao(conexao) : null}
+        />
+      }
+    />
   );
 }

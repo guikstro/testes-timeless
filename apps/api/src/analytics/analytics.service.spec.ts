@@ -225,7 +225,13 @@ describe("AnalyticsService.desempenhoPorCampanha", () => {
       roas: 4.5,
     });
     expect(resultado.semCampanha).toEqual({ atual: 1, anterior: 0 });
-    expect(resultado.totais).toEqual({ gastoCentavos: 20000, leads: 1, vendas: 1, receitaCentavos: 90000 });
+    expect(resultado.totais).toEqual({
+      gastoCentavos: 20000,
+      leads: 1,
+      vendas: 1,
+      receitaCentavos: 90000,
+      conversasNaPlataforma: null,
+    });
   });
 
   it("aceita o id da campanha vindo só da evidência, como no clique para WhatsApp", async () => {

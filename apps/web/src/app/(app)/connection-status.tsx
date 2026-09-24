@@ -1,9 +1,5 @@
 import Link from "next/link";
-
-export interface ConexaoDoWhatsApp {
-  provider: "CLOUD_API" | "EVOLUTION";
-  status: "PENDING_QR" | "CONNECTED" | "DISCONNECTED";
-}
+import type { ConexaoDoWhatsApp } from "@/lib/conexao-do-whatsapp";
 
 /**
  * O estado da conexão, sempre à vista.

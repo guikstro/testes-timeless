@@ -11,6 +11,8 @@ function campanha(over: Partial<CampanhaComGasto> = {}): CampanhaComGasto {
     externalId: "ext-1",
     name: "Institucional",
     platform: "GOOGLE",
+    status: "ACTIVE",
+    criadaNaPlataformaEm: null,
     spend: [],
     ...over,
   };
@@ -23,13 +25,61 @@ function lead(over: Partial<LeadAtribuido> = {}): LeadAtribuido {
 const dia = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 
 describe("agregaDesempenhoPorCampanha", () => {
+  it("soma as conversas que a plataforma contou e diz quando a conta está completa", () => {
+    const { campanhas } = agregaDesempenhoPorCampanha(
+      [
+        campanha({
+          spend: [
+            { date: dia("2026-09-23"), spendCents: 500, conversasIniciadas: 2 },
+            { date: dia("2026-09-24"), spendCents: 700, conversasIniciadas: 0 },
+          ],
+        }),
+      ],
+      [],
+    );
+    expect(campanhas[0].conversasNaPlataforma).toBe(2);
+    expect(campanhas[0].conversasCompletas).toBe(true);
+  });
+
+  it("marca como piso quando parte dos dias não trouxe a contagem", () => {
+    const { campanhas } = agregaDesempenhoPorCampanha(
+      [
+        campanha({
+          spend: [
+            { date: dia("2026-09-10"), spendCents: 500, conversasIniciadas: null },
+            { date: dia("2026-09-24"), spendCents: 700, conversasIniciadas: 3 },
+          ],
+        }),
+      ],
+      [],
+    );
+    expect(campanhas[0].conversasNaPlataforma).toBe(3);
+    expect(campanhas[0].conversasCompletas).toBe(false);
+  });
+
+  it("não afirma zero conversa quando nenhum dia trouxe a contagem", () => {
+    const { campanhas } = agregaDesempenhoPorCampanha(
+      [campanha({ spend: [{ date: dia("2026-09-10"), spendCents: 500, conversasIniciadas: null }] })],
+      [],
+    );
+    expect(campanhas[0].conversasNaPlataforma).toBeNull();
+  });
+
+  it("leva a data de criação como dia civil, para distinguir campanhas de mesmo nome", () => {
+    const { campanhas } = agregaDesempenhoPorCampanha(
+      [campanha({ criadaNaPlataformaEm: new Date("2026-09-24T12:48:04Z"), spend: [] })],
+      [],
+    );
+    expect(campanhas[0].criadaNaPlataformaEm).toBe("2026-09-24");
+  });
+
   it("soma gasto, leads, vendas e receita na campanha certa", () => {
     const { campanhas } = agregaDesempenhoPorCampanha(
       [
         campanha({
           spend: [
-            { date: dia("2026-03-01"), spendCents: 5000 },
-            { date: dia("2026-03-02"), spendCents: 3000 },
+            { date: dia("2026-03-01"), spendCents: 5000, conversasIniciadas: null },
+            { date: dia("2026-03-02"), spendCents: 3000, conversasIniciadas: null },
           ],
         }),
         campanha({ id: "c2", externalId: "ext-2", name: "Remarketing" }),
@@ -56,7 +106,7 @@ describe("agregaDesempenhoPorCampanha", () => {
     // A linha mais acionável da tabela: dinheiro saiu, nada voltou. Some-la
     // esconderia justamente a campanha que precisa ser cortada.
     const { campanhas } = agregaDesempenhoPorCampanha(
-      [campanha({ spend: [{ date: dia("2026-03-01"), spendCents: 9000 }] })],
+      [campanha({ spend: [{ date: dia("2026-03-01"), spendCents: 9000, conversasIniciadas: null }] })],
       [],
     );
 
@@ -85,10 +135,10 @@ describe("agregaDesempenhoPorCampanha", () => {
       [
         campanha({
           spend: [
-            { date: dia("2026-03-10"), spendCents: 1000 },
-            { date: dia("2026-03-01"), spendCents: 1000 },
+            { date: dia("2026-03-10"), spendCents: 1000, conversasIniciadas: null },
+            { date: dia("2026-03-01"), spendCents: 1000, conversasIniciadas: null },
             // Duas linhas no mesmo dia contam como um dia só.
-            { date: dia("2026-03-01"), spendCents: 500 },
+            { date: dia("2026-03-01"), spendCents: 500, conversasIniciadas: null },
           ],
         }),
       ],
@@ -100,7 +150,7 @@ describe("agregaDesempenhoPorCampanha", () => {
 
   it("separa venda sem valor da receita, para o ROAS não passar por completo", () => {
     const { campanhas } = agregaDesempenhoPorCampanha(
-      [campanha({ spend: [{ date: dia("2026-03-01"), spendCents: 10000 }] })],
+      [campanha({ spend: [{ date: dia("2026-03-01"), spendCents: 10000, conversasIniciadas: null }] })],
       [
         lead({ wonAt: dia("2026-03-02"), sale: { amountCents: 30000 } }),
         lead({ wonAt: dia("2026-03-03"), sale: { amountCents: null } }),
@@ -134,8 +184,8 @@ describe("agregaDesempenhoPorCampanha", () => {
   it("ordena pelo maior gasto", () => {
     const { campanhas } = agregaDesempenhoPorCampanha(
       [
-        campanha({ id: "c1", externalId: "ext-1", spend: [{ date: dia("2026-03-01"), spendCents: 1000 }] }),
-        campanha({ id: "c2", externalId: "ext-2", spend: [{ date: dia("2026-03-01"), spendCents: 9000 }] }),
+        campanha({ id: "c1", externalId: "ext-1", spend: [{ date: dia("2026-03-01"), spendCents: 1000, conversasIniciadas: null }] }),
+        campanha({ id: "c2", externalId: "ext-2", spend: [{ date: dia("2026-03-01"), spendCents: 9000, conversasIniciadas: null }] }),
       ],
       [],
     );
@@ -147,13 +197,13 @@ describe("agregaDesempenhoPorCampanha", () => {
 describe("comparaDesempenho", () => {
   const marco = () =>
     agregaDesempenhoPorCampanha(
-      [campanha({ externalId: "ext-1", name: "Institucional", spend: [{ date: dia("2026-03-01"), spendCents: 10000 }] })],
+      [campanha({ externalId: "ext-1", name: "Institucional", spend: [{ date: dia("2026-03-01"), spendCents: 10000, conversasIniciadas: null }] })],
       [lead({ campaignExternalId: "ext-1", wonAt: dia("2026-03-05"), sale: { amountCents: 50000 } })],
     );
 
   it("calcula a variação da campanha que rodou nos dois períodos", () => {
     const julho = agregaDesempenhoPorCampanha(
-      [campanha({ externalId: "ext-1", name: "Institucional", spend: [{ date: dia("2026-07-01"), spendCents: 20000 }] })],
+      [campanha({ externalId: "ext-1", name: "Institucional", spend: [{ date: dia("2026-07-01"), spendCents: 20000, conversasIniciadas: null }] })],
       [lead({ campaignExternalId: "ext-1" }), lead({ campaignExternalId: "ext-1" })],
     );
 
@@ -169,7 +219,7 @@ describe("comparaDesempenho", () => {
 
   it("mostra a campanha que existe só num dos períodos, sem zerá-la no outro", () => {
     const julho = agregaDesempenhoPorCampanha(
-      [campanha({ externalId: "ext-2", name: "Remarketing", spend: [{ date: dia("2026-07-01"), spendCents: 4000 }] })],
+      [campanha({ externalId: "ext-2", name: "Remarketing", spend: [{ date: dia("2026-07-01"), spendCents: 4000, conversasIniciadas: null }] })],
       [],
     );
 
@@ -190,7 +240,7 @@ describe("comparaDesempenho", () => {
 
   it("usa o nome do período atual quando a campanha foi renomeada", () => {
     const julho = agregaDesempenhoPorCampanha(
-      [campanha({ externalId: "ext-1", name: "Institucional 2026", spend: [{ date: dia("2026-07-01"), spendCents: 1000 }] })],
+      [campanha({ externalId: "ext-1", name: "Institucional 2026", spend: [{ date: dia("2026-07-01"), spendCents: 1000, conversasIniciadas: null }] })],
       [],
     );
 

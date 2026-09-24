@@ -28,7 +28,7 @@ describe("MetaGraphClient", () => {
     expect(campaigns).toEqual([{ id: "c1", name: "Direito Trabalhista", status: "ACTIVE" }]);
     const requestedUrl = new URL(fetchMock.mock.calls[0][0] as string);
     expect(requestedUrl.pathname).toBe("/v21.0/act_123/campaigns");
-    expect(requestedUrl.searchParams.get("fields")).toBe("id,name,status");
+    expect(requestedUrl.searchParams.get("fields")).toBe("id,name,status,created_time");
     expect(requestedUrl.searchParams.get("access_token")).toBe("token-abc");
   });
 

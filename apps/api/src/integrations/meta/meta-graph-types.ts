@@ -4,6 +4,8 @@ export interface MetaCampaign {
   id: string;
   name: string;
   status: string;
+  /** "2026-09-24T12:48:04+0000": com o fuso sem os dois pontos. */
+  created_time?: string;
 }
 
 export interface MetaAdSet {
@@ -38,7 +40,17 @@ export interface MetaInsight {
   spend: string; // Meta returns this as a decimal string, e.g. "123.45"
   impressions?: string;
   clicks?: string;
+  /**
+   * Os resultados que a Meta contou, cada um com o seu tipo. Só vêm os tipos
+   * que aconteceram: um tipo ausente da lista é zero, não desconhecido.
+   */
+  actions?: MetaAcao[];
   date_start: string; // "YYYY-MM-DD"
+}
+
+export interface MetaAcao {
+  action_type: string;
+  value: string;
 }
 
 export interface MetaPagedResponse<T> {

@@ -64,7 +64,14 @@ export interface DesempenhoDeCampanhas {
   comparacao: Janela | null;
   campanhas: CampanhaComparada[];
   semCampanha: { atual: number; anterior: number };
-  totais: { gastoCentavos: number; leads: number; vendas: number; receitaCentavos: number };
+  totais: {
+    gastoCentavos: number;
+    leads: number;
+    vendas: number;
+    receitaCentavos: number;
+    /** Null quando nenhuma campanha do período trouxe a contagem da plataforma. */
+    conversasNaPlataforma: number | null;
+  };
 }
 
 /**
@@ -261,14 +268,20 @@ export class AnalyticsService {
       comparacao,
       campanhas: juncao.campanhas,
       semCampanha: juncao.semCampanha,
-      totais: atual.campanhas.reduce(
+      totais: atual.campanhas.reduce<DesempenhoDeCampanhas["totais"]>(
         (soma, linha) => ({
           gastoCentavos: soma.gastoCentavos + linha.gastoCentavos,
           leads: soma.leads + linha.leads,
           vendas: soma.vendas + linha.vendas,
           receitaCentavos: soma.receitaCentavos + linha.receitaCentavos,
+          // Só soma quem tem o número: uma campanha de CSV não conta conversa
+          // nenhuma, e isso não pode apagar a contagem das que contam.
+          conversasNaPlataforma:
+            linha.conversasNaPlataforma === null
+              ? soma.conversasNaPlataforma
+              : (soma.conversasNaPlataforma ?? 0) + linha.conversasNaPlataforma,
         }),
-        { gastoCentavos: 0, leads: 0, vendas: 0, receitaCentavos: 0 },
+        { gastoCentavos: 0, leads: 0, vendas: 0, receitaCentavos: 0, conversasNaPlataforma: null },
       ),
     };
   }
@@ -298,7 +311,12 @@ export class AnalyticsService {
           externalId: true,
           name: true,
           platform: true,
-          spend: { where: { date: { gte: deDia, lte: ateDia } }, select: { date: true, spendCents: true } },
+          status: true,
+          criadaNaPlataformaEm: true,
+          spend: {
+            where: { date: { gte: deDia, lte: ateDia } },
+            select: { date: true, spendCents: true, conversasIniciadas: true },
+          },
         },
       }),
       this.prisma.lead.findMany({

@@ -21,6 +21,8 @@ import { compara, Variacao } from "./overview-aggregation";
 export interface LinhaDeGasto {
   date: Date;
   spendCents: number;
+  /** Null quando o dia não trouxe a contagem da Meta (CSV, ou sincronizado antes dela). */
+  conversasIniciadas: number | null;
 }
 
 export interface CampanhaComGasto {
@@ -28,6 +30,8 @@ export interface CampanhaComGasto {
   externalId: string;
   name: string;
   platform: string;
+  status: string;
+  criadaNaPlataformaEm: Date | null;
   spend: LinhaDeGasto[];
 }
 
@@ -60,6 +64,20 @@ export interface DesempenhoDeCampanha {
   externalId: string;
   nome: string;
   plataforma: string;
+  /** Como a plataforma descreve a campanha hoje: ACTIVE, PAUSED. */
+  status: string;
+  /** Dia civil em que ela foi criada na plataforma, quando se sabe. */
+  criadaNaPlataformaEm: string | null;
+  /**
+   * Conversas que a própria plataforma diz ter iniciado na janela. Null quando
+   * nenhum dia trouxe essa contagem, que é "não sabemos", e não zero.
+   */
+  conversasNaPlataforma: number | null;
+  /**
+   * Falso quando parte dos dias com gasto não trouxe a contagem: o número
+   * acima é então um piso, e a tela precisa dizer isso.
+   */
+  conversasCompletas: boolean;
   /** Null quando não há nenhum gasto lançado para a campanha dentro da janela. */
   ativo: PeriodoAtivo | null;
   gastoCentavos: number;
@@ -107,6 +125,18 @@ function periodoAtivo(gastos: LinhaDeGasto[]): PeriodoAtivo | null {
 }
 
 /**
+ * A soma das conversas contadas pela plataforma, separando o que não se sabe.
+ */
+function conversasDaPlataforma(gastos: LinhaDeGasto[]): { total: number | null; completas: boolean } {
+  const conhecidos = gastos.filter((linha) => typeof linha.conversasIniciadas === "number");
+  if (conhecidos.length === 0) return { total: null, completas: false };
+  return {
+    total: conhecidos.reduce((soma, linha) => soma + (linha.conversasIniciadas ?? 0), 0),
+    completas: conhecidos.length === gastos.length,
+  };
+}
+
+/**
  * Divisão que devolve null em vez de zero ou infinito quando não dá para
  * dividir. Um custo por lead de R$ 0,00 numa campanha sem leads afirmaria que
  * ela foi eficiente, quando o caso é que ela não produziu nada.
@@ -123,11 +153,16 @@ export function agregaDesempenhoPorCampanha(
   const porExternalId = new Map<string, DesempenhoDeCampanha>();
 
   for (const campanha of campanhas) {
+    const conversas = conversasDaPlataforma(campanha.spend);
     porExternalId.set(campanha.externalId, {
       id: campanha.id,
       externalId: campanha.externalId,
       nome: campanha.name,
       plataforma: campanha.platform,
+      status: campanha.status,
+      criadaNaPlataformaEm: campanha.criadaNaPlataformaEm ? diaCivil(campanha.criadaNaPlataformaEm) : null,
+      conversasNaPlataforma: conversas.total,
+      conversasCompletas: conversas.completas,
       ativo: periodoAtivo(campanha.spend),
       gastoCentavos: campanha.spend.reduce((soma, linha) => soma + linha.spendCents, 0),
       leads: 0,
@@ -196,6 +231,8 @@ export interface CampanhaComparada {
   externalId: string;
   nome: string;
   plataforma: string;
+  status: string;
+  criadaNaPlataformaEm: string | null;
   atual: DesempenhoDeCampanha | null;
   anterior: DesempenhoDeCampanha | null;
   /** Preenchida só quando a campanha teve atividade nos dois períodos. */
@@ -232,6 +269,8 @@ export function comparaDesempenho(
       externalId,
       nome: referencia.nome,
       plataforma: referencia.plataforma,
+      status: referencia.status,
+      criadaNaPlataformaEm: referencia.criadaNaPlataformaEm,
       atual: agora,
       anterior: antes,
       variacao:

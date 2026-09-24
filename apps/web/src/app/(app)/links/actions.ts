@@ -13,14 +13,16 @@ export async function createTrackingLink(
   _prevState: CreateLinkState,
   formData: FormData,
 ): Promise<CreateLinkState> {
-  const name = String(formData.get("name") ?? "").trim();
+  // Sem nome digitado, o da plataforma escolhida: o nome serve para achar o
+  // link depois, e exigir um antes de criar travava quem só queria o link.
+  const name = String(formData.get("name") ?? "").trim() || String(formData.get("nomePadrao") ?? "").trim();
   const destinationUrl = String(formData.get("destinationUrl") ?? "").trim();
   const defaultSource = String(formData.get("defaultSource") ?? "").trim();
   const defaultMedium = String(formData.get("defaultMedium") ?? "").trim();
   const defaultCampaign = String(formData.get("defaultCampaign") ?? "").trim();
 
   if (!name || !destinationUrl) {
-    return { error: "Nome e destino são obrigatórios." };
+    return { error: "Diga para onde o link leva." };
   }
 
   try {

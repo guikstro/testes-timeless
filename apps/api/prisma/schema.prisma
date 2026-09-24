@@ -837,6 +837,7 @@ model MetaConnection {
   /**
    * /**
    * /**
+   * /**
    * /** Código numérico da Meta. Ver `leituraDoStatusDaConta`.
    */
   accountStatus    Int?      @map("account_status")
@@ -971,6 +972,13 @@ model Campaign {
    */
   manual Boolean @default(false)
 
+  /**
+   * Quando a campanha foi criada na plataforma, e não quando entrou aqui.
+   * A Meta aceita duas campanhas com o mesmo nome, e é comum duplicar uma
+   * para testar sem renomear: a data de criação é o que as distingue na tela.
+   */
+  criadaNaPlataformaEm DateTime? @map("criada_na_plataforma_em")
+
   lastSyncedAt DateTime @map("last_synced_at")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
@@ -1074,14 +1082,18 @@ model Budget {
  * ou está sendo visto e ninguém clica.
  */
 model AdInsight {
-  id          String   @id @default(uuid())
-  adId        String   @map("ad_id")
-  date        DateTime @db.Date
-  spendCents  Int      @map("spend_cents")
-  impressions Int      @default(0)
-  clicks      Int      @default(0)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id                 String   @id @default(uuid())
+  adId               String   @map("ad_id")
+  date               DateTime @db.Date
+  spendCents         Int      @map("spend_cents")
+  impressions        Int      @default(0)
+  clicks             Int      @default(0)
+  /**
+   * O mesmo número de `AdSpend.conversasIniciadas`, no nível do anúncio.
+   */
+  conversasIniciadas Int?     @map("conversas_iniciadas")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   ad Ad @relation(fields: [adId], references: [id], onDelete: Cascade)
 
@@ -1100,12 +1112,21 @@ model AdInsight {
  * usa para decidir investimento.
  */
 model AdSpend {
-  id         String   @id @default(uuid())
-  campaignId String   @map("campaign_id")
-  date       DateTime @db.Date
-  spendCents Int      @map("spend_cents")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id                 String   @id @default(uuid())
+  campaignId         String   @map("campaign_id")
+  date               DateTime @db.Date
+  spendCents         Int      @map("spend_cents")
+  /**
+   * Conversas que a própria Meta diz ter iniciado neste dia, pelo anúncio que
+   * abre o WhatsApp.
+   * É a conta dela, e fica ao lado da nossa de propósito: a diferença entre
+   * as duas é o que o produto existe para mostrar. Null quer dizer que o dia
+   * foi sincronizado antes de este número ser pedido, ou veio de CSV, e não
+   * que não houve conversa; zero é a Meta dizendo que não houve.
+   */
+  conversasIniciadas Int?     @map("conversas_iniciadas")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 

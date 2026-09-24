@@ -4,6 +4,7 @@ import { EncryptionService } from "../../common/encryption/encryption.service";
 import { MetaGraphClient, InsightsRange } from "../../integrations/meta/meta-graph-client";
 import { MetaApiError } from "../../integrations/meta/meta-api-error";
 import { normalizaRespostaDaConta } from "../../integrations/meta/saude-da-conta";
+import { conversasIniciadasDe, dataDaMeta } from "../../integrations/meta/conversas-iniciadas";
 import { NotificationsService } from "../../notifications/notifications.service";
 
 const INSIGHTS_LOOKBACK_DAYS = 7;
@@ -68,12 +69,20 @@ export class MetaSyncService {
             name: campaign.name,
             status: campaign.status,
             platform: "META",
+            criadaNaPlataformaEm: dataDaMeta(campaign.created_time),
             lastSyncedAt: now,
           },
           // `platform` também no update: uma campanha lançada à mão que depois
           // apareça na sincronização passa a ser reconhecida como da Meta, em
           // vez de manter o rótulo de quando foi digitada.
-          update: { name: campaign.name, status: campaign.status, platform: "META", manual: false, lastSyncedAt: now },
+          update: {
+            name: campaign.name,
+            status: campaign.status,
+            platform: "META",
+            manual: false,
+            criadaNaPlataformaEm: dataDaMeta(campaign.created_time),
+            lastSyncedAt: now,
+          },
         });
       }
 
@@ -125,15 +134,20 @@ export class MetaSyncService {
         conta pode devolver gasto de anúncio que já não existe mais: somar só o
         reconhecido encolheria o total sem ninguém perceber.
       */
-      const totalPorCampanhaEDia = new Map<string, number>();
+      const totalPorCampanhaEDia = new Map<string, { spendCents: number; conversasIniciadas: number }>();
 
       for (const insight of insights) {
         const dia = insight.date_start;
         const centavos = Math.round(Number(insight.spend) * 100);
         if (!Number.isFinite(centavos)) continue;
 
+        const conversas = conversasIniciadasDe(insight.actions);
         const chave = `${insight.campaign_id}|${dia}`;
-        totalPorCampanhaEDia.set(chave, (totalPorCampanhaEDia.get(chave) ?? 0) + centavos);
+        const acumulado = totalPorCampanhaEDia.get(chave) ?? { spendCents: 0, conversasIniciadas: 0 };
+        totalPorCampanhaEDia.set(chave, {
+          spendCents: acumulado.spendCents + centavos,
+          conversasIniciadas: acumulado.conversasIniciadas + conversas,
+        });
 
         // O detalhe por anúncio só existe para anúncio que conhecemos. Um id
         // que não casa entra no total da campanha acima e para por aí.
@@ -144,6 +158,7 @@ export class MetaSyncService {
           spendCents: centavos,
           impressions: Number(insight.impressions ?? 0) || 0,
           clicks: Number(insight.clicks ?? 0) || 0,
+          conversasIniciadas: conversas,
         };
         await this.prisma.adInsight.upsert({
           where: { adId_date: { adId, date: new Date(dia) } },
@@ -152,14 +167,14 @@ export class MetaSyncService {
         });
       }
 
-      for (const [chave, spendCents] of totalPorCampanhaEDia) {
+      for (const [chave, total] of totalPorCampanhaEDia) {
         const [externalId, dia] = chave.split("|");
         const campaignId = campaignIdByExternalId.get(externalId);
         if (!campaignId) continue;
         await this.prisma.adSpend.upsert({
           where: { campaignId_date: { campaignId, date: new Date(dia) } },
-          create: { campaignId, date: new Date(dia), spendCents },
-          update: { spendCents },
+          create: { campaignId, date: new Date(dia), ...total },
+          update: total,
         });
       }
 

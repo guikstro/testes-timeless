@@ -34,7 +34,10 @@ export const PLATAFORMAS: Plataforma[] = [
     source: "facebook",
     medium: "paid_social",
     cor: "#0866FF",
-    descricao: "Campanha no Facebook ou no Instagram pelo Gerenciador.",
+    // O anúncio que abre o WhatsApp não precisa de link, e é o caso mais
+    // comum da Meta: dizer isso aqui evita criar um link que nunca é clicado.
+    descricao:
+      "Só para anúncio da Meta que leva a uma página. Anúncio que abre o WhatsApp direto não precisa de link.",
   },
   {
     chave: "instagram-bio",

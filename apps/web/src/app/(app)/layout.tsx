@@ -5,7 +5,8 @@ import { LivingBackground } from "@/components/living-background";
 import { AppNav } from "./app-nav";
 import { ImpersonationHairline } from "./impersonation-banner";
 import { AppMain } from "./app-main";
-import { ConexaoDoWhatsApp, ConnectionStatus } from "./connection-status";
+import { ConnectionStatus } from "./connection-status";
+import { conexaoDoWhatsApp } from "@/lib/conexao-do-whatsapp";
 import { NotificationProvider } from "@/components/notifications/notification-provider";
 import { NotificationToasts } from "@/components/notifications/notification-toasts";
 import { NotificationBell } from "@/components/notifications/notification-bell";
@@ -32,12 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     try/catch não é zelo excessivo: sem ele, uma falha nesta consulta derruba
     o layout inteiro, e o app ficaria inacessível por causa de um indicador.
   */
-  let conexao: ConexaoDoWhatsApp | null = null;
-  try {
-    conexao = await apiFetch<ConexaoDoWhatsApp | null>("/integrations/whatsapp");
-  } catch {
-    conexao = null;
-  }
+  const conexao = (await conexaoDoWhatsApp()) ?? null;
 
   return (
     <NotificationProvider>

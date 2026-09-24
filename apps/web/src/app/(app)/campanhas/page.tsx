@@ -1,4 +1,6 @@
 import { apiFetch } from "@/lib/api-client";
+import { conexaoDoWhatsApp } from "@/lib/conexao-do-whatsapp";
+import { inicioDaMedicao, medicaoDeLeads } from "@/lib/medicao-de-leads";
 import { intervaloDoMes, leIntervalo, mesAtual } from "@/lib/periodo";
 import { CampanhasView } from "./campanhas-view";
 import { DesempenhoDeCampanhas } from "./tipos";
@@ -8,15 +10,6 @@ interface Busca {
   ate?: string;
   compararDe?: string;
   compararAte?: string;
-  /** Ano que cada seletor está exibindo, que é navegação e não seleção. */
-  ano?: string;
-  anoCmp?: string;
-}
-
-/** Ano plausível vindo da URL. Fora da faixa, a tela volta ao ano do período. */
-function leAno(valor: string | undefined): number | null {
-  const ano = Number(valor);
-  return Number.isInteger(ano) && ano >= 2000 && ano <= 2100 ? ano : null;
 }
 
 export default async function CampanhasPage({ searchParams }: { searchParams: Promise<Busca> }) {
@@ -33,11 +26,24 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
     query.set("compararAte", comparacao.ate);
   }
 
-  const dados = await apiFetch<DesempenhoDeCampanhas>(`/analytics/campanhas?${query.toString()}`);
+  const [dados, conexao] = await Promise.all([
+    apiFetch<DesempenhoDeCampanhas>(`/analytics/campanhas?${query.toString()}`),
+    conexaoDoWhatsApp(),
+  ]);
 
-  const anoDoPeriodo = Number(periodo.de.slice(0, 4));
-  const ano = leAno(params.ano) ?? anoDoPeriodo;
-  const anoComparacao = leAno(params.anoCmp) ?? (comparacao ? Number(comparacao.de.slice(0, 4)) : anoDoPeriodo);
+  // Todos os leads do período, e não só os ligados a campanha: um lead sem
+  // campanha também prova que o WhatsApp estava recebendo.
+  const medicao = medicaoDeLeads({
+    conexao,
+    ate: periodo.ate,
+    leads: dados.totais.leads + dados.semCampanha.atual,
+  });
 
-  return <CampanhasView dados={dados} ano={ano} anoComparacao={anoComparacao} />;
+  return (
+    <CampanhasView
+      dados={dados}
+      medicao={medicao}
+      desdeDoWhatsApp={conexao ? inicioDaMedicao(conexao) : null}
+    />
+  );
 }

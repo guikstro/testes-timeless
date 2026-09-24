@@ -124,8 +124,8 @@ describe("MetaSyncService", () => {
 
     expect(prisma.adSpend.upsert).toHaveBeenCalledWith({
       where: { campaignId_date: { campaignId: "internal-campaign-1", date: new Date("2026-08-01") } },
-      create: { campaignId: "internal-campaign-1", date: new Date("2026-08-01"), spendCents: 12345 },
-      update: { spendCents: 12345 },
+      create: { campaignId: "internal-campaign-1", date: new Date("2026-08-01"), spendCents: 12345, conversasIniciadas: 0 },
+      update: { spendCents: 12345, conversasIniciadas: 0 },
     });
   });
 
@@ -171,7 +171,7 @@ describe("MetaSyncService", () => {
 
       expect(prisma.adSpend.upsert).toHaveBeenCalledTimes(1);
       expect(prisma.adSpend.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({ update: { spendCents: 15050 } }),
+        expect.objectContaining({ update: { spendCents: 15050, conversasIniciadas: 0 } }),
       );
     });
 
@@ -188,8 +188,8 @@ describe("MetaSyncService", () => {
 
       expect(prisma.adInsight.upsert).toHaveBeenCalledWith({
         where: { adId_date: { adId: "anuncio-a", date: new Date("2026-08-01") } },
-        create: { adId: "anuncio-a", date: new Date("2026-08-01"), spendCents: 3400, impressions: 1200, clicks: 48 },
-        update: { spendCents: 3400, impressions: 1200, clicks: 48 },
+        create: { adId: "anuncio-a", date: new Date("2026-08-01"), spendCents: 3400, impressions: 1200, clicks: 48, conversasIniciadas: 0 },
+        update: { spendCents: 3400, impressions: 1200, clicks: 48, conversasIniciadas: 0 },
       });
     });
 
@@ -207,7 +207,7 @@ describe("MetaSyncService", () => {
 
       // Somar só o que conseguimos casar encolheria o total em silêncio.
       expect(prisma.adSpend.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({ update: { spendCents: 8000 } }),
+        expect.objectContaining({ update: { spendCents: 8000, conversasIniciadas: 0 } }),
       );
       expect(prisma.adInsight.upsert).not.toHaveBeenCalled();
     });

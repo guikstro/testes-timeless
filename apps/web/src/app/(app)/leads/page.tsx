@@ -1,4 +1,7 @@
 import { apiFetch } from "@/lib/api-client";
+import { AvisoDeMedicao } from "@/components/aviso-de-medicao";
+import { conexaoDoWhatsApp } from "@/lib/conexao-do-whatsapp";
+import { hojeEmBrasilia, inicioDaMedicao, medicaoDeLeads } from "@/lib/medicao-de-leads";
 import { EmptyState } from "@/components/ui/skeleton";
 import { ESTAGIOS } from "./estagios";
 import { LeadBoard } from "./lead-board";
@@ -30,24 +33,31 @@ export default async function LeadsPage({
 
   // Quatro consultas em paralelo, uma por coluna. São independentes, então
   // esperar uma pela outra só somaria latência.
-  const colunas = await Promise.all(
-    ESTAGIOS.map(async (estagio) => {
-      const consulta = new URLSearchParams({ limit: String(POR_COLUNA), offset: "0", status: estagio });
-      if (params.search) consulta.set("search", params.search);
+  const [colunas, conexao] = await Promise.all([
+    Promise.all(
+      ESTAGIOS.map(async (estagio) => {
+        const consulta = new URLSearchParams({ limit: String(POR_COLUNA), offset: "0", status: estagio });
+        if (params.search) consulta.set("search", params.search);
 
-      const { items, total } = await apiFetch<PaginatedResult<LeadCartao>>(`/leads?${consulta.toString()}`);
-      return { estagio, itens: soAguardando ? items.filter((lead) => lead.awaitingReply) : items, total };
-    }),
-  );
+        const { items, total } = await apiFetch<PaginatedResult<LeadCartao>>(`/leads?${consulta.toString()}`);
+        return { estagio, itens: soAguardando ? items.filter((lead) => lead.awaitingReply) : items, total };
+      }),
+    ),
+    conexaoDoWhatsApp(),
+  ]);
 
   const totalGeral = colunas.reduce((soma, coluna) => soma + coluna.total, 0);
   const mostrados = colunas.reduce((soma, coluna) => soma + coluna.itens.length, 0);
   const filtrando = Boolean(params.search || soAguardando);
+  // Com filtro, zero é resposta ao filtro e não diz nada sobre a conexão.
+  const medicao = filtrando ? "medido" : medicaoDeLeads({ conexao, ate: hojeEmBrasilia(), leads: totalGeral });
 
   return (
     <div className="mx-auto max-w-[100rem]">
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Leads</h1>
       <p className="mb-6 mt-1 text-sm text-ink-mute">Cada conversa que chegou pelo WhatsApp, com a origem provada.</p>
+
+      <AvisoDeMedicao medicao={medicao} desde={conexao ? inicioDaMedicao(conexao) : null} />
 
       <LeadsFilters total={totalGeral} />
 
@@ -58,7 +68,9 @@ export default async function LeadsPage({
             description={
               filtrando
                 ? "Tente outro termo, ou limpe os filtros para ver o quadro inteiro."
-                : "Conecte o WhatsApp em Integrações e os leads aparecem aqui assim que a primeira mensagem chegar."
+                : medicao === "medido"
+                  ? "Assim que a primeira mensagem chegar no WhatsApp conectado, ela aparece aqui como lead."
+                  : "Os leads aparecem aqui quando as mensagens começarem a chegar no WhatsApp conectado."
             }
           />
         </div>

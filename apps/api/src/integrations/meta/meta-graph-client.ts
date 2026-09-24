@@ -42,7 +42,7 @@ export class MetaGraphClient {
   private readonly baseUrl = process.env.META_GRAPH_API_BASE_URL ?? DEFAULT_BASE_URL;
 
   async getCampaigns(adAccountId: string, accessToken: string): Promise<MetaCampaign[]> {
-    const url = this.buildUrl(`/${adAccountId}/campaigns`, accessToken, { fields: "id,name,status" });
+    const url = this.buildUrl(`/${adAccountId}/campaigns`, accessToken, { fields: "id,name,status,created_time" });
     return this.fetchAllPages<MetaCampaign>(url);
   }
 
@@ -71,7 +71,7 @@ export class MetaGraphClient {
   async getInsights(adAccountId: string, accessToken: string, range: InsightsRange): Promise<MetaInsight[]> {
     const url = this.buildUrl(`/${adAccountId}/insights`, accessToken, {
       level: "ad",
-      fields: "campaign_id,adset_id,ad_id,spend,impressions,clicks",
+      fields: "campaign_id,adset_id,ad_id,spend,impressions,clicks,actions",
       time_increment: "1",
       time_range: JSON.stringify({ since: range.since, until: range.until }),
     });

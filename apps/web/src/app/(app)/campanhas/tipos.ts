@@ -18,6 +18,14 @@ export interface DesempenhoDeCampanha {
   externalId: string;
   nome: string;
   plataforma: string;
+  /** Como a plataforma descreve a campanha hoje: ACTIVE, PAUSED. */
+  status: string;
+  /** Dia em que ela foi criada na plataforma, quando se sabe. */
+  criadaNaPlataformaEm: string | null;
+  /** Conversas que a própria plataforma diz ter iniciado. Null quando não se sabe. */
+  conversasNaPlataforma: number | null;
+  /** Falso quando parte dos dias não trouxe a contagem: o número é um piso. */
+  conversasCompletas: boolean;
   ativo: PeriodoAtivo | null;
   gastoCentavos: number;
   leads: number;
@@ -34,6 +42,8 @@ export interface CampanhaComparada {
   externalId: string;
   nome: string;
   plataforma: string;
+  status: string;
+  criadaNaPlataformaEm: string | null;
   /** Null quando a campanha não teve atividade naquele período. Não é zero: é ausência. */
   atual: DesempenhoDeCampanha | null;
   anterior: DesempenhoDeCampanha | null;
@@ -50,5 +60,11 @@ export interface DesempenhoDeCampanhas {
   comparacao: { de: string; ate: string } | null;
   campanhas: CampanhaComparada[];
   semCampanha: { atual: number; anterior: number };
-  totais: { gastoCentavos: number; leads: number; vendas: number; receitaCentavos: number };
+  totais: {
+    gastoCentavos: number;
+    leads: number;
+    vendas: number;
+    receitaCentavos: number;
+    conversasNaPlataforma: number | null;
+  };
 }
