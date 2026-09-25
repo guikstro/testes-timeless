@@ -1,8 +1,15 @@
-import { Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
+import { HttpStatus, Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
 import Redis from "ioredis";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { criaConexaoRedis } from "../common/queue/redis-connection";
 import { canalDaOrganizacao, NotificationEvent } from "./notification-event";
+import { AppException } from "../common/exceptions/app-exception";
+
+/** De quem é a caixa: a pessoa, dentro da organização da sessão. */
+export interface DonoDaCaixa {
+  userId: string;
+  organizationId: string;
+}
 
 /** Teto de uma página do histórico, para uma caixa antiga não virar uma consulta enorme. */
 const POR_PAGINA = 30;
@@ -82,9 +89,19 @@ export class NotificationsService implements OnModuleDestroy {
     });
   }
 
-  async listar(userId: string, opcoes: { antesDe?: string; tipo?: string; naoLidas?: boolean } = {}) {
+  /*
+    Pessoa E organização em toda consulta, e não só a pessoa.
+
+    Filtrava só pela pessoa, e ela pode fazer parte de mais de uma
+    organização, ou ter saído de uma: quem era removido de um cliente
+    continuava lendo, na sessão de outro, as notificações antigas do primeiro,
+    com nome de lead e trecho de mensagem. A caixa agora é a da organização
+    da sessão.
+  */
+  async listar(dono: DonoDaCaixa, opcoes: { antesDe?: string; tipo?: string; naoLidas?: boolean } = {}) {
     const where = {
-      userId,
+      userId: dono.userId,
+      organizationId: dono.organizationId,
       ...(opcoes.tipo ? { type: opcoes.tipo } : {}),
       ...(opcoes.naoLidas ? { read: false } : {}),
       ...(opcoes.antesDe ? { createdAt: { lt: new Date(opcoes.antesDe) } } : {}),
@@ -105,22 +122,38 @@ export class NotificationsService implements OnModuleDestroy {
       // Cursor é a data da última linha, e não um número de página: a caixa
       // recebe linhas novas no topo o tempo todo, e um offset saltaria itens.
       proximoCursor: linhas.length > POR_PAGINA ? pagina[pagina.length - 1].createdAt.toISOString() : null,
-      naoLidas: await this.contarNaoLidas(userId),
+      naoLidas: await this.contarNaoLidas(dono),
     };
   }
 
-  contarNaoLidas(userId: string): Promise<number> {
-    return this.prisma.notification.count({ where: { userId, read: false } });
+  contarNaoLidas(dono: DonoDaCaixa): Promise<number> {
+    return this.prisma.notification.count({
+      where: { userId: dono.userId, organizationId: dono.organizationId, read: false },
+    });
   }
 
-  /** O `userId` no filtro é o que impede marcar como lida a notificação de outra pessoa. */
-  async marcarComoLida(userId: string, id: string): Promise<{ naoLidas: number }> {
-    await this.prisma.notification.updateMany({ where: { id, userId }, data: { read: true } });
-    return { naoLidas: await this.contarNaoLidas(userId) };
+  /**
+   * Pessoa e organização no filtro: é o que impede marcar como lida a
+   * notificação de outra pessoa, ou a de outra organização. Não achar é 404,
+   * e não um sucesso silencioso, para quem tenta um id alheio não ter como
+   * distinguir "não é seu" de "não existe".
+   */
+  async marcarComoLida(dono: DonoDaCaixa, id: string): Promise<{ naoLidas: number }> {
+    const { count } = await this.prisma.notification.updateMany({
+      where: { id, userId: dono.userId, organizationId: dono.organizationId },
+      data: { read: true },
+    });
+    if (count === 0) {
+      throw new AppException("NAO_ENCONTRADA", "Notificação não encontrada.", HttpStatus.NOT_FOUND);
+    }
+    return { naoLidas: await this.contarNaoLidas(dono) };
   }
 
-  async marcarTodasComoLidas(userId: string): Promise<{ naoLidas: number }> {
-    await this.prisma.notification.updateMany({ where: { userId, read: false }, data: { read: true } });
+  async marcarTodasComoLidas(dono: DonoDaCaixa): Promise<{ naoLidas: number }> {
+    await this.prisma.notification.updateMany({
+      where: { userId: dono.userId, organizationId: dono.organizationId, read: false },
+      data: { read: true },
+    });
     return { naoLidas: 0 };
   }
 }

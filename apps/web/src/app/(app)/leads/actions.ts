@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { apiFetch, ApiRequestError } from "@/lib/api-client";
+import { apiFetch, ApiRequestError, rota } from "@/lib/api-client";
 
 /**
  * Move o lead de estágio a partir do quadro.
@@ -15,7 +15,7 @@ export async function moverEstagio(
   status: "QUALIFIED" | "MEETING_SCHEDULED" | "WON",
 ): Promise<{ error?: string } | void> {
   try {
-    await apiFetch(`/leads/${leadId}`, { method: "PATCH", body: JSON.stringify({ status }) });
+    await apiFetch(rota`/leads/${leadId}`, { method: "PATCH", body: JSON.stringify({ status }) });
   } catch (error) {
     if (error instanceof ApiRequestError) return { error: error.body.message };
     return { error: "Não foi possível mover o lead." };
@@ -36,7 +36,7 @@ export async function responderRapido(leadId: string, texto: string): Promise<{ 
   if (!limpo) return { error: "Escreva uma mensagem." };
 
   try {
-    await apiFetch(`/leads/${leadId}/messages`, { method: "POST", body: JSON.stringify({ text: limpo }) });
+    await apiFetch(rota`/leads/${leadId}/messages`, { method: "POST", body: JSON.stringify({ text: limpo }) });
   } catch (error) {
     if (error instanceof ApiRequestError) return { error: error.body.message };
     return { error: "Não foi possível enviar." };

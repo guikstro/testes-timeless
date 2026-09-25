@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { apiFetch, ApiRequestError } from "@/lib/api-client";
+import { apiFetch, ApiRequestError, rota } from "@/lib/api-client";
 
 export interface UpdateLeadState {
   error?: string;
@@ -30,7 +30,7 @@ export async function updateLead(
   }
 
   try {
-    await apiFetch(`/leads/${leadId}`, { method: "PATCH", body: JSON.stringify(body) });
+    await apiFetch(rota`/leads/${leadId}`, { method: "PATCH", body: JSON.stringify(body) });
   } catch (error) {
     if (error instanceof ApiRequestError) {
       return { error: error.body.message };
@@ -61,7 +61,7 @@ export async function setDisqualified(
   const reason = String(formData.get("reason") ?? "").trim();
 
   try {
-    await apiFetch(`/leads/${leadId}`, {
+    await apiFetch(rota`/leads/${leadId}`, {
       method: "PATCH",
       body: JSON.stringify({ disqualified, ...(disqualified && reason ? { disqualifiedReason: reason } : {}) }),
     });
@@ -94,7 +94,7 @@ export async function sendMessage(
   }
 
   try {
-    await apiFetch(`/leads/${leadId}/messages`, { method: "POST", body: JSON.stringify({ text }) });
+    await apiFetch(rota`/leads/${leadId}/messages`, { method: "POST", body: JSON.stringify({ text }) });
   } catch (error) {
     if (error instanceof ApiRequestError) {
       return { error: error.body.message };

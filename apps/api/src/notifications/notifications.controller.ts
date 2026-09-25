@@ -44,7 +44,7 @@ export class NotificationsController {
 
   @Get()
   listar(@CurrentUser() user: AuthenticatedUser, @Query() query: ListarNotificacoesDto) {
-    return this.notifications.listar(user.userId, {
+    return this.notifications.listar(user, {
       antesDe: query.antesDe,
       tipo: query.tipo,
       naoLidas: query.naoLidas,
@@ -53,11 +53,11 @@ export class NotificationsController {
 
   @Patch(":id/read")
   marcarComoLida(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
-    return this.notifications.marcarComoLida(user.userId, id);
+    return this.notifications.marcarComoLida(user, id);
   }
 
   @Post("read-all")
   marcarTodasComoLidas(@CurrentUser() user: AuthenticatedUser) {
-    return this.notifications.marcarTodasComoLidas(user.userId);
+    return this.notifications.marcarTodasComoLidas(user);
   }
 }

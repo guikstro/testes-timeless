@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { apiFetch, ApiRequestError } from "@/lib/api-client";
+import { apiFetch, ApiRequestError, rota } from "@/lib/api-client";
 
 export interface CreateRuleState {
   error?: string;
@@ -36,7 +36,7 @@ export async function createClassificationRule(
 }
 
 export async function deleteClassificationRule(id: string): Promise<void> {
-  await apiFetch(`/classification-rules/${id}`, { method: "DELETE" });
+  await apiFetch(rota`/classification-rules/${id}`, { method: "DELETE" });
   revalidatePath("/settings");
 }
 

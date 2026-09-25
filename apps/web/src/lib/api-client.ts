@@ -98,3 +98,5 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 
   return body as T;
 }
+
+export { rota } from "./rota";

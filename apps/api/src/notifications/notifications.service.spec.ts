@@ -99,26 +99,37 @@ describe("NotificationsService", () => {
     expect(prisma.notification.createMany).not.toHaveBeenCalled();
   });
 
-  it("lista apenas a caixa de quem pediu", async () => {
+  const DONO = { userId: "u-1", organizationId: "org-1" };
+
+  it("lista apenas a caixa de quem pediu, na organização da sessão", async () => {
     const { service, prisma } = buildService();
 
-    await service.listar("u-1", { naoLidas: true, tipo: "lead.won" });
+    await service.listar(DONO, { naoLidas: true, tipo: "lead.won" });
 
+    // A organização no filtro: sem ela, quem saiu de um cliente continuava
+    // lendo as notificações antigas dele de dentro de outro.
     expect(prisma.notification.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { userId: "u-1", type: "lead.won", read: false } }),
+      expect.objectContaining({
+        where: { userId: "u-1", organizationId: "org-1", type: "lead.won", read: false },
+      }),
     );
   });
 
-  it("marcar como lida não alcança a notificação de outra pessoa", async () => {
+  it("marcar como lida não alcança a notificação de outra pessoa nem de outra organização", async () => {
     const { service, prisma } = buildService();
 
-    await service.marcarComoLida("u-1", "n-9");
+    await service.marcarComoLida(DONO, "n-9");
 
-    // O `userId` no filtro é o que impede alguém de mexer na caixa alheia
-    // adivinhando um id.
     expect(prisma.notification.updateMany).toHaveBeenCalledWith({
-      where: { id: "n-9", userId: "u-1" },
+      where: { id: "n-9", userId: "u-1", organizationId: "org-1" },
       data: { read: true },
     });
+  });
+
+  it("responde 404 quando o id não é da caixa de quem pediu", async () => {
+    const { service, prisma } = buildService();
+    prisma.notification.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.marcarComoLida(DONO, "n-alheia")).rejects.toMatchObject({ status: 404 });
   });
 });

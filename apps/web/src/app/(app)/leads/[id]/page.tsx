@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { apiFetch, ApiRequestError } from "@/lib/api-client";
+import { apiFetch, ApiRequestError, rota } from "@/lib/api-client";
 import {
   attributionCampaignLabel,
   attributionMethodLabel,
@@ -186,7 +186,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
   let lead: LeadDetail;
   try {
-    lead = await apiFetch<LeadDetail>(`/leads/${id}`);
+    lead = await apiFetch<LeadDetail>(rota`/leads/${id}`);
   } catch (error) {
     if (error instanceof ApiRequestError && error.status === 404) {
       notFound();

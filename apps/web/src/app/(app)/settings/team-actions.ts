@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { apiFetch, ApiRequestError } from "@/lib/api-client";
+import { apiFetch, ApiRequestError, rota } from "@/lib/api-client";
 
 export interface EstadoDaEquipe {
   erro?: string;
@@ -9,7 +9,7 @@ export interface EstadoDaEquipe {
 
 export async function mudarPapel(userId: string, role: string): Promise<EstadoDaEquipe> {
   try {
-    await apiFetch(`/organizations/current/members/${userId}`, {
+    await apiFetch(rota`/organizations/current/members/${userId}`, {
       method: "PATCH",
       body: JSON.stringify({ role }),
     });
@@ -24,7 +24,7 @@ export async function mudarPapel(userId: string, role: string): Promise<EstadoDa
 
 export async function removerMembro(userId: string): Promise<EstadoDaEquipe> {
   try {
-    await apiFetch(`/organizations/current/members/${userId}`, { method: "DELETE" });
+    await apiFetch(rota`/organizations/current/members/${userId}`, { method: "DELETE" });
   } catch (error) {
     if (error instanceof ApiRequestError) return { erro: error.body.message };
     return { erro: "Não foi possível remover." };

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { apiFetch, ApiRequestError } from "@/lib/api-client";
+import { apiFetch, ApiRequestError, rota } from "@/lib/api-client";
 
 export interface EstadoDaVerba {
   erro?: string;
@@ -31,7 +31,7 @@ export async function salvarVerba(
   if (ate && ate < de) return { erro: "A data final precisa ser igual ou depois da inicial." };
 
   try {
-    await apiFetch(id ? `/verbas/${id}` : "/verbas", {
+    await apiFetch(id ? rota`/verbas/${id}` : "/verbas", {
       method: id ? "PATCH" : "POST",
       body: JSON.stringify({ de, ate: ate || undefined, valorCentavos: valor, rotulo: rotulo || undefined }),
     });
@@ -46,7 +46,7 @@ export async function salvarVerba(
 
 export async function removerVerba(id: string): Promise<void> {
   try {
-    await apiFetch(`/verbas/${id}`, { method: "DELETE" });
+    await apiFetch(rota`/verbas/${id}`, { method: "DELETE" });
   } catch {
     // A tela relista de qualquer forma; falhar aqui não pode derrubar a ação.
   }

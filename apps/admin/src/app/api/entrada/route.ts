@@ -16,15 +16,29 @@ const SITE_DO_CLIENTE = process.env.NEXT_PUBLIC_WEB_APP_URL ?? "http://localhost
  * cliente" para restaurá-la: agora ela simplesmente fica onde estava, neste
  * site, enquanto o navegador vai para o outro.
  */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function POST(request: NextRequest) {
   const token = request.cookies.get(ADMIN_ACCESS_COOKIE)?.value;
   if (!token) {
     return NextResponse.json({ code: "UNAUTHORIZED", message: "Não autenticado." }, { status: 401 });
   }
 
-  const { organizationId } = await request.json();
+  const { organizationId } = await request.json().catch(() => ({}));
 
-  const resposta = await fetch(`${API_URL}/admin/organizations/${organizationId}/entrada`, {
+  /*
+    Só um id no formato de id, antes de virar pedaço de endereço.
+
+    O valor vem do navegador e ia direto para o caminho da chamada à API: um
+    "../../outra-rota?" faria este servidor chamar outra rota com o token do
+    operador. A API também confere o formato, mas a essa altura a chamada já
+    teria ido para o lugar errado.
+  */
+  if (typeof organizationId !== "string" || !UUID.test(organizationId)) {
+    return NextResponse.json({ code: "VALIDATION_ERROR", message: "Organização inválida." }, { status: 400 });
+  }
+
+  const resposta = await fetch(`${API_URL}/admin/organizations/${encodeURIComponent(organizationId)}/entrada`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",

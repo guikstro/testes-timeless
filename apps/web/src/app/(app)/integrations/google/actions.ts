@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { apiFetch, ApiRequestError } from "@/lib/api-client";
+import { apiFetch, ApiRequestError, rota } from "@/lib/api-client";
 
 export interface EstadoFormulario {
   error?: string;
@@ -42,7 +42,7 @@ export async function lancarGasto(
   if (Number.isNaN(valor) || valor < 0) return { error: "Valor inválido." };
 
   try {
-    await apiFetch(`/campaigns/${campaignId}/spend`, {
+    await apiFetch(rota`/campaigns/${campaignId}/spend`, {
       method: "POST",
       // Centavos, nunca reais quebrados: ponto flutuante perde dinheiro.
       body: JSON.stringify({ date, spendCents: Math.round(valor * 100) }),
@@ -58,7 +58,7 @@ export async function lancarGasto(
 
 export async function removerCampanha(campaignId: string): Promise<{ error?: string } | void> {
   try {
-    await apiFetch(`/campaigns/${campaignId}`, { method: "DELETE" });
+    await apiFetch(rota`/campaigns/${campaignId}`, { method: "DELETE" });
   } catch (error) {
     if (error instanceof ApiRequestError) return { error: error.body.message };
     return { error: "Não foi possível remover." };
@@ -101,7 +101,7 @@ export async function importarCsv(
   colunaValor: number,
 ): Promise<ResultadoImportacao | { error: string }> {
   try {
-    const resultado = await apiFetch<ResultadoImportacao>(`/campaigns/${campaignId}/csv`, {
+    const resultado = await apiFetch<ResultadoImportacao>(rota`/campaigns/${campaignId}/csv`, {
       method: "POST",
       body: JSON.stringify({ conteudo, colunaData, colunaValor }),
     });
