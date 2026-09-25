@@ -6,6 +6,7 @@ import { generateTrackingCode } from "../common/utils/generate-code";
 import { PaginatedResult, PaginationQueryDto } from "../common/dto/pagination.dto";
 import { enderecoPublico } from "../common/configuracao/ambiente";
 import { CreateTrackingLinkDto } from "./dto/create-tracking-link.dto";
+import { Autor, AuditoriaService } from "../auditoria/auditoria.service";
 import { UpdateTrackingLinkDto } from "./dto/update-tracking-link.dto";
 
 const CODE_GENERATION_MAX_ATTEMPTS = 5;
@@ -17,9 +18,13 @@ export type LinkListado = Prisma.TrackingLinkGetPayload<{
 
 @Injectable()
 export class TrackingLinksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditoria: AuditoriaService,
+  ) {}
 
-  async create(organizationId: string, dto: CreateTrackingLinkDto) {
+  async create(autor: Autor, dto: CreateTrackingLinkDto) {
+    const organizationId = autor.organizationId;
     // Collisions are practically impossible (7 chars, 58-char alphabet ≈ 1.6e12
     // combinations) but we still guard against them rather than trust luck.
     for (let attempt = 0; attempt < CODE_GENERATION_MAX_ATTEMPTS; attempt++) {
@@ -27,9 +32,16 @@ export class TrackingLinksService {
       const existing = await this.prisma.trackingLink.findUnique({ where: { code } });
       if (existing) continue;
 
-      return this.prisma.trackingLink.create({
+      const link = await this.prisma.trackingLink.create({
         data: { organizationId, code, ...dto },
       });
+      await this.auditoria.registra(autor, {
+        acao: "TRACKING_LINK_CREATED",
+        entidade: "TrackingLink",
+        entidadeId: link.id,
+        depois: resumoDoLink(link),
+      });
+      return link;
     }
 
     throw new AppException(
@@ -87,15 +99,46 @@ export class TrackingLinksService {
     return link;
   }
 
-  async update(organizationId: string, id: string, dto: UpdateTrackingLinkDto) {
-    await this.findOne(organizationId, id);
-    return this.prisma.trackingLink.update({ where: { id }, data: dto });
+  async update(autor: Autor, id: string, dto: UpdateTrackingLinkDto) {
+    const antes = await this.findOne(autor.organizationId, id);
+    const depois = await this.prisma.trackingLink.update({ where: { id }, data: dto });
+    await this.auditoria.registra(autor, {
+      acao: "TRACKING_LINK_UPDATED",
+      entidade: "TrackingLink",
+      entidadeId: id,
+      antes: resumoDoLink(antes),
+      depois: resumoDoLink(depois),
+    });
+    return depois;
   }
 
-  async remove(organizationId: string, id: string): Promise<void> {
-    await this.findOne(organizationId, id);
+  async remove(autor: Autor, id: string): Promise<void> {
+    const link = await this.findOne(autor.organizationId, id);
     // Soft delete: click history is a historical record and must not be
     // orphaned/destroyed just because the link itself was retired.
     await this.prisma.trackingLink.update({ where: { id }, data: { deletedAt: new Date() } });
+    await this.auditoria.registra(autor, {
+      acao: "TRACKING_LINK_DELETED",
+      entidade: "TrackingLink",
+      entidadeId: id,
+      antes: resumoDoLink(link),
+    });
   }
+}
+
+/** O link como a auditoria mostra: o que muda o rastreio, sem contagens. */
+function resumoDoLink(link: {
+  name: string;
+  destinationUrl: string;
+  defaultSource: string | null;
+  defaultMedium: string | null;
+  defaultCampaign: string | null;
+}) {
+  return {
+    nome: link.name,
+    destino: link.destinationUrl,
+    origem: link.defaultSource,
+    meio: link.defaultMedium,
+    campanha: link.defaultCampaign,
+  };
 }

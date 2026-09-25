@@ -1,3 +1,4 @@
+import { AuditoriaService } from "../../auditoria/auditoria.service";
 import { MembershipRole } from "@prisma/client";
 import { ControleDeAnunciosService } from "./controle-de-anuncios.service";
 import { PrismaService } from "../../common/prisma/prisma.service";
@@ -39,14 +40,16 @@ function monta() {
   const verbas = { resumo: jest.fn().mockResolvedValue(null) };
   const fila = { add: jest.fn() };
 
+  const auditoria = { registra: jest.fn().mockResolvedValue(undefined) };
   const service = new ControleDeAnunciosService(
     prisma as unknown as PrismaService,
     encryption as unknown as EncryptionService,
     meta as unknown as MetaGraphClient,
     verbas as unknown as BudgetsService,
     fila as never,
+    auditoria as unknown as AuditoriaService,
   );
-  return { service, prisma, meta, verbas, fila, encryption };
+  return { service, prisma, meta, verbas, fila, encryption, auditoria };
 }
 
 describe("ControleDeAnunciosService", () => {
@@ -182,6 +185,40 @@ describe("ControleDeAnunciosService", () => {
         where: { id: "reg-1" },
         data: { erro: expect.stringContaining("id inválido") },
       });
+    });
+
+    it("leva para a auditoria a mudança que a Meta aceitou", async () => {
+      const { service, prisma, auditoria } = monta();
+      prisma.mudancaNoAnuncio.create.mockResolvedValue({
+        id: "reg-1",
+        nivel: "ANUNCIO",
+        externalId: "ad1",
+        nome: "Vídeo 01",
+        acao: "PAUSAR",
+        de: "ACTIVE",
+        para: "PAUSED",
+      });
+
+      await service.mudarStatus(usuario(), "ANUNCIO", "ad1", "PAUSED");
+
+      expect(auditoria.registra).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org-1", userId: "u1" }),
+        expect.objectContaining({
+          acao: "AD_STATUS_CHANGED",
+          entidade: "Anúncio",
+          entidadeId: "ad1",
+          antes: { nome: "Vídeo 01", valor: "ACTIVE" },
+          depois: { nome: "Vídeo 01", valor: "PAUSED" },
+        }),
+      );
+    });
+
+    it("não leva para a auditoria a mudança que a Meta recusou", async () => {
+      const { service, meta, auditoria } = monta();
+      meta.atualizarStatus.mockRejectedValue(new MetaApiError(100, undefined, "falhou", 400));
+
+      await expect(service.mudarStatus(usuario(), "ANUNCIO", "ad1", "PAUSED")).rejects.toThrow();
+      expect(auditoria.registra).not.toHaveBeenCalled();
     });
 
     it("não grava o status local quando a escrita falhou", async () => {

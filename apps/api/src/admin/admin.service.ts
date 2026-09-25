@@ -4,6 +4,7 @@ import { PrismaService } from "../common/prisma/prisma.service";
 import { AppException } from "../common/exceptions/app-exception";
 import { PaginatedResult, PaginationQueryDto } from "../common/dto/pagination.dto";
 import { AuthService } from "../auth/auth.service";
+import { AuditoriaService } from "../auditoria/auditoria.service";
 import { UpsertOperatorDto } from "./dto/upsert-operator.dto";
 
 /**
@@ -29,6 +30,7 @@ export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auth: AuthService,
+    private readonly auditoria: AuditoriaService,
   ) {}
 
   /** Lista os clientes com os números que dizem se a conta está viva ou parada. */
@@ -119,15 +121,11 @@ export class AdminService {
     // Registrado ANTES de emitir o token: se a gravação da auditoria falhar,
     // o acesso não acontece. Um acesso sem rastro é pior que um acesso
     // negado.
-    await this.prisma.auditLog.create({
-      data: {
-        organizationId,
-        userId: adminUserId,
-        entity: "Organization",
-        entityId: organizationId,
-        action: "IMPERSONATION_STARTED",
-        after: { organizationName: organization.name },
-      },
+    await this.auditoria.registra({ organizationId, userId: adminUserId, impersonating: true }, {
+      acao: "IMPERSONATION_STARTED",
+      entidade: "Organization",
+      entidadeId: organizationId,
+      depois: { organizationName: organization.name },
     });
 
     this.logger.warn(

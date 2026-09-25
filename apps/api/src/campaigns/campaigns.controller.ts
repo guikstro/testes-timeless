@@ -5,6 +5,7 @@ import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { CampaignsService } from "./campaigns.service";
 import { CriarCampanhaManualDto, RegistrarGastoDto } from "./dto/manual-campaign.dto";
+import { autorDe } from "../auditoria/auditoria.service";
 import { ImportarCsvDto, PreverCsvDto } from "./dto/importar-csv.dto";
 
 @Controller("campaigns")
@@ -31,7 +32,7 @@ export class CampaignsController {
 
   @Post("manual")
   criarManual(@CurrentUser() user: AuthenticatedUser, @Body() dto: CriarCampanhaManualDto) {
-    return this.campaignsService.criarManual(user.organizationId, dto);
+    return this.campaignsService.criarManual(autorDe(user), dto);
   }
 
   @Post(":id/spend")
@@ -40,13 +41,13 @@ export class CampaignsController {
     @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: RegistrarGastoDto,
   ) {
-    return this.campaignsService.registrarGasto(user.organizationId, id, dto);
+    return this.campaignsService.registrarGasto(autorDe(user), id, dto);
   }
 
   @Delete(":id")
   @HttpCode(HttpStatus.NO_CONTENT)
   async removerManual(@CurrentUser() user: AuthenticatedUser, @Param("id", ParseUUIDPipe) id: string): Promise<void> {
-    await this.campaignsService.removerManual(user.organizationId, id);
+    await this.campaignsService.removerManual(autorDe(user), id);
   }
 
   @Post("csv/preview")
@@ -62,6 +63,6 @@ export class CampaignsController {
     @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: ImportarCsvDto,
   ) {
-    return this.campaignsService.importarCsv(user.organizationId, id, dto.conteudo, dto.colunaData, dto.colunaValor);
+    return this.campaignsService.importarCsv(autorDe(user), id, dto.conteudo, dto.colunaData, dto.colunaValor);
   }
 }

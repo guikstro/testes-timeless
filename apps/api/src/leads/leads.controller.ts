@@ -28,7 +28,7 @@ export class LeadsController {
     @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: UpdateLeadDto,
   ) {
-    return this.leadsService.update(user.organizationId, id, user.userId, dto);
+    return this.leadsService.update(user.organizationId, id, user.userId, dto, user.impersonating);
   }
 
   @Post(":id/messages")

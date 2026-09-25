@@ -1,3 +1,4 @@
+import { AuditoriaService } from "../auditoria/auditoria.service";
 import { JwtService } from "@nestjs/jwt";
 import { Prisma } from "@prisma/client";
 import * as bcrypt from "bcrypt";
@@ -65,17 +66,24 @@ describe("AuthService", () => {
   let service: AuthService;
   let email: { enfileirar: jest.Mock };
   let mfa: { confereSegundoFator: jest.Mock; desativar: jest.Mock };
+  let auditoria: { registra: jest.Mock; registraParaAPessoa: jest.Mock; registraSemEsperar: jest.Mock };
 
   beforeEach(() => {
     prisma = buildPrismaMock();
     jwt = new JwtService({ secret: "test-secret" });
     email = { enfileirar: jest.fn().mockResolvedValue(undefined) };
     mfa = { confereSegundoFator: jest.fn().mockResolvedValue(true), desativar: jest.fn() };
+    auditoria = {
+      registra: jest.fn().mockResolvedValue(undefined),
+      registraParaAPessoa: jest.fn().mockResolvedValue(undefined),
+      registraSemEsperar: jest.fn(),
+    };
     service = new AuthService(
       prisma as unknown as PrismaService,
       jwt,
       email as unknown as EmailService,
       mfa as unknown as MfaService,
+      auditoria as unknown as AuditoriaService,
     );
   });
 

@@ -1,7 +1,7 @@
 import { HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
-import { AcaoNoAnuncio, NivelDoAnuncio } from "@prisma/client";
+import { AcaoNoAnuncio, MudancaNoAnuncio, NivelDoAnuncio } from "@prisma/client";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { EncryptionService } from "../../common/encryption/encryption.service";
 import { AppException } from "../../common/exceptions/app-exception";
@@ -11,6 +11,7 @@ import { MetaSyncJob } from "../../common/queue/meta-sync.job";
 import { BudgetsService } from "../../budgets/budgets.service";
 import { MetaGraphClient } from "./meta-graph-client";
 import { MetaApiError } from "./meta-api-error";
+import { AuditoriaService, autorDe } from "../../auditoria/auditoria.service";
 import {
   confereOrcamentoDiario,
   planejaMudancaDeStatus,
@@ -46,6 +47,7 @@ export class ControleDeAnunciosService {
     private readonly meta: MetaGraphClient,
     private readonly verbas: BudgetsService,
     @InjectQueue(META_SYNC_QUEUE) private readonly syncQueue: Queue<MetaSyncJob>,
+    private readonly auditoria: AuditoriaService,
   ) {}
 
   async mudarStatus(
@@ -68,7 +70,7 @@ export class ControleDeAnunciosService {
     const acao: AcaoNoAnuncio = desejado === "PAUSED" ? "PAUSAR" : "ATIVAR";
     const registro = await this.abreRegistro(user, nivel, externalId, alvo, acao, plano.de, plano.para);
 
-    await this.aplica(registro.id, () => this.meta.atualizarStatus(externalId, token, desejado));
+    await this.aplica(user, registro, () => this.meta.atualizarStatus(externalId, token, desejado));
     await this.gravaLocal(nivel, alvo.id, { status: desejado });
     await this.pedeSincronia(user.organizationId);
 
@@ -114,7 +116,7 @@ export class ControleDeAnunciosService {
       String(centavos),
     );
 
-    await this.aplica(registro.id, () =>
+    await this.aplica(user, registro, () =>
       this.meta.atualizarOrcamentoDiario(externalId, token, centavos),
     );
     await this.pedeSincronia(user.organizationId);
@@ -250,7 +252,12 @@ export class ControleDeAnunciosService {
    * `ads_management` no token, que é o caso mais comum aqui, tem conserto
    * conhecido e precisa dizer qual é.
    */
-  private async aplica(registroId: string, escrita: () => Promise<void>): Promise<void> {
+  private async aplica(
+    user: AuthenticatedUser,
+    registro: MudancaNoAnuncio,
+    escrita: () => Promise<void>,
+  ): Promise<void> {
+    const registroId = registro.id;
     try {
       await escrita();
       await this.prisma.mudancaNoAnuncio.update({
@@ -274,6 +281,16 @@ export class ControleDeAnunciosService {
 
       throw new AppException("META_RECUSOU", `A Meta recusou a alteração: ${motivo}`, HttpStatus.BAD_GATEWAY);
     }
+
+    // Só o que a Meta aceitou vai para a auditoria: a tentativa recusada já
+    // fica no histórico de mudanças do anúncio, com o motivo.
+    await this.auditoria.registra(autorDe(user), {
+      acao: registro.acao === "ORCAMENTO_DIARIO" ? "AD_BUDGET_CHANGED" : "AD_STATUS_CHANGED",
+      entidade: NOME_DO_NIVEL[registro.nivel],
+      entidadeId: registro.externalId,
+      antes: { nome: registro.nome, valor: registro.de },
+      depois: { nome: registro.nome, valor: registro.para },
+    });
   }
 
   /**
@@ -317,3 +334,10 @@ export class ControleDeAnunciosService {
 function semPermissaoDeEscrita(erro: MetaApiError): boolean {
   return erro.code === 200 || erro.code === 10 || /permission/i.test(erro.message);
 }
+
+/** Como cada nível aparece na auditoria. */
+const NOME_DO_NIVEL: Record<NivelDoAnuncio, string> = {
+  CAMPANHA: "Campanha",
+  CONJUNTO: "Conjunto de anúncios",
+  ANUNCIO: "Anúncio",
+};

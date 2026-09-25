@@ -3,6 +3,7 @@ import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { ClassificationRulesService } from "./classification-rules.service";
+import { autorDe } from "../auditoria/auditoria.service";
 import { CreateClassificationRuleDto } from "./dto/create-classification-rule.dto";
 
 @Controller("classification-rules")
@@ -17,12 +18,12 @@ export class ClassificationRulesController {
 
   @Post()
   create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateClassificationRuleDto) {
-    return this.classificationRulesService.create(user.organizationId, dto);
+    return this.classificationRulesService.create(autorDe(user), dto);
   }
 
   @Delete(":id")
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@CurrentUser() user: AuthenticatedUser, @Param("id", ParseUUIDPipe) id: string): Promise<void> {
-    await this.classificationRulesService.remove(user.organizationId, id);
+    await this.classificationRulesService.remove(autorDe(user), id);
   }
 }

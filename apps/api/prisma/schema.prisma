@@ -796,12 +796,62 @@ enum AuditAction {
    */
   IMPERSONATION_STARTED
   /**
+   * O operador saiu da organização que visitava.
+   */
+  IMPERSONATION_ENDED
+  /**
    * Mudanças na equipe. Ficam auditadas porque tirar alguém de uma conta é
    * irreversível do ponto de vista de quem foi tirado, e a pergunta "quem me
    * removeu, e quando" precisa ter resposta.
    */
   MEMBER_ROLE_CHANGED
   MEMBER_REMOVED
+
+  // Conta e acesso.
+  LOGIN_SUCCEEDED
+  /**
+   * Senha ou segundo fator errados para um e-mail que existe.
+   */
+  LOGIN_FAILED
+  LOGOUT
+  PASSWORD_CHANGED
+  PASSWORD_RESET
+  EMAIL_CHANGED
+  MFA_ENABLED
+  MFA_DISABLED
+  MFA_CODES_REGENERATED
+  /**
+   * Sessões encerradas à mão, na tela de sessões.
+   */
+  SESSIONS_ENDED
+
+  // Organização e integrações.
+  ORGANIZATION_UPDATED
+  INTEGRATION_CONNECTED
+  INTEGRATION_DISCONNECTED
+  INTEGRATION_UPDATED
+
+  // Anúncios e verba: decisões com dinheiro.
+  AD_STATUS_CHANGED
+  AD_BUDGET_CHANGED
+  BUDGET_CREATED
+  BUDGET_UPDATED
+  BUDGET_DELETED
+
+  // Dados que mudam o que os números dizem.
+  CAMPAIGN_CREATED
+  CAMPAIGN_DELETED
+  SPEND_IMPORTED
+  TRACKING_LINK_CREATED
+  TRACKING_LINK_UPDATED
+  TRACKING_LINK_DELETED
+  CLASSIFICATION_RULE_CREATED
+  CLASSIFICATION_RULE_DELETED
+
+  /**
+   * Dados que saíram do sistema, como a planilha de conversões do Google.
+   */
+  DATA_EXPORTED
 }
 
 /**
@@ -810,18 +860,41 @@ enum AuditAction {
 model AuditLog {
   id             String      @id @default(uuid())
   organizationId String      @map("organization_id")
-  userId         String      @map("user_id")
+  /**
+   * Quem fez. Opcional e sem cascata de propósito: apagava o histórico de
+   * quem saía da conta, justamente o histórico que alguém vai querer ver
+   * depois. O nome e o e-mail ficam copiados abaixo pelo mesmo motivo.
+   */
+  userId         String?     @map("user_id")
+  /**
+   * Nome e e-mail de quem fez, como eram no momento.
+   */
+  autorNome      String?     @map("autor_nome")
+  autorEmail     String?     @map("autor_email")
+  /**
+   * Feito por um operador da plataforma visitando a conta, e não por alguém dela.
+   */
+  viaSuporte     Boolean     @default(false) @map("via_suporte")
   entity         String
   entityId       String      @map("entity_id")
   action         AuditAction
+  /**
+   * Sempre passados pela limpeza de segredos antes de gravar.
+   */
   before         Json?
   after          Json?
+  ip             String?
+  /**
+   * O navegador, já descrito ("Chrome no macOS"), e não o cabeçalho cru.
+   */
+  aparelho       String?
   createdAt      DateTime    @default(now()) @map("created_at")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, createdAt])
+  @@index([organizationId, action, createdAt])
   @@map("audit_logs")
 }
 
@@ -879,6 +952,7 @@ model MetaConnection {
    * completamente o sentido.
    */
   /**
+   * /**
    * /**
    * /**
    * /**

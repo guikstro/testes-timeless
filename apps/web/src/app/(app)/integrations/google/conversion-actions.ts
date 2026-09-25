@@ -29,3 +29,19 @@ export async function salvarAcoesDeConversao(
   revalidatePath("/integrations/google");
   return { salvoEm: Date.now() };
 }
+
+/**
+ * Avisa a auditoria de que a planilha foi baixada. Uma falha aqui não impede
+ * o download: quem baixou não deve ficar sem o arquivo por causa do registro,
+ * e o erro fica no log do servidor.
+ */
+export async function registraExportacao(dias: number, linhas: number): Promise<void> {
+  try {
+    await apiFetch("/integrations/google/conversions/exportacao", {
+      method: "POST",
+      body: JSON.stringify({ dias, linhas }),
+    });
+  } catch {
+    // Silencioso de propósito; ver acima.
+  }
+}

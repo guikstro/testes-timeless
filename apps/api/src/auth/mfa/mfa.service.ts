@@ -3,6 +3,7 @@ import { PrismaService } from "../../common/prisma/prisma.service";
 import { EncryptionService } from "../../common/encryption/encryption.service";
 import { AppException } from "../../common/exceptions/app-exception";
 import { confereCodigo, enderecoOtpAuth, geraSegredo } from "./totp";
+import { AuditoriaService } from "../../auditoria/auditoria.service";
 import {
   encontraCodigo,
   geraLote,
@@ -49,6 +50,7 @@ export class MfaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryption: EncryptionService,
+    private readonly auditoria: AuditoriaService,
   ) {}
 
   async situacao(userId: string): Promise<SituacaoDoMfa> {
@@ -151,6 +153,7 @@ export class MfaService {
       }),
     ]);
 
+    await this.auditoria.registraParaAPessoa(userId, { acao: "MFA_ENABLED", entidade: "User", entidadeId: userId });
     return { codigos };
   }
 
@@ -207,6 +210,12 @@ export class MfaService {
       }),
     ]);
 
+    // Os códigos em si nunca vão para o registro: só o fato de terem mudado.
+    await this.auditoria.registraParaAPessoa(userId, {
+      acao: "MFA_CODES_REGENERATED",
+      entidade: "User",
+      entidadeId: userId,
+    });
     return { codigos };
   }
 

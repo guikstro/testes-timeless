@@ -18,6 +18,7 @@ import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { PaginationQueryDto } from "../common/dto/pagination.dto";
 import { TrackingLinksService } from "./tracking-links.service";
 import { CreateTrackingLinkDto } from "./dto/create-tracking-link.dto";
+import { autorDe } from "../auditoria/auditoria.service";
 import { UpdateTrackingLinkDto } from "./dto/update-tracking-link.dto";
 
 @Controller("tracking-links")
@@ -27,7 +28,7 @@ export class TrackingLinksController {
 
   @Post()
   create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateTrackingLinkDto) {
-    return this.trackingLinksService.create(user.organizationId, dto);
+    return this.trackingLinksService.create(autorDe(user), dto);
   }
 
   @Get()
@@ -46,12 +47,12 @@ export class TrackingLinksController {
     @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: UpdateTrackingLinkDto,
   ) {
-    return this.trackingLinksService.update(user.organizationId, id, dto);
+    return this.trackingLinksService.update(autorDe(user), id, dto);
   }
 
   @Delete(":id")
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@CurrentUser() user: AuthenticatedUser, @Param("id", ParseUUIDPipe) id: string): Promise<void> {
-    await this.trackingLinksService.remove(user.organizationId, id);
+    await this.trackingLinksService.remove(autorDe(user), id);
   }
 }

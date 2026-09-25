@@ -15,6 +15,7 @@ import { SendMessageDto } from "./dto/send-message.dto";
 import { ListLeadsDto } from "./dto/list-leads.dto";
 import { computeLeadMetrics } from "./lead-metrics";
 import { expedienteDa, SELECAO_DE_EXPEDIENTE } from "../common/expediente-da-organizacao";
+import { AuditoriaService } from "../auditoria/auditoria.service";
 import { AdIds, AdReferences, extractAdIds } from "./ad-references";
 
 /**
@@ -61,6 +62,7 @@ export class LeadsService {
     private readonly conversionEvents: ConversionEventsService,
     @InjectQueue(WHATSAPP_SEND_QUEUE) private readonly sendQueue: Queue<WhatsAppSendJob>,
     private readonly notifications: NotificationsService,
+    private readonly auditoria: AuditoriaService,
   ) {}
 
   async list(organizationId: string, query: ListLeadsDto): Promise<PaginatedResult<unknown>> {
@@ -248,7 +250,7 @@ export class LeadsService {
    * errou. Every change is audited (Section 65) and mirrored into the
    * lead's timeline so it's visible in the same place as automatic events.
    */
-  async update(organizationId: string, id: string, userId: string, dto: UpdateLeadDto) {
+  async update(organizationId: string, id: string, userId: string, dto: UpdateLeadDto, impersonating = false) {
     const lead = await this.prisma.lead.findFirst({ where: { id, organizationId }, include: { sale: true } });
     if (!lead) {
       throw new AppException("NOT_FOUND", "Lead não encontrado.", HttpStatus.NOT_FOUND);
@@ -356,15 +358,11 @@ export class LeadsService {
           metadata: { userId, reason: data.disqualifiedReason ?? null },
         },
       });
-      await this.prisma.auditLog.create({
-        data: {
-          organizationId,
-          userId,
-          entity: "Lead",
-          entityId: id,
-          action: "LEAD_DISQUALIFIED",
-          after: { reason: data.disqualifiedReason ?? null },
-        },
+      await this.auditoria.registra({ organizationId, userId, impersonating }, {
+        acao: "LEAD_DISQUALIFIED",
+        entidade: "Lead",
+        entidadeId: id,
+        depois: { reason: data.disqualifiedReason ?? null },
       });
     }
 
@@ -378,15 +376,11 @@ export class LeadsService {
           metadata: { userId, byProgress: reactivatedByProgress },
         },
       });
-      await this.prisma.auditLog.create({
-        data: {
-          organizationId,
-          userId,
-          entity: "Lead",
-          entityId: id,
-          action: "LEAD_REACTIVATED",
-          before: { reason: lead.disqualifiedReason },
-        },
+      await this.auditoria.registra({ organizationId, userId, impersonating }, {
+        acao: "LEAD_REACTIVATED",
+        entidade: "Lead",
+        entidadeId: id,
+        antes: { reason: lead.disqualifiedReason },
       });
     }
 
@@ -424,15 +418,11 @@ export class LeadsService {
           metadata: { classifierType: "MANUAL", userId },
         },
       });
-      await this.prisma.auditLog.create({
-        data: {
-          organizationId,
-          userId,
-          entity: "Sale",
-          entityId: sale.id,
-          action: "SALE_CREATED",
-          after: { amountCents: sale.amountCents },
-        },
+      await this.auditoria.registra({ organizationId, userId, impersonating }, {
+        acao: "SALE_CREATED",
+        entidade: "Sale",
+        entidadeId: sale.id,
+        depois: { amountCents: sale.amountCents },
       });
       // Only sent once a value is known (Section: never guess) — a WON
       // correction with no revenueCents waits for a later correction below.
@@ -451,16 +441,12 @@ export class LeadsService {
           metadata: { classifierType: "MANUAL", userId, amountCents: dto.revenueCents },
         },
       });
-      await this.prisma.auditLog.create({
-        data: {
-          organizationId,
-          userId,
-          entity: "Sale",
-          entityId: sale.id,
-          action: "SALE_UPDATED",
-          before,
-          after: { amountCents: sale.amountCents },
-        },
+      await this.auditoria.registra({ organizationId, userId, impersonating }, {
+        acao: "SALE_UPDATED",
+        entidade: "Sale",
+        entidadeId: sale.id,
+        antes: before,
+        depois: { amountCents: sale.amountCents },
       });
       // If this is the first time a value became known, this actually sends
       // the Purchase; if the sale was already sent, ConversionEventsService's
@@ -470,16 +456,12 @@ export class LeadsService {
     }
 
     if (data.status) {
-      await this.prisma.auditLog.create({
-        data: {
-          organizationId,
-          userId,
-          entity: "Lead",
-          entityId: id,
-          action: "LEAD_STATUS_CHANGED",
-          before: { status: beforeStatus },
-          after: { status: data.status },
-        },
+      await this.auditoria.registra({ organizationId, userId, impersonating }, {
+        acao: "LEAD_STATUS_CHANGED",
+        entidade: "Lead",
+        entidadeId: id,
+        antes: { status: beforeStatus },
+        depois: { status: data.status },
       });
 
       // O mesmo aviso que a mudança automática produz. Para quem está com o

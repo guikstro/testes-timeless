@@ -41,6 +41,8 @@ const TELAS = [
   "/relatorio?days=7",
   "/links",
   "/settings",
+  "/settings?aba=seguranca",
+  "/settings?aba=auditoria",
   "/notifications",
   "/integrations",
   "/integrations/google",

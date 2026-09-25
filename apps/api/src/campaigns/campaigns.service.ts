@@ -6,11 +6,15 @@ import { AppException } from "../common/exceptions/app-exception";
 import { isUniqueConstraintError } from "../common/utils/is-unique-constraint-error";
 import { hojeLocal } from "../common/tempo";
 import { CriarCampanhaManualDto, RegistrarGastoDto } from "./dto/manual-campaign.dto";
+import { Autor, AuditoriaService } from "../auditoria/auditoria.service";
 import { extraiGastos, leCsv } from "./csv-gasto";
 
 @Injectable()
 export class CampaignsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditoria: AuditoriaService,
+  ) {}
 
   async list(organizationId: string) {
     const campaigns = await this.prisma.campaign.findMany({
@@ -79,7 +83,8 @@ export class CampaignsService {
     }));
   }
 
-  async criarManual(organizationId: string, dto: CriarCampanhaManualDto) {
+  async criarManual(autor: Autor, dto: CriarCampanhaManualDto) {
+    const organizationId = autor.organizationId;
     const externalId = dto.externalId?.trim() || `manual:${organizationId}:${Date.now()}`;
 
     // Dentro da organização, nunca no sistema inteiro. Com a conferência
@@ -94,8 +99,9 @@ export class CampaignsService {
       );
     }
 
+    let campanha;
     try {
-      return await this.prisma.campaign.create({
+      campanha = await this.prisma.campaign.create({
         data: {
           organizationId,
           externalId,
@@ -117,6 +123,14 @@ export class CampaignsService {
         HttpStatus.CONFLICT,
       );
     }
+
+    await this.auditoria.registra(autor, {
+      acao: "CAMPAIGN_CREATED",
+      entidade: "Campaign",
+      entidadeId: campanha.id,
+      depois: { nome: campanha.name, plataforma: campanha.platform, idNaPlataforma: campanha.externalId },
+    });
+    return campanha;
   }
 
   /**
@@ -126,24 +140,38 @@ export class CampaignsService {
    * dia é correção, não acúmulo, e somar transformaria um erro de digitação em
    * dado permanentemente errado.
    */
-  async registrarGasto(organizationId: string, campaignId: string, dto: RegistrarGastoDto) {
-    const campanha = await this.prisma.campaign.findFirst({ where: { id: campaignId, organizationId } });
+  async registrarGasto(autor: Autor, campaignId: string, dto: RegistrarGastoDto) {
+    const campanha = await this.prisma.campaign.findFirst({
+      where: { id: campaignId, organizationId: autor.organizationId },
+    });
     if (!campanha) {
       throw new AppException("NOT_FOUND", "Campanha não encontrada.", HttpStatus.NOT_FOUND);
     }
 
     const date = new Date(`${dto.date}T00:00:00.000Z`);
+    const anterior = await this.prisma.adSpend.findUnique({ where: { campaignId_date: { campaignId, date } } });
 
-    return this.prisma.adSpend.upsert({
+    const gasto = await this.prisma.adSpend.upsert({
       where: { campaignId_date: { campaignId, date } },
       create: { campaignId, date, spendCents: dto.spendCents },
       update: { spendCents: dto.spendCents },
     });
+
+    // O valor anterior vai junto porque lançar de novo o mesmo dia substitui:
+    // sem ele, uma correção e um primeiro lançamento seriam indistinguíveis.
+    await this.auditoria.registra(autor, {
+      acao: "SPEND_IMPORTED",
+      entidade: "Campaign",
+      entidadeId: campaignId,
+      antes: anterior ? { dia: dto.date, valorCentavos: anterior.spendCents } : null,
+      depois: { campanha: campanha.name, dia: dto.date, valorCentavos: dto.spendCents, por: "lançamento manual" },
+    });
+    return gasto;
   }
 
-  async removerManual(organizationId: string, campaignId: string) {
+  async removerManual(autor: Autor, campaignId: string) {
     const campanha = await this.prisma.campaign.findFirst({
-      where: { id: campaignId, organizationId, manual: true },
+      where: { id: campaignId, organizationId: autor.organizationId, manual: true },
     });
     if (!campanha) {
       // Só campanhas manuais podem ser removidas: uma vinda da sincronização
@@ -156,6 +184,12 @@ export class CampaignsService {
     }
 
     await this.prisma.campaign.delete({ where: { id: campaignId } });
+    await this.auditoria.registra(autor, {
+      acao: "CAMPAIGN_DELETED",
+      entidade: "Campaign",
+      entidadeId: campaignId,
+      antes: { nome: campanha.name, plataforma: campanha.platform, idNaPlataforma: campanha.externalId },
+    });
   }
 
   listarPorPlataforma(organizationId: string, platform: AdPlatform) {
@@ -195,13 +229,15 @@ export class CampaignsService {
   }
 
   async importarCsv(
-    organizationId: string,
+    autor: Autor,
     campaignId: string,
     conteudo: string,
     colunaData: number,
     colunaValor: number,
   ) {
-    const campanha = await this.prisma.campaign.findFirst({ where: { id: campaignId, organizationId } });
+    const campanha = await this.prisma.campaign.findFirst({
+      where: { id: campaignId, organizationId: autor.organizationId },
+    });
     if (!campanha) {
       throw new AppException("NOT_FOUND", "Campanha não encontrada.", HttpStatus.NOT_FOUND);
     }
@@ -227,6 +263,20 @@ export class CampaignsService {
         }),
       ),
     );
+
+    await this.auditoria.registra(autor, {
+      acao: "SPEND_IMPORTED",
+      entidade: "Campaign",
+      entidadeId: campaignId,
+      depois: {
+        campanha: campanha.name,
+        por: "planilha CSV",
+        dias: linhas.length,
+        de: linhas[0].date,
+        ate: linhas[linhas.length - 1].date,
+        totalCentavos: linhas.reduce((soma, linha) => soma + linha.spendCents, 0),
+      },
+    });
 
     return {
       importados: linhas.length,

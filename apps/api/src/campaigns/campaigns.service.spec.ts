@@ -1,6 +1,10 @@
+import { AuditoriaService } from "../auditoria/auditoria.service";
 import { CampaignsService } from "./campaigns.service";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../common/prisma/prisma.service";
+
+/** Quem faz a ação, na organização dada. */
+const autor = (organizationId: string) => ({ organizationId, userId: "user-1" });
 
 describe("CampaignsService", () => {
   function buildService() {
@@ -13,8 +17,9 @@ describe("CampaignsService", () => {
       },
       adSpend: { upsert: jest.fn() },
     };
-    const service = new CampaignsService(prisma as unknown as PrismaService);
-    return { service, prisma };
+    const auditoria = { registra: jest.fn().mockResolvedValue(undefined) };
+    const service = new CampaignsService(prisma as unknown as PrismaService, auditoria as unknown as AuditoriaService);
+    return { service, prisma, auditoria };
   }
 
   it("scopes the query to the caller's organization", async () => {
@@ -99,7 +104,7 @@ describe("CampaignsService", () => {
     it("procura o id existente dentro da organização, nunca no sistema inteiro", async () => {
       const { service, prisma } = buildService();
 
-      await service.criarManual("org-1", { name: "Minha campanha", platform: "GOOGLE", externalId: "123" });
+      await service.criarManual(autor("org-1"), { name: "Minha campanha", platform: "GOOGLE", externalId: "123" });
 
       expect(prisma.campaign.findFirst).toHaveBeenCalledWith({
         where: { organizationId: "org-1", externalId: "123" },
@@ -109,8 +114,8 @@ describe("CampaignsService", () => {
     it("deixa duas organizações usarem o mesmo id", async () => {
       const { service, prisma } = buildService();
 
-      await service.criarManual("org-1", { name: "Campanha da A", platform: "GOOGLE", externalId: "123" });
-      await service.criarManual("org-2", { name: "Campanha da B", platform: "GOOGLE", externalId: "123" });
+      await service.criarManual(autor("org-1"), { name: "Campanha da A", platform: "GOOGLE", externalId: "123" });
+      await service.criarManual(autor("org-2"), { name: "Campanha da B", platform: "GOOGLE", externalId: "123" });
 
       expect(prisma.campaign.create).toHaveBeenCalledTimes(2);
     });
@@ -120,7 +125,7 @@ describe("CampaignsService", () => {
       prisma.campaign.findFirst.mockResolvedValue({ id: "ja-existe" });
 
       await expect(
-        service.criarManual("org-1", { name: "Outra", platform: "GOOGLE", externalId: "123" }),
+        service.criarManual(autor("org-1"), { name: "Outra", platform: "GOOGLE", externalId: "123" }),
       ).rejects.toThrow("Já existe uma campanha sua com esse id");
       expect(prisma.campaign.create).not.toHaveBeenCalled();
     });
@@ -137,14 +142,14 @@ describe("CampaignsService", () => {
       // A conferência e a criação não são atômicas: dois envios seguidos do
       // mesmo formulário chegam aqui, e quem manda é a restrição do banco.
       await expect(
-        service.criarManual("org-1", { name: "Minha", platform: "GOOGLE", externalId: "123" }),
+        service.criarManual(autor("org-1"), { name: "Minha", platform: "GOOGLE", externalId: "123" }),
       ).rejects.toThrow("Já existe uma campanha sua com esse id");
     });
 
     it("gera um id próprio quando ninguém informa um", async () => {
       const { service, prisma } = buildService();
 
-      await service.criarManual("org-1", { name: "Sem id", platform: "GOOGLE" });
+      await service.criarManual(autor("org-1"), { name: "Sem id", platform: "GOOGLE" });
 
       const dados = prisma.campaign.create.mock.calls[0][0].data as { externalId: string };
       // O id gerado carrega a organização: dois clientes criando no mesmo

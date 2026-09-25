@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from "@nestjs/common";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { AppException } from "../common/exceptions/app-exception";
 import { situacaoDaVerba, SituacaoDaVerba } from "./calculo-da-verba";
+import { Autor, AuditoriaService } from "../auditoria/auditoria.service";
 import { SalvarVerbaDto } from "./dto/salvar-verba.dto";
 
 /**
@@ -15,7 +16,10 @@ import { SalvarVerbaDto } from "./dto/salvar-verba.dto";
  */
 @Injectable()
 export class BudgetsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditoria: AuditoriaService,
+  ) {}
 
   /** Todas as verbas, da mais recente para a mais antiga. */
   listar(organizationId: string) {
@@ -69,24 +73,31 @@ export class BudgetsService {
     return situacaoDaVerba(verba, gasto._sum.spendCents ?? 0, agora);
   }
 
-  async criar(organizationId: string, dto: SalvarVerbaDto) {
+  async criar(autor: Autor, dto: SalvarVerbaDto) {
     this.conferePeriodo(dto);
-    return this.prisma.budget.create({
+    const verba = await this.prisma.budget.create({
       data: {
-        organizationId,
+        organizationId: autor.organizationId,
         startsOn: new Date(`${dto.de}T00:00:00.000Z`),
         endsOn: dto.ate ? new Date(`${dto.ate}T00:00:00.000Z`) : null,
         amountCents: dto.valorCentavos,
         label: dto.rotulo?.trim() || null,
       },
     });
+    await this.auditoria.registra(autor, {
+      acao: "BUDGET_CREATED",
+      entidade: "Budget",
+      entidadeId: verba.id,
+      depois: resumoDaVerba(verba),
+    });
+    return verba;
   }
 
-  async atualizar(organizationId: string, id: string, dto: SalvarVerbaDto) {
+  async atualizar(autor: Autor, id: string, dto: SalvarVerbaDto) {
     this.conferePeriodo(dto);
-    await this.suaOuErro(organizationId, id);
+    const antes = await this.suaOuErro(autor.organizationId, id);
 
-    return this.prisma.budget.update({
+    const depois = await this.prisma.budget.update({
       where: { id },
       data: {
         startsOn: new Date(`${dto.de}T00:00:00.000Z`),
@@ -95,11 +106,25 @@ export class BudgetsService {
         label: dto.rotulo?.trim() || null,
       },
     });
+    await this.auditoria.registra(autor, {
+      acao: "BUDGET_UPDATED",
+      entidade: "Budget",
+      entidadeId: id,
+      antes: resumoDaVerba(antes),
+      depois: resumoDaVerba(depois),
+    });
+    return depois;
   }
 
-  async remover(organizationId: string, id: string): Promise<void> {
-    await this.suaOuErro(organizationId, id);
+  async remover(autor: Autor, id: string): Promise<void> {
+    const verba = await this.suaOuErro(autor.organizationId, id);
     await this.prisma.budget.delete({ where: { id } });
+    await this.auditoria.registra(autor, {
+      acao: "BUDGET_DELETED",
+      entidade: "Budget",
+      entidadeId: id,
+      antes: resumoDaVerba(verba),
+    });
   }
 
   /** O `organizationId` no filtro é o que impede mexer na verba de outro cliente. */
@@ -122,4 +147,14 @@ export class BudgetsService {
       );
     }
   }
+}
+
+/** A verba como a auditoria mostra: período, valor e nome, sem ids internos. */
+function resumoDaVerba(verba: { startsOn: Date; endsOn: Date | null; amountCents: number; label: string | null }) {
+  return {
+    de: verba.startsOn.toISOString().slice(0, 10),
+    ate: verba.endsOn ? verba.endsOn.toISOString().slice(0, 10) : null,
+    valorCentavos: verba.amountCents,
+    rotulo: verba.label,
+  };
 }

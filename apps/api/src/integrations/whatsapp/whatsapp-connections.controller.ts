@@ -5,12 +5,16 @@ import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { AuthenticatedUser } from "../../auth/jwt-payload.interface";
 import { WhatsAppConnectionsService } from "./whatsapp-connections.service";
 import { ConnectWhatsAppDto } from "./dto/connect-whatsapp.dto";
+import { AuditoriaService, autorDe } from "../../auditoria/auditoria.service";
 import { RegraDeLeadsDto } from "./dto/regra-de-leads.dto";
 
 @Controller("integrations/whatsapp")
 @UseGuards(JwtAuthGuard)
 export class WhatsAppConnectionsController {
-  constructor(private readonly whatsappConnectionsService: WhatsAppConnectionsService) {}
+  constructor(
+    private readonly whatsappConnectionsService: WhatsAppConnectionsService,
+    private readonly auditoria: AuditoriaService,
+  ) {}
 
   /**
    * Manual @Res() only because Nest sends an empty body (not the JSON text
@@ -36,20 +40,55 @@ export class WhatsAppConnectionsController {
     return this.whatsappConnectionsService.regra(user.organizationId);
   }
 
+  /*
+    A auditoria das integrações fica no controlador: o que ela precisa é o
+    estado como a tela o vê, antes e depois, e isso é o que `getCurrent` e
+    `regra` já devolvem, sem token nenhum.
+  */
   @Patch("regra")
-  mudaRegra(@CurrentUser() user: AuthenticatedUser, @Body() dto: RegraDeLeadsDto) {
-    return this.whatsappConnectionsService.mudaRegra(user.organizationId, dto.origemDosLeads);
+  async mudaRegra(@CurrentUser() user: AuthenticatedUser, @Body() dto: RegraDeLeadsDto) {
+    const antes = await this.whatsappConnectionsService.regra(user.organizationId);
+    const depois = await this.whatsappConnectionsService.mudaRegra(user.organizationId, dto.origemDosLeads);
+    if (antes.origemDosLeads !== depois.origemDosLeads) {
+      await this.auditoria.registra(autorDe(user), {
+        acao: "INTEGRATION_UPDATED",
+        entidade: "Organization",
+        entidadeId: user.organizationId,
+        antes: { integracao: "WhatsApp", quemViraLead: antes.origemDosLeads },
+        depois: { integracao: "WhatsApp", quemViraLead: depois.origemDosLeads },
+      });
+    }
+    return depois;
   }
 
   @Post("connect")
-  connect(@CurrentUser() user: AuthenticatedUser, @Body() dto: ConnectWhatsAppDto) {
-    return this.whatsappConnectionsService.connect(user.organizationId, dto);
+  async connect(@CurrentUser() user: AuthenticatedUser, @Body() dto: ConnectWhatsAppDto) {
+    const conexao = await this.whatsappConnectionsService.connect(user.organizationId, dto);
+    await this.auditoria.registra(autorDe(user), {
+      acao: "INTEGRATION_CONNECTED",
+      entidade: "WhatsAppConnection",
+      entidadeId: conexao?.id ?? user.organizationId,
+      depois: { integracao: "WhatsApp", forma: "API oficial", numero: conexao?.displayPhoneNumber ?? null },
+    });
+    return conexao;
   }
 
-  /** Fase 8: inicia (ou reinicia) uma conexão por QR Code e já devolve o primeiro QR. */
+  /**
+   * Fase 8: inicia (ou reinicia) uma conexão por QR Code e já devolve o primeiro QR.
+   *
+   * Registrado aqui, quando alguém pede o QR: a leitura no celular chega
+   * depois, pelo webhook, sem pessoa nenhuma por trás para constar.
+   */
   @Post("qr/connect")
-  connectViaQrCode(@CurrentUser() user: AuthenticatedUser) {
-    return this.whatsappConnectionsService.connectViaQrCode(user.organizationId);
+  async connectViaQrCode(@CurrentUser() user: AuthenticatedUser) {
+    const resultado = await this.whatsappConnectionsService.connectViaQrCode(user.organizationId);
+    await this.auditoria.registra(autorDe(user), {
+      acao: "INTEGRATION_CONNECTED",
+      entidade: "WhatsAppConnection",
+      entidadeId: user.organizationId,
+      depois: { integracao: "WhatsApp", forma: "QR Code", status: "aguardando leitura" },
+    });
+    return resultado;
   }
 
   /**
@@ -64,6 +103,13 @@ export class WhatsAppConnectionsController {
   @Post("disconnect")
   @HttpCode(HttpStatus.NO_CONTENT)
   async disconnect(@CurrentUser() user: AuthenticatedUser): Promise<void> {
+    const antes = await this.whatsappConnectionsService.getCurrent(user.organizationId);
     await this.whatsappConnectionsService.disconnect(user.organizationId);
+    await this.auditoria.registra(autorDe(user), {
+      acao: "INTEGRATION_DISCONNECTED",
+      entidade: "WhatsAppConnection",
+      entidadeId: antes?.id ?? user.organizationId,
+      antes: { integracao: "WhatsApp", numero: antes?.displayPhoneNumber ?? null },
+    });
   }
 }

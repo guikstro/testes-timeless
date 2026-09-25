@@ -4,6 +4,7 @@ import { AbaOperacao } from "./aba-operacao";
 import { AbaAparencia } from "./aba-aparencia";
 import { AbaSeguranca } from "./aba-seguranca";
 import { AbaEquipe } from "./aba-equipe";
+import { AbaAuditoria } from "./aba-auditoria";
 import { Papel } from "./papeis";
 
 /*
@@ -16,7 +17,11 @@ const ABAS = [
   { chave: "equipe", rotulo: "Equipe" },
   { chave: "aparencia", rotulo: "Aparência" },
   { chave: "seguranca", rotulo: "Segurança" },
+  { chave: "auditoria", rotulo: "Auditoria" },
 ] as const;
+
+/** Só dono e administrador veem a auditoria; é a mesma regra da API. */
+const PAPEIS_QUE_VEEM_AUDITORIA: Papel[] = ["OWNER", "ADMIN"];
 
 type Aba = (typeof ABAS)[number]["chave"];
 
@@ -29,19 +34,21 @@ interface Sessao {
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ aba?: string }>;
+  searchParams: Promise<{ aba?: string; categoria?: string; pessoa?: string; depoisDe?: string }>;
 }) {
-  const { aba } = await searchParams;
-  const atual: Aba = ABAS.some((opcao) => opcao.chave === aba) ? (aba as Aba) : "operacao";
+  const { aba, categoria, pessoa, depoisDe } = await searchParams;
 
-  // A sessão diz quem é você e o que você pode: as três abas dependem disso,
+  // A sessão diz quem é você e o que você pode: as abas dependem disso,
   // então vem antes de escolher o que buscar.
   const sessao = await apiFetch<Sessao>("/auth/session");
+
+  const abas = ABAS.filter((opcao) => opcao.chave !== "auditoria" || PAPEIS_QUE_VEEM_AUDITORIA.includes(sessao.role));
+  const atual: Aba = abas.some((opcao) => opcao.chave === aba) ? (aba as Aba) : "operacao";
 
   return (
     <div className="mx-auto max-w-4xl">
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Configurações</h1>
-      <p className="mt-1 text-corpo text-ink-mute">Identidade, gatilhos, credenciais e quem tem acesso.</p>
+      <p className="mt-1 text-corpo text-ink-mute">Identidade, gatilhos, credenciais, quem tem acesso e o que foi feito.</p>
 
       {/*
         Abas em vez de uma página só. O conteúdo já não cabia numa rolagem
@@ -51,7 +58,7 @@ export default async function SettingsPage({
       <div className="my-6">
         <GrupoDePilulas
           ativo={atual}
-          opcoes={ABAS.map((opcao) => ({
+          opcoes={abas.map((opcao) => ({
             chave: opcao.chave,
             rotulo: opcao.rotulo,
             href: `/settings?aba=${opcao.chave}`,
@@ -66,6 +73,7 @@ export default async function SettingsPage({
         <AbaSeguranca emailAtual={sessao.user.email} impersonando={sessao.impersonating} />
       ) : null}
       {atual === "equipe" ? <AbaEquipe euId={sessao.user.id} meuPapel={sessao.role} /> : null}
+      {atual === "auditoria" ? <AbaAuditoria filtro={{ categoria, pessoa, depoisDe }} /> : null}
     </div>
   );
 }

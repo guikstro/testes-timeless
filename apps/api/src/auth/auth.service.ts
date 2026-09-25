@@ -20,6 +20,7 @@ import { ChangeEmailDto } from "./dto/change-email.dto";
 import { enderecoDaAplicacao } from "../common/configuracao/ambiente";
 import { EmailService } from "../common/email/email.service";
 import { confirmacaoDeEmail, emailAlterado, recuperacaoDeSenha, senhaAlterada } from "../common/email/mensagens";
+import { AuditoriaService } from "../auditoria/auditoria.service";
 import { AuthenticatedUser, JwtPayload } from "./jwt-payload.interface";
 
 const ACCESS_TOKEN_TTL = "15m";
@@ -77,6 +78,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly email: EmailService,
     private readonly mfa: MfaService,
+    private readonly auditoria: AuditoriaService,
   ) {}
 
   async register(dto: RegisterDto, contexto?: ContextoDoCliente): Promise<TokenPair> {
@@ -149,6 +151,16 @@ export class AuthService {
     // pagar o mesmo custo de bcrypt: separar as duas respostas transformaria
     // o login num verificador de quem já teve conta aqui.
     if (!user || user.deletedAt || !passwordMatches) {
+      // Senha errada de uma conta que existe fica registrada na organização
+      // em que ela entraria: várias seguidas são o sinal de alguém tentando.
+      // E-mail desconhecido não tem organização nenhuma a quem avisar.
+      const alvo = user && !user.deletedAt ? escolheVinculo(user.memberships, dto.organizationId) : undefined;
+      if (user && alvo) {
+        this.auditoria.registraSemEsperar(
+          { organizationId: alvo.organizationId, userId: user.id },
+          { acao: "LOGIN_FAILED", entidade: "User", entidadeId: user.id, depois: { motivo: "senha incorreta" } },
+        );
+      }
       throw new AppException("INVALID_CREDENTIALS", "E-mail ou senha inválidos.", HttpStatus.UNAUTHORIZED);
     }
 
@@ -160,9 +172,7 @@ export class AuthService {
       );
     }
 
-    const membership = dto.organizationId
-      ? user.memberships.find((m) => m.organizationId === dto.organizationId)
-      : user.memberships[0];
+    const membership = escolheVinculo(user.memberships, dto.organizationId);
 
     if (!membership) {
       throw new AppException(
@@ -189,7 +199,12 @@ export class AuthService {
       };
     }
 
-    return this.issueTokenPair(user.id, membership.organizationId, membership.role, undefined, { contexto });
+    const par = await this.issueTokenPair(user.id, membership.organizationId, membership.role, undefined, { contexto });
+    await this.auditoria.registra(
+      { organizationId: membership.organizationId, userId: user.id },
+      { acao: "LOGIN_SUCCEEDED", entidade: "User", entidadeId: user.id, depois: { segundoFator: false } },
+    );
+    return par;
   }
 
   /**
@@ -217,7 +232,18 @@ export class AuthService {
       throw new AppException("DESAFIO_INVALIDO", "Requisição inválida.", HttpStatus.UNAUTHORIZED);
     }
 
+    const autor = { organizationId: payload.organizationId, userId: payload.sub };
+
     if (!(await this.mfa.confereSegundoFator(payload.sub, codigo))) {
+      // A senha já estava certa: código errado aqui é alguém que tem a senha
+      // e não tem o celular, que é exatamente o caso que o fator existe para
+      // barrar, e o que mais vale registrar.
+      this.auditoria.registraSemEsperar(autor, {
+        acao: "LOGIN_FAILED",
+        entidade: "User",
+        entidadeId: payload.sub,
+        depois: { motivo: "código do segundo fator incorreto" },
+      });
       throw new AppException(
         "MFA_CODIGO_INVALIDO",
         "Código inválido. Use o código atual do aplicativo ou um código de recuperação.",
@@ -225,7 +251,14 @@ export class AuthService {
       );
     }
 
-    return this.issueTokenPair(payload.sub, payload.organizationId, payload.role, undefined, { contexto });
+    const par = await this.issueTokenPair(payload.sub, payload.organizationId, payload.role, undefined, { contexto });
+    await this.auditoria.registra(autor, {
+      acao: "LOGIN_SUCCEEDED",
+      entidade: "User",
+      entidadeId: payload.sub,
+      depois: { segundoFator: true },
+    });
+    return par;
   }
 
   /**
@@ -242,6 +275,7 @@ export class AuthService {
     }
 
     await this.mfa.desativar(userId, codigo);
+    await this.auditoria.registraParaAPessoa(userId, { acao: "MFA_DISABLED", entidade: "User", entidadeId: userId });
   }
 
   async refresh(refreshToken: string, contexto?: ContextoDoCliente): Promise<TokenPair> {
@@ -377,7 +411,10 @@ export class AuthService {
     const tokenHash = hashToken(refreshToken);
     const stored = await this.prisma.refreshToken.findUnique({
       where: { tokenHash },
-      select: { sessaoId: true },
+      select: {
+        sessaoId: true,
+        sessao: { select: { userId: true, organizationId: true, impersonando: true, encerradaEm: true } },
+      },
     });
 
     await this.prisma.refreshToken.updateMany({
@@ -392,6 +429,20 @@ export class AuthService {
         where: { id: stored.sessaoId, encerradaEm: null },
         data: { encerradaEm: new Date(), motivoDoEncerramento: "saiu" },
       });
+    }
+
+    // Só a primeira saída de uma sessão aberta: um segundo clique, ou o
+    // cookie velho de uma sessão que já caiu, não é uma saída nova.
+    const sessao = stored?.sessao;
+    if (sessao && !sessao.encerradaEm) {
+      await this.auditoria.registra(
+        { organizationId: sessao.organizationId, userId: sessao.userId, impersonating: sessao.impersonando },
+        {
+          acao: sessao.impersonando ? "IMPERSONATION_ENDED" : "LOGOUT",
+          entidade: "Sessao",
+          entidadeId: stored.sessaoId!,
+        },
+      );
     }
   }
 
@@ -457,6 +508,13 @@ export class AuthService {
       // confirmação e levaria o login junto. Retomar a senha o cancela.
       this.prisma.emailChangeToken.deleteMany({ where: { userId: stored.userId, usedAt: null } }),
     ]);
+
+    await this.auditoria.registraParaAPessoa(stored.userId, {
+      acao: "PASSWORD_RESET",
+      entidade: "User",
+      entidadeId: stored.userId,
+      depois: { pelo: "link de recuperação por e-mail" },
+    });
   }
 
 
@@ -511,6 +569,7 @@ export class AuthService {
     // É assim que a pessoa descobre no mesmo dia que perdeu a conta, em vez
     // de na próxima vez que tentar entrar.
     await this.email.enfileirar(senhaAlterada(user.email, user.name));
+    await this.auditoria.registraParaAPessoa(user.id, { acao: "PASSWORD_CHANGED", entidade: "User", entidadeId: user.id });
 
     return this.issueTokenPair(user.id, quem.organizationId, quem.role, undefined, { contexto });
   }
@@ -628,6 +687,13 @@ export class AuthService {
       canal que ainda alcança o dono legítimo depois de uma tomada de conta.
     */
     await this.email.enfileirar(emailAlterado(emailAntigo, stored.user.name, stored.newEmail));
+    await this.auditoria.registraParaAPessoa(stored.userId, {
+      acao: "EMAIL_CHANGED",
+      entidade: "User",
+      entidadeId: stored.userId,
+      antes: { email: emailAntigo },
+      depois: { email: stored.newEmail },
+    });
   }
 
 
@@ -770,4 +836,12 @@ export class AuthService {
       data: { encerradaEm: new Date(), motivoDoEncerramento: motivo },
     });
   }
+}
+
+/**
+ * O vínculo em que o login entra: o pedido, quando veio, ou o primeiro. O
+ * mesmo cálculo serve para saber onde registrar uma senha errada.
+ */
+function escolheVinculo<T extends { organizationId: string }>(vinculos: T[], pedido?: string): T | undefined {
+  return pedido ? vinculos.find((v) => v.organizationId === pedido) : vinculos[0];
 }

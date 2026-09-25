@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { AppException } from "../../common/exceptions/app-exception";
 import { AuthenticatedUser } from "../jwt-payload.interface";
+import { AuditoriaService } from "../../auditoria/auditoria.service";
 import { descreveAparelho, rotuloDoAparelho } from "./descreve-aparelho";
 
 export interface SessaoNaTela {
@@ -27,7 +28,10 @@ export interface SessaoNaTela {
  */
 @Injectable()
 export class SessoesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditoria: AuditoriaService,
+  ) {}
 
   async listar(quem: AuthenticatedUser): Promise<SessaoNaTela[]> {
     const sessoes = await this.prisma.sessao.findMany({
@@ -103,6 +107,13 @@ export class SessoesService {
     if (encerradas.count === 0) {
       throw new AppException("NAO_ENCONTRADA", "Sessão não encontrada.", HttpStatus.NOT_FOUND);
     }
+
+    await this.auditoria.registraParaAPessoa(quem.userId, {
+      acao: "SESSIONS_ENDED",
+      entidade: "Sessao",
+      entidadeId: sessaoId,
+      depois: { encerradas: 1 },
+    });
   }
 
   /**
@@ -132,6 +143,15 @@ export class SessoesService {
         data: { revokedAt: new Date() },
       }),
     ]);
+
+    if (encerradas.count > 0) {
+      await this.auditoria.registraParaAPessoa(quem.userId, {
+        acao: "SESSIONS_ENDED",
+        entidade: "User",
+        entidadeId: quem.userId,
+        depois: { encerradas: encerradas.count, todasAsOutras: true },
+      });
+    }
 
     return { encerradas: encerradas.count };
   }

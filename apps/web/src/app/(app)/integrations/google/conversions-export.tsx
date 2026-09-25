@@ -9,7 +9,7 @@ import { GrupoDePilulas } from "@/components/ui/pill-group";
 import { formatCentsAsBRL } from "@/lib/currency";
 import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
 import { contaExportaveis, LinhaDeConversao, montaCsv, NomesDasAcoes } from "@/lib/google/conversoes-csv";
-import { EstadoDasAcoes, salvarAcoesDeConversao } from "./conversion-actions";
+import { EstadoDasAcoes, registraExportacao, salvarAcoesDeConversao } from "./conversion-actions";
 import { PERIODOS } from "./periodos";
 
 const inicial: EstadoDasAcoes = {};
@@ -42,6 +42,7 @@ export function ConversionsExport({
     link.download = `conversoes-google-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+    void registraExportacao(dias, exportaveis);
   }
 
   return (

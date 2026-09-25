@@ -1,3 +1,4 @@
+import { AuditoriaService } from "../auditoria/auditoria.service";
 import { AdminService } from "./admin.service";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { AuthService } from "../auth/auth.service";
@@ -19,7 +20,11 @@ describe("AdminService", () => {
     const auth = {
       issueTokenPair: jest.fn().mockResolvedValue({ accessToken: "access", refreshToken: "refresh" }),
     };
-    const service = new AdminService(prisma as unknown as PrismaService, auth as unknown as AuthService);
+    const service = new AdminService(
+      prisma as unknown as PrismaService,
+      auth as unknown as AuthService,
+      new AuditoriaService(prisma as unknown as PrismaService),
+    );
     return { service, prisma, auth };
   }
 
@@ -122,6 +127,7 @@ describe("AdminService", () => {
     it("records the access in the audit log", async () => {
       const { service, prisma } = buildService();
       prisma.organization.findFirst.mockResolvedValue({ id: "org-1", name: "Cliente A" });
+      prisma.user.findUnique.mockResolvedValue({ name: "Operador", email: "op@timeless.local" });
 
       await service.impersonate("admin-1", "org-1");
 
@@ -130,6 +136,10 @@ describe("AdminService", () => {
           organizationId: "org-1",
           userId: "admin-1",
           action: "IMPERSONATION_STARTED",
+          // O nome vai copiado e a entrada fica marcada como do suporte: é
+          // assim que o cliente distingue a visita da própria equipe.
+          autorNome: "Operador",
+          viaSuporte: true,
         }),
       });
     });

@@ -5,6 +5,7 @@ import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { OrganizationsService } from "./organizations.service";
 import { UpdateOrganizationDto } from "./dto/update-organization.dto";
 import { UpdateMemberDto } from "./dto/update-member.dto";
+import { autorDe } from "../auditoria/auditoria.service";
 import { EnviarLogoDto } from "./dto/enviar-logo.dto";
 
 @Controller("organizations")
@@ -19,7 +20,7 @@ export class OrganizationsController {
 
   @Patch("current")
   updateCurrent(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateOrganizationDto) {
-    return this.organizationsService.updateCurrent(user.organizationId, dto);
+    return this.organizationsService.updateCurrent(autorDe(user), dto);
   }
 
   /** Quem da equipe da plataforma entrou nesta conta — visível para o próprio cliente. */
@@ -53,11 +54,11 @@ export class OrganizationsController {
 
   @Post("current/logo")
   enviarLogo(@CurrentUser() user: AuthenticatedUser, @Body() dto: EnviarLogoDto) {
-    return this.organizationsService.enviarLogo(user.organizationId, dto.arquivo);
+    return this.organizationsService.enviarLogo(autorDe(user), dto.arquivo);
   }
 
   @Delete("current/logo")
   removerLogo(@CurrentUser() user: AuthenticatedUser) {
-    return this.organizationsService.removerLogo(user.organizationId);
+    return this.organizationsService.removerLogo(autorDe(user));
   }
 }

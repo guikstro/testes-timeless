@@ -6,6 +6,7 @@ import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { UpdateOrganizationDto } from "./dto/update-organization.dto";
 import { ArmazenamentoService } from "./upload/armazenamento.service";
 import { ErroDaImagem, validaImagem } from "./upload/imagem-enviada";
+import { Autor, AuditoriaService, autorDe } from "../auditoria/auditoria.service";
 import { enderecoPublico } from "../common/configuracao/ambiente";
 
 @Injectable()
@@ -13,6 +14,7 @@ export class OrganizationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly armazenamento: ArmazenamentoService,
+    private readonly auditoria: AuditoriaService,
   ) {}
 
   /**
@@ -30,8 +32,9 @@ export class OrganizationsService {
     return organization;
   }
 
-  async updateCurrent(organizationId: string, dto: UpdateOrganizationDto) {
-    await this.getCurrent(organizationId);
+  async updateCurrent(autor: Autor, dto: UpdateOrganizationDto) {
+    const organizationId = autor.organizationId;
+    const atual = await this.getCurrent(organizationId);
 
     // Uma janela invertida faria toda espera contar como zero, sem erro
     // visível: o número simplesmente ficaria bom demais para ser verdade.
@@ -47,7 +50,7 @@ export class OrganizationsService {
       );
     }
 
-    return this.prisma.organization.update({
+    const atualizada = await this.prisma.organization.update({
       where: { id: organizationId },
       data: {
         ...dto,
@@ -59,6 +62,26 @@ export class OrganizationsService {
         ...(dto.googleConversionWon === "" ? { googleConversionWon: null } : {}),
       },
     });
+
+    // Só os campos que o pedido tocou, e o valor de cada um antes e depois:
+    // o registro inteiro da organização esconderia a mudança no meio de
+    // vinte campos iguais.
+    // Só os que vieram de fato: a validação cria o objeto com todos os campos
+    // declarados, e os ausentes chegam como `undefined`.
+    const campos = (Object.keys(dto) as (keyof UpdateOrganizationDto)[]).filter((c) => dto[c] !== undefined);
+    const antes = Object.fromEntries(campos.map((c) => [c, atual[c as keyof typeof atual] ?? null]));
+    const depois = Object.fromEntries(campos.map((c) => [c, atualizada[c as keyof typeof atualizada] ?? null]));
+    if (JSON.stringify(antes) !== JSON.stringify(depois)) {
+      await this.auditoria.registra(autor, {
+        acao: "ORGANIZATION_UPDATED",
+        entidade: "Organization",
+        entidadeId: organizationId,
+        antes,
+        depois,
+      });
+    }
+
+    return atualizada;
   }
 
 
@@ -78,7 +101,8 @@ export class OrganizationsService {
    * organização apontando para um arquivo que não existe mais, e a logo
    * sumiria de todas as telas.
    */
-  async enviarLogo(organizationId: string, arquivo: string) {
+  async enviarLogo(autor: Autor, arquivo: string) {
+    const organizationId = autor.organizationId;
     const atual = await this.getCurrent(organizationId);
 
     const resultado = validaImagem(arquivo);
@@ -98,17 +122,32 @@ export class OrganizationsService {
     });
 
     await this.armazenamento.apagarPelaUrl(atual.logoUrl);
+    await this.auditoria.registra(autor, {
+      acao: "ORGANIZATION_UPDATED",
+      entidade: "Organization",
+      entidadeId: organizationId,
+      antes: { logoUrl: atual.logoUrl },
+      depois: { logoUrl: atualizada.logoUrl },
+    });
     return atualizada;
   }
 
   /** Remove a logo e o arquivo, voltando à inicial do nome. */
-  async removerLogo(organizationId: string) {
+  async removerLogo(autor: Autor) {
+    const organizationId = autor.organizationId;
     const atual = await this.getCurrent(organizationId);
     const atualizada = await this.prisma.organization.update({
       where: { id: organizationId },
       data: { logoUrl: null },
     });
     await this.armazenamento.apagarPelaUrl(atual.logoUrl);
+    await this.auditoria.registra(autor, {
+      acao: "ORGANIZATION_UPDATED",
+      entidade: "Organization",
+      entidadeId: organizationId,
+      antes: { logoUrl: atual.logoUrl },
+      depois: { logoUrl: null },
+    });
     return atualizada;
   }
 
@@ -121,7 +160,7 @@ export class OrganizationsService {
    * como todo o resto — um cliente nunca enxerga os acessos de outro.
    */
   async listSupportAccesses(organizationId: string) {
-    return this.prisma.auditLog.findMany({
+    const acessos = await this.prisma.auditLog.findMany({
       where: { organizationId, action: "IMPERSONATION_STARTED" },
       orderBy: { createdAt: "desc" },
       take: 50,
@@ -130,8 +169,16 @@ export class OrganizationsService {
         createdAt: true,
         // Nome e e-mail de quem entrou; nunca o id interno do operador.
         user: { select: { name: true, email: true } },
+        autorNome: true,
+        autorEmail: true,
       },
     });
+    // O nome copiado no registro vale quando o operador já não existe: a
+    // visita aconteceu, e quem a fez continua sendo informação do cliente.
+    return acessos.map(({ autorNome, autorEmail, user, ...acesso }) => ({
+      ...acesso,
+      user: user ?? (autorNome && autorEmail ? { name: autorNome, email: autorEmail } : null),
+    }));
   }
 
   /** Quem está na organização. Todo mundo de dentro pode ver com quem divide a conta. */
@@ -194,16 +241,16 @@ export class OrganizationsService {
       data: { role },
     });
 
-    await this.prisma.auditLog.create({
-      data: {
-        organizationId: quem.organizationId,
-        userId: quem.userId,
-        entity: "Membership",
-        entityId: alvoUserId,
-        action: "MEMBER_ROLE_CHANGED",
-        before: { role: alvo.role },
-        after: { role },
-      },
+    const pessoa = await this.prisma.user.findUnique({
+      where: { id: alvoUserId },
+      select: { name: true, email: true },
+    });
+    await this.auditoria.registra(autorDe(quem), {
+      acao: "MEMBER_ROLE_CHANGED",
+      entidade: "Membership",
+      entidadeId: alvoUserId,
+      antes: { role: alvo.role, nome: pessoa?.name ?? null, email: pessoa?.email ?? null },
+      depois: { role },
     });
 
     return { userId: alvoUserId, role };
@@ -234,10 +281,19 @@ export class OrganizationsService {
       await this.exigeOutroDono(quem.organizationId, alvoUserId);
     }
 
-    await this.prisma.$transaction([
-      this.prisma.membership.delete({
+    // O nome de quem saiu vai para o registro: depois da remoção, o id sozinho
+    // não diz nada a quem lê a auditoria.
+    const pessoa = await this.prisma.user.findUnique({
+      where: { id: alvoUserId },
+      select: { name: true, email: true },
+    });
+
+    // Transação interativa, e não a lista de antes, para o registro de
+    // auditoria entrar junto: se ele falhar, a remoção não acontece.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.membership.delete({
         where: { organizationId_userId: { organizationId: quem.organizationId, userId: alvoUserId } },
-      }),
+      });
       // As sessões abertas dela caem junto: sem isto, quem foi removido
       // continuaria dentro do sistema até o token expirar.
       /*
@@ -250,32 +306,32 @@ export class OrganizationsService {
         As renovações sem sessão, de antes desta mudança, continuam caindo
         todas: sem saber a organização delas, derrubar é o lado seguro.
       */
-      this.prisma.refreshToken.updateMany({
+      await tx.refreshToken.updateMany({
         where: {
           userId: alvoUserId,
           revokedAt: null,
           OR: [{ sessaoId: null }, { sessao: { organizationId: quem.organizationId } }],
         },
         data: { revokedAt: new Date() },
-      }),
+      });
       // E a sessão, não só a renovação: sem isto o token de acesso de quem foi
       // removido seguia valendo por até quinze minutos, que é o que o
       // comentário acima prometia que não aconteceria.
-      this.prisma.sessao.updateMany({
+      await tx.sessao.updateMany({
         where: { userId: alvoUserId, organizationId: quem.organizationId, encerradaEm: null },
         data: { encerradaEm: new Date(), motivoDoEncerramento: "removido da organização" },
-      }),
-      this.prisma.auditLog.create({
-        data: {
-          organizationId: quem.organizationId,
-          userId: quem.userId,
-          entity: "Membership",
-          entityId: alvoUserId,
-          action: "MEMBER_REMOVED",
-          before: { role: alvo.role },
+      });
+      await this.auditoria.registra(
+        autorDe(quem),
+        {
+          acao: "MEMBER_REMOVED",
+          entidade: "Membership",
+          entidadeId: alvoUserId,
+          antes: { role: alvo.role, nome: pessoa?.name ?? null, email: pessoa?.email ?? null },
         },
-      }),
-    ]);
+        tx,
+      );
+    });
   }
 
   private exigeGestao(quem: AuthenticatedUser): void {

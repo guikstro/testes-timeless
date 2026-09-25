@@ -3,6 +3,7 @@ import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { BudgetsService } from "./budgets.service";
+import { autorDe } from "../auditoria/auditoria.service";
 import { SalvarVerbaDto } from "./dto/salvar-verba.dto";
 
 @Controller("verbas")
@@ -23,17 +24,17 @@ export class BudgetsController {
 
   @Post()
   criar(@CurrentUser() user: AuthenticatedUser, @Body() dto: SalvarVerbaDto) {
-    return this.verbas.criar(user.organizationId, dto);
+    return this.verbas.criar(autorDe(user), dto);
   }
 
   @Patch(":id")
   atualizar(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() dto: SalvarVerbaDto) {
-    return this.verbas.atualizar(user.organizationId, id, dto);
+    return this.verbas.atualizar(autorDe(user), id, dto);
   }
 
   @Delete(":id")
   @HttpCode(HttpStatus.NO_CONTENT)
   async remover(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string): Promise<void> {
-    await this.verbas.remover(user.organizationId, id);
+    await this.verbas.remover(autorDe(user), id);
   }
 }

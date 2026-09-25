@@ -1,3 +1,4 @@
+import { AuditoriaService } from "../auditoria/auditoria.service";
 import { OrganizationsService } from "./organizations.service";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
@@ -17,8 +18,12 @@ describe("OrganizationsService, gestão da equipe", () => {
       refreshToken: { updateMany: jest.fn() },
       sessao: { updateMany: jest.fn() },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
-      $transaction: jest.fn().mockResolvedValue([]),
+      user: { findUnique: jest.fn().mockResolvedValue({ name: "Bia", email: "bia@x.com" }) },
+      $transaction: jest.fn(),
     };
+    // A remoção roda numa transação interativa: o callback recebe o próprio
+    // mock, e o teste confere as escritas que aconteceram dentro dela.
+    prisma.$transaction.mockImplementation((executar: (tx: typeof prisma) => unknown) => executar(prisma));
     const armazenamento = {
       guardar: jest.fn().mockResolvedValue("abc.png"),
       apagarPelaUrl: jest.fn().mockResolvedValue(undefined),
@@ -29,6 +34,7 @@ describe("OrganizationsService, gestão da equipe", () => {
       service: new OrganizationsService(
         prisma as unknown as PrismaService,
         armazenamento as unknown as ArmazenamentoService,
+        new AuditoriaService(prisma as unknown as PrismaService),
       ),
       prisma,
       armazenamento,
@@ -89,9 +95,20 @@ describe("OrganizationsService, gestão da equipe", () => {
 
       await service.removeMember(quem(), "outro");
 
-      const operacoes = prisma.$transaction.mock.calls[0][0];
-      expect(operacoes).toHaveLength(4);
+      // Tudo numa transação só, a auditoria junto: se o registro falhar, a
+      // remoção não acontece.
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       expect(prisma.membership.delete).toHaveBeenCalled();
+      expect(prisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: "MEMBER_REMOVED",
+            // O nome de quem saiu fica no registro: depois da remoção, o id
+            // sozinho não diz nada a quem lê.
+            before: { role: "MEMBER", nome: "Bia", email: "bia@x.com" },
+          }),
+        }),
+      );
       // A conta continua existindo: leads, mensagens e auditoria apontam para
       // ela, e apagá-la reescreveria o histórico de quem fez o quê.
 
@@ -159,7 +176,7 @@ describe("OrganizationsService, gestão da equipe", () => {
         expect.objectContaining({
           data: expect.objectContaining({
             action: "MEMBER_ROLE_CHANGED",
-            before: { role: "MEMBER" },
+            before: { role: "MEMBER", nome: "Bia", email: "bia@x.com" },
             after: { role: "ADMIN" },
           }),
         }),

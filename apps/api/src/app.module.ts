@@ -28,6 +28,8 @@ import { ControleDeAnunciosModule } from "./integrations/meta/controle-de-anunci
 import { NotificationsStreamModule } from "./notifications/notifications-stream.module";
 import { ConversationsModule } from "./conversations/conversations.module";
 import { TelemetriaModule } from "./telemetria/telemetria.module";
+import { AuditoriaModule } from "./auditoria/auditoria.module";
+import { OrigemDaRequisicaoMiddleware } from "./auditoria/contexto-da-requisicao";
 import { GoogleConversionsModule } from "./integrations/google/google-conversions.module";
 
 @Module({
@@ -44,6 +46,7 @@ import { GoogleConversionsModule } from "./integrations/google/google-conversion
       useFactory: (storage: RedisThrottlerStorage) => ({ throttlers: [PADRAO], storage }),
     }),
     PrismaModule,
+    AuditoriaModule,
     EncryptionModule,
     EmailModule,
     AuthModule,
@@ -77,5 +80,7 @@ export class AppModule implements NestModule {
     // Em tudo: o identificador precisa existir antes de qualquer erro, e um
     // erro pode acontecer em qualquer rota.
     consumer.apply(IdDaRequisicaoMiddleware).forRoutes("*");
+    // Também em tudo: é de onde a auditoria tira o IP e o aparelho.
+    consumer.apply(OrigemDaRequisicaoMiddleware).forRoutes("*");
   }
 }

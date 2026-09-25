@@ -1,3 +1,4 @@
+import { AuditoriaService } from "../auditoria/auditoria.service";
 import { LeadsService } from "./leads.service";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { AppException } from "../common/exceptions/app-exception";
@@ -11,6 +12,7 @@ describe("LeadsService", () => {
       message: { findMany: jest.fn().mockResolvedValue([]), create: jest.fn() },
       sale: { create: jest.fn(), update: jest.fn() },
       auditLog: { create: jest.fn() },
+      user: { findUnique: jest.fn().mockResolvedValue({ name: "Ana", email: "ana@x.com" }) },
       whatsAppConnection: { findUnique: jest.fn() },
       conversation: { findFirst: jest.fn(), update: jest.fn() },
       ad: { findFirst: jest.fn() },
@@ -29,6 +31,7 @@ describe("LeadsService", () => {
       conversionEvents as unknown as ConversionEventsService,
       sendQueue as never,
       notifications as never,
+      new AuditoriaService(prisma as unknown as PrismaService),
     );
     return { service, prisma, conversionEvents, sendQueue, notifications };
   }
