@@ -304,4 +304,21 @@ describe("AdminService", () => {
       );
     });
   });
+
+  describe("criaCliente", () => {
+    it("recusa a cor que já é de outro cliente, sem criar nada", async () => {
+      const { service, prisma } = buildService();
+      prisma.organization.findFirst.mockResolvedValue({ name: "Clínica Sorriso" });
+      const transacao = jest.fn();
+      (prisma as unknown as { $transaction: jest.Mock }).$transaction = transacao;
+
+      await expect(service.criaCliente("op-1", "Acme", "#2563eb")).rejects.toMatchObject({
+        response: { code: "COR_EM_USO" },
+      });
+      expect(prisma.organization.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { deletedAt: null, brandColor: { equals: "#2563eb", mode: "insensitive" } } }),
+      );
+      expect(transacao).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -285,13 +285,27 @@ export class AdminService {
     return { items, total, offset, limit };
   }
 
-  async criaCliente(operadorId: string, nome: string): Promise<{ id: string; name: string }> {
+  /** A cor identifica o cliente nas telas da equipe, então não se repete entre clientes ativos. */
+  async criaCliente(operadorId: string, nome: string, cor: string): Promise<{ id: string; name: string }> {
+    // ponytail: conferência fora da transação, dois cadastros simultâneos com a
+    // mesma cor passam. Índice único parcial no banco se isso virar problema.
+    const jaUsada = await this.prisma.organization.findFirst({
+      where: { deletedAt: null, brandColor: { equals: cor, mode: "insensitive" } },
+      select: { name: true },
+    });
+    if (jaUsada) {
+      throw new AppException("COR_EM_USO", `Essa cor já é do cliente ${jaUsada.name}. Escolha outra.`, HttpStatus.CONFLICT);
+    }
+
     const cliente = await this.prisma.$transaction(async (tx) =>
-      tx.organization.create({ data: { name: nome, slug: await slugLivre(tx, nome) }, select: { id: true, name: true } }),
+      tx.organization.create({
+        data: { name: nome, brandColor: cor, slug: await slugLivre(tx, nome) },
+        select: { id: true, name: true },
+      }),
     );
     await this.auditoria.registra(
       { organizationId: cliente.id, userId: operadorId, impersonating: true },
-      { acao: "ORGANIZATION_UPDATED", entidade: "Organization", entidadeId: cliente.id, antes: null, depois: { nome, criadaPor: "painel da plataforma" } },
+      { acao: "ORGANIZATION_UPDATED", entidade: "Organization", entidadeId: cliente.id, antes: null, depois: { nome, cor, criadaPor: "equipe da plataforma" } },
     );
     return cliente;
   }
@@ -338,10 +352,10 @@ export class AdminService {
     );
   }
 
-  private async exigeCliente(organizationId: string): Promise<{ id: string; name: string }> {
+  private async exigeCliente(organizationId: string): Promise<{ id: string; name: string; brandColor: string | null }> {
     const organizacao = await this.prisma.organization.findFirst({
       where: { id: organizationId, deletedAt: null },
-      select: { id: true, name: true },
+      select: { id: true, name: true, brandColor: true },
     });
     if (!organizacao) throw new AppException("ORGANIZATION_NOT_FOUND", "Cliente não encontrado.", HttpStatus.NOT_FOUND);
     return organizacao;

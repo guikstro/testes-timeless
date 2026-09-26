@@ -3,10 +3,10 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { desconecta, geraLink, LinkGerado } from "../actions";
+import { desconecta, entra, geraLink, LinkGerado } from "../actions";
 
 export interface WhatsAppDoClienteDados {
-  organizacao: { id: string; name: string };
+  organizacao: { id: string; name: string; brandColor: string | null };
   conexao: { status: string; provider: string; numero: string | null; ultimoEventoEm: string | null } | null;
   linkExpiraEm: string | null;
 }
@@ -59,6 +59,13 @@ export function WhatsAppDoCliente({ dados }: { dados: WhatsAppDoClienteDados }) 
     });
   };
 
+  const entrar = () =>
+    startTransition(async () => {
+      setErro(null);
+      const resultado = await entra(dados.organizacao.id);
+      if (resultado?.error) setErro(resultado.error);
+    });
+
   const copiar = async () => {
     if (!link) return;
     await navigator.clipboard.writeText(link.url);
@@ -101,6 +108,9 @@ export function WhatsAppDoCliente({ dados }: { dados: WhatsAppDoClienteDados }) 
             {dados.linkExpiraEm || link ? "Gerar novo link" : "Gerar link de conexão"}
           </Button>
         ) : null}
+        <Button type="button" variant="secondary" onClick={entrar} disabled={pending}>
+          Entrar no painel do cliente
+        </Button>
         {status && status !== "DISCONNECTED" ? (
           <Button type="button" variant="danger" onClick={desconectar} disabled={pending}>
             Desconectar

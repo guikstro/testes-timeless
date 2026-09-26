@@ -89,3 +89,27 @@ Decisões do usuário: a gestão fica na aba Clientes do painel da plataforma; "
 - Apagar o serviço "CRM TMLSS-work" (worker antigo).
 - Publicar o admin como Web Service free.
 - Criar o operador com `grant:admin` e ativar o MFA.
+
+### Clientes dentro do site principal (2026-09-26)
+Decisão do usuário: a lista de clientes fica no site (web), e não no painel admin separado. A equipe Timeless abre a lista clicando no bloco da organização no menu.
+
+**Site (apps/web)**
+- `app-nav.tsx`:
+  - para operadores, o bloco com o nome da organização é um link para `/clientes`;
+  - o item "Administração", que apontava para outra origem, virou "Clientes" (`/clientes`).
+- As páginas `/clientes/[id]`, `/clientes/novo` e `actions.ts` foram movidas do admin para `web/src/app/(app)/clientes` com `git mv`.
+- `/clientes` (novo): lista com a cor do cliente, o nome clicável e o status do WhatsApp. Busca e botão "+ Novo cliente".
+- Um 403 da API (sem ser operador, ou sem verificação em duas etapas) aparece como mensagem na página.
+- Novo cliente pede **nome e cor** (`<input type="color">`), com prévia de como o cliente aparece no menu.
+- A página do cliente mostra o nome com a cor e ganhou "Entrar no painel do cliente": a ação `entra` gera o código e redireciona para `/entrar-como`. Isso troca a sessão do navegador.
+- `middleware.ts`: `/clientes` protegido.
+
+**API**
+- `CriaClienteDto.cor` (`#rrggbb`), gravada em `brandColor`.
+- `criaCliente` recusa cor já usada por outro cliente ativo (409 `COR_EM_USO`). Há teste para isso.
+- `exigeCliente` devolve `brandColor`.
+
+**Admin (apps/admin)**
+- Voltaram a ser removidos o link no nome do cliente e o botão "Novo cliente", porque as páginas agora estão no site.
+
+**Pré-requisito:** o usuário Timeless precisa de `platformRole` (`pnpm --filter api grant:admin <email>`) e da verificação em duas etapas ativa (Configurações → Segurança). Sem isso, a API recusa com 403.

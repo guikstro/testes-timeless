@@ -146,26 +146,27 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-/**
- * A administração vive noutro endereço, com login próprio.
- *
- * O link continua aqui porque só aparece para quem já é operador, e tirá-lo
- * obrigaria a guardar a URL em algum lugar. Mas é uma âncora comum e não um
- * `Link`: o destino é outra origem, e o roteador do Next não navega para
- * fora. Abre em aba nova, porque a sessão deste site não vale lá e voltar
- * seria refazer o login daqui.
- */
-const ENDERECO_DA_ADMINISTRACAO = process.env.NEXT_PUBLIC_ADMIN_URL ?? "http://localhost:3002";
-
+/** A lista de clientes da equipe Timeless. Só aparece para operadores da plataforma. */
 const ADMIN_ITEM: NavItem = {
-  href: ENDERECO_DA_ADMINISTRACAO,
-  label: "Administração",
+  href: "/clientes",
+  label: "Clientes",
   icon: (
     <svg {...ICON_PROPS}>
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
     </svg>
   ),
 };
+
+/** O bloco com o nome da organização. Para a equipe Timeless, leva à lista de clientes. */
+function Identidade({ href, className, children }: { href: string | null; className: string; children: ReactNode }) {
+  return href ? (
+    <Link href={href} title="Ver clientes" className={className}>
+      {children}
+    </Link>
+  ) : (
+    <div className={className}>{children}</div>
+  );
+}
 
 function isActive(pathname: string, href: string): boolean {
   // Prefixo, não igualdade: /leads/<id> continua marcando "Leads".
@@ -266,7 +267,10 @@ export function AppNav({
           com anel âmbar. É para cá que o olho vai quando a pergunta é "onde eu
           estou", então é aqui que a resposta precisa estar.
         */}
-        <div className="mb-6 flex items-center gap-3 px-0.5">
+        <Identidade
+          href={showAdmin ? "/clientes" : null}
+          className="focus-ring mb-6 flex items-center gap-3 rounded-xl px-0.5"
+        >
           <span className={impersonating ? "rounded-[14px] ring-2 ring-amber-500 ring-offset-2 ring-offset-panel" : undefined}>
             <OrgLogo name={organizationName} logoUrl={logoUrl} />
           </span>
@@ -280,7 +284,7 @@ export function AppNav({
               {organizationName}
             </span>
           </span>
-        </div>
+        </Identidade>
 
         <nav className="flex flex-1 flex-col gap-1">{NAV_ITEMS.map((item) => renderItem(item))}</nav>
 

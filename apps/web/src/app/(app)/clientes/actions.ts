@@ -19,11 +19,12 @@ function mensagemDe(error: unknown, padrao: string): string {
 
 export async function criaCliente(_anterior: NovoClienteState, formData: FormData): Promise<NovoClienteState> {
   const nome = String(formData.get("nome") ?? "").trim();
+  const cor = String(formData.get("cor") ?? "").trim();
   if (nome.length < 2) return { error: "Informe o nome do cliente." };
 
   let cliente: { id: string };
   try {
-    cliente = await apiFetch<{ id: string }>("/admin/organizations", { method: "POST", body: JSON.stringify({ nome }) });
+    cliente = await apiFetch<{ id: string }>("/admin/organizations", { method: "POST", body: JSON.stringify({ nome, cor }) });
   } catch (error) {
     return { error: mensagemDe(error, "Não foi possível criar o cliente.") };
   }
@@ -39,6 +40,21 @@ export async function geraLink(organizationId: string): Promise<LinkGerado | { e
   } catch (error) {
     return { error: mensagemDe(error, "Não foi possível gerar o link.") };
   }
+}
+
+/**
+ * Entra no cliente para ver o painel dele. Troca a sessão deste navegador:
+ * para voltar à Timeless, é "Sair do cliente" e entrar de novo.
+ */
+export async function entra(organizationId: string): Promise<{ error: string }> {
+  let codigo: string;
+  try {
+    const resposta = await apiFetch<{ entrega: string }>(`/admin/organizations/${organizationId}/entrada`, { method: "POST" });
+    codigo = resposta.entrega;
+  } catch (error) {
+    return { error: mensagemDe(error, "Não foi possível entrar neste cliente.") };
+  }
+  redirect(`/entrar-como?codigo=${encodeURIComponent(codigo)}`);
 }
 
 export async function desconecta(organizationId: string): Promise<{ error?: string }> {

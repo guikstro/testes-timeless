@@ -45,7 +45,7 @@ export class AdminController {
   /** "Novo cliente": só a organização. Quem usa a conta entra pelo link do WhatsApp ou pelo suporte. */
   @Post("organizations")
   criaCliente(@CurrentUser() user: AuthenticatedUser, @Body() dto: CriaClienteDto) {
-    return this.adminService.criaCliente(user.userId, dto.nome);
+    return this.adminService.criaCliente(user.userId, dto.nome, dto.cor);
   }
 
   @Get("organizations/:id/whatsapp")

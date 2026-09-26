@@ -1,4 +1,4 @@
-import { IsString, Length } from "class-validator";
+import { IsString, Length, Matches } from "class-validator";
 import { Transform } from "class-transformer";
 
 export class CriaClienteDto {
@@ -6,4 +6,9 @@ export class CriaClienteDto {
   @IsString()
   @Length(2, 80)
   nome!: string;
+
+  /** A cor do cliente no sistema. Formato do `<input type="color">`. */
+  @Transform(({ value }) => (typeof value === "string" ? value.trim().toLowerCase() : value))
+  @Matches(/^#[0-9a-f]{6}$/, { message: "Escolha uma cor válida." })
+  cor!: string;
 }
