@@ -2,14 +2,16 @@ packages:
   - "apps/*"
   - "packages/*"
 allowBuilds:
+  # Negados de propósito: os scripts só conferem a versão do Node e avisam
+  # sobre versão; nada é compilado. Menos script de terceiro rodando no build.
+  baileys: false
+  protobufjs: false
   '@prisma/client': true
   '@prisma/engines': true
   '@scarf/scarf': true
-  baileys: set this to true or false
   bcrypt: true
   msgpackr-extract: true
   prisma: true
-  protobufjs: set this to true or false
   sharp: true
   unrs-resolver: true
 overrides:

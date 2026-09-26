@@ -48,3 +48,10 @@ Registro cumulativo do que foi feito em cada rodada. Só se adiciona; nada é ap
 - **Token:** aleatório, só o hash guardado no Redis, validade de 24 h e uso único.
 - **Rota pública:** reaproveita `connectViaQrCode`/`getQrCode` e o componente `QrConnect`.
 - Aguardando: validade, onde fica a página pública, quem gera o link.
+
+### Correção do build no Render: ERR_PNPM_IGNORED_BUILDS (2026-09-26)
+- O pnpm 11 exige decidir, pacote a pacote, se os scripts de instalação rodam.
+- `baileys` e `protobufjs` foram negados no `allowBuilds` do `pnpm-workspace.yaml`: os scripts deles só conferem a versão do Node e avisam sobre versão.
+- Foram removidas as duas linhas de espera que o pnpm tinha escrito no arquivo.
+- Build do Render reproduzido numa cópia limpa no disco C: (`pnpm install --frozen-lockfile` + `pnpm --filter api build`), sem erro.
+- A API compilada carrega o `baileys` e o `libsignal@6.0.0`.
