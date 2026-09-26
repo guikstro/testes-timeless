@@ -3,6 +3,7 @@ import { redireciona } from "@/lib/redireciona";
 import {
   ACCESS_TOKEN_COOKIE,
   ACCESS_TOKEN_MAX_AGE,
+  ADMIN_REFRESH_TOKEN_COOKIE,
   REFRESH_TOKEN_COOKIE,
   REFRESH_TOKEN_MAX_AGE,
   SESSION_COOKIE_OPTIONS,
@@ -56,6 +57,11 @@ export async function GET(request: NextRequest) {
     gasto, mas não há razão para deixá-lo à vista.
   */
   const pronto = redireciona("/dashboard");
+  // Guarda a sessão da Timeless: é para ela que "Encerrar visita" volta.
+  const daTimeless = request.cookies.get(REFRESH_TOKEN_COOKIE)?.value;
+  if (daTimeless) {
+    pronto.cookies.set(ADMIN_REFRESH_TOKEN_COOKIE, daTimeless, { ...SESSION_COOKIE_OPTIONS, maxAge: REFRESH_TOKEN_MAX_AGE });
+  }
   pronto.cookies.set(ACCESS_TOKEN_COOKIE, accessToken, {
     ...SESSION_COOKIE_OPTIONS,
     maxAge: ACCESS_TOKEN_MAX_AGE,

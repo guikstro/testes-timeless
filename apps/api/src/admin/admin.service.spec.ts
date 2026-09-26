@@ -27,6 +27,7 @@ describe("AdminService", () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
     return { service, prisma, auth };
   }

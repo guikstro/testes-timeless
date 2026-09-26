@@ -21,12 +21,9 @@ export const MFA_CHALLENGE_COOKIE = "mfa_challenge";
 export const MFA_CHALLENGE_MAX_AGE = 120;
 
 /*
-  Resquício do tempo em que a administração morava aqui dentro.
-
-  Estes cookies guardavam a sessão do operador enquanto ele visitava um
-  cliente. A administração tem site próprio agora e nada mais os escreve, mas
-  navegadores que passaram pelo fluxo antigo ainda os têm. Continuam
-  declarados só para o logout poder apagá-los.
+  A sessão da Timeless enquanto o operador visita um cliente. Gravado por
+  `entrar-como` e devolvido por `api/auth/encerrar-visita`. O de acesso não
+  é mais escrito; continua declarado para o logout apagar o de fluxos antigos.
 */
 export const ADMIN_ACCESS_TOKEN_COOKIE = "admin_access_token";
 export const ADMIN_REFRESH_TOKEN_COOKIE = "admin_refresh_token";

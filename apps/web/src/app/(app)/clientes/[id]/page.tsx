@@ -3,6 +3,7 @@ import { apiFetch } from "@/lib/api-client";
 import { WhatsAppDoCliente, WhatsAppDoClienteDados } from "./whatsapp-do-cliente";
 import { CorDoCliente } from "../cor-do-cliente";
 import { PessoaDoCliente, PessoasDoCliente } from "./pessoas-do-cliente";
+import { ExcluirCliente } from "./excluir-cliente";
 
 export default async function ClientePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,6 +23,7 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
       </h1>
       <WhatsAppDoCliente dados={dados} />
       <PessoasDoCliente organizationId={id} pessoas={pessoas} />
+      <ExcluirCliente organizationId={id} nome={dados.organizacao.name} />
     </div>
   );
 }

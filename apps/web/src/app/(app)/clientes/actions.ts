@@ -78,3 +78,16 @@ export async function removePessoa(organizationId: string, userId: string): Prom
     return { error: mensagemDe(error, "Não foi possível remover.") };
   }
 }
+
+export async function excluiCliente(organizationId: string, confirmacao: string, codigo: string): Promise<{ error: string } | void> {
+  try {
+    await apiFetch(`/admin/organizations/${organizationId}/excluir`, {
+      method: "POST",
+      body: JSON.stringify({ confirmacao, codigo }),
+    });
+  } catch (error) {
+    return { error: mensagemDe(error, "Não foi possível excluir o cliente.") };
+  }
+  revalidatePath("/clientes");
+  redirect("/clientes");
+}

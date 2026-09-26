@@ -186,3 +186,19 @@ Decisões do usuário: convite por link, um cliente por pessoa, cadastro públic
 - `/convite/[token]` (público, `no-referrer`) e o proxy `/api/convites/[token]`, que grava a sessão ao aceitar.
 - Página do cliente: "Pessoas com acesso", com botão para remover.
 - Login: o link "Criar organização" virou "Peça um convite à equipe Timeless".
+
+### "Encerrar visita" volta para a Timeless, e exclusão de cliente (2026-09-26)
+**Encerrar visita**
+- Antes fazia logout e mandava ao login.
+- `entrar-como/route.ts` guarda o refresh da Timeless em `admin_refresh_token` (cookie httpOnly que já existia, reaproveitado).
+- A nova rota `api/auth/encerrar-visita` revoga a sessão do cliente na API, devolve o refresh da Timeless e responde `{ destino: "/clientes" }`. O middleware renova a sessão ao carregar.
+- Sem sessão guardada (entrou antes desta mudança), é um logout comum.
+
+**Excluir cliente**
+- API: `POST /admin/organizations/:id/excluir`, só para ADMIN, com limite `CREDENCIAL` (10 tentativas em 5 min).
+- Exige a frase exata "Quero excluir o <nome>" (espaços normalizados). A frase é conferida **antes** do código, para um erro de digitação não gastar o código.
+- Depois, o código de duas etapas (`MfaService.confereSegundoFator`, que também aceita código de recuperação).
+- Efeitos: desconecta o WhatsApp, encerra o link de conexão, `organization.deletedAt = agora` (os dados ficam no banco) e derruba as sessões naquela organização. Fica registrado na auditoria.
+- Não deixa excluir a conta da própria equipe.
+- Teste: `admin/exclui-cliente.spec.ts` (4 casos).
+- Site: bloco "Zona de perigo" (`excluir-cliente.tsx`) na página do cliente. O botão só libera quando a frase bate e o código tem 6 dígitos. Depois de excluir, volta para `/clientes`.

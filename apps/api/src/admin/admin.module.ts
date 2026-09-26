@@ -1,5 +1,6 @@
 import { Module, forwardRef } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
+import { MfaModule } from "../auth/mfa/mfa.module";
 import { PlatformAdminGuard } from "../common/guards/platform-admin.guard";
 import { AdminController } from "./admin.controller";
 import { AdminService } from "./admin.service";
@@ -8,7 +9,7 @@ import { WhatsAppConnectionsModule } from "../integrations/whatsapp/whatsapp-con
 
 /** Importa AuthModule para reemitir tokens ao entrar numa organização. */
 @Module({
-  imports: [forwardRef(() => AuthModule), WhatsAppConnectionsModule],
+  imports: [forwardRef(() => AuthModule), forwardRef(() => MfaModule), WhatsAppConnectionsModule],
   controllers: [AdminController],
   providers: [AdminService, PlatformAdminGuard, EntregaDeSessaoService],
   exports: [EntregaDeSessaoService],

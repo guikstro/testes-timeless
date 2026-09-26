@@ -10,6 +10,7 @@ import { slugLivre } from "../common/utils/slug-livre";
 import { ConviteGerado, ConvitesService } from "../auth/convites/convites.service";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { CriaConviteDto } from "./dto/cria-convite.dto";
+import { MfaService } from "../auth/mfa/mfa.service";
 import { WhatsAppConnectionsService } from "../integrations/whatsapp/whatsapp-connections.service";
 import { LinkDeConexaoService, LinkGerado } from "../integrations/whatsapp/link-de-conexao.service";
 
@@ -40,6 +41,7 @@ export class AdminService {
     private readonly conexoes: WhatsAppConnectionsService,
     private readonly links: LinkDeConexaoService,
     private readonly convites: ConvitesService,
+    private readonly mfa: MfaService,
   ) {}
 
   /** Lista os clientes com os números que dizem se a conta está viva ou parada. */
@@ -336,6 +338,42 @@ export class AdminService {
     return convite;
   }
 
+  /**
+   * Exclui o cliente: some das listas e ninguém mais entra nele. Os dados
+   * ficam no banco (`deletedAt`), então um engano ainda tem volta pelo suporte.
+   * A frase vem antes do código para um erro de digitação não gastar o código.
+   */
+  async excluiCliente(operador: AuthenticatedUser, organizationId: string, confirmacao: string, codigo: string): Promise<void> {
+    const cliente = await this.exigeCliente(organizationId);
+    if (organizationId === operador.organizationId) {
+      throw new AppException("EXCLUSAO_PROIBIDA", "Não dá para excluir a conta da própria equipe.", HttpStatus.FORBIDDEN);
+    }
+
+    const esperada = `Quero excluir o ${cliente.name}`;
+    if (confirmacao.trim().replace(/\s+/g, " ") !== esperada) {
+      throw new AppException("CONFIRMACAO_INCORRETA", `Digite exatamente: ${esperada}`, HttpStatus.BAD_REQUEST);
+    }
+    if (!(await this.mfa.confereSegundoFator(operador.userId, codigo.replace(/\s/g, "")))) {
+      throw new AppException("CODIGO_INVALIDO", "Código de verificação inválido.", HttpStatus.BAD_REQUEST);
+    }
+
+    // O WhatsApp primeiro: senão o número continuaria recebendo mensagens de um cliente que não existe mais.
+    if (await this.conexoes.getCurrent(organizationId)) await this.conexoes.disconnect(organizationId);
+    await this.links.encerra(organizationId);
+
+    const agora = new Date();
+    await this.prisma.$transaction([
+      this.prisma.organization.update({ where: { id: organizationId }, data: { deletedAt: agora } }),
+      this.prisma.sessao.updateMany({
+        where: { organizationId, encerradaEm: null },
+        data: { encerradaEm: agora, motivoDoEncerramento: "cliente excluído pela equipe Timeless" },
+      }),
+    ]);
+    await this.auditoria.registra(
+      { organizationId, userId: operador.userId, impersonating: true },
+      { acao: "ORGANIZATION_UPDATED", entidade: "Organization", entidadeId: organizationId, antes: { nome: cliente.name }, depois: { excluidoEm: agora } },
+    );
+  }
   /** Quem tem acesso a um cliente, para a página dele no painel da Timeless. */
   async pessoasDoCliente(organizationId: string) {
     await this.exigeCliente(organizationId);

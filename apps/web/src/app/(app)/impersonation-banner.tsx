@@ -43,16 +43,16 @@ export function LeaveClientButton({ collapsedLabelClassName = "" }: { collapsedL
     setError(null);
     setPending(true);
 
+    let destino = "/login?motivo=saiu-do-cliente";
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      const resposta = await fetch("/api/auth/encerrar-visita", { method: "POST" });
+      destino = (await resposta.json()).destino ?? destino;
     } catch {
-      // A revogação no servidor é o ideal; sair da tela é o mínimo, e falhar
-      // no primeiro não pode prender o operador dentro do cliente.
+      // Sem resposta, cai no login: é o lado seguro.
     }
 
-    // Recarregamento completo: a sessão morreu nos cookies e o shell precisa
-    // ser refeito sem ela.
-    window.location.href = "/login?motivo=saiu-do-cliente";
+    // Navegação completa: a área da Timeless carrega com a sessão devolvida.
+    window.location.href = destino;
   }
 
   return (

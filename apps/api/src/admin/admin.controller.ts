@@ -24,6 +24,9 @@ import { ListOrganizationsDto } from "./dto/list-organizations.dto";
 import { UpsertOperatorDto } from "./dto/upsert-operator.dto";
 import { CriaClienteDto } from "./dto/cria-cliente.dto";
 import { CriaConviteDto } from "./dto/cria-convite.dto";
+import { ExcluiClienteDto } from "./dto/exclui-cliente.dto";
+import { Throttle } from "@nestjs/throttler";
+import { CREDENCIAL } from "../common/throttling/limites";
 
 /**
  * Rotas do operador da plataforma. A ordem dos guards importa: `JwtAuthGuard`
@@ -53,6 +56,22 @@ export class AdminController {
   @Post("convites")
   criaConvite(@CurrentUser() user: AuthenticatedUser, @Body() dto: CriaConviteDto) {
     return this.adminService.criaConvite(user, dto);
+  }
+
+  /**
+   * Exclui o cliente. Exige a frase de confirmação e o código de duas etapas,
+   * e poucas tentativas: é o código que decide, e ele não pode ser chutado.
+   */
+  @Post("organizations/:id/excluir")
+  @RequiresPlatformRole("ADMIN")
+  @Throttle({ default: CREDENCIAL })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  excluiCliente(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: ExcluiClienteDto,
+  ): Promise<void> {
+    return this.adminService.excluiCliente(user, id, dto.confirmacao, dto.codigo);
   }
 
   @Get("organizations/:id/pessoas")
