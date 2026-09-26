@@ -31,6 +31,7 @@ import { TelemetriaModule } from "./telemetria/telemetria.module";
 import { AuditoriaModule } from "./auditoria/auditoria.module";
 import { OrigemDaRequisicaoMiddleware } from "./auditoria/contexto-da-requisicao";
 import { GoogleConversionsModule } from "./integrations/google/google-conversions.module";
+import { WorkerModule } from "./worker/worker.module";
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { GoogleConversionsModule } from "./integrations/google/google-conversion
     ConversationsModule,
     GoogleConversionsModule,
     TelemetriaModule,
+    WorkerModule,
   ],
   providers: [
     // Global: uma rota nova nasce protegida, e abrir exceção exige escrever

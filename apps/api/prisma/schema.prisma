@@ -506,6 +506,21 @@ model WhatsAppConnection {
   @@map("whatsapp_connections")
 }
 
+/**
+ * Sessão do WhatsApp por QR Code (credenciais e chaves do Baileys), uma linha
+ * por chave. No banco, e não em disco, para sobreviver a deploy sem ler o QR
+ * de novo. `valor` vai cifrado: quem lê estas linhas assume o número.
+ */
+model SessaoWhatsApp {
+  instanceName String   @map("instance_name")
+  chave        String
+  valor        String
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@id([instanceName, chave])
+  @@map("sessoes_whatsapp")
+}
+
 enum LeadStatus {
   NEW
   QUALIFIED

@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { HttpStatus, Injectable } from "@nestjs/common";
 import { WhatsAppConnection } from "@prisma/client";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { EncryptionService } from "../../common/encryption/encryption.service";
@@ -6,98 +6,20 @@ import { AppException } from "../../common/exceptions/app-exception";
 import { isUniqueConstraintError } from "../../common/utils/is-unique-constraint-error";
 import { normalizePhone } from "../../common/utils/normalize-phone";
 import { ConnectWhatsAppDto } from "./dto/connect-whatsapp.dto";
-import { EvolutionClient } from "./evolution-client";
-import { EvolutionApiError } from "./evolution-api-error";
+import { MotorWhatsApp } from "./motor-whatsapp";
 import { OrigemDosLeads } from "@prisma/client";
 import { hojeLocal } from "../../common/tempo";
 
 /** A janela da contagem do que ficou fora da regra. */
 const DIAS_DA_CONTAGEM = 30;
-import { conferenciaDoWebhook } from "./conferencia-do-webhook";
 
 @Injectable()
-export class WhatsAppConnectionsService implements OnModuleInit {
-  private readonly logger = new Logger(WhatsAppConnectionsService.name);
-
+export class WhatsAppConnectionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryption: EncryptionService,
-    private readonly evolution: EvolutionClient,
+    private readonly motor: MotorWhatsApp,
   ) {}
-
-  /**
-   * Na subida, confere o webhook de toda instância já conectada.
-   *
-   * É a metade que faltou quando `base64: false` entrou: a correção valia
-   * para instâncias criadas dali em diante, e as que já existiam seguiram
-   * mandando mídia embutida por semanas, perdendo toda mensagem com anexo
-   * grande. Corrigir o caminho de criação não corrige quem já passou por ele.
-   *
-   * Sem `await` na subida de propósito: a API não pode depender da Evolution
-   * estar de pé para aceitar requisição. Se a conferência falhar, ela fica no
-   * log e a próxima subida tenta de novo.
-   */
-  onModuleInit(): void {
-    void this.reconciliaWebhooks();
-  }
-
-  async reconciliaWebhooks(): Promise<void> {
-    let conexoes;
-    try {
-      conexoes = await this.prisma.whatsAppConnection.findMany({
-        where: { provider: "EVOLUTION", instanceName: { not: null } },
-        select: { organizationId: true, instanceName: true },
-      });
-    } catch (error) {
-      this.logger.warn(`Não foi possível listar conexões para conferir webhooks: ${(error as Error).message}`);
-      return;
-    }
-
-    for (const conexao of conexoes) {
-      await this.reconciliaWebhookDe(conexao.instanceName!, conexao.organizationId);
-    }
-  }
-
-  /**
-   * Confere uma instância e só escreve quando há o que corrigir.
-   *
-   * Ler antes de escrever não é economia de rede: é o que faz o log dizer
-   * alguma coisa. Regravar sempre deixaria "webhook corrigido" em toda subida,
-   * e a linha que importa se perderia no meio das que não importam.
-   */
-  private async reconciliaWebhookDe(instanceName: string, organizationId: string): Promise<void> {
-    let urlEsperada: string;
-    try {
-      urlEsperada = this.webhookUrl();
-    } catch {
-      // Sem as variáveis configuradas não há o que conferir contra.
-      return;
-    }
-
-    try {
-      const motivos = conferenciaDoWebhook(await this.evolution.lerWebhook(instanceName), urlEsperada);
-      if (motivos.length === 0) return;
-
-      await this.evolution.defineWebhook(instanceName, urlEsperada);
-      this.logger.warn(
-        JSON.stringify({
-          event: "webhook_da_evolution_corrigido",
-          organizationId,
-          instanceName,
-          motivos,
-        }),
-      );
-    } catch (error) {
-      this.logger.warn(
-        JSON.stringify({
-          event: "webhook_da_evolution_nao_conferido",
-          organizationId,
-          instanceName,
-          message: (error as Error).message,
-        }),
-      );
-    }
-  }
 
   async regra(organizationId: string) {
     const desde = new Date(`${hojeLocal()}T00:00:00.000Z`);
@@ -197,17 +119,7 @@ export class WhatsAppConnectionsService implements OnModuleInit {
   async connectViaQrCode(organizationId: string) {
     const instanceName = this.instanceNameFor(organizationId);
 
-    // Criar quando já existe devolve erro na Evolution; como o nome é
-    // determinístico, uma segunda tentativa é o caso normal (reconexão),
-    // não um erro — por isso a criação é best-effort e o QR vem depois.
-    try {
-      await this.evolution.createInstance(instanceName, this.webhookUrl());
-    } catch (error) {
-      if (!(error instanceof EvolutionApiError)) throw error;
-      this.logger.log(
-        JSON.stringify({ event: "evolution_instance_reused", organizationId, reason: error.message }),
-      );
-    }
+    await this.motor.conecta(instanceName);
 
     await this.prisma.whatsAppConnection.upsert({
       where: { organizationId },
@@ -227,20 +139,20 @@ export class WhatsAppConnectionsService implements OnModuleInit {
   }
 
   /**
-   * QR atual + status. A Evolution rotaciona o código a cada ~30s, então a
+   * QR atual + status. O WhatsApp troca o código a cada ~20s, então a
    * UI chama isto repetidamente enquanto o status for PENDING_QR — e é aqui
    * que a leitura bem-sucedida do QR vira CONNECTED no nosso banco.
    */
   async getQrCode(organizationId: string) {
     const connection = await this.requireEvolutionConnection(organizationId);
-    const state = await this.evolution.getConnectionState(connection.instanceName!);
+    const state = this.motor.estado(connection.instanceName!);
 
     if (state === "open") {
       const updated = await this.markConnected(connection);
       return { status: updated.status, qrCodeBase64: null, displayPhoneNumber: updated.displayPhoneNumber };
     }
 
-    const qr = await this.evolution.getQrCode(connection.instanceName!);
+    const qr = await this.motor.qrCode(connection.instanceName!);
     return { status: "PENDING_QR" as const, qrCodeBase64: qr.base64, displayPhoneNumber: null };
   }
 
@@ -251,18 +163,8 @@ export class WhatsAppConnectionsService implements OnModuleInit {
     }
 
     if (existing.provider === "EVOLUTION" && existing.instanceName) {
-      // Sem o logout, o aparelho continuaria pareado do lado da Evolution e
-      // mensagens seguiriam chegando por webhook depois de "desconectar".
-      try {
-        await this.evolution.logout(existing.instanceName);
-      } catch (error) {
-        // Já desconectado do outro lado é o resultado desejado, não um erro:
-        // o estado local abaixo é a fonte da verdade para a aplicação.
-        if (!(error instanceof EvolutionApiError)) throw error;
-        this.logger.warn(
-          JSON.stringify({ event: "evolution_logout_failed", organizationId, reason: error.message }),
-        );
-      }
+      // Sem isto o aparelho continuaria pareado e as mensagens seguiriam chegando.
+      await this.motor.desconecta(existing.instanceName);
     }
 
     // Só troca de status — nunca apaga a linha, para a chave de roteamento
@@ -274,16 +176,13 @@ export class WhatsAppConnectionsService implements OnModuleInit {
     });
   }
 
-  /** Chamado pelo webhook de `CONNECTION_UPDATE` da Evolution, não pela UI. */
+  /** Chamado pelos eventos de conexão do motor, não pela UI. */
   async syncEvolutionState(instanceName: string, state: "open" | "connecting" | "close"): Promise<void> {
     const connection = await this.prisma.whatsAppConnection.findUnique({ where: { instanceName } });
     if (!connection) return;
 
     if (state === "open") {
       await this.markConnected(connection);
-      // Uma sessão que reabre é a segunda chance de corrigir um registro
-      // errado, para a instância não esperar a próxima subida da API.
-      await this.reconciliaWebhookDe(connection.instanceName!, connection.organizationId);
       return;
     }
 
@@ -299,7 +198,7 @@ export class WhatsAppConnectionsService implements OnModuleInit {
   }
 
   private async markConnected(connection: WhatsAppConnection): Promise<WhatsAppConnection> {
-    const rawNumber = await this.evolution.getConnectedNumber(connection.instanceName!);
+    const rawNumber = this.motor.numeroConectado(connection.instanceName!);
 
     return this.prisma.whatsAppConnection.update({
       where: { id: connection.id },
@@ -325,24 +224,6 @@ export class WhatsAppConnectionsService implements OnModuleInit {
 
   private instanceNameFor(organizationId: string): string {
     return `org-${organizationId}`;
-  }
-
-  /**
-   * O segredo compartilhado vai no path da URL registrada na Evolution — é
-   * o que autentica os webhooks dela, que (ao contrário da Meta) não são
-   * assinados. Ver `WhatsAppWebhookService.verifyEvolutionToken`.
-   */
-  private webhookUrl(): string {
-    const url = process.env.EVOLUTION_WEBHOOK_URL;
-    const token = process.env.EVOLUTION_WEBHOOK_TOKEN;
-    if (!url || !token) {
-      throw new AppException(
-        "EVOLUTION_NOT_CONFIGURED",
-        "EVOLUTION_WEBHOOK_URL/EVOLUTION_WEBHOOK_TOKEN não configuradas — a Evolution não teria para onde entregar as mensagens com segurança.",
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-    return `${url.replace(/\/+$/, "")}/${encodeURIComponent(token)}`;
   }
 
   private redact<T extends { accessTokenEncrypted: string | null } | null>(

@@ -1,10 +1,9 @@
 import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
 import { BullModule } from "@nestjs/bullmq";
 import { PrismaModule } from "../common/prisma/prisma.module";
 import { EncryptionModule } from "../common/encryption/encryption.module";
 import { EmailModule } from "../common/email/email.module";
-import { getRedisConnectionOptions } from "../common/queue/redis-connection";
+import { QueueModule } from "../common/queue/queue.module";
 import {
   META_CONVERSIONS_QUEUE,
   MANUTENCAO_QUEUE,
@@ -31,11 +30,15 @@ import { MetaConversionSendService } from "./processors/meta-conversion-send.ser
 import { WhatsAppSendProcessor } from "./processors/whatsapp-send.processor";
 import { WhatsAppSendService } from "./processors/whatsapp-send.service";
 import { MetaGraphClient } from "../integrations/meta/meta-graph-client";
-import { EvolutionClient } from "../integrations/whatsapp/evolution-client";
+import { WhatsAppConnectionsModule } from "../integrations/whatsapp/whatsapp-connections.module";
 
+/**
+ * Processadores das filas e agendas, rodando dentro do processo da API.
+ * Um processo só: o WhatsApp por QR Code mantém a conexão em memória, e um
+ * worker separado abriria uma segunda conexão para o mesmo número.
+ */
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     EncryptionModule,
     EmailModule,
@@ -43,7 +46,8 @@ import { EvolutionClient } from "../integrations/whatsapp/evolution-client";
     ClassificationModule,
     ConversionEventsModule,
     NotificationsModule,
-    BullModule.forRoot({ connection: getRedisConnectionOptions() }),
+    QueueModule,
+    WhatsAppConnectionsModule,
     BullModule.registerQueue(
       { name: WHATSAPP_EVENTS_QUEUE },
       { name: WHATSAPP_SEND_QUEUE },
@@ -68,7 +72,6 @@ import { EvolutionClient } from "../integrations/whatsapp/evolution-client";
     MetaConversionSendProcessor,
     MetaConversionSendService,
     MetaGraphClient,
-    EvolutionClient,
   ],
 })
 export class WorkerModule {}

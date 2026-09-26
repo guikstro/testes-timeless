@@ -21,13 +21,7 @@ async function bootstrap() {
     rawBody: true,
   });
 
-  // O padrão do Express (100kb) é pequeno demais para um webhook de WhatsApp:
-  // uma instância da Evolution configurada para enviar mídia embutida produz
-  // payloads de megabytes, e o 413 resultante descartava a mensagem inteira em
-  // vez de só o anexo. Instâncias novas já não pedem base64 (ver
-  // evolution-client.ts), mas as criadas antes disso continuam enviando, então
-  // o limite generoso protege quem já está conectado.
-  //
+  // O padrão do Express (100kb) é pequeno para alguns corpos JSON desta API.
   // Generoso, não ilimitado: aceitar qualquer tamanho transformaria o webhook
   // público num vetor de exaustão de memória.
   app.useBodyParser("json", { limit: "10mb" });
@@ -79,10 +73,6 @@ async function bootstrap() {
       { path: "uploads/:nome", method: RequestMethod.GET },
       { path: "whatsapp-webhook", method: RequestMethod.GET },
       { path: "whatsapp-webhook", method: RequestMethod.POST },
-      // Receptor da Evolution API (Fase 8). Mesmo motivo dos dois acima: é um
-      // webhook chamado por um sistema externo e autenticado pelo segredo no
-      // path, não pela sessão — logo fica fora do prefixo /api do app.
-      { path: "whatsapp-webhook/evolution/:token", method: RequestMethod.POST },
     ],
   });
 

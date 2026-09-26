@@ -23,6 +23,7 @@ describe("WhatsAppWebhookService", () => {
     const service = new WhatsAppWebhookService(
       queue as unknown as Queue,
       connections as unknown as WhatsAppConnectionsService,
+      { aoEvento: jest.fn() } as never,
     );
     return { service, queue, connections };
   }

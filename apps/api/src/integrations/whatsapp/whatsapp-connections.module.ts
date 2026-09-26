@@ -1,16 +1,15 @@
 import { Module } from "@nestjs/common";
 import { WhatsAppConnectionsController } from "./whatsapp-connections.controller";
 import { WhatsAppConnectionsService } from "./whatsapp-connections.service";
-import { EvolutionClient } from "./evolution-client";
+import { MotorWhatsApp } from "./motor-whatsapp";
 
 /**
- * Exporta o serviço porque o receptor de webhooks da Evolution
- * (`WhatsAppWebhookModule`) precisa dele para refletir os eventos de
- * `CONNECTION_UPDATE` no status da conexão.
+ * Exporta o motor para existir uma cópia só no processo: o envio (fila) e
+ * a entrada de eventos (`WhatsAppWebhookModule`) usam a mesma conexão.
  */
 @Module({
   controllers: [WhatsAppConnectionsController],
-  providers: [WhatsAppConnectionsService, EvolutionClient],
-  exports: [WhatsAppConnectionsService],
+  providers: [WhatsAppConnectionsService, MotorWhatsApp],
+  exports: [WhatsAppConnectionsService, MotorWhatsApp],
 })
 export class WhatsAppConnectionsModule {}

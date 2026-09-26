@@ -1,7 +1,6 @@
 import { WhatsAppSendService } from "./whatsapp-send.service";
 import { PrismaService } from "../../common/prisma/prisma.service";
-import { EvolutionClient } from "../../integrations/whatsapp/evolution-client";
-import { EvolutionApiError } from "../../integrations/whatsapp/evolution-api-error";
+import { MotorWhatsApp } from "../../integrations/whatsapp/motor-whatsapp";
 import { ConversationClassifierService } from "../../classification/conversation-classifier.service";
 import { NotificationsService } from "../../notifications/notifications.service";
 
@@ -20,16 +19,16 @@ describe("WhatsAppSendService", () => {
         }),
       },
     };
-    const evolution = { sendText: jest.fn().mockResolvedValue({ externalId: "3EB0SENT" }) };
+    const motor = { enviaTexto: jest.fn().mockResolvedValue({ externalId: "3EB0SENT" }) };
     const classifier = { classify: jest.fn() };
     const notifications = { notificar: jest.fn().mockResolvedValue(undefined) };
     const service = new WhatsAppSendService(
       prisma as unknown as PrismaService,
-      evolution as unknown as EvolutionClient,
+      motor as unknown as MotorWhatsApp,
       classifier as unknown as ConversationClassifierService,
       notifications as unknown as NotificationsService,
     );
-    return { service, prisma, evolution, classifier, notifications };
+    return { service, prisma, motor, classifier, notifications };
   }
 
   function messageRow(overrides: Record<string, unknown> = {}) {
@@ -48,35 +47,35 @@ describe("WhatsAppSendService", () => {
   }
 
   it("does nothing when the message no longer exists", async () => {
-    const { service, prisma, evolution } = buildService();
+    const { service, prisma, motor } = buildService();
     prisma.message.findUnique.mockResolvedValue(null);
 
     await service.send("msg-1", false);
 
-    expect(evolution.sendText).not.toHaveBeenCalled();
+    expect(motor.enviaTexto).not.toHaveBeenCalled();
   });
 
   it("never re-sends a message a previous attempt already delivered", async () => {
-    const { service, prisma, evolution } = buildService();
+    const { service, prisma, motor } = buildService();
     prisma.message.findUnique.mockResolvedValue(messageRow({ outboundStatus: "SENT" }));
 
     await service.send("msg-1", false);
 
-    expect(evolution.sendText).not.toHaveBeenCalled();
+    expect(motor.enviaTexto).not.toHaveBeenCalled();
     expect(prisma.message.update).not.toHaveBeenCalled();
   });
 
   it("refuses to send an INBOUND message (defensive — the queue should never carry one)", async () => {
-    const { service, prisma, evolution } = buildService();
+    const { service, prisma, motor } = buildService();
     prisma.message.findUnique.mockResolvedValue(messageRow({ direction: "INBOUND" }));
 
     await service.send("msg-1", false);
 
-    expect(evolution.sendText).not.toHaveBeenCalled();
+    expect(motor.enviaTexto).not.toHaveBeenCalled();
   });
 
   it("fails without throwing when the connection dropped between enqueue and send", async () => {
-    const { service, prisma, evolution } = buildService();
+    const { service, prisma, motor } = buildService();
     prisma.message.findUnique.mockResolvedValue(
       messageRow({
         conversation: {
@@ -88,7 +87,7 @@ describe("WhatsAppSendService", () => {
 
     await expect(service.send("msg-1", false)).resolves.not.toThrow();
 
-    expect(evolution.sendText).not.toHaveBeenCalled();
+    expect(motor.enviaTexto).not.toHaveBeenCalled();
     expect(prisma.message.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "msg-1" },
@@ -98,7 +97,7 @@ describe("WhatsAppSendService", () => {
   });
 
   it("fails explicitly for a Cloud API connection instead of pretending the message went out", async () => {
-    const { service, prisma, evolution } = buildService();
+    const { service, prisma, motor } = buildService();
     prisma.message.findUnique.mockResolvedValue(
       messageRow({
         conversation: {
@@ -110,7 +109,7 @@ describe("WhatsAppSendService", () => {
 
     await service.send("msg-1", false);
 
-    expect(evolution.sendText).not.toHaveBeenCalled();
+    expect(motor.enviaTexto).not.toHaveBeenCalled();
     expect(prisma.message.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "msg-1" },
@@ -120,12 +119,12 @@ describe("WhatsAppSendService", () => {
   });
 
   it("sends the text to the lead's number without the leading + and records the provider's id", async () => {
-    const { service, prisma, evolution } = buildService();
+    const { service, prisma, motor } = buildService();
     prisma.message.findUnique.mockResolvedValue(messageRow());
 
     await service.send("msg-1", false);
 
-    expect(evolution.sendText).toHaveBeenCalledWith("org-123", "5585999999999", "Olá, tudo bem?");
+    expect(motor.enviaTexto).toHaveBeenCalledWith("org-123", "5585999999999", "Olá, tudo bem?");
     expect(prisma.message.update).toHaveBeenCalledWith({
       where: { id: "msg-1" },
       data: { outboundStatus: "SENT", externalId: "3EB0SENT", sendError: null },
@@ -133,9 +132,9 @@ describe("WhatsAppSendService", () => {
   });
 
   it("keeps the message retryable (not FAILED) and re-throws when attempts remain", async () => {
-    const { service, prisma, evolution } = buildService();
+    const { service, prisma, motor } = buildService();
     prisma.message.findUnique.mockResolvedValue(messageRow());
-    evolution.sendText.mockRejectedValue(new EvolutionApiError("Connection Closed", 400));
+    motor.enviaTexto.mockRejectedValue(new Error("Connection Closed"));
 
     await expect(service.send("msg-1", false)).rejects.toThrow("Connection Closed");
 
@@ -146,9 +145,9 @@ describe("WhatsAppSendService", () => {
   });
 
   it("marks FAILED on the last configured attempt, and still re-throws so BullMQ records it", async () => {
-    const { service, prisma, evolution } = buildService();
+    const { service, prisma, motor } = buildService();
     prisma.message.findUnique.mockResolvedValue(messageRow());
-    evolution.sendText.mockRejectedValue(new EvolutionApiError("Connection Closed", 400));
+    motor.enviaTexto.mockRejectedValue(new Error("Connection Closed"));
 
     await expect(service.send("msg-1", true)).rejects.toThrow("Connection Closed");
 
@@ -161,9 +160,9 @@ describe("WhatsAppSendService", () => {
   });
 
   it("avisa quem está na tela só quando a mensagem realmente não vai mais sair", async () => {
-    const { service, prisma, evolution, notifications } = buildService();
+    const { service, prisma, motor, notifications } = buildService();
     prisma.message.findUnique.mockResolvedValue(messageRow());
-    evolution.sendText.mockRejectedValue(new EvolutionApiError("Connection Closed", 400));
+    motor.enviaTexto.mockRejectedValue(new Error("Connection Closed"));
 
     // Ainda há retentativa pela frente: a fila pode resolver sozinha, e um
     // alarme a cada tentativa encheria a tela de falso alarme. O erro sobe do
@@ -204,9 +203,9 @@ describe("WhatsAppSendService", () => {
      * lógica que já exclui uma OUTBOUND falhada do tempo de resposta.
      */
     it("não classifica quando o envio falhou", async () => {
-      const { service, prisma, evolution, classifier } = buildService();
+      const { service, prisma, motor, classifier } = buildService();
       prisma.message.findUnique.mockResolvedValue(messageRow());
-      evolution.sendText.mockRejectedValue(new EvolutionApiError("Connection Closed", 500));
+      motor.enviaTexto.mockRejectedValue(new Error("Connection Closed"));
 
       await expect(service.send("msg-1", true)).rejects.toThrow();
 

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../common/prisma/prisma.service";
-import { EvolutionClient } from "../../integrations/whatsapp/evolution-client";
+import { MotorWhatsApp } from "../../integrations/whatsapp/motor-whatsapp";
 import { ConversationClassifierService } from "../../classification/conversation-classifier.service";
 import { NotificationsService } from "../../notifications/notifications.service";
 
@@ -16,7 +16,7 @@ export class WhatsAppSendService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly evolution: EvolutionClient,
+    private readonly motor: MotorWhatsApp,
     private readonly classifier: ConversationClassifierService,
     private readonly notifications: NotificationsService,
   ) {}
@@ -54,11 +54,11 @@ export class WhatsAppSendService {
       return;
     }
 
-    // Dígitos sem "+" é o formato que a Evolution espera.
+    // Dígitos sem "+" é o formato do endereço no WhatsApp.
     const toPhoneDigits = message.conversation.lead.normalizedPhone.replace(/^\+/, "");
 
     try {
-      const result = await this.evolution.sendText(connection.instanceName, toPhoneDigits, message.text);
+      const result = await this.motor.enviaTexto(connection.instanceName, toPhoneDigits, message.text);
       await this.prisma.message.update({
         where: { id: messageId },
         data: { outboundStatus: "SENT", externalId: result.externalId, sendError: null },

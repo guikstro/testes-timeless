@@ -10,7 +10,6 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U tintim"]
       interval: 5s
@@ -50,44 +49,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-
-  # Fase 8: motor do provider EVOLUTION (conexão por QR Code). Fica isolado
-  # num container próprio de propósito — ele mantém a sessão do WhatsApp Web
-  # viva, o que tornaria nosso worker stateful se fosse embutido. Ver
-  # docs/WHATSAPP.md.
-  evolution:
-    # Namespace oficial atual do projeto: o antigo `atendai/evolution-api`
-    # deixou de ser público. Tag fixa (não `latest`) para o build ser
-    # reprodutível.
-    image: evoapicloud/evolution-api:v2.3.7
-    restart: unless-stopped
-    environment:
-      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-dev-evolution-key-change-me}
-      # Persistência da sessão no mesmo Postgres, para o número não cair a
-      # cada restart do container (sem isso, o QR precisa ser lido de novo).
-      DATABASE_ENABLED: "true"
-      DATABASE_PROVIDER: postgresql
-      DATABASE_CONNECTION_URI: postgresql://tintim:tintim@postgres:5432/evolution
-      DATABASE_SAVE_DATA_INSTANCE: "true"
-      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
-      CACHE_REDIS_ENABLED: "true"
-      CACHE_REDIS_URI: redis://redis:6379/2
-      CACHE_REDIS_PREFIX_KEY: evolution
-      CACHE_LOCAL_ENABLED: "false"
-      # Só os eventos que este produto realmente consome — evita ruído e
-      # trabalho inútil de rede a cada mudança de presença/typing.
-      WEBHOOK_GLOBAL_ENABLED: "false"
-      QRCODE_LIMIT: "10"
-      LOG_LEVEL: ERROR
-    ports:
-      - "8080:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      - evolution_instances:/evolution/instances
 
   api:
     build:
@@ -131,40 +92,6 @@ services:
     # real serem encerradas com ordem.
     stop_grace_period: 20s
     command: sh -c "pnpm --filter api prisma:generate && pnpm --filter api prisma:migrate:deploy && pnpm --filter api start:dev"
-
-  worker:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
-      target: dev
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      # O produto é brasileiro e todo relatório é lido em horário de Brasília.
-      # Sem isto o Node conta os dias em UTC, e um lead das 22h aparece no dia
-      # seguinte no gráfico, no mapa de horários e na virada do mês.
-      TZ: America/Sao_Paulo
-      # O site fica na frente da API e repassa o IP de quem chamou. Sem este
-      # salto de confiança, toda tentativa de login apareceria com o IP do
-      # contêiner do site e o limite contaria todos os clientes juntos.
-      TRUST_PROXY: "1"
-      # DATABASE_URL vem do .env (Supabase).
-      REDIS_URL: redis://redis:6379
-    depends_on:
-      redis:
-        condition: service_healthy
-    volumes:
-      - ./apps/api:/app/apps/api
-      - ./packages:/app/packages
-      - /app/apps/api/node_modules
-      - /app/node_modules
-    # Tempo para terminar o job que está na mão antes de ser morto. O padrão de
-    # dez segundos é curto para uma sincronia que está no meio de uma chamada à
-    # Meta, e um job cortado volta como travado.
-    stop_grace_period: 40s
-    # Mesmo motivo do serviço `api` acima: volume anônimo, client próprio.
-    command: sh -c "pnpm --filter api prisma:generate && pnpm --filter api start:worker:dev"
 
   web:
     build:
@@ -234,4 +161,3 @@ volumes:
   uploads:
   postgres_data:
   redis_data:
-  evolution_instances:

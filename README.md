@@ -28,8 +28,8 @@ Meta Conversions API. Ver o escopo completo e as regras do produto em
 - **Frontend**: Next.js 15 (App Router) + TypeScript + Tailwind CSS
 - **Backend**: NestJS + TypeScript
 - **Banco**: PostgreSQL + Prisma ORM (migrations versionadas)
-- **Fila/cache**: Redis + BullMQ (worker dedicado — processa eventos do WhatsApp)
-- **WhatsApp (QR Code)**: [Evolution API](https://doc.evolution-api.com) em container próprio
+- **Fila/cache**: Redis + BullMQ (processadores rodam dentro da API — um processo só)
+- **WhatsApp (QR Code)**: [Baileys](https://github.com/WhiskeySockets/Baileys) dentro da API, sessão cifrada no Postgres
 - **Infra local**: Docker Compose
 
 ## Estrutura de pastas
@@ -48,7 +48,7 @@ tintim-clone/
 │   │   │   ├── attribution/        # AttributionEngine — clique -> lead (first-touch)
 │   │   │   ├── leads/              # leitura de leads (lista/detalhe com timeline + atribuição)
 │   │   │   ├── health/
-│   │   │   ├── worker/             # entrypoint do processo worker + processors (BullMQ)
+│   │   │   ├── worker/             # processors e agendas (BullMQ), carregados pela API
 │   │   │   └── common/       # prisma, guards, decorators, filters, logger, encryption, queue
 │   │   ├── prisma/           # schema.prisma, migrations/, seed.ts
 │   │   └── test/             # testes e2e (Jest + Supertest)
@@ -90,8 +90,8 @@ precisa duplicar nada.
 docker compose up -d
 ```
 
-Sobe Postgres, Redis, Evolution API (`:8080`, motor do WhatsApp por QR Code),
-API (`:3001`), worker e web (`:3000`). A API roda as migrations
+Sobe Postgres, Redis, API (`:3001`, que também roda as filas e o WhatsApp
+por QR Code) e web (`:3000`). A API roda as migrations
 automaticamente (`prisma migrate deploy`) antes de iniciar.
 
 > **Atenção ao alterar `prisma/schema.prisma` ou dependências:** os
@@ -124,7 +124,7 @@ Usuário de demonstração criado pelo seed:
 ### Portas
 
 Por padrão a API/Postgres/Redis deste projeto usam `3001` / `5433` / `6380`
-(host) para não colidir com outros stacks locais; a Evolution API usa `8080`.
+(host) para não colidir com outros stacks locais.
 Ajuste em `docker-compose.yml` e `.env` se preferir as portas padrão.
 
 ## Testes

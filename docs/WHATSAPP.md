@@ -1,5 +1,13 @@
 # Integração com WhatsApp
 
+> **Atualização (2026-09-26): a Evolution API foi removida.** O QR Code agora
+> roda dentro da própria API, com o Baileys (`integrations/whatsapp/motor-whatsapp.ts`),
+> e a sessão fica cifrada na tabela `sessoes_whatsapp`. Os eventos entram por
+> `WhatsAppWebhookService.enqueueEvolutionEvent`, no mesmo formato de antes, e
+> o enum `provider = EVOLUTION` continua significando "conexão por QR Code".
+> Não há mais webhook da Evolution, `EVOLUTION_*` nem worker separado: o que
+> este documento diz sobre eles é histórico.
+
 > **Status: implementado (Fase 3, reformulado na Fase 8).** Este documento
 > descreve o comportamento real do código em
 > `apps/api/src/whatsapp-webhook/`, `apps/api/src/integrations/whatsapp/` e
