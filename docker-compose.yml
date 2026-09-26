@@ -24,16 +24,15 @@ services:
   # imagem da aplicação precisa carregar o cliente de banco. Se a API cair, a
   # cópia continua acontecendo.
   backup:
-    image: postgres:16-alpine
+    # 17: o pg_dump precisa ser >= a versão do servidor (Supabase roda 15/17).
+    image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://tintim:tintim@postgres:5432/tintim
+      # O mesmo banco da API (Supabase), lido do .env.
+      DATABASE_URL: ${DATABASE_URL}
       # Uma cópia por dia, guardando as últimas trinta.
       BACKUP_INTERVAL_SECONDS: "86400"
       BACKUP_KEEP: "30"
-    depends_on:
-      postgres:
-        condition: service_healthy
     volumes:
       - ./docker/backup:/scripts:ro
       - backups:/backups
@@ -107,13 +106,11 @@ services:
       # salto de confiança, toda tentativa de login apareceria com o IP do
       # contêiner do site e o limite contaria todos os clientes juntos.
       TRUST_PROXY: "1"
-      DATABASE_URL: postgresql://tintim:tintim@postgres:5432/tintim
+      # DATABASE_URL vem do .env (Supabase).
       REDIS_URL: redis://redis:6379
     ports:
       - "3001:3001"
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     volumes:
@@ -152,11 +149,9 @@ services:
       # salto de confiança, toda tentativa de login apareceria com o IP do
       # contêiner do site e o limite contaria todos os clientes juntos.
       TRUST_PROXY: "1"
-      DATABASE_URL: postgresql://tintim:tintim@postgres:5432/tintim
+      # DATABASE_URL vem do .env (Supabase).
       REDIS_URL: redis://redis:6379
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     volumes:

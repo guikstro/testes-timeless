@@ -8,3 +8,4 @@ coverage/
 .env.local
 .DS_Store
 apps/api/prisma/dev.db
+.regas-main
