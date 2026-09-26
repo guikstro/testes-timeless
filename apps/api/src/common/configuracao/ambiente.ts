@@ -89,26 +89,9 @@ const EXIGENCIAS: Exigencia[] = [
     soEmProducao: true,
     processos: ["api"],
   },
-  {
-    nome: "EMAIL_TRANSPORTE",
-    porque:
-      "sem um transporte real, quem esquecer a senha fica trancado fora da conta para sempre",
-    soEmProducao: true,
-    confere: (valor) =>
-      valor.toLowerCase() === "smtp"
-        ? null
-        : "em produção só vale `smtp`; `registro` apenas escreve o e-mail no log e não entrega nada",
-  },
-  {
-    nome: "SMTP_HOST",
-    porque: "é para onde o e-mail é entregue",
-    soEmProducao: true,
-  },
-  {
-    nome: "EMAIL_REMETENTE",
-    porque: "é o endereço que aparece como remetente, e um domínio errado cai em spam",
-    soEmProducao: true,
-  },
+  // E-mail não é exigido: uso interno, sem SMTP. Com `registro` o link de
+  // recuperação de senha sai no log do servidor, onde só a equipe chega.
+  // ponytail: ao abrir para clientes, voltar a exigir EMAIL_TRANSPORTE=smtp e SMTP_HOST.
   {
     nome: "PUBLIC_TRACKING_BASE_URL",
     porque: "entra no endereço público dos links e das imagens, e fica gravado no banco",

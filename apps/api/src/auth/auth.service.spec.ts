@@ -151,6 +151,21 @@ describe("AuthService", () => {
         }),
       ).rejects.toMatchObject({ response: { code: "EMAIL_ALREADY_IN_USE" } });
     });
+
+    it("fecha o cadastro em produção quando já existem 4 contas", async () => {
+      const ambiente = process.env.NODE_ENV;
+      process.env.NODE_ENV = "production";
+      prisma.user.count = jest.fn().mockResolvedValue(4);
+
+      try {
+        await expect(
+          service.register({ name: "Ana", email: "ana@example.com", password: "password123", organizationName: "Acme" }),
+        ).rejects.toMatchObject({ response: { code: "LIMITE_DE_USUARIOS" } });
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+      } finally {
+        process.env.NODE_ENV = ambiente;
+      }
+    });
   });
 
   describe("login", () => {

@@ -14,8 +14,8 @@ import { ProvedorDeEmail } from "./provedor-de-email";
  * e o silêncio aqui é justamente não mandar o e-mail que alguém está
  * esperando para voltar a entrar na conta.
  *
- * Em produção, `confereAmbiente` recusa a subida com o provedor de registro,
- * então este caminho nunca fica ligado sem querer lá.
+ * Sem `EMAIL_TRANSPORTE=smtp`, nada é entregue: o e-mail só vai para o log.
+ * É o modo atual de produção (uso interno, ver `ambiente.ts`).
  */
 function escolheProvedor(): ProvedorDeEmail {
   const transporte = process.env.EMAIL_TRANSPORTE?.trim().toLowerCase() || "registro";

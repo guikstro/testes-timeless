@@ -75,31 +75,13 @@ describe("confereAmbiente", () => {
     expect(() => confereAmbiente("api", logger)).toThrow(/PUBLIC_TRACKING_BASE_URL/);
   });
 
-  it("recusa subir em produção com o provedor de registro", () => {
+  it("sobe em produção sem SMTP, com o e-mail só no log (uso interno)", () => {
     process.env.EMAIL_TRANSPORTE = "registro";
-
-    /*
-      O provedor de registro só escreve o e-mail no log.
-
-      Em produção isso significa que quem esquecer a senha fica trancado fora
-      da conta para sempre: o token é gerado, gravado, e nunca alcança
-      ninguém. É uma falha silenciosa, e por isso vira impedimento de subida.
-    */
-    expect(() => confereAmbiente("api", logger)).toThrow(/EMAIL_TRANSPORTE/);
-  });
-
-  it("exige para onde entregar e quem assina", () => {
     delete process.env.SMTP_HOST;
     delete process.env.EMAIL_REMETENTE;
 
-    try {
-      confereAmbiente("api", logger);
-      throw new Error("devia ter recusado");
-    } catch (erro) {
-      const mensagem = (erro as Error).message;
-      expect(mensagem).toContain("SMTP_HOST");
-      expect(mensagem).toContain("EMAIL_REMETENTE");
-    }
+    expect(() => confereAmbiente("api", logger)).not.toThrow();
+    expect(() => confereAmbiente("worker", logger)).not.toThrow();
   });
 
   it("não cobra do worker o que é só da API", () => {
@@ -107,12 +89,6 @@ describe("confereAmbiente", () => {
     delete process.env.PUBLIC_TRACKING_BASE_URL;
 
     expect(() => confereAmbiente("worker", logger)).not.toThrow();
-  });
-
-  it("cobra o e-mail do worker também, que é quem entrega", () => {
-    process.env.EMAIL_TRANSPORTE = "registro";
-
-    expect(() => confereAmbiente("worker", logger)).toThrow(/EMAIL_TRANSPORTE/);
   });
 
   it("fora de produção avisa em vez de impedir", () => {

@@ -17,7 +17,7 @@ import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { ChangeEmailDto } from "./dto/change-email.dto";
-import { enderecoDaAplicacao } from "../common/configuracao/ambiente";
+import { ehDesenvolvimento, enderecoDaAplicacao } from "../common/configuracao/ambiente";
 import { EmailService } from "../common/email/email.service";
 import { confirmacaoDeEmail, emailAlterado, recuperacaoDeSenha, senhaAlterada } from "../common/email/mensagens";
 import { AuditoriaService } from "../auditoria/auditoria.service";
@@ -35,6 +35,8 @@ const RESET_TOKEN_TTL_MS = 1000 * 60 * 60; // 1 hour
  */
 const EMAIL_CHANGE_TOKEN_TTL_MS = 1000 * 60 * 60 * 24;
 const BCRYPT_ROUNDS = 12;
+/** Uso interno: o cadastro público fecha depois desta quantidade de contas. */
+const LIMITE_DE_USUARIOS = 4;
 
 // Compared against on every login with an unknown e-mail so the bcrypt cost
 // is paid regardless — otherwise response time leaks whether an account
@@ -82,6 +84,17 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto, contexto?: ContextoDoCliente): Promise<TokenPair> {
+    // Só em produção: os testes e2e cadastram dezenas de contas.
+    // ponytail: contagem fora da transação, dois cadastros simultâneos podem passar
+    // de 4 por um. Aceitável para uso interno.
+    if (!ehDesenvolvimento() && (await this.prisma.user.count({ where: { deletedAt: null } })) >= LIMITE_DE_USUARIOS) {
+      throw new AppException(
+        "LIMITE_DE_USUARIOS",
+        `O cadastro está fechado: o limite de ${LIMITE_DE_USUARIOS} contas já foi atingido.`,
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) {
       throw new AppException("EMAIL_ALREADY_IN_USE", "Este e-mail já está em uso.", HttpStatus.CONFLICT);
