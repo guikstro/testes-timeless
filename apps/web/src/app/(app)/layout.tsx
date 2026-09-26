@@ -33,7 +33,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     try/catch não é zelo excessivo: sem ele, uma falha nesta consulta derruba
     o layout inteiro, e o app ficaria inacessível por causa de um indicador.
   */
-  const conexao = (await conexaoDoWhatsApp()) ?? null;
+  // Na área da Timeless o WhatsApp que importa é o de cada cliente, não o da própria conta.
+  const areaDaTimeless = Boolean(session.user.platformRole) && !session.impersonating;
+  const conexao = areaDaTimeless ? null : ((await conexaoDoWhatsApp()) ?? null);
 
   return (
     <NotificationProvider>
@@ -50,7 +52,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           logoUrl={session.organization.logoUrl}
           // Só na sessão própria do operador: de dentro de um cliente, o
           // caminho de volta é o botão "Sair do cliente".
-          showAdmin={Boolean(session.user.platformRole) && !session.impersonating}
+          showAdmin={areaDaTimeless}
           impersonating={session.impersonating}
         />
         <main className="min-w-0 flex-1">
@@ -72,7 +74,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               expande sobre este canto, e um indicador que some quando o mouse
               passa no menu não serve como sinal permanente.
             */}
-            <ConnectionStatus conexao={conexao} />
+            {areaDaTimeless ? null : <ConnectionStatus conexao={conexao} />}
             <NotificationBell />
           </div>
 

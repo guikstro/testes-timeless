@@ -113,3 +113,40 @@ Decisão do usuário: a lista de clientes fica no site (web), e não no painel a
 - Voltaram a ser removidos o link no nome do cliente e o botão "Novo cliente", porque as páginas agora estão no site.
 
 **Pré-requisito:** o usuário Timeless precisa de `platformRole` (`pnpm --filter api grant:admin <email>`) e da verificação em duas etapas ativa (Configurações → Segurança). Sem isso, a API recusa com 403.
+
+### Tela inicial depois do login (2026-09-26)
+- `app/page.tsx` escolhe o destino: operador da plataforma (fora de um cliente) vai para `/clientes`; os outros usuários, para `/dashboard`. Se a sessão falhar, vai para `/dashboard`, que renova a sessão ou manda ao login.
+- `login-form.tsx`: depois do login (e do código de duas etapas), vai para `/` em vez de `/dashboard`. O `?next=` continua valendo.
+- "Entrar no painel do cliente" (`/entrar-como`) continua abrindo o `/dashboard` do cliente.
+
+### Operador da plataforma sem o Shell do Render (2026-09-26)
+- O plano do Render não dá acesso ao Shell. Em vez do `grant:admin`, rodei direto no Supabase via `psql`: `update users set platform_role = 'ADMIN' where email = 'mozyc.art@gmail.com'`.
+- Única conta existente: `mozyc.art@gmail.com` → ADMIN. A verificação em duas etapas ainda não está ativa, e o usuário precisa ativar em Configurações → Segurança.
+
+### Toda conta nova nasce operadora da plataforma (2026-09-26)
+- Pedido do usuário: toda conta criada deve ser admin; depois essa pessoa adiciona outras e dá cargos.
+- `auth.service.ts` (`register`): `user.create` com `platformRole: "ADMIN"`. O teste do cadastro confere isso.
+- O que segura o acesso: o limite de 4 contas e a verificação em duas etapas, que o `PlatformAdminGuard` exige.
+- Lacuna encontrada: não existe "adicionar pessoa". A aba Equipe só lista, muda cargo e remove. Hoje conta nova só nasce pelo `/register`, que também cria uma organização nova. Isso fica para uma próxima tarefa, se o usuário quiser.
+
+### Área da Timeless separada da área do cliente (2026-09-26)
+"Área da Timeless" é o operador da plataforma fora de um cliente (`platformRole && !impersonating`).
+
+**Área da Timeless**
+- Menu (`app-nav.tsx`, `ITENS_DA_TIMELESS`): só **Clientes**, **Relatório geral** e **Configurações**.
+- Configurações (`settings/page.tsx`): só as abas **Equipe, Aparência e Segurança**, com a Equipe aberta por padrão.
+- Barra do topo (`layout.tsx`): sem o aviso do WhatsApp, porque o WhatsApp que importa é o de cada cliente.
+- **Relatório geral** (novo, `/relatorio-geral`): totais de clientes, WhatsApp conectado, leads, vendas e receita. Tabela por cliente, ordenada por receita, com conversão.
+  - Usa `GET /admin/organizations`, sem endpoint novo.
+  - Os números são de todo o histórico; não há filtro por período.
+
+**Dentro do cliente** (depois de "Entrar no painel do cliente")
+- O menu completo do cliente, como antes.
+- As Configurações perdem Equipe, Aparência e Segurança: ficam Operação e Auditoria.
+
+`middleware.ts` protege `/relatorio-geral`.
+
+### Link do WhatsApp abria "Cannot GET" (2026-09-26)
+- Causa: no Render, o `WEB_APP_URL` da API apontava para a própria API (`crm-timeless.onrender.com`). O link é montado com `enderecoDaAplicacao()`, que é a primeira origem do `WEB_APP_URL`.
+- Correção (configuração, sem código): `WEB_APP_URL=https://timeless-crm.onrender.com`, que é o site Next. Também corrigido no `.env` local.
+- Conferido no site: a página `/conectar-whatsapp/<token>` responde 200, e o proxy `/api/publico/whatsapp/<token>` com token inválido responde 404 `LINK_INVALIDO`.

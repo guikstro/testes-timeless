@@ -23,10 +23,17 @@ const ABAS = [
 /** Só dono e administrador veem a auditoria; é a mesma regra da API. */
 const PAPEIS_QUE_VEEM_AUDITORIA: Papel[] = ["OWNER", "ADMIN"];
 
+/**
+ * Configurações da conta de quem opera a plataforma. Na área da Timeless são
+ * só estas; dentro de um cliente elas saem, porque ali o que se configura é
+ * o cliente.
+ */
+const DA_CONTA: Aba[] = ["equipe", "aparencia", "seguranca"];
+
 type Aba = (typeof ABAS)[number]["chave"];
 
 interface Sessao {
-  user: { id: string; name: string; email: string };
+  user: { id: string; name: string; email: string; platformRole: "SUPPORT" | "ADMIN" | null };
   role: Papel;
   impersonating: boolean;
 }
@@ -42,13 +49,22 @@ export default async function SettingsPage({
   // então vem antes de escolher o que buscar.
   const sessao = await apiFetch<Sessao>("/auth/session");
 
-  const abas = ABAS.filter((opcao) => opcao.chave !== "auditoria" || PAPEIS_QUE_VEEM_AUDITORIA.includes(sessao.role));
-  const atual: Aba = abas.some((opcao) => opcao.chave === aba) ? (aba as Aba) : "operacao";
+  const areaDaTimeless = Boolean(sessao.user.platformRole) && !sessao.impersonating;
+  const abas = ABAS.filter((opcao) => {
+    if (areaDaTimeless) return DA_CONTA.includes(opcao.chave);
+    if (sessao.impersonating && DA_CONTA.includes(opcao.chave)) return false;
+    return opcao.chave !== "auditoria" || PAPEIS_QUE_VEEM_AUDITORIA.includes(sessao.role);
+  });
+  const atual: Aba = abas.some((opcao) => opcao.chave === aba) ? (aba as Aba) : abas[0].chave;
 
   return (
     <div className="mx-auto max-w-4xl">
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Configurações</h1>
-      <p className="mt-1 text-corpo text-ink-mute">Identidade, gatilhos, credenciais, quem tem acesso e o que foi feito.</p>
+      <p className="mt-1 text-corpo text-ink-mute">
+        {areaDaTimeless
+          ? "Sua conta e a equipe Timeless: quem tem acesso, a aparência e a segurança."
+          : "Identidade, gatilhos, credenciais, quem tem acesso e o que foi feito."}
+      </p>
 
       {/*
         Abas em vez de uma página só. O conteúdo já não cabia numa rolagem

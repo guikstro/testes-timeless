@@ -96,7 +96,7 @@ export function LoginForm() {
       // sempre de quem provou ser quem diz ser neste navegador.
       gravarUltimoNome(body?.firstName ?? null);
 
-      router.push(searchParams.get("next") ?? "/dashboard");
+      router.push(searchParams.get("next") ?? "/");
       router.refresh();
     } catch {
       setError("Sem conexão com o servidor.");
@@ -133,7 +133,7 @@ export function LoginForm() {
 
       const body = await response.json().catch(() => null);
       gravarUltimoNome(body?.firstName ?? null);
-      router.push(searchParams.get("next") ?? "/dashboard");
+      router.push(searchParams.get("next") ?? "/");
       router.refresh();
     } catch {
       setError("Sem conexão com o servidor.");

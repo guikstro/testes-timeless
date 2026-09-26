@@ -113,8 +113,11 @@ export class AuthService {
           data: { name: dto.organizationName, slug: await slugLivre(tx, dto.organizationName) },
         });
 
+        // Uso interno: toda conta criada já é operadora da plataforma. O que
+        // segura o acesso é o limite de contas acima e a verificação em duas
+        // etapas, que o PlatformAdminGuard exige para ver os clientes.
         const user = await tx.user.create({
-          data: { name: dto.name, email: dto.email, passwordHash },
+          data: { name: dto.name, email: dto.email, passwordHash, platformRole: "ADMIN" },
         });
 
         const membership = await tx.membership.create({

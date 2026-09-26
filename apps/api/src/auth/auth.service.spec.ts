@@ -90,6 +90,7 @@ describe("AuthService", () => {
   describe("register", () => {
     it("creates an organization, a user, and an OWNER membership, then returns tokens", async () => {
       prisma.user.findUnique.mockResolvedValue(null);
+      const criaUsuario = jest.fn().mockResolvedValue({ id: "user-1" });
 
       prisma.$transaction.mockImplementationOnce(async (callback: (tx: unknown) => unknown) => {
         const txStub = {
@@ -97,7 +98,7 @@ describe("AuthService", () => {
             findUnique: jest.fn().mockResolvedValue(null),
             create: jest.fn().mockResolvedValue({ id: "org-1", slug: "acme" }),
           },
-          user: { create: jest.fn().mockResolvedValue({ id: "user-1" }) },
+          user: { create: criaUsuario },
           membership: {
             create: jest.fn().mockResolvedValue({ organizationId: "org-1", userId: "user-1", role: "OWNER" }),
           },
@@ -115,6 +116,8 @@ describe("AuthService", () => {
       expect(result.accessToken).toEqual(expect.any(String));
       expect(result.refreshToken).toEqual(expect.any(String));
       expect(prisma.refreshToken.create).toHaveBeenCalledTimes(1);
+      // Uso interno: toda conta nova já nasce operadora da plataforma.
+      expect(criaUsuario).toHaveBeenCalledWith({ data: expect.objectContaining({ platformRole: "ADMIN" }) });
     });
 
     it("rejects registration when the e-mail is already in use", async () => {

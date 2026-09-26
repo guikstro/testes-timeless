@@ -12,7 +12,7 @@ import {
 // removido na Fase 9. "/admin" saiu quando a administração virou site
 // próprio, com sessão, cookies e middleware dela — este aqui não a alcança
 // mais, e manter o caminho na lista daria a impressão de que alcança.
-const PROTECTED_PREFIXES = ["/dashboard", "/conversas", "/leads", "/links", "/integrations", "/settings", "/campanhas", "/verba", "/relatorio", "/notifications", "/clientes"];
+const PROTECTED_PREFIXES = ["/dashboard", "/conversas", "/leads", "/links", "/integrations", "/settings", "/campanhas", "/verba", "/relatorio", "/notifications", "/clientes", "/relatorio-geral"];
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
 
 export async function middleware(request: NextRequest) {
@@ -84,5 +84,6 @@ export const config = {
     "/relatorio/:path*",
     "/notifications/:path*",
     "/clientes/:path*",
+    "/relatorio-geral/:path*",
   ],
 };

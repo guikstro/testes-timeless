@@ -157,6 +157,18 @@ const ADMIN_ITEM: NavItem = {
   ),
 };
 
+const doCliente = (href: string) => NAV_ITEMS.find((item) => item.href === href)!;
+
+/**
+ * O menu da área da equipe Timeless: só o que é da plataforma. Dashboard,
+ * conversas, leads e o resto são de cada cliente e aparecem ao entrar nele.
+ */
+const ITENS_DA_TIMELESS: NavItem[] = [
+  ADMIN_ITEM,
+  { ...doCliente("/relatorio"), href: "/relatorio-geral", label: "Relatório geral" },
+  doCliente("/settings"),
+];
+
 /** O bloco com o nome da organização. Para a equipe Timeless, leva à lista de clientes. */
 function Identidade({ href, className, children }: { href: string | null; className: string; children: ReactNode }) {
   return href ? (
@@ -286,11 +298,9 @@ export function AppNav({
           </span>
         </Identidade>
 
-        <nav className="flex flex-1 flex-col gap-1">{NAV_ITEMS.map((item) => renderItem(item))}</nav>
+        <nav className="flex flex-1 flex-col gap-1">{(showAdmin ? ITENS_DA_TIMELESS : NAV_ITEMS).map((item) => renderItem(item))}</nav>
 
         <div className="flex flex-col gap-1 pt-2">
-          {showAdmin ? renderItem(ADMIN_ITEM) : null}
-
           <button
             type="button"
             onClick={() => setPinned((current) => !current)}
