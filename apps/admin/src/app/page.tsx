@@ -56,6 +56,7 @@ export default async function AdminOrganizationsPage({
           </p>
         </div>
 
+        <div className="flex flex-wrap items-center gap-2">
         <form className="flex gap-2">
           <input
             type="search"
@@ -71,6 +72,13 @@ export default async function AdminOrganizationsPage({
             Buscar
           </button>
         </form>
+          <Link
+            href="/clientes/novo"
+            className="focus-ring rounded-md bg-ink px-3 py-2 text-sm font-medium text-canvas hover:opacity-90"
+          >
+            Novo cliente
+          </Link>
+        </div>
       </div>
 
       {data.items.length === 0 ? (
@@ -94,7 +102,12 @@ export default async function AdminOrganizationsPage({
               {data.items.map((organization) => (
                 <tr key={organization.id} className="border-b border-line/60 last:border-0">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-ink">{organization.name}</p>
+                    <Link
+                      href={`/clientes/${organization.id}`}
+                      className="focus-ring rounded font-medium text-ink underline decoration-line underline-offset-4 hover:decoration-accent"
+                    >
+                      {organization.name}
+                    </Link>
                     <p className="text-xs text-ink-mute">
                       {organization.owner ? organization.owner.email : "sem responsável"}
                       {" · "}

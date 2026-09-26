@@ -55,3 +55,37 @@ Registro cumulativo do que foi feito em cada rodada. Só se adiciona; nada é ap
 - Foram removidas as duas linhas de espera que o pnpm tinha escrito no arquivo.
 - Build do Render reproduzido numa cópia limpa no disco C: (`pnpm install --frozen-lockfile` + `pnpm --filter api build`), sem erro.
 - A API compilada carrega o `baileys` e o `libsignal@6.0.0`.
+
+### Gestão de clientes e link externo do WhatsApp (2026-09-26)
+Decisões do usuário: a gestão fica na aba Clientes do painel da plataforma; "Novo cliente" cria só a organização; o link vale 24 h.
+
+**API**
+- `POST /admin/organizations`: cria cliente.
+- `GET /admin/organizations/:id/whatsapp`: status do WhatsApp do cliente.
+- `POST /admin/organizations/:id/whatsapp/link`: gera o link.
+- `POST /admin/organizations/:id/whatsapp/desconectar`: desconecta.
+- `GET /api/publico/whatsapp/:token`: rota pública, com limite de 30/min (`LINK_PUBLICO`).
+- `LinkDeConexaoService` (Redis):
+  - só o hash do token é guardado;
+  - vale 24 h e é de uso único;
+  - um link por organização;
+  - organização já conectada não reinicia o QR.
+- `slugLivre()` extraído do cadastro e reaproveitado na criação de cliente.
+
+**Admin (apps/admin)**
+- O nome do cliente na lista abre `/clientes/[id]` (status, número, gerar/copiar link, desconectar).
+- A página atualiza sozinha a cada 5 s enquanto espera a leitura do QR.
+- Novo: `/clientes/novo`.
+
+**Site (apps/web)**
+- Página pública `/conectar-whatsapp/[token]` (sem login, `referrer: no-referrer`, noindex) e proxy `/api/publico/whatsapp/[token]`.
+- Assinatura VIGO adicionada em `app/page.tsx`.
+
+**Verificação**
+- `tsc` da API, do site e do admin sem erro.
+- 67 testes passaram, com 6 novos em `link-de-conexao.service.spec.ts`: hash, isolamento entre clientes, uso único e invalidação do link anterior.
+
+**Pendente no Render**
+- Apagar o serviço "CRM TMLSS-work" (worker antigo).
+- Publicar o admin como Web Service free.
+- Criar o operador com `grant:admin` e ativar o MFA.

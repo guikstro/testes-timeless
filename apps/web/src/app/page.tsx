@@ -1,3 +1,8 @@
+/*
+     /\___/\
+    ( ⌐■_■ )    VIGO
+     >  ᴥ  <    by mozycking
+*/
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { ACCESS_TOKEN_COOKIE } from "@/lib/session";

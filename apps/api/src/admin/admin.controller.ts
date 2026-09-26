@@ -22,6 +22,7 @@ import { AdminService } from "./admin.service";
 import { EntregaDeSessaoService } from "./entrega/entrega-de-sessao.service";
 import { ListOrganizationsDto } from "./dto/list-organizations.dto";
 import { UpsertOperatorDto } from "./dto/upsert-operator.dto";
+import { CriaClienteDto } from "./dto/cria-cliente.dto";
 
 /**
  * Rotas do operador da plataforma. A ordem dos guards importa: `JwtAuthGuard`
@@ -39,6 +40,28 @@ export class AdminController {
   @Get("organizations")
   listOrganizations(@Query() query: ListOrganizationsDto) {
     return this.adminService.listOrganizations(query, query.search);
+  }
+
+  /** "Novo cliente": só a organização. Quem usa a conta entra pelo link do WhatsApp ou pelo suporte. */
+  @Post("organizations")
+  criaCliente(@CurrentUser() user: AuthenticatedUser, @Body() dto: CriaClienteDto) {
+    return this.adminService.criaCliente(user.userId, dto.nome);
+  }
+
+  @Get("organizations/:id/whatsapp")
+  whatsappDoCliente(@Param("id", ParseUUIDPipe) id: string) {
+    return this.adminService.whatsappDoCliente(id);
+  }
+
+  @Post("organizations/:id/whatsapp/link")
+  geraLinkDoWhatsApp(@CurrentUser() user: AuthenticatedUser, @Param("id", ParseUUIDPipe) id: string) {
+    return this.adminService.geraLinkDoWhatsApp(user.userId, id);
+  }
+
+  @Post("organizations/:id/whatsapp/desconectar")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  desconectaWhatsApp(@CurrentUser() user: AuthenticatedUser, @Param("id", ParseUUIDPipe) id: string): Promise<void> {
+    return this.adminService.desconectaWhatsApp(user.userId, id);
   }
 
   @Post("organizations/:id/impersonate")

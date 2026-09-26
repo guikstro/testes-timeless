@@ -24,6 +24,8 @@ describe("AdminService", () => {
       prisma as unknown as PrismaService,
       auth as unknown as AuthService,
       new AuditoriaService(prisma as unknown as PrismaService),
+      {} as never,
+      {} as never,
     );
     return { service, prisma, auth };
   }

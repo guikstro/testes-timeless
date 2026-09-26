@@ -1,5 +1,12 @@
 # Plano: link externo para o cliente conectar o WhatsApp
 
+> **Decisões do usuário (2026-09-26), que substituem as perguntas em aberto e a decisão 6:**
+> - **Onde:** a gestão fica no **painel da plataforma (apps/admin), na aba Clientes**. O nome do cliente abre a página dele, com o WhatsApp (status, gerar link, desconectar), e a aba ganha o botão **Novo cliente**.
+> - **Novo cliente:** cria só a organização (nome). Não gera usuário nem ocupa vaga do limite de 4 contas.
+> - **Validade do link:** 24 h.
+> - **Página pública:** fica no site (web).
+> - **Isolamento:** tudo é por organização (instância `org-<id>`, link com hash próprio), e um cliente não afeta o outro.
+
 ## Objetivo
 
 A equipe gera um **link temporário** e envia ao cliente. O cliente abre o link

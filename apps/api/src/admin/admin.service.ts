@@ -6,6 +6,9 @@ import { PaginatedResult, PaginationQueryDto } from "../common/dto/pagination.dt
 import { AuthService } from "../auth/auth.service";
 import { AuditoriaService } from "../auditoria/auditoria.service";
 import { UpsertOperatorDto } from "./dto/upsert-operator.dto";
+import { slugLivre } from "../common/utils/slug-livre";
+import { WhatsAppConnectionsService } from "../integrations/whatsapp/whatsapp-connections.service";
+import { LinkDeConexaoService, LinkGerado } from "../integrations/whatsapp/link-de-conexao.service";
 
 /**
  * Prazo absoluto de uma visita a um cliente. Curto de propósito: o caso de
@@ -31,6 +34,8 @@ export class AdminService {
     private readonly prisma: PrismaService,
     private readonly auth: AuthService,
     private readonly auditoria: AuditoriaService,
+    private readonly conexoes: WhatsAppConnectionsService,
+    private readonly links: LinkDeConexaoService,
   ) {}
 
   /** Lista os clientes com os números que dizem se a conta está viva ou parada. */
@@ -278,5 +283,67 @@ export class AdminService {
     ]);
 
     return { items, total, offset, limit };
+  }
+
+  async criaCliente(operadorId: string, nome: string): Promise<{ id: string; name: string }> {
+    const cliente = await this.prisma.$transaction(async (tx) =>
+      tx.organization.create({ data: { name: nome, slug: await slugLivre(tx, nome) }, select: { id: true, name: true } }),
+    );
+    await this.auditoria.registra(
+      { organizationId: cliente.id, userId: operadorId, impersonating: true },
+      { acao: "ORGANIZATION_UPDATED", entidade: "Organization", entidadeId: cliente.id, antes: null, depois: { nome, criadaPor: "painel da plataforma" } },
+    );
+    return cliente;
+  }
+
+  /** O WhatsApp de um cliente, como a página dele no painel mostra. */
+  async whatsappDoCliente(organizationId: string) {
+    const organizacao = await this.exigeCliente(organizationId);
+    const [conexao, linkExpiraEm] = await Promise.all([
+      this.conexoes.getCurrent(organizationId),
+      this.links.expiracao(organizationId),
+    ]);
+    return {
+      organizacao,
+      conexao: conexao && {
+        status: conexao.status,
+        provider: conexao.provider,
+        numero: conexao.displayPhoneNumber,
+        ultimoEventoEm: conexao.lastEventAt,
+      },
+      linkExpiraEm,
+    };
+  }
+
+  async geraLinkDoWhatsApp(operadorId: string, organizationId: string): Promise<LinkGerado> {
+    await this.exigeCliente(organizationId);
+    const link = await this.links.gera(organizationId);
+    await this.auditoria.registra(
+      { organizationId, userId: operadorId, impersonating: true },
+      { acao: "INTEGRATION_UPDATED", entidade: "LinkDeConexaoWhatsApp", entidadeId: organizationId, depois: { integracao: "WhatsApp", linkExpiraEm: link.expiraEm } },
+    );
+    return link;
+  }
+
+  async desconectaWhatsApp(operadorId: string, organizationId: string): Promise<void> {
+    await this.exigeCliente(organizationId);
+    const antes = await this.conexoes.getCurrent(organizationId);
+    await this.links.encerra(organizationId);
+    if (!antes) return;
+
+    await this.conexoes.disconnect(organizationId);
+    await this.auditoria.registra(
+      { organizationId, userId: operadorId, impersonating: true },
+      { acao: "INTEGRATION_DISCONNECTED", entidade: "WhatsAppConnection", entidadeId: antes.id, antes: { integracao: "WhatsApp", numero: antes.displayPhoneNumber } },
+    );
+  }
+
+  private async exigeCliente(organizationId: string): Promise<{ id: string; name: string }> {
+    const organizacao = await this.prisma.organization.findFirst({
+      where: { id: organizationId, deletedAt: null },
+      select: { id: true, name: true },
+    });
+    if (!organizacao) throw new AppException("ORGANIZATION_NOT_FOUND", "Cliente não encontrado.", HttpStatus.NOT_FOUND);
+    return organizacao;
   }
 }

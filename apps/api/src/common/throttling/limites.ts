@@ -45,3 +45,9 @@ export const CLIQUES_CONTADOS = { ttl: MINUTO, limit: 120, blockDuration: MINUTO
  * vezes o teto de contagem: quem passa daqui não está clicando em anúncio.
  */
 export const REDIRECIONAMENTO = { ttl: MINUTO, limit: 600 };
+
+/**
+ * A página pública do link de conexão do WhatsApp consulta o QR a cada 5 s
+ * (12 por minuto). 30 cobre duas abas abertas; acima disso é abuso.
+ */
+export const LINK_PUBLICO = { ttl: MINUTO, limit: 30 };

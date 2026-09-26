@@ -8,7 +8,7 @@ import { MembershipRole } from "@prisma/client";
 import { MfaService } from "./mfa/mfa.service";
 import { decideRenovacao } from "./sessoes/decide-renovacao";
 import { ContextoDoCliente } from "./sessoes/contexto-do-cliente";
-import { slugify } from "../common/utils/slugify";
+import { slugLivre } from "../common/utils/slug-livre";
 import { hashToken } from "../common/utils/hash-token";
 import { isUniqueConstraintError } from "../common/utils/is-unique-constraint-error";
 import { RegisterDto } from "./dto/register.dto";
@@ -101,7 +101,6 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
-    const baseSlug = slugify(dto.organizationName) || "org";
 
     // The findUnique-then-create checks above and below are not atomic, so
     // two identical requests can race past both checks; the unique
@@ -110,18 +109,8 @@ export class AuthService {
     let result: { user: { id: string }; membership: { organizationId: string; role: JwtPayload["role"] } };
     try {
       result = await this.prisma.$transaction(async (tx) => {
-        let slug = baseSlug;
-        let suffix = 0;
-
-        for (;;) {
-          const collision = await tx.organization.findUnique({ where: { slug } });
-          if (!collision) break;
-          suffix += 1;
-          slug = `${baseSlug}-${suffix}`;
-        }
-
         const organization = await tx.organization.create({
-          data: { name: dto.organizationName, slug },
+          data: { name: dto.organizationName, slug: await slugLivre(tx, dto.organizationName) },
         });
 
         const user = await tx.user.create({

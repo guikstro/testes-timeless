@@ -2,6 +2,8 @@
 
 Plano e decisões: [`plan-link-whatsapp.md`](plan-link-whatsapp.md).
 
+> **Implementado em 2026-09-26, com as decisões do usuário.** A geração e o controle ficaram no painel da plataforma (aba Clientes → página do cliente), e não na tela do cliente. A auditoria usa as ações que já existem (`INTEGRATION_UPDATED`, `INTEGRATION_CONNECTED`, `INTEGRATION_DISCONNECTED`, `ORGANIZATION_UPDATED`), sem migration. O `Referrer-Policy` vai pelo metadata da página. Checkpoints no Render: pendentes.
+
 Verificação (em `apps/api`): `node ../../node_modules/jest/bin/jest.js <spec>`,
 `node ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json`.
 No web: `pnpm --filter web typecheck`.
@@ -10,7 +12,7 @@ No web: `pnpm --filter web typecheck`.
 
 ## Fase 1: o caminho completo
 
-### [ ] T1: A equipe gera o link na tela de WhatsApp
+### [x] T1: A equipe gera o link na tela de WhatsApp
 
 **Descrição:** Criar o `LinkDeConexaoService` com Redis e TTL, no padrão do
 `EntregaDeSessaoService`:
@@ -39,7 +41,7 @@ e o spec dele, `whatsapp-connections.controller.ts`,
 `web/src/app/(app)/integrations/whatsapp/page.tsx` e `actions.ts`.
 **Tamanho:** M.
 
-### [ ] T2: O cliente abre o link, vê o QR e conecta
+### [x] T2: O cliente abre o link, vê o QR e conecta
 
 **Descrição:** Criar a rota pública `GET /publico/whatsapp/:token`, sem JWT.
 Ela resolve o token e chama `connectViaQrCode` (na primeira vez) e depois
@@ -77,7 +79,7 @@ e o spec dele, `whatsapp-connections.module.ts`,
 
 ## Fase 2: travas e acabamento
 
-### [ ] T3: Uso único, organização já conectada e novo link invalidando o antigo
+### [x] T3: Uso único, organização já conectada e novo link invalidando o antigo
 
 **Descrição:**
 - Quando o status vira CONNECTED, apagar o link da organização. O ponto de
@@ -100,7 +102,7 @@ e o spec dele, `whatsapp-connections.module.ts`,
 `link-publico.controller.ts`, `whatsapp-connections.service.ts`.
 **Tamanho:** S.
 
-### [ ] T4: Auditoria e limite de requisições da rota pública
+### [x] T4: Auditoria e limite de requisições da rota pública
 
 **Descrição:**
 - Criar o limite `LINK_PUBLICO` (por exemplo, 30 por minuto por IP) com
@@ -125,7 +127,7 @@ migration nova, `link-publico.controller.ts`, `link-de-conexao.service.ts`,
 `web/next.config.ts`.
 **Tamanho:** M.
 
-### [ ] T5: A plataforma atualiza para "Conectado" sozinha
+### [x] T5: A plataforma atualiza para "Conectado" sozinha
 
 **Descrição:** Enquanto houver um link ativo, a tela de WhatsApp da
 organização consulta o status a cada 5 s, com o mesmo polling do QR. Quando o
