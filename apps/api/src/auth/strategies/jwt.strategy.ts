@@ -61,12 +61,27 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       }
     }
 
+    // Só MEMBER tem áreas limitadas, e só ele paga a consulta. Lido do banco a
+    // cada requisição: tirar uma área vale na hora, sem esperar o token vencer.
+    let areas: string[] | null = null;
+    if (payload.role === "MEMBER" && payload.impersonating !== true) {
+      const vinculo = await this.prisma.membership.findUnique({
+        where: { organizationId_userId: { organizationId: payload.organizationId, userId: payload.sub } },
+        select: { areas: true },
+      });
+      if (!vinculo) {
+        throw new AppException("SESSAO_ENCERRADA", "Seu acesso a esta conta foi removido.", HttpStatus.UNAUTHORIZED);
+      }
+      areas = vinculo.areas;
+    }
+
     return {
       userId: payload.sub,
       organizationId: payload.organizationId,
       role: payload.role,
       impersonating: payload.impersonating === true,
       sessaoId: payload.sid,
+      areas,
     };
   }
 }

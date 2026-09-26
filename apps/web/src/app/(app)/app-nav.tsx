@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode, useState } from "react";
 import { OrgLogo } from "@/components/ui/logo";
+import { podeVer } from "@/lib/areas";
 import { LeaveClientButton } from "./impersonation-banner";
 import { LogoutButton } from "./logout-button";
 
@@ -190,11 +191,13 @@ export function AppNav({
   logoUrl,
   showAdmin,
   impersonating = false,
+  areas = null,
 }: {
   organizationName: string;
   logoUrl?: string | null;
   showAdmin: boolean;
   impersonating?: boolean;
+  areas?: string[] | null;
 }) {
   const [pinned, setPinned] = useState(false);
   const pathname = usePathname();
@@ -298,7 +301,7 @@ export function AppNav({
           </span>
         </Identidade>
 
-        <nav className="flex flex-1 flex-col gap-1">{(showAdmin ? ITENS_DA_TIMELESS : NAV_ITEMS).map((item) => renderItem(item))}</nav>
+        <nav className="flex flex-1 flex-col gap-1">{(showAdmin ? ITENS_DA_TIMELESS : NAV_ITEMS.filter((item) => podeVer(areas, item.href))).map((item) => renderItem(item))}</nav>
 
         <div className="flex flex-col gap-1 pt-2">
           <button

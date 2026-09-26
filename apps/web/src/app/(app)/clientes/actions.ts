@@ -43,10 +43,12 @@ export async function geraLink(organizationId: string): Promise<LinkGerado | { e
 }
 
 /**
- * Entra no cliente para ver o painel dele. Troca a sessão deste navegador:
- * para voltar à Timeless, é "Sair do cliente" e entrar de novo.
+ * Pede o código de entrada no cliente. Devolve o destino em vez de
+ * redirecionar: um redirect de server action faz o Next visitar a rota duas
+ * vezes, e a primeira gastava o código de uso único. Quem navega é o botão.
+ * Troca a sessão deste navegador: para voltar à Timeless, é "Sair do cliente".
  */
-export async function entra(organizationId: string): Promise<{ error: string }> {
+export async function entra(organizationId: string): Promise<{ destino: string } | { error: string }> {
   let codigo: string;
   try {
     const resposta = await apiFetch<{ entrega: string }>(`/admin/organizations/${organizationId}/entrada`, { method: "POST" });
@@ -54,7 +56,7 @@ export async function entra(organizationId: string): Promise<{ error: string }> 
   } catch (error) {
     return { error: mensagemDe(error, "Não foi possível entrar neste cliente.") };
   }
-  redirect(`/entrar-como?codigo=${encodeURIComponent(codigo)}`);
+  return { destino: `/entrar-como?codigo=${encodeURIComponent(codigo)}` };
 }
 
 export async function desconecta(organizationId: string): Promise<{ error?: string }> {
@@ -64,5 +66,15 @@ export async function desconecta(organizationId: string): Promise<{ error?: stri
     return {};
   } catch (error) {
     return { error: mensagemDe(error, "Não foi possível desconectar.") };
+  }
+}
+
+export async function removePessoa(organizationId: string, userId: string): Promise<{ error?: string }> {
+  try {
+    await apiFetch(`/admin/organizations/${organizationId}/pessoas/${userId}`, { method: "DELETE" });
+    revalidatePath(`/clientes/${organizationId}`);
+    return {};
+  } catch (error) {
+    return { error: mensagemDe(error, "Não foi possível remover.") };
   }
 }

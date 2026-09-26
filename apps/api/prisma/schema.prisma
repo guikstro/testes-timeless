@@ -211,6 +211,8 @@ model Membership {
   organizationId String         @map("organization_id")
   userId         String         @map("user_id")
   role           MembershipRole @default(OWNER)
+  /// Áreas do painel que um MEMBER pode usar (ver `areas.decorator.ts`). OWNER/ADMIN ignoram.
+  areas          String[]       @default([])
   createdAt      DateTime       @default(now()) @map("created_at")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)

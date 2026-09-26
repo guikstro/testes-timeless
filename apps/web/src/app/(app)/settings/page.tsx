@@ -36,6 +36,7 @@ interface Sessao {
   user: { id: string; name: string; email: string; platformRole: "SUPPORT" | "ADMIN" | null };
   role: Papel;
   impersonating: boolean;
+  areas: string[] | null;
 }
 
 export default async function SettingsPage({
@@ -53,6 +54,8 @@ export default async function SettingsPage({
   const abas = ABAS.filter((opcao) => {
     if (areaDaTimeless) return DA_CONTA.includes(opcao.chave);
     if (sessao.impersonating && DA_CONTA.includes(opcao.chave)) return false;
+    // Quem tem áreas limitadas: a própria senha sempre; a operação, se tiver a área.
+    if (sessao.areas) return opcao.chave === "seguranca" || (opcao.chave === "operacao" && sessao.areas.includes("configuracoes"));
     return opcao.chave !== "auditoria" || PAPEIS_QUE_VEEM_AUDITORIA.includes(sessao.role);
   });
   const atual: Aba = abas.some((opcao) => opcao.chave === aba) ? (aba as Aba) : abas[0].chave;
@@ -88,7 +91,7 @@ export default async function SettingsPage({
       {atual === "seguranca" ? (
         <AbaSeguranca emailAtual={sessao.user.email} impersonando={sessao.impersonating} />
       ) : null}
-      {atual === "equipe" ? <AbaEquipe euId={sessao.user.id} meuPapel={sessao.role} /> : null}
+      {atual === "equipe" ? <AbaEquipe euId={sessao.user.id} meuPapel={sessao.role} areaDaTimeless={areaDaTimeless} /> : null}
       {atual === "auditoria" ? <AbaAuditoria filtro={{ categoria, pessoa, depoisDe }} /> : null}
     </div>
   );

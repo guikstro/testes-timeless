@@ -2,10 +2,14 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
 import { WhatsAppDoCliente, WhatsAppDoClienteDados } from "./whatsapp-do-cliente";
 import { CorDoCliente } from "../cor-do-cliente";
+import { PessoaDoCliente, PessoasDoCliente } from "./pessoas-do-cliente";
 
 export default async function ClientePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const dados = await apiFetch<WhatsAppDoClienteDados>(`/admin/organizations/${id}/whatsapp`);
+  const [dados, pessoas] = await Promise.all([
+    apiFetch<WhatsAppDoClienteDados>(`/admin/organizations/${id}/whatsapp`),
+    apiFetch<PessoaDoCliente[]>(`/admin/organizations/${id}/pessoas`),
+  ]);
 
   return (
     <div className="max-w-2xl">
@@ -17,6 +21,7 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
         {dados.organizacao.name}
       </h1>
       <WhatsAppDoCliente dados={dados} />
+      <PessoasDoCliente organizationId={id} pessoas={pessoas} />
     </div>
   );
 }

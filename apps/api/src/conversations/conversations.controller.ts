@@ -1,12 +1,14 @@
 import { Controller, Get, Query, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
+import { Areas } from "../common/decorators/areas.decorator";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { ConversationsService } from "./conversations.service";
 import { ListConversationsDto } from "./dto/list-conversations.dto";
 
 @Controller("conversations")
 @UseGuards(JwtAuthGuard)
+@Areas("conversas")
 export class ConversationsController {
   constructor(private readonly conversations: ConversationsService) {}
 

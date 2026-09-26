@@ -1,6 +1,7 @@
 import { Controller, Get, Query, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
+import { Areas } from "../common/decorators/areas.decorator";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { AuditoriaService } from "./auditoria.service";
 import { ListarAuditoriaDto } from "./dto/listar-auditoria.dto";
@@ -8,6 +9,7 @@ import { CATEGORIAS } from "./categorias";
 
 @Controller("auditoria")
 @UseGuards(JwtAuthGuard)
+@Areas("configuracoes")
 export class AuditoriaController {
   constructor(private readonly auditoria: AuditoriaService) {}
 

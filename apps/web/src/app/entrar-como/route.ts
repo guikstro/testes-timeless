@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { redireciona } from "@/lib/redireciona";
 import {
   ACCESS_TOKEN_COOKIE,
   ACCESS_TOKEN_MAX_AGE,
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
   const codigo = request.nextUrl.searchParams.get("codigo");
 
   if (!codigo) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return redireciona("/login");
   }
 
   const resposta = await fetch(`${API_URL}/auth/entrega`, {
@@ -41,9 +42,7 @@ export async function GET(request: NextRequest) {
       gasto. Sem o motivo, a tela de entrada apareceria sem explicação
       nenhuma depois de um clique que parecia certo.
     */
-    const destino = new URL("/login", request.url);
-    destino.searchParams.set("motivo", "entrada-expirada");
-    return NextResponse.redirect(destino);
+    return redireciona("/login?motivo=entrada-expirada");
   }
 
   const { accessToken, refreshToken } = await resposta.json();
@@ -56,7 +55,7 @@ export async function GET(request: NextRequest) {
     requisições seguintes. O redirecionamento o descarta na hora — ele já foi
     gasto, mas não há razão para deixá-lo à vista.
   */
-  const pronto = NextResponse.redirect(new URL("/dashboard", request.url));
+  const pronto = redireciona("/dashboard");
   pronto.cookies.set(ACCESS_TOKEN_COOKIE, accessToken, {
     ...SESSION_COOKIE_OPTIONS,
     maxAge: ACCESS_TOKEN_MAX_AGE,

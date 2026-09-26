@@ -44,6 +44,8 @@ export interface AuthenticatedUser {
   impersonating: boolean;
   /** A sessão desta requisição. É por ela que a tela sabe qual é "este aparelho". */
   sessaoId?: string;
+  /** Áreas que a pessoa pode usar. `null` é tudo (OWNER, ADMIN e operador dentro do cliente). */
+  areas?: string[] | null;
   /**
    * Preenchido pelo `PlatformAdminGuard` a partir do banco, nunca do token —
    * só existe nas rotas de administração, e evita uma segunda consulta no

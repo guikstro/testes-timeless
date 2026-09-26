@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Res, UseGuard
 import { Response } from "express";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { Areas } from "../../common/decorators/areas.decorator";
 import { AuthenticatedUser } from "../../auth/jwt-payload.interface";
 import { PaginationQueryDto } from "../../common/dto/pagination.dto";
 import { MetaConnectionsService } from "./meta-connections.service";
@@ -12,6 +13,7 @@ import { ConnectMetaCapiDto } from "./dto/connect-meta-capi.dto";
 
 @Controller("integrations/meta")
 @UseGuards(JwtAuthGuard)
+@Areas("integracoes")
 export class MetaConnectionsController {
   constructor(
     private readonly metaConnectionsService: MetaConnectionsService,
@@ -20,6 +22,7 @@ export class MetaConnectionsController {
   ) {}
 
   /** See the identical note in WhatsAppConnectionsController — Nest sends an empty body, not "null", for a null return value. */
+  @Areas("integracoes", "verba")
   @Get()
   async getCurrent(@CurrentUser() user: AuthenticatedUser, @Res() res: Response): Promise<void> {
     const result = await this.metaConnectionsService.getCurrent(user.organizationId);
@@ -32,6 +35,7 @@ export class MetaConnectionsController {
    * Rota separada da conexão porque responde outra pergunta. A de conexão diz
    * se o vínculo existe; esta diz se o dinheiro do outro lado está de pé.
    */
+  @Areas("integracoes", "verba")
   @Get("saude")
   saude(@CurrentUser() user: AuthenticatedUser) {
     return this.metaConnectionsService.saudeDaConta(user.organizationId);

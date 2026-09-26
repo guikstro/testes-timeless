@@ -15,6 +15,7 @@ interface SessionContext {
   user: { id: string; name: string; email: string; platformRole: "SUPPORT" | "ADMIN" | null };
   organization: { id: string; name: string; logoUrl: string | null; brandColor: string | null };
   impersonating: boolean;
+  areas: string[] | null;
 }
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -54,6 +55,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           // caminho de volta é o botão "Sair do cliente".
           showAdmin={areaDaTimeless}
           impersonating={session.impersonating}
+          areas={session.areas}
         />
         <main className="min-w-0 flex-1">
           {/*

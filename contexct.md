@@ -150,3 +150,39 @@ Decisão do usuário: a lista de clientes fica no site (web), e não no painel a
 - Causa: no Render, o `WEB_APP_URL` da API apontava para a própria API (`crm-timeless.onrender.com`). O link é montado com `enderecoDaAplicacao()`, que é a primeira origem do `WEB_APP_URL`.
 - Correção (configuração, sem código): `WEB_APP_URL=https://timeless-crm.onrender.com`, que é o site Next. Também corrigido no `.env` local.
 - Conferido no site: a página `/conectar-whatsapp/<token>` responde 200, e o proxy `/api/publico/whatsapp/<token>` com token inválido responde 404 `LINK_INVALIDO`.
+
+### "Entrar no painel do cliente" ia para localhost:10000 com entrada-expirada (2026-09-26)
+- O erro `isFeatureEnabled` vinha de `chromewebdata`, a página de erro do próprio Chrome. Não é do sistema.
+- **Causa 1:** atrás do proxy do Render, `request.url` é `http://localhost:10000`. Redirecionamentos com `new URL(..., request.url)` mandavam o navegador para lá.
+  - Correção: `lib/redireciona.ts` (`Location` relativo), usado em `entrar-como/route.ts` e no redirecionamento ao login do `middleware.ts`.
+- **Causa 2:** a server action `entra` fazia `redirect()` para um route handler. O Next busca a rota por dentro e depois faz a navegação completa, o que dá **duas visitas**: a primeira gastava o código de uso único e a segunda caía em "entrada-expirada".
+  - Correção: `entra` devolve `{ destino }`, e o botão faz `window.location.assign(destino)`, uma visita só.
+
+### Pessoas com acesso a um cliente e a áreas específicas (2026-09-26)
+Decisões do usuário: convite por link, um cliente por pessoa, cadastro público fechado. Plano em `tasks/plan-equipe.md`.
+
+**Banco**
+- Migration `20260926140000_areas_do_vinculo`: nova coluna `memberships.areas text[]`, que vale só para MEMBER.
+- Os MEMBER que já existiam receberam todas as áreas.
+
+**API**
+- A permissão é conferida na API: `@Areas(...)` nos controllers, checado no `JwtAuthGuard`.
+  - A rota aceita quem tiver **qualquer uma** das áreas listadas.
+  - O `JwtStrategy` carrega `areas` do vínculo a cada requisição, só para MEMBER. Sem vínculo, a sessão cai na hora.
+  - Mapa rota → áreas: `tasks/plan-equipe.md`.
+- Convites (`auth/convites`, Redis): guarda só o hash do token, vale 72 h, uso único (`GETDEL`).
+  - Um convite da equipe Timeless cria a conta com `platformRole` ADMIN.
+  - Um convite para cliente cria a conta como MEMBER, com as áreas marcadas.
+  - Rotas: `POST /admin/convites`, `GET/POST /publico/convites/:token`, `GET/DELETE /admin/organizations/:id/pessoas[/:userId]`. A remoção encerra as sessões da pessoa naquele cliente.
+- Cadastro: em produção, só a primeira conta de todas pode usar o `/register` (`CADASTRO_FECHADO`). A constante `LIMITE_DE_USUARIOS` foi removida.
+- `/auth/session` devolve `areas`.
+- Testes novos: `jwt-auth.guard.spec.ts` (4) e `convites.service.spec.ts` (5), mais um caso de MEMBER no `jwt.strategy.spec.ts`.
+
+**Site**
+- `lib/areas.ts`: a lista de áreas (`podeVer`, `telaInicial`, `rotuloDaArea`).
+- O menu filtra pelas áreas da pessoa. A tela inicial leva à primeira área permitida.
+- Configurações para MEMBER: Segurança sempre; Operação só se tiver a área de configurações.
+- Equipe (área da Timeless): novo card "Adicionar pessoa" (`adicionar-pessoa.tsx`, `convite-actions.ts`). O link gerado aparece com botão de copiar.
+- `/convite/[token]` (público, `no-referrer`) e o proxy `/api/convites/[token]`, que grava a sessão ao aceitar.
+- Página do cliente: "Pessoas com acesso", com botão para remover.
+- Login: o link "Criar organização" virou "Peça um convite à equipe Timeless".

@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
+import { Areas } from "../common/decorators/areas.decorator";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { ListLeadsDto } from "./dto/list-leads.dto";
 import { LeadsService } from "./leads.service";
@@ -9,6 +10,7 @@ import { SendMessageDto } from "./dto/send-message.dto";
 
 @Controller("leads")
 @UseGuards(JwtAuthGuard)
+@Areas("leads", "conversas")
 export class LeadsController {
   constructor(private readonly leadsService: LeadsService) {}
 

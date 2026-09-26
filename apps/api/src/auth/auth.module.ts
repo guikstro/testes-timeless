@@ -8,6 +8,8 @@ import { AdminModule } from "../admin/admin.module";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { SessoesController } from "./sessoes/sessoes.controller";
 import { SessoesService } from "./sessoes/sessoes.service";
+import { ConvitesService } from "./convites/convites.service";
+import { ConvitesController } from "./convites/convites.controller";
 
 @Module({
   imports: [
@@ -18,8 +20,8 @@ import { SessoesService } from "./sessoes/sessoes.service";
       secret: process.env.JWT_SECRET,
     }),
   ],
-  controllers: [AuthController, SessoesController],
-  providers: [AuthService, JwtStrategy, SessoesService],
-  exports: [AuthService],
+  controllers: [AuthController, SessoesController, ConvitesController],
+  providers: [AuthService, JwtStrategy, SessoesService, ConvitesService],
+  exports: [AuthService, ConvitesService],
 })
 export class AuthModule {}

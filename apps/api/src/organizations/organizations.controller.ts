@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
+import { Areas } from "../common/decorators/areas.decorator";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { OrganizationsService } from "./organizations.service";
 import { UpdateOrganizationDto } from "./dto/update-organization.dto";
@@ -10,9 +11,11 @@ import { EnviarLogoDto } from "./dto/enviar-logo.dto";
 
 @Controller("organizations")
 @UseGuards(JwtAuthGuard)
+@Areas("configuracoes")
 export class OrganizationsController {
   constructor(private readonly organizationsService: OrganizationsService) {}
 
+  @Areas()
   @Get("current")
   getCurrent(@CurrentUser() user: AuthenticatedUser) {
     return this.organizationsService.getCurrent(user.organizationId);

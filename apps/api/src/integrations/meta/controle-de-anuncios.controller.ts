@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/co
 import { NivelDoAnuncio } from "@prisma/client";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { Areas } from "../../common/decorators/areas.decorator";
 import { AuthenticatedUser } from "../../auth/jwt-payload.interface";
 import { ControleDeAnunciosService } from "./controle-de-anuncios.service";
 import { MudarOrcamentoDto } from "./dto/controle-de-anuncios.dto";
@@ -15,6 +16,7 @@ import { MudarOrcamentoDto } from "./dto/controle-de-anuncios.dto";
  */
 @Controller("controle-de-anuncios")
 @UseGuards(JwtAuthGuard)
+@Areas("verba")
 export class ControleDeAnunciosController {
   constructor(private readonly controle: ControleDeAnunciosService) {}
 

@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, Res, UseGuard
 import { Response } from "express";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { Areas } from "../../common/decorators/areas.decorator";
 import { AuthenticatedUser } from "../../auth/jwt-payload.interface";
 import { WhatsAppConnectionsService } from "./whatsapp-connections.service";
 import { ConnectWhatsAppDto } from "./dto/connect-whatsapp.dto";
@@ -10,6 +11,7 @@ import { RegraDeLeadsDto } from "./dto/regra-de-leads.dto";
 
 @Controller("integrations/whatsapp")
 @UseGuards(JwtAuthGuard)
+@Areas("integracoes")
 export class WhatsAppConnectionsController {
   constructor(
     private readonly whatsappConnectionsService: WhatsAppConnectionsService,
@@ -24,6 +26,7 @@ export class WhatsAppConnectionsController {
    * a frontend fetch's response.json() throws on it, which is exactly the
    * "no connection yet" case this endpoint exists to report.
    */
+  @Areas()
   @Get()
   async getCurrent(@CurrentUser() user: AuthenticatedUser, @Res() res: Response): Promise<void> {
     const result = await this.whatsappConnectionsService.getCurrent(user.organizationId);

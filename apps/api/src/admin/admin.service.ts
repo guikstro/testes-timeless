@@ -7,6 +7,9 @@ import { AuthService } from "../auth/auth.service";
 import { AuditoriaService } from "../auditoria/auditoria.service";
 import { UpsertOperatorDto } from "./dto/upsert-operator.dto";
 import { slugLivre } from "../common/utils/slug-livre";
+import { ConviteGerado, ConvitesService } from "../auth/convites/convites.service";
+import { AuthenticatedUser } from "../auth/jwt-payload.interface";
+import { CriaConviteDto } from "./dto/cria-convite.dto";
 import { WhatsAppConnectionsService } from "../integrations/whatsapp/whatsapp-connections.service";
 import { LinkDeConexaoService, LinkGerado } from "../integrations/whatsapp/link-de-conexao.service";
 
@@ -36,6 +39,7 @@ export class AdminService {
     private readonly auditoria: AuditoriaService,
     private readonly conexoes: WhatsAppConnectionsService,
     private readonly links: LinkDeConexaoService,
+    private readonly convites: ConvitesService,
   ) {}
 
   /** Lista os clientes com os números que dizem se a conta está viva ou parada. */
@@ -308,6 +312,62 @@ export class AdminService {
       { acao: "ORGANIZATION_UPDATED", entidade: "Organization", entidadeId: cliente.id, antes: null, depois: { nome, cor, criadaPor: "equipe da plataforma" } },
     );
     return cliente;
+  }
+
+  async criaConvite(operador: AuthenticatedUser, dto: CriaConviteDto): Promise<ConviteGerado> {
+    const paraCliente = dto.acesso === "cliente";
+    const organizationId = paraCliente ? (await this.exigeCliente(dto.organizationId!)).id : operador.organizationId;
+    const convite = await this.convites.cria({
+      organizationId,
+      email: dto.email,
+      papel: paraCliente ? "MEMBER" : "ADMIN",
+      areas: paraCliente ? dto.areas! : [],
+      operador: !paraCliente,
+    });
+    await this.auditoria.registra(
+      { organizationId, userId: operador.userId, impersonating: paraCliente },
+      {
+        acao: "ORGANIZATION_UPDATED",
+        entidade: "Convite",
+        entidadeId: organizationId,
+        depois: { convidado: dto.email, acesso: paraCliente ? "cliente" : "equipe Timeless", areas: dto.areas ?? "todas" },
+      },
+    );
+    return convite;
+  }
+
+  /** Quem tem acesso a um cliente, para a página dele no painel da Timeless. */
+  async pessoasDoCliente(organizationId: string) {
+    await this.exigeCliente(organizationId);
+    const vinculos = await this.prisma.membership.findMany({
+      where: { organizationId, user: { deletedAt: null } },
+      orderBy: { createdAt: "asc" },
+      select: { role: true, areas: true, user: { select: { id: true, name: true, email: true } } },
+    });
+    return vinculos.map((v) => ({ userId: v.user.id, nome: v.user.name, email: v.user.email, papel: v.role, areas: v.areas }));
+  }
+
+  /** Tira a pessoa do cliente e encerra as sessões dela lá na hora. */
+  async removePessoa(operadorId: string, organizationId: string, userId: string): Promise<void> {
+    await this.exigeCliente(organizationId);
+    const vinculo = await this.prisma.membership.findUnique({
+      where: { organizationId_userId: { organizationId, userId } },
+      select: { role: true, user: { select: { email: true } } },
+    });
+    if (!vinculo) throw new AppException("NOT_FOUND", "Esta pessoa não tem acesso a este cliente.", HttpStatus.NOT_FOUND);
+
+    const agora = new Date();
+    await this.prisma.$transaction([
+      this.prisma.membership.delete({ where: { organizationId_userId: { organizationId, userId } } }),
+      this.prisma.sessao.updateMany({
+        where: { userId, organizationId, encerradaEm: null },
+        data: { encerradaEm: agora, motivoDoEncerramento: "acesso removido pela equipe Timeless" },
+      }),
+    ]);
+    await this.auditoria.registra(
+      { organizationId, userId: operadorId, impersonating: true },
+      { acao: "MEMBER_REMOVED", entidade: "Membership", entidadeId: userId, antes: { email: vinculo.user.email, papel: vinculo.role } },
+    );
   }
 
   /** O WhatsApp de um cliente, como a página dele no painel mostra. */

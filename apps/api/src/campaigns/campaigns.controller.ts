@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPi
 import { AdPlatform } from "@prisma/client";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
+import { Areas } from "../common/decorators/areas.decorator";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { CampaignsService } from "./campaigns.service";
 import { CriarCampanhaManualDto, RegistrarGastoDto } from "./dto/manual-campaign.dto";
@@ -10,6 +11,7 @@ import { ImportarCsvDto, PreverCsvDto } from "./dto/importar-csv.dto";
 
 @Controller("campaigns")
 @UseGuards(JwtAuthGuard)
+@Areas("integracoes")
 export class CampaignsController {
   constructor(private readonly campaignsService: CampaignsService) {}
 
@@ -23,6 +25,7 @@ export class CampaignsController {
   }
 
   /** Investimento agregado por campanha na janela, para o relatório do cliente. */
+  @Areas("integracoes", "relatorio")
   @Get("investimento")
   investimento(@CurrentUser() user: AuthenticatedUser, @Query("days") days?: string) {
     const dias = Number(days);

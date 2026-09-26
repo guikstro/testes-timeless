@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { Areas } from "../../common/decorators/areas.decorator";
 import { AuthenticatedUser } from "../../auth/jwt-payload.interface";
 import { AppException } from "../../common/exceptions/app-exception";
 import { GoogleConversionsService } from "./google-conversions.service";
@@ -10,6 +11,7 @@ import { ListarConversoesDto } from "./dto/listar-conversoes.dto";
 
 @Controller("integrations/google")
 @UseGuards(JwtAuthGuard)
+@Areas("integracoes")
 export class GoogleConversionsController {
   constructor(
     private readonly conversions: GoogleConversionsService,

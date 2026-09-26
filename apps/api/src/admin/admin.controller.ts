@@ -23,6 +23,7 @@ import { EntregaDeSessaoService } from "./entrega/entrega-de-sessao.service";
 import { ListOrganizationsDto } from "./dto/list-organizations.dto";
 import { UpsertOperatorDto } from "./dto/upsert-operator.dto";
 import { CriaClienteDto } from "./dto/cria-cliente.dto";
+import { CriaConviteDto } from "./dto/cria-convite.dto";
 
 /**
  * Rotas do operador da plataforma. A ordem dos guards importa: `JwtAuthGuard`
@@ -46,6 +47,27 @@ export class AdminController {
   @Post("organizations")
   criaCliente(@CurrentUser() user: AuthenticatedUser, @Body() dto: CriaClienteDto) {
     return this.adminService.criaCliente(user.userId, dto.nome, dto.cor);
+  }
+
+  /** Convida alguém: para a equipe Timeless, ou para um cliente em áreas escolhidas. Devolve o link. */
+  @Post("convites")
+  criaConvite(@CurrentUser() user: AuthenticatedUser, @Body() dto: CriaConviteDto) {
+    return this.adminService.criaConvite(user, dto);
+  }
+
+  @Get("organizations/:id/pessoas")
+  pessoasDoCliente(@Param("id", ParseUUIDPipe) id: string) {
+    return this.adminService.pessoasDoCliente(id);
+  }
+
+  @Delete("organizations/:id/pessoas/:userId")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removePessoa(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("userId", ParseUUIDPipe) userId: string,
+  ): Promise<void> {
+    return this.adminService.removePessoa(user.userId, id, userId);
   }
 
   @Get("organizations/:id/whatsapp")

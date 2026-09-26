@@ -409,10 +409,7 @@ export function LoginForm() {
 
           {pedindoCodigo ? null : (
           <p className="mt-8 text-corpo text-ink-mute">
-            Não tem conta?{" "}
-            <Link href="/register" className="focus-ring rounded font-medium text-ink underline decoration-line underline-offset-4 transition-colors hover:decoration-accent">
-              Criar organização
-            </Link>
+            Não tem conta? Peça um convite à equipe Timeless.
           </p>
           )}
         </div>

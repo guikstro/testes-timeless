@@ -2,9 +2,24 @@ import { apiFetch } from "@/lib/api-client";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Membro, TeamList } from "./team-list";
 import { PAPEL, Papel } from "./papeis";
+import { AdicionarPessoa } from "./adicionar-pessoa";
 
-export async function AbaEquipe({ euId, meuPapel }: { euId: string; meuPapel: Papel }) {
+export async function AbaEquipe({
+  euId,
+  meuPapel,
+  areaDaTimeless = false,
+}: {
+  euId: string;
+  meuPapel: Papel;
+  areaDaTimeless?: boolean;
+}) {
   const membros = await apiFetch<Membro[]>("/organizations/current/members");
+  // A lista de clientes vem da administração, que exige a verificação em duas etapas.
+  const clientes = areaDaTimeless
+    ? await apiFetch<{ items: { id: string; name: string }[] }>("/admin/organizations?limit=100")
+        .then((resposta) => resposta.items)
+        .catch((erro: Error) => erro.message)
+    : null;
   const posso = meuPapel === "OWNER" || meuPapel === "ADMIN";
 
   return (
@@ -29,6 +44,21 @@ export async function AbaEquipe({ euId, meuPapel }: { euId: string; meuPapel: Pa
         ) : null}
       </Card>
 
+      {clientes !== null ? (
+        <Card className="p-6">
+          <CardHeader
+            title="Adicionar pessoa"
+            description="Gere um convite: a pessoa abre o link e cria a própria senha. Para um cliente, ela só vê o que você marcar."
+            className="mb-5"
+          />
+          {typeof clientes === "string" ? (
+            <p className="text-apoio text-ink-mute">{clientes}</p>
+          ) : (
+            <AdicionarPessoa clientes={clientes} />
+          )}
+        </Card>
+      ) : null}
+
       <Card className="p-6">
         <CardHeader title="O que cada papel faz" className="mb-4" />
         <dl className="space-y-2.5">
@@ -39,14 +69,6 @@ export async function AbaEquipe({ euId, meuPapel }: { euId: string; meuPapel: Pa
             </div>
           ))}
         </dl>
-        {/*
-          Convidar ainda não existe. Dizer isso é melhor que deixar procurar um
-          botão que não está lá.
-        */}
-        <p className="mt-4 rounded-xl border border-line bg-panel-soft/60 px-3.5 py-2.5 text-apoio leading-relaxed text-ink-mute">
-          Ainda não dá para convidar alguém por aqui: novas pessoas entram criando conta e sendo adicionadas pelo
-          suporte. Convite por e-mail depende do envio de e-mail, que o produto ainda não tem.
-        </p>
       </Card>
     </div>
   );

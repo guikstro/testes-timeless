@@ -47,6 +47,18 @@ describe("JwtStrategy", () => {
       role: "OWNER",
       impersonating: false,
       sessaoId: "sessao-1",
+      areas: null,
+    });
+  });
+
+  it("MEMBER traz as áreas do vínculo, e perde o acesso quando o vínculo some", async () => {
+    const { strategy, prisma } = monta();
+    const vinculo = jest.fn().mockResolvedValueOnce({ areas: ["conversas"] }).mockResolvedValueOnce(null);
+    (prisma as unknown as { membership: { findUnique: jest.Mock } }).membership = { findUnique: vinculo };
+
+    await expect(strategy.validate(payload({ role: "MEMBER" }))).resolves.toMatchObject({ areas: ["conversas"] });
+    await expect(strategy.validate(payload({ role: "MEMBER" }))).rejects.toMatchObject({
+      response: { code: "SESSAO_ENCERRADA" },
     });
   });
 

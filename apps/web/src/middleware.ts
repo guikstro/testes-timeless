@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cabecalhosDoCliente } from "@/lib/ip-do-cliente";
+import { redireciona } from "@/lib/redireciona";
 import {
   ACCESS_TOKEN_COOKIE,
   ACCESS_TOKEN_MAX_AGE,
@@ -63,9 +64,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  const loginUrl = new URL("/login", request.url);
-  loginUrl.searchParams.set("next", pathname);
-  return NextResponse.redirect(loginUrl);
+  return redireciona(`/login?next=${encodeURIComponent(pathname)}`);
 }
 
 export const config = {

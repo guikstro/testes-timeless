@@ -63,7 +63,9 @@ export function WhatsAppDoCliente({ dados }: { dados: WhatsAppDoClienteDados }) 
     startTransition(async () => {
       setErro(null);
       const resultado = await entra(dados.organizacao.id);
-      if (resultado?.error) setErro(resultado.error);
+      if ("error" in resultado) setErro(resultado.error);
+      // Navegação completa, uma vez só: é ela que grava a sessão do cliente.
+      else window.location.assign(resultado.destino);
     });
 
   const copiar = async () => {

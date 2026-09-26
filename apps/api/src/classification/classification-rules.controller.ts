@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
+import { Areas } from "../common/decorators/areas.decorator";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { ClassificationRulesService } from "./classification-rules.service";
 import { autorDe } from "../auditoria/auditoria.service";
@@ -8,6 +9,7 @@ import { CreateClassificationRuleDto } from "./dto/create-classification-rule.dt
 
 @Controller("classification-rules")
 @UseGuards(JwtAuthGuard)
+@Areas("configuracoes")
 export class ClassificationRulesController {
   constructor(private readonly classificationRulesService: ClassificationRulesService) {}
 

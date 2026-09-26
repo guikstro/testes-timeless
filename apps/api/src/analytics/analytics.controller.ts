@@ -1,6 +1,7 @@
 import { Controller, Get, HttpStatus, Query, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
+import { Areas } from "../common/decorators/areas.decorator";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { AnalyticsService } from "./analytics.service";
 import { OverviewQueryDto } from "./dto/overview-query.dto";
@@ -9,6 +10,7 @@ import { AppException } from "../common/exceptions/app-exception";
 
 @Controller("analytics")
 @UseGuards(JwtAuthGuard)
+@Areas("dashboard", "campanhas", "relatorio", "verba")
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 

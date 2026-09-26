@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
+import { Areas } from "../common/decorators/areas.decorator";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { BudgetsService } from "./budgets.service";
 import { autorDe } from "../auditoria/auditoria.service";
@@ -8,6 +9,7 @@ import { SalvarVerbaDto } from "./dto/salvar-verba.dto";
 
 @Controller("verbas")
 @UseGuards(JwtAuthGuard)
+@Areas("verba")
 export class BudgetsController {
   constructor(private readonly verbas: BudgetsService) {}
 

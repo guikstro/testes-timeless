@@ -14,6 +14,7 @@ import {
 } from "@nestjs/common";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
+import { Areas } from "../common/decorators/areas.decorator";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { PaginationQueryDto } from "../common/dto/pagination.dto";
 import { TrackingLinksService } from "./tracking-links.service";
@@ -23,6 +24,7 @@ import { UpdateTrackingLinkDto } from "./dto/update-tracking-link.dto";
 
 @Controller("tracking-links")
 @UseGuards(JwtAuthGuard)
+@Areas("links")
 export class TrackingLinksController {
   constructor(private readonly trackingLinksService: TrackingLinksService) {}
 

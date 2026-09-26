@@ -7,10 +7,12 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { ACCESS_TOKEN_COOKIE } from "@/lib/session";
 import { apiFetch } from "@/lib/api-client";
+import { telaInicial } from "@/lib/areas";
 
 interface Sessao {
   user: { platformRole: "SUPPORT" | "ADMIN" | null };
   impersonating: boolean;
+  areas: string[] | null;
 }
 
 /**
@@ -25,7 +27,7 @@ export default async function RootPage() {
   let destino = "/dashboard";
   try {
     const sessao = await apiFetch<Sessao>("/auth/session");
-    if (sessao.user.platformRole && !sessao.impersonating) destino = "/clientes";
+    destino = sessao.user.platformRole && !sessao.impersonating ? "/clientes" : telaInicial(sessao.areas);
   } catch {
     // Sessão vencida ou API fora: o painel cuida disso (renova ou manda ao login).
   }
