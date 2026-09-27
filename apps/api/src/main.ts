@@ -92,4 +92,19 @@ async function bootstrap() {
   Logger.log(`API listening on port ${port}`, "Bootstrap");
 }
 
+/*
+  O Baileys tem ouvintes `async` sem `catch` (o do `CB:success`, por exemplo):
+  uma consulta ao WhatsApp que passa de 60 s vira rejeição sem dono, e o Node
+  22 derrubava a API inteira por causa de uma conexão de WhatsApp. Essas ficam
+  no log; qualquer outra continua derrubando o processo, como antes.
+*/
+// ponytail: a conexão que falhou assim pode ficar em "connecting"; se acontecer, reconectar pela tela ou reiniciar.
+process.on("unhandledRejection", (motivo) => {
+  if (motivo instanceof Error && motivo.stack?.includes("baileys")) {
+    Logger.error(JSON.stringify({ event: "whatsapp_rejeicao_sem_tratamento", message: motivo.message }), "Baileys");
+    return;
+  }
+  throw motivo;
+});
+
 bootstrap();
