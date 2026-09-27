@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { leArquivoDeTexto } from "@/lib/le-arquivo-de-texto";
 import { importarCsv, preverCsv } from "./actions";
 
 interface Previa {
@@ -46,7 +47,7 @@ export function ImportarCsv({ campaignId }: { campaignId: string }) {
     setOcupado(true);
 
     try {
-      const texto = await arquivo.text();
+      const texto = await leArquivoDeTexto(arquivo);
       setConteudo(texto);
 
       const resposta = await preverCsv(texto);

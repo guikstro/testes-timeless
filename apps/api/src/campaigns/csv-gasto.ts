@@ -58,12 +58,27 @@ function separaLinha(linha: string, delimitador: string): string[] {
   return campos;
 }
 
-/** O delimitador sai da linha de cabeçalho: é o que aparece mais vezes nela. */
-function detectaDelimitador(cabecalho: string): string {
-  const candidatos = [",", ";", "\t"];
-  return candidatos.reduce((melhor, atual) =>
-    cabecalho.split(atual).length > cabecalho.split(melhor).length ? atual : melhor,
-  );
+/**
+ * O delimitador sai das primeiras linhas juntas, e não só da primeira.
+ *
+ * Saía da primeira, e no Google Ads a primeira é o título ("Relatório de
+ * campanha"), sem separador nenhum: a vírgula vencia por empate, e um arquivo
+ * separado por tabulação virava uma coluna só. Agora vence o separador que
+ * divide mais linhas no mesmo número de colunas, que é o que uma tabela é.
+ */
+export function detectaDelimitador(linhas: string[]): string {
+  const amostra = linhas.slice(0, 20);
+  let melhor = { delimitador: ",", pontos: 0 };
+
+  for (const delimitador of [",", ";", "\t"]) {
+    const colunasPorLinha = amostra.map((linha) => separaLinha(linha, delimitador).length).filter((n) => n > 1);
+    const frequencia = new Map<number, number>();
+    for (const n of colunasPorLinha) frequencia.set(n, (frequencia.get(n) ?? 0) + 1);
+    const pontos = Math.max(0, ...[...frequencia.values()]);
+    if (pontos > melhor.pontos) melhor = { delimitador, pontos };
+  }
+
+  return melhor.delimitador;
 }
 
 const PALAVRAS_DATA = ["data", "date", "dia", "day"];
@@ -78,6 +93,8 @@ function procuraColuna(cabecalho: string[], palavras: string[]): number | null {
 
 export function leCsv(conteudo: string): CsvLido {
   const linhas = conteudo
+    // A marca de ordem de bytes do Excel grudava no primeiro título.
+    .replace(/^\uFEFF/, "")
     .split(/\r?\n/)
     .map((linha) => linha.trim())
     .filter((linha) => linha.length > 0);
@@ -92,7 +109,7 @@ export function leCsv(conteudo: string): CsvLido {
     primeira linha com mais de uma coluna, então pulamos o preâmbulo em vez de
     exigir que a pessoa edite o arquivo antes de subir.
   */
-  const delimitador = detectaDelimitador(linhas[0]);
+  const delimitador = detectaDelimitador(linhas);
   const inicio = linhas.findIndex((linha) => separaLinha(linha, delimitador).length > 1);
   if (inicio === -1) {
     return { cabecalho: [], linhas: [], sugestaoData: null, sugestaoValor: null };
@@ -202,4 +219,15 @@ export function extraiGastos(csv: CsvLido, colunaData: number, colunaValor: numb
       .sort((a, b) => a.date.localeCompare(b.date)),
     ignoradas,
   };
+}
+
+/**
+ * Se alguma coluna do arquivo tem datas de verdade.
+ *
+ * O relatório padrão de campanha do Google Ads traz uma linha por campanha,
+ * com o total do período, e nenhuma coluna de dia. Importar dele é
+ * impossível, e dizer isso é mais útil que mandar conferir as colunas.
+ */
+export function temColunaDeDia(csv: CsvLido): boolean {
+  return csv.cabecalho.some((_, indice) => csv.linhas.some((campos) => paraDataIso(campos[indice] ?? "") !== null));
 }

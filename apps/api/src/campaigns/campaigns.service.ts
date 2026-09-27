@@ -7,7 +7,7 @@ import { isUniqueConstraintError } from "../common/utils/is-unique-constraint-er
 import { hojeLocal } from "../common/tempo";
 import { CriarCampanhaManualDto, RegistrarGastoDto } from "./dto/manual-campaign.dto";
 import { Autor, AuditoriaService } from "../auditoria/auditoria.service";
-import { extraiGastos, leCsv } from "./csv-gasto";
+import { CsvLido, extraiGastos, leCsv, temColunaDeDia } from "./csv-gasto";
 
 @Injectable()
 export class CampaignsService {
@@ -218,6 +218,7 @@ export class CampaignsService {
         HttpStatus.BAD_REQUEST,
       );
     }
+    exigeColunaDeDia(csv);
 
     return {
       cabecalho: csv.cabecalho,
@@ -242,7 +243,9 @@ export class CampaignsService {
       throw new AppException("NOT_FOUND", "Campanha não encontrada.", HttpStatus.NOT_FOUND);
     }
 
-    const { linhas, ignoradas } = extraiGastos(leCsv(conteudo), colunaData, colunaValor);
+    const lido = leCsv(conteudo);
+    exigeColunaDeDia(lido);
+    const { linhas, ignoradas } = extraiGastos(lido, colunaData, colunaValor);
 
     if (linhas.length === 0) {
       throw new AppException(
@@ -287,5 +290,15 @@ export class CampaignsService {
       periodo: { de: linhas[0].date, ate: linhas[linhas.length - 1].date },
       totalCentavos: linhas.reduce((soma, linha) => soma + linha.spendCents, 0),
     };
+  }
+}
+
+function exigeColunaDeDia(csv: CsvLido): void {
+  if (!temColunaDeDia(csv)) {
+    throw new AppException(
+      "SEM_COLUNA_DE_DIA",
+      "Este relatório não tem uma coluna de dia: ele traz o total de cada campanha no período. No Google Ads, abra o relatório, clique em Segmentar → Tempo → Dia e baixe de novo. Ou ligue o script, que traz o gasto sozinho.",
+      HttpStatus.BAD_REQUEST,
+    );
   }
 }

@@ -3,6 +3,7 @@ import { apiFetch } from "@/lib/api-client";
 import { EmptyState } from "@/components/ui/skeleton";
 import { CartaoCampanha, NovaCampanha } from "./campaign-forms";
 import { ConversionsExport } from "./conversions-export";
+import { ConexaoGoogleAds, SituacaoDoGoogleAds } from "./conexao-google-ads";
 import { periodoValido } from "./periodos";
 import { LinhaDeConversao } from "@/lib/google/conversoes-csv";
 import { diaCivil } from "@/lib/periodo";
@@ -37,7 +38,8 @@ export default async function GoogleAdsPage({
   inicio.setDate(inicio.getDate() - (dias - 1));
   const de = diaCivil(inicio);
 
-  const [campanhas, exportacao, organizacao] = await Promise.all([
+  const [situacao, campanhas, exportacao, organizacao] = await Promise.all([
+    apiFetch<SituacaoDoGoogleAds>("/integrations/google/script"),
     apiFetch<Campanha[]>("/campaigns?platform=GOOGLE"),
     apiFetch<Exportacao>(`/integrations/google/conversions?de=${de}&ate=${ate}`),
     apiFetch<{ currency: string }>("/organizations/current"),
@@ -52,8 +54,10 @@ export default async function GoogleAdsPage({
     <div className="mx-auto max-w-4xl">
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Google Ads</h1>
       <p className="mb-6 mt-1 text-sm text-ink-mute">
-        Registre suas campanhas e o gasto de cada dia para medir custo por lead e retorno.
+        Quanto cada campanha gasta e o que ela traz, e as vendas devolvidas ao Google.
       </p>
+
+      <ConexaoGoogleAds situacao={situacao} rotuloDoPeriodo="este mês" />
 
       {/*
         A API do Google Ads exige um token de desenvolvedor aprovado por eles,
@@ -62,11 +66,11 @@ export default async function GoogleAdsPage({
         para o cliente não ficar esperando.
       */}
       <div className="mb-6 rounded-2xl border border-line bg-panel-soft/60 p-5">
-        <h2 className="text-corpo font-semibold text-ink">Por que o lançamento é manual</h2>
+        <h2 className="text-corpo font-semibold text-ink">Sem o script, à mão</h2>
         <p className="mt-1.5 text-corpo leading-relaxed text-ink-soft">
-          A sincronização automática com o Google Ads depende de um token de desenvolvedor que o próprio Google
-          aprova, e essa aprovação leva semanas. Lançar o gasto à mão permite medir retorno desde já. Quando a
-          integração automática entrar, ela vai atualizar estas mesmas campanhas, sem refazer nada.
+          Para uma conta onde o script não pode rodar, dá para lançar o gasto à mão ou por planilha, abaixo. Uma
+          campanha lançada à mão com o id real passa a ser atualizada pelo script quando ele for ligado, sem virar
+          outra linha.
         </p>
         <p className="mt-2.5 text-corpo leading-relaxed text-ink-soft">
           A atribuição dos leads do Google já funciona hoje, por{" "}

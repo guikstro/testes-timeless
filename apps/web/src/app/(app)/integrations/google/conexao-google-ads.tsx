@@ -1,0 +1,236 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { BotaoCopiar } from "@/components/ui/copy-button";
+import { formatCentsAsBRL } from "@/lib/currency";
+import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
+import { desligaScriptDoGoogleAds, geraScriptDoGoogleAds } from "./script-actions";
+
+export interface SituacaoDoGoogleAds {
+  conexao: {
+    conta: string | null;
+    nomeDaConta: string | null;
+    moeda: string | null;
+    ultimoEnvioEm: string | null;
+    atrasado: boolean;
+  } | null;
+  campanhas: {
+    id: string;
+    idNaPlataforma: string;
+    nome: string;
+    status: string;
+    orcamentoDiarioCentavos: number | null;
+    gastoCentavos: number;
+    impressoes: number;
+    cliques: number;
+    conversoes: number;
+    valorConversoesCentavos: number;
+  }[];
+}
+
+/**
+ * A ligação com o Google Ads e os números das campanhas.
+ *
+ * O script é o caminho porque não depende de aprovação do Google: roda dentro
+ * da própria conta e manda os números para cá. A chave vai dentro dele e
+ * aparece uma vez só; se a pessoa perder, gera outro, e o antigo para.
+ */
+export function ConexaoGoogleAds({ situacao, rotuloDoPeriodo }: { situacao: SituacaoDoGoogleAds; rotuloDoPeriodo: string }) {
+  const [script, setScript] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const [pendente, comecar] = useTransition();
+  const { conexao, campanhas } = situacao;
+  const recebendo = Boolean(conexao?.ultimoEnvioEm);
+
+  function gera() {
+    setErro(null);
+    comecar(async () => {
+      const r = await geraScriptDoGoogleAds();
+      if (r.error) setErro(r.error);
+      else setScript(r.script ?? null);
+    });
+  }
+
+  function desliga() {
+    if (!window.confirm("Desligar o Google Ads? O script para de ser aceito. O que já chegou continua aqui.")) return;
+    comecar(async () => {
+      const r = await desligaScriptDoGoogleAds();
+      if (r.error) setErro(r.error);
+      setScript(null);
+    });
+  }
+
+  return (
+    <section className="surface mb-6 p-5 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-display text-destaque font-semibold tracking-tight text-ink">Conexão com o Google Ads</h2>
+          {recebendo ? (
+            <p className="mt-1 text-corpo text-ink-soft">
+              Conta <span className="font-medium text-ink">{conexao!.conta}</span>
+              {conexao!.nomeDaConta ? ` (${conexao!.nomeDaConta})` : ""}. Último envio{" "}
+              <span title={dataCompleta(conexao!.ultimoEnvioEm!)}>{tempoRelativo(conexao!.ultimoEnvioEm!)}</span>.
+            </p>
+          ) : conexao ? (
+            <p className="mt-1 text-corpo text-ink-soft">
+              Script gerado, esperando o primeiro envio. Depois de colar e rodar no Google Ads, os números aparecem aqui.
+            </p>
+          ) : (
+            <p className="mt-1 text-corpo text-ink-soft">
+              Um script que roda dentro da conta do Google Ads e manda o gasto e os números de cada campanha para cá, a
+              cada hora. Não precisa de aprovação do Google. Só lê: não pausa nem muda nada na conta.
+            </p>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" size="sm" variant={conexao ? "secondary" : "primary"} loading={pendente} onClick={gera}>
+            {conexao ? "Gerar script novo" : "Gerar script"}
+          </Button>
+          {conexao ? (
+            <Button type="button" size="sm" variant="ghost" onClick={desliga} disabled={pendente}>
+              Desligar
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      {erro ? (
+        <p className="mt-3 text-apoio text-red-600 dark:text-red-400" role="alert">
+          {erro}
+        </p>
+      ) : null}
+
+      {/*
+        Parado há mais de três horas: o script de hora em hora deixou de rodar,
+        e os números da tabela estão velhos sem parecer.
+      */}
+      {conexao?.atrasado ? (
+        <p className="mt-3 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-apoio text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
+          O script parou de enviar. No Google Ads, abra Ferramentas → Ações em massa → Scripts e confira se ele está
+          agendado e sem erro.
+        </p>
+      ) : null}
+
+      {script ? <PassoAPasso script={script} /> : null}
+
+      {campanhas.length > 0 ? <Tabela campanhas={campanhas} rotuloDoPeriodo={rotuloDoPeriodo} /> : null}
+    </section>
+  );
+}
+
+function PassoAPasso({ script }: { script: string }) {
+  return (
+    <div className="mt-5 rounded-xl border border-line/70 bg-panel-soft/40 p-4">
+      <p className="text-corpo font-semibold text-ink">Cole este script no Google Ads</p>
+      <p className="mt-1 text-apoio text-ink-mute">
+        Ele aparece só agora: a chave dentro dele não fica guardada aqui. Se perder, gere outro.
+      </p>
+      <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-apoio leading-relaxed text-ink-soft">
+        <li>Abra a conta do cliente no Google Ads (a conta dele, e não a de administrador).</li>
+        <li>Vá em Ferramentas → Ações em massa → Scripts e clique no botão de adicionar (+), em Novo script.</li>
+        <li>Apague o que vier escrito, cole o script abaixo e dê um nome, como “Timeless”.</li>
+        <li>Clique em Autorizar e aceite com a sua conta do Google.</li>
+        <li>Clique em Visualizar para testar: no registro deve aparecer “Timeless respondeu 200”.</li>
+        <li>Salve, e em Frequência escolha “A cada hora”.</li>
+      </ol>
+      <div className="relative mt-3">
+        <pre className="max-h-72 overflow-auto rounded-lg bg-ink/[0.06] p-3 pr-12 font-mono text-[11px] leading-relaxed text-ink-soft">
+          {script}
+        </pre>
+        <BotaoCopiar texto={script} rotulo="Copiar o script" className="absolute right-2 top-2" />
+      </div>
+    </div>
+  );
+}
+
+const STATUS: Record<string, { rotulo: string; tom: "success" | "neutral" }> = {
+  ACTIVE: { rotulo: "Ativa", tom: "success" },
+  PAUSED: { rotulo: "Pausada", tom: "neutral" },
+  ARCHIVED: { rotulo: "Removida", tom: "neutral" },
+};
+
+const inteiro = (n: number) => n.toLocaleString("pt-BR");
+const porcento = (n: number) => `${(n * 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
+
+function Tabela({ campanhas, rotuloDoPeriodo }: { campanhas: SituacaoDoGoogleAds["campanhas"]; rotuloDoPeriodo: string }) {
+  const total = campanhas.reduce(
+    (t, c) => ({
+      gasto: t.gasto + c.gastoCentavos,
+      impressoes: t.impressoes + c.impressoes,
+      cliques: t.cliques + c.cliques,
+      conversoes: t.conversoes + c.conversoes,
+    }),
+    { gasto: 0, impressoes: 0, cliques: 0, conversoes: 0 },
+  );
+
+  return (
+    <div className="mt-5">
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">Campanhas, {rotuloDoPeriodo}</h3>
+        <span className="text-corpo text-ink-mute">
+          Gasto: <span className="font-semibold tabular-nums text-ink">{formatCentsAsBRL(total.gasto)}</span>
+        </span>
+      </div>
+      <div className="overflow-x-auto rounded-xl border border-line/70">
+        <table className="w-full min-w-[52rem] text-corpo">
+          <thead>
+            <tr className="border-b border-line text-left text-rotulo font-semibold uppercase tracking-[0.09em] text-ink-mute">
+              <th className="px-3 py-2.5 font-semibold">Campanha</th>
+              <th className="px-3 py-2.5 text-right font-semibold">Gasto</th>
+              <th className="px-3 py-2.5 text-right font-semibold">Impressões</th>
+              <th className="px-3 py-2.5 text-right font-semibold">Cliques</th>
+              <th className="px-3 py-2.5 text-right font-semibold">CTR</th>
+              <th className="px-3 py-2.5 text-right font-semibold">Custo por clique</th>
+              <th className="px-3 py-2.5 text-right font-semibold">Conversões</th>
+              <th className="px-3 py-2.5 text-right font-semibold">Custo por conversão</th>
+            </tr>
+          </thead>
+          <tbody>
+            {campanhas.map((c) => {
+              const status = STATUS[c.status];
+              return (
+                <tr key={c.id} className="border-b border-line/60 last:border-0">
+                  <td className="px-3 py-3 align-top">
+                    <p className="font-medium text-ink">{c.nome}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-rotulo text-ink-mute">
+                      {status ? (
+                        <Badge tone={status.tom} dot>
+                          {status.rotulo}
+                        </Badge>
+                      ) : null}
+                      {c.orcamentoDiarioCentavos !== null ? <span>{formatCentsAsBRL(c.orcamentoDiarioCentavos)} por dia</span> : null}
+                    </div>
+                  </td>
+                  <Celula>{formatCentsAsBRL(c.gastoCentavos)}</Celula>
+                  <Celula>{inteiro(c.impressoes)}</Celula>
+                  <Celula>{inteiro(c.cliques)}</Celula>
+                  {/* Sem impressão ou sem clique, a conta não existe: escrito, e não um zero falso. */}
+                  <Celula apagado={c.impressoes === 0}>{c.impressoes > 0 ? porcento(c.cliques / c.impressoes) : "Sem impressão"}</Celula>
+                  <Celula apagado={c.cliques === 0}>{c.cliques > 0 ? formatCentsAsBRL(Math.round(c.gastoCentavos / c.cliques)) : "Sem clique"}</Celula>
+                  <Celula>{c.conversoes.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</Celula>
+                  <Celula apagado={c.conversoes === 0}>
+                    {c.conversoes > 0 ? formatCentsAsBRL(Math.round(c.gastoCentavos / c.conversoes)) : "Nenhuma"}
+                  </Celula>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-apoio text-ink-mute">
+        Conversões como o Google conta, com as ações configuradas na conta. Os leads que chegam aqui pelo WhatsApp
+        aparecem em Campanhas.
+      </p>
+    </div>
+  );
+}
+
+function Celula({ children, apagado = false }: { children: React.ReactNode; apagado?: boolean }) {
+  return (
+    <td className={`whitespace-nowrap px-3 py-3 text-right align-top tabular-nums ${apagado ? "text-apoio text-ink-mute" : "text-ink"}`}>
+      {children}
+    </td>
+  );
+}

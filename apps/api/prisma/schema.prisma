@@ -151,6 +151,7 @@ model Organization {
   trackingLinks        TrackingLink[]
   whatsappConnection   WhatsAppConnection?
   mensagensForaDaRegra MensagemForaDaRegra[]
+  googleAdsConexao     GoogleAdsConexao?
   leads                Lead[]
   attributions         Attribution[]
   classificationRules  ClassificationRule[]
@@ -974,6 +975,7 @@ model MetaConnection {
    * /**
    * /**
    * /**
+   * /**
    * /** Código numérico da Meta. Ver `leituraDoStatusDaConta`.
    */
   accountStatus    Int?      @map("account_status")
@@ -1115,6 +1117,11 @@ model Campaign {
    */
   criadaNaPlataformaEm DateTime? @map("criada_na_plataforma_em")
 
+  /**
+   * Orçamento diário na plataforma, quando ela informa.
+   */
+  orcamentoDiarioCentavos Int? @map("orcamento_diario_centavos")
+
   lastSyncedAt DateTime @map("last_synced_at")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
@@ -1247,11 +1254,36 @@ model AdInsight {
  * faria o total da campanha encolher em silêncio — um número que o cliente
  * usa para decidir investimento.
  */
+/**
+ * A ligação de um cliente com a conta dele no Google Ads, pelo script.
+ * O script roda dentro da conta do Google Ads e manda os números para cá com
+ * uma chave. A chave identifica o cliente, e por isso só o hash dela fica
+ * guardado: quem lê esta tabela não consegue mandar dados em nome de ninguém.
+ * Uma por cliente; gerar outra invalida a anterior.
+ */
+model GoogleAdsConexao {
+  id             String    @id @default(uuid())
+  organizationId String    @unique @map("organization_id")
+  chaveHash      String    @unique @map("chave_hash")
+  /**
+   * A conta que mandou o primeiro envio. Outra conta com a mesma chave é recusada.
+   */
+  customerId     String?   @map("customer_id")
+  nomeDaConta    String?   @map("nome_da_conta")
+  moeda          String?
+  criadaEm       DateTime  @default(now()) @map("criada_em")
+  ultimoEnvioEm  DateTime? @map("ultimo_envio_em")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("google_ads_conexoes")
+}
+
 model AdSpend {
-  id                 String   @id @default(uuid())
-  campaignId         String   @map("campaign_id")
-  date               DateTime @db.Date
-  spendCents         Int      @map("spend_cents")
+  id                      String   @id @default(uuid())
+  campaignId              String   @map("campaign_id")
+  date                    DateTime @db.Date
+  spendCents              Int      @map("spend_cents")
   /**
    * Conversas que a própria Meta diz ter iniciado neste dia, pelo anúncio que
    * abre o WhatsApp.
@@ -1260,9 +1292,21 @@ model AdSpend {
    * foi sincronizado antes de este número ser pedido, ou veio de CSV, e não
    * que não houve conversa; zero é a Meta dizendo que não houve.
    */
-  conversasIniciadas Int?     @map("conversas_iniciadas")
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
+  conversasIniciadas      Int?     @map("conversas_iniciadas")
+  /**
+   * Os números do dia como a plataforma conta, quando ela manda. Null quer
+   * dizer que não veio (CSV, lançamento à mão, ou sincronia que não pede),
+   * e não zero.
+   */
+  impressoes              Int?     @map("impressoes")
+  cliques                 Int?     @map("cliques")
+  /**
+   * Conversões como o Google conta; fracionárias com atribuição por dados.
+   */
+  conversoesNaPlataforma  Float?   @map("conversoes_na_plataforma")
+  valorConversoesCentavos Int?     @map("valor_conversoes_centavos")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 

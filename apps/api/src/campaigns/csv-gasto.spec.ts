@@ -1,4 +1,4 @@
-import { extraiGastos, leCsv, paraCentavos, paraDataIso } from "./csv-gasto";
+import { temColunaDeDia, extraiGastos, leCsv, paraCentavos, paraDataIso } from "./csv-gasto";
 
 describe("leitura de CSV de gasto", () => {
   describe("paraCentavos", () => {
@@ -48,6 +48,24 @@ describe("leitura de CSV de gasto", () => {
   });
 
   describe("leCsv", () => {
+    it("acha o separador mesmo com o título do Google Ads na primeira linha", () => {
+      const tab = "Relatório de campanha\n1 de setembro de 2026 - 27 de setembro de 2026\nDia\tCampanha\tCusto\n01/09/2026\tBusca, Marca\t120,50\n02/09/2026\tBusca, Marca\t98,00";
+      const csv = leCsv(tab);
+      expect(csv.cabecalho).toEqual(["Dia", "Campanha", "Custo"]);
+      expect(csv.linhas).toHaveLength(2);
+      expect(csv.sugestaoValor).toBe(2);
+    });
+
+    it("tira a marca de ordem de bytes do Excel do primeiro título", () => {
+      expect(leCsv("\uFEFFDia;Custo\n31/08/2026;250,00").cabecalho).toEqual(["Dia", "Custo"]);
+    });
+
+    it("sabe quando o relatório não tem coluna de dia", () => {
+      const semDia = leCsv("Relatório de campanha\nCampanha,Custo\n[TMLS] PMAX,1.234,56\n--,--");
+      expect(temColunaDeDia(semDia)).toBe(false);
+      expect(temColunaDeDia(leCsv("Dia;Custo\n31/08/2026;250,00"))).toBe(true);
+    });
+
     it("detecta o delimitador e o cabeçalho", () => {
       const csv = leCsv("Dia;Custo\n31/08/2026;250,00");
       expect(csv.cabecalho).toEqual(["Dia", "Custo"]);
