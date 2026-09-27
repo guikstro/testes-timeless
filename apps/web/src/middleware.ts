@@ -64,7 +64,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return redireciona(`/login?next=${encodeURIComponent(pathname)}`);
+  return redireciona(request, `/login?next=${encodeURIComponent(pathname)}`);
 }
 
 export const config = {

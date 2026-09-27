@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cabecalhosDoCliente } from "@/lib/ip-do-cliente";
+import { origemPublica } from "@/lib/origem-publica";
 import {
   ACCESS_MAX_AGE,
   ADMIN_ACCESS_COOKIE,
@@ -79,7 +80,9 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  const login = new URL("/login", request.url);
+  // Pela origem pública, e não por `request.url`: no Render ele é o endereço
+  // interno do servidor, e o operador iria parar em localhost.
+  const login = new URL("/login", origemPublica(request.headers, request.nextUrl.origin));
   if (pathname !== "/") login.searchParams.set("next", pathname);
   return comCaminho(NextResponse.redirect(login), pathname);
 }

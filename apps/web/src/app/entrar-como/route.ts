@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
   const codigo = request.nextUrl.searchParams.get("codigo");
 
   if (!codigo) {
-    return redireciona("/login");
+    return redireciona(request, "/login");
   }
 
   const resposta = await fetch(`${API_URL}/auth/entrega`, {
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
       gasto. Sem o motivo, a tela de entrada apareceria sem explicação
       nenhuma depois de um clique que parecia certo.
     */
-    return redireciona("/login?motivo=entrada-expirada");
+    return redireciona(request, "/login?motivo=entrada-expirada");
   }
 
   const { accessToken, refreshToken } = await resposta.json();
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     requisições seguintes. O redirecionamento o descarta na hora — ele já foi
     gasto, mas não há razão para deixá-lo à vista.
   */
-  const pronto = redireciona("/dashboard");
+  const pronto = redireciona(request, "/dashboard");
   // Guarda a sessão da Timeless: é para ela que "Encerrar visita" volta.
   const daTimeless = request.cookies.get(REFRESH_TOKEN_COOKIE)?.value;
   if (daTimeless) {

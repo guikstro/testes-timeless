@@ -1,13 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { origemPublica } from "./origem-publica";
 
 /**
- * Redireciona com endereço relativo.
+ * Redireciona para um caminho do próprio site, com endereço absoluto.
  *
- * Atrás do proxy do Render, `request.url` é `http://localhost:10000/...`, e um
- * endereço absoluto montado com ele manda o navegador para a porta interna do
- * servidor. O navegador resolve um `Location` relativo contra o endereço que
- * ele mesmo está vendo, que é o certo.
+ * Absoluto porque o middleware do Next não aceita outro: um `Location`
+ * relativo ("/login") faz ele lançar "URL is malformed" e responder 500, e foi
+ * isso que derrubou toda tela protegida para quem estava sem sessão. A origem
+ * é a pública (ver `origemPublica`), e não a interna do servidor.
  */
-export function redireciona(caminho: string): NextResponse {
-  return new NextResponse(null, { status: 307, headers: { Location: caminho } });
+export function redireciona(request: NextRequest, caminho: string): NextResponse {
+  return NextResponse.redirect(new URL(caminho, origemPublica(request.headers, request.nextUrl.origin)), 307);
 }
