@@ -38,7 +38,7 @@ function buildPrismaMock(): MockPrisma {
   };
 
   return {
-    user: { findUnique: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
+    user: { findUnique: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn(), count: jest.fn().mockResolvedValue(1) },
     organization: { findUnique: jest.fn() },
     membership: { create: jest.fn(), findUnique: jest.fn() },
     refreshToken: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
@@ -116,8 +116,8 @@ describe("AuthService", () => {
       expect(result.accessToken).toEqual(expect.any(String));
       expect(result.refreshToken).toEqual(expect.any(String));
       expect(prisma.refreshToken.create).toHaveBeenCalledTimes(1);
-      // Uso interno: toda conta nova já nasce operadora da plataforma.
-      expect(criaUsuario).toHaveBeenCalledWith({ data: expect.objectContaining({ platformRole: "ADMIN" }) });
+      // Cadastro aberto: quem se cadastra não vira operador da plataforma.
+      expect(criaUsuario).toHaveBeenCalledWith({ data: expect.objectContaining({ platformRole: null }) });
     });
 
     it("rejects registration when the e-mail is already in use", async () => {
@@ -155,19 +155,27 @@ describe("AuthService", () => {
       ).rejects.toMatchObject({ response: { code: "EMAIL_ALREADY_IN_USE" } });
     });
 
-    it("fecha o cadastro em produção quando já existe alguma conta", async () => {
-      const ambiente = process.env.NODE_ENV;
-      process.env.NODE_ENV = "production";
-      prisma.user.count = jest.fn().mockResolvedValue(1);
+    it("só a primeira conta da instalação nasce operadora da plataforma", async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.user.count.mockResolvedValue(0);
+      const criaUsuario = jest.fn().mockResolvedValue({ id: "user-1" });
 
-      try {
-        await expect(
-          service.register({ name: "Ana", email: "ana@example.com", password: "password123", organizationName: "Acme" }),
-        ).rejects.toMatchObject({ response: { code: "CADASTRO_FECHADO" } });
-        expect(prisma.$transaction).not.toHaveBeenCalled();
-      } finally {
-        process.env.NODE_ENV = ambiente;
-      }
+      prisma.$transaction.mockImplementationOnce(async (callback: (tx: unknown) => unknown) =>
+        callback({
+          organization: {
+            findUnique: jest.fn().mockResolvedValue(null),
+            create: jest.fn().mockResolvedValue({ id: "org-1", slug: "acme" }),
+          },
+          user: { create: criaUsuario },
+          membership: {
+            create: jest.fn().mockResolvedValue({ organizationId: "org-1", userId: "user-1", role: "OWNER" }),
+          },
+        }),
+      );
+
+      await service.register({ name: "Ana", email: "ana@example.com", password: "password123", organizationName: "Acme" });
+
+      expect(criaUsuario).toHaveBeenCalledWith({ data: expect.objectContaining({ platformRole: "ADMIN" }) });
     });
   });
 

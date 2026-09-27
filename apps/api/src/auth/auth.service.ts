@@ -17,7 +17,7 @@ import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { ChangeEmailDto } from "./dto/change-email.dto";
-import { ehDesenvolvimento, enderecoDaAplicacao } from "../common/configuracao/ambiente";
+import { enderecoDaAplicacao } from "../common/configuracao/ambiente";
 import { EmailService } from "../common/email/email.service";
 import { confirmacaoDeEmail, emailAlterado, recuperacaoDeSenha, senhaAlterada } from "../common/email/mensagens";
 import { AuditoriaService } from "../auditoria/auditoria.service";
@@ -83,15 +83,11 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto, contexto?: ContextoDoCliente): Promise<TokenPair> {
-    // Cadastro público só para a primeira conta de todas (a instalação); depois,
-    // só por convite. Só em produção: os testes e2e cadastram dezenas de contas.
-    if (!ehDesenvolvimento() && (await this.prisma.user.count()) > 0) {
-      throw new AppException(
-        "CADASTRO_FECHADO",
-        "O cadastro está fechado. Peça um convite à equipe Timeless.",
-        HttpStatus.FORBIDDEN,
-      );
-    }
+    // Cadastro aberto: quem chega cria a própria organização e é dono dela.
+    // Só a primeira conta da instalação nasce operadora da plataforma, porque
+    // `platformRole` abre todos os clientes; as demais só por convite ou pela
+    // administração.
+    const primeiraConta = (await this.prisma.user.count()) === 0;
 
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) {
@@ -111,11 +107,8 @@ export class AuthService {
           data: { name: dto.organizationName, slug: await slugLivre(tx, dto.organizationName) },
         });
 
-        // Uso interno: toda conta criada já é operadora da plataforma. O que
-        // segura o acesso é o limite de contas acima e a verificação em duas
-        // etapas, que o PlatformAdminGuard exige para ver os clientes.
         const user = await tx.user.create({
-          data: { name: dto.name, email: dto.email, passwordHash, platformRole: "ADMIN" },
+          data: { name: dto.name, email: dto.email, passwordHash, platformRole: primeiraConta ? "ADMIN" : null },
         });
 
         const membership = await tx.membership.create({
