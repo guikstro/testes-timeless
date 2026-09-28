@@ -1,4 +1,8 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, UseGuards } from "@nestjs/common";
+import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
+import { Requer } from "../../common/permissoes/requer.decorator";
+import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { AuthenticatedUser } from "../jwt-payload.interface";
 import { Throttle } from "@nestjs/throttler";
 import { IsString, Length } from "class-validator";
 import { Transform } from "class-transformer";
@@ -26,6 +30,18 @@ export class ConvitesController {
   @Get(":token")
   le(@Param("token") token: string) {
     return this.convites.le(token);
+  }
+
+  /**
+   * Aceite de quem já tem conta. Exige sessão, mas nenhuma capacidade: a
+   * sessão pode ser de qualquer conta, e o que decide é o e-mail do convite.
+   */
+  @Post(":token/com-conta")
+  @UseGuards(JwtAuthGuard)
+  @Requer()
+  @HttpCode(HttpStatus.OK)
+  aceitaComConta(@Param("token") token: string, @CurrentUser() quem: AuthenticatedUser, @Contexto() contexto: ContextoDoCliente) {
+    return this.convites.aceitaComConta(token, quem, contexto);
   }
 
   @Post(":token")

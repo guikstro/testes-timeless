@@ -330,6 +330,10 @@ export class AdminService {
         HttpStatus.FORBIDDEN,
       );
     }
+    // A conta da equipe não recebe gente pelo convite de cliente: lá dentro se vê todos os clientes.
+    if (paraCliente && dto.organizationId === operador.organizationId) {
+      throw new AppException("CONVITE_PARA_A_EQUIPE", "Para a equipe, escolha Equipe Timeless.", HttpStatus.BAD_REQUEST);
+    }
     const organizationId = paraCliente ? (await this.exigeCliente(dto.organizationId!)).id : operador.organizationId;
     const convite = await this.convites.cria({
       organizationId,

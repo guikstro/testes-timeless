@@ -11,6 +11,7 @@ import { isUniqueConstraintError } from "../../common/utils/is-unique-constraint
 import { enderecoDaAplicacao } from "../../common/configuracao/ambiente";
 import { AuthService } from "../auth.service";
 import { ContextoDoCliente } from "../sessoes/contexto-do-cliente";
+import { AuthenticatedUser } from "../jwt-payload.interface";
 
 /** Três dias: tempo de a pessoa ver a mensagem e abrir, sem o link valer para sempre. */
 const VALIDADE_EM_SEGUNDOS = 72 * 60 * 60;
@@ -33,12 +34,14 @@ export interface ConviteGerado {
 const invalido = () =>
   new AppException("CONVITE_INVALIDO", "Este convite é inválido, já foi usado ou venceu. Peça um novo.", HttpStatus.NOT_FOUND);
 
-const emailEmUso = () => new AppException("EMAIL_ALREADY_IN_USE", "Este e-mail já tem conta.", HttpStatus.CONFLICT);
+const emailEmUso = () =>
+  new AppException("EMAIL_ALREADY_IN_USE", "Este e-mail já tem conta. Entre com ela para aceitar o convite.", HttpStatus.CONFLICT);
 
 /**
- * O convite é o único jeito de criar conta depois da primeira: a pessoa abre
- * o link e escolhe a própria senha. No Redis fica só o hash do token, e o
- * aceite lê e apaga numa operação só (`GETDEL`), então o link vale uma vez.
+ * O convite leva alguém para uma conta. Quem ainda não tem conta abre o link
+ * e escolhe a própria senha; quem já tem entra com ela (senha e, se tiver, o
+ * autenticador) e aceita. No Redis fica só o hash do token, e o aceite lê e
+ * apaga numa operação só (`GETDEL`), então o link vale uma vez.
  */
 @Injectable()
 export class ConvitesService implements OnModuleDestroy {
@@ -54,7 +57,13 @@ export class ConvitesService implements OnModuleDestroy {
   }
 
   async cria(dados: DadosDoConvite): Promise<ConviteGerado> {
-    await this.exigeEmailLivre(dados.email);
+    const jaFazParte = await this.prisma.membership.findFirst({
+      where: { organizationId: dados.organizationId, user: { email: dados.email } },
+      select: { userId: true },
+    });
+    if (jaFazParte) {
+      throw new AppException("JA_FAZ_PARTE", "Esta pessoa já faz parte desta conta.", HttpStatus.CONFLICT);
+    }
     const token = randomBytes(32).toString("base64url");
     await this.redis.set(this.chave(token), JSON.stringify(dados), "EX", VALIDADE_EM_SEGUNDOS);
     return {
@@ -64,19 +73,21 @@ export class ConvitesService implements OnModuleDestroy {
   }
 
   /** O que a página do convite mostra antes de a pessoa criar a senha. */
-  async le(token: string): Promise<{ organizacao: string; email: string }> {
+  async le(token: string): Promise<{ organizacao: string; email: string; contaExiste: boolean }> {
     const dados = await this.dados(token, false);
     const organizacao = await this.prisma.organization.findFirst({
       where: { id: dados.organizationId, deletedAt: null },
       select: { name: true },
     });
     if (!organizacao) throw invalido();
-    return { organizacao: organizacao.name, email: dados.email };
+    const conta = await this.prisma.user.findUnique({ where: { email: dados.email }, select: { id: true } });
+    return { organizacao: organizacao.name, email: dados.email, contaExiste: Boolean(conta) };
   }
 
   async aceita(token: string, nome: string, senha: string, contexto?: ContextoDoCliente) {
+    // Confere antes de gastar: quem já tem conta precisa do link para aceitar entrando com ela.
+    await this.exigeEmailLivre((await this.dados(token, false)).email);
     const dados = await this.dados(token, true);
-    await this.exigeEmailLivre(dados.email);
 
     const passwordHash = await bcrypt.hash(senha, BCRYPT_ROUNDS);
     let userId: string;
@@ -96,6 +107,47 @@ export class ConvitesService implements OnModuleDestroy {
     }
 
     return this.auth.issueTokenPair(userId, dados.organizationId, dados.papel, undefined, { contexto });
+  }
+
+  /**
+   * Aceite de quem já tem conta, com a sessão aberta. A sessão prova a senha
+   * (e o autenticador, se a pessoa tiver); o e-mail do convite prova que o
+   * link é para ela. Devolve uma sessão nova, já na conta do convite.
+   */
+  async aceitaComConta(token: string, quem: AuthenticatedUser, contexto?: ContextoDoCliente) {
+    if (quem.impersonating) {
+      throw new AppException("CONVITE_DE_OUTRO_EMAIL", "Saia da visita de suporte para aceitar um convite.", HttpStatus.FORBIDDEN);
+    }
+    const lido = await this.dados(token, false);
+    const pessoa = await this.prisma.user.findUnique({
+      where: { id: quem.userId },
+      select: { email: true, platformRole: true, deletedAt: true },
+    });
+    if (!pessoa || pessoa.deletedAt || pessoa.email !== lido.email) {
+      throw new AppException(
+        "CONVITE_DE_OUTRO_EMAIL",
+        `Este convite é para ${lido.email}. Saia e entre com essa conta para aceitar.`,
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    const dados = await this.dados(token, true);
+    const vinculo = await this.prisma.$transaction(async (tx) => {
+      const existente = await tx.membership.findUnique({
+        where: { organizationId_userId: { organizationId: dados.organizationId, userId: quem.userId } },
+        select: { role: true },
+      });
+      if (dados.operador && !pessoa.platformRole) {
+        await tx.user.update({ where: { id: quem.userId }, data: { platformRole: "ADMIN" } });
+      }
+      if (existente) return existente;
+      return tx.membership.create({
+        data: { organizationId: dados.organizationId, userId: quem.userId, role: dados.papel, areas: dados.areas },
+        select: { role: true },
+      });
+    });
+
+    return this.auth.issueTokenPair(quem.userId, dados.organizationId, vinculo.role, undefined, { contexto });
   }
 
   private async dados(token: string, gasta: boolean): Promise<DadosDoConvite> {

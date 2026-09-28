@@ -359,6 +359,7 @@ describe("Isolamento entre organizações (e2e)", () => {
       // credencial e já aponta para uma única organização.
       "GET /api/publico/convites/:token": "convite pelo token aleatório",
       "POST /api/publico/convites/:token": "convite pelo token aleatório",
+      "POST /api/publico/convites/:token/com-conta": "convite pelo token aleatório, para o e-mail da sessão",
       "GET /api/publico/whatsapp/:token": "link de conexão pelo token aleatório",
     };
 

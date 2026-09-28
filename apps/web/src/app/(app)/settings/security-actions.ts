@@ -1,42 +1,13 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { apiFetch, ApiRequestError } from "@/lib/api-client";
-import {
-  ACCESS_TOKEN_COOKIE,
-  ACCESS_TOKEN_MAX_AGE,
-  REFRESH_TOKEN_COOKIE,
-  REFRESH_TOKEN_MAX_AGE,
-  SESSION_COOKIE_OPTIONS,
-} from "@/lib/session";
+import { guardaSessao, ParDeTokens } from "@/lib/guarda-sessao";
 
 export interface EstadoDeSeguranca {
   erro?: string;
   /** Carimbo do sucesso, para o formulário limpar os campos sem confundir dois envios. */
   okEm?: number;
-}
-
-interface ParDeTokens {
-  accessToken: string;
-  refreshToken: string;
-}
-
-/**
- * A API derruba todas as sessões ao trocar a credencial e devolve um par novo.
- * Gravar esse par aqui é o que mantém quem trocou logado nesta aba, em vez de
- * ser expulso pela própria ação.
- */
-async function guardaSessao(tokens: ParDeTokens): Promise<void> {
-  const bau = await cookies();
-  bau.set(ACCESS_TOKEN_COOKIE, tokens.accessToken, {
-    ...SESSION_COOKIE_OPTIONS,
-    maxAge: ACCESS_TOKEN_MAX_AGE,
-  });
-  bau.set(REFRESH_TOKEN_COOKIE, tokens.refreshToken, {
-    ...SESSION_COOKIE_OPTIONS,
-    maxAge: REFRESH_TOKEN_MAX_AGE,
-  });
 }
 
 export async function trocarSenha(

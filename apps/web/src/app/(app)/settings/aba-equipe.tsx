@@ -3,6 +3,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Membro, TeamList } from "./team-list";
 import { PAPEL, Papel } from "./papeis";
 import { AdicionarPessoa } from "./adicionar-pessoa";
+import { TransferirPosse } from "./transferir-posse";
 
 export async function AbaEquipe({
   euId,
@@ -36,7 +37,13 @@ export async function AbaEquipe({
           className="mb-5"
         />
 
-        <TeamList membros={membros} euId={euId} possoGerir={possoGerir} possoMexerEmDono={possoMexerEmDono} />
+        <TeamList
+          membros={membros}
+          euId={euId}
+          possoGerir={possoGerir}
+          possoMexerEmDono={possoMexerEmDono}
+          contaDaEquipe={areaDaTimeless}
+        />
 
         {!possoGerir ? (
           <p className="mt-3 text-apoio text-ink-mute">
@@ -57,6 +64,20 @@ export async function AbaEquipe({
           ) : (
             <AdicionarPessoa clientes={clientes} />
           )}
+        </Card>
+      ) : null}
+
+      {/* Só o dono, só na conta da equipe, e só para quem já é da equipe. */}
+      {areaDaTimeless && possoMexerEmDono ? (
+        <Card className="p-6">
+          <CardHeader
+            title="Transferir a posse"
+            description="Passe esta conta para outra pessoa da equipe Timeless. Ela vira dona; você passa a administrador. Pede o código do autenticador."
+            className="mb-5"
+          />
+          <TransferirPosse
+            candidatos={membros.filter((m) => m.daEquipe && m.userId !== euId && m.role !== "OWNER")}
+          />
         </Card>
       ) : null}
 

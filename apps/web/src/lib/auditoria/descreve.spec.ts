@@ -41,6 +41,9 @@ describe("descreveRegistro", () => {
       descreveRegistro(r("ORGANIZATION_UPDATED", null, { nome: "Loja", cor: null, criadaPor: "equipe da plataforma" }, "Organization")),
     ).toBe("Criou o cliente “Loja”");
     expect(descreveRegistro(r("MEMBER_REMOVED", { email: "bia@x.com", papel: "MEMBER" }))).toBe("Removeu bia@x.com da equipe");
+    expect(descreveRegistro(r("OWNERSHIP_TRANSFERRED", { dono: "Adriano" }, { dono: "Guilherme", email: "g@x.com" }))).toBe(
+      "Passou a posse da conta para Guilherme, com o código do autenticador",
+    );
   });
 
   it("escreve dinheiro em reais, e não em centavos", () => {

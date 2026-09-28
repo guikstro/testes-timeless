@@ -824,6 +824,11 @@ enum AuditAction {
    */
   MEMBER_ROLE_CHANGED
   MEMBER_REMOVED
+  /**
+   * A posse da conta da equipe passou de uma pessoa para outra, confirmada
+   * com o código do autenticador.
+   */
+  OWNERSHIP_TRANSFERRED
 
   // Conta e acesso.
   LOGIN_SUCCEEDED

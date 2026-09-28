@@ -14,6 +14,8 @@ export interface Membro {
   email: string;
   role: Papel;
   joinedAt: string;
+  /** Da equipe Timeless. É para quem a posse da conta da equipe pode ir. */
+  daEquipe: boolean;
 }
 
 
@@ -22,11 +24,14 @@ export function TeamList({
   euId,
   possoGerir,
   possoMexerEmDono,
+  contaDaEquipe = false,
 }: {
   membros: Membro[];
   euId: string;
   possoGerir: boolean;
   possoMexerEmDono: boolean;
+  /** Na conta da equipe, dono só se vira pela transferência, com o autenticador. */
+  contaDaEquipe?: boolean;
 }) {
   const [erro, setErro] = useState<string | null>(null);
 
@@ -40,6 +45,7 @@ export function TeamList({
             souEu={membro.userId === euId}
             posso={possoGerir}
             possoMexerEmDono={possoMexerEmDono}
+            semVirarDono={contaDaEquipe}
             aoFalhar={setErro}
           />
         ))}
@@ -59,12 +65,14 @@ function Linha({
   souEu,
   posso,
   possoMexerEmDono,
+  semVirarDono,
   aoFalhar,
 }: {
   membro: Membro;
   souEu: boolean;
   posso: boolean;
   possoMexerEmDono: boolean;
+  semVirarDono: boolean;
   aoFalhar: (erro: string | null) => void;
 }) {
   const [confirmando, setConfirmando] = useState(false);
@@ -109,7 +117,9 @@ function Linha({
           aria-label={`Papel de ${membro.name}`}
           className="h-8 w-auto text-apoio"
         >
-          {(Object.keys(PAPEL) as Papel[]).map((papel) => (
+          {(Object.keys(PAPEL) as Papel[])
+            .filter((papel) => !(semVirarDono && papel === "OWNER" && membro.role !== "OWNER"))
+            .map((papel) => (
             <option key={papel} value={papel}>
               {PAPEL[papel].rotulo}
             </option>

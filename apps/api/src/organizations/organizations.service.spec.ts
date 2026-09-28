@@ -18,12 +18,15 @@ describe("OrganizationsService, gestão da equipe", () => {
       refreshToken: { updateMany: jest.fn() },
       sessao: { updateMany: jest.fn() },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
-      user: { findUnique: jest.fn().mockResolvedValue({ name: "Bia", email: "bia@x.com" }) },
+      user: { findUnique: jest.fn().mockResolvedValue({ name: "Bia", email: "bia@x.com" }), findMany: jest.fn() },
+      userMfa: { findFirst: jest.fn() },
       $transaction: jest.fn(),
     };
     // A remoção roda numa transação interativa: o callback recebe o próprio
     // mock, e o teste confere as escritas que aconteceram dentro dela.
     prisma.$transaction.mockImplementation((executar: (tx: typeof prisma) => unknown) => executar(prisma));
+    const auth = { issueTokenPair: jest.fn().mockResolvedValue({ accessToken: "a", refreshToken: "r" }) };
+    const mfa = { confereSegundoFator: jest.fn().mockResolvedValue(true) };
     const armazenamento = {
       guardar: jest.fn().mockResolvedValue("abc.png"),
       apagarPelaUrl: jest.fn().mockResolvedValue(undefined),
@@ -35,9 +38,13 @@ describe("OrganizationsService, gestão da equipe", () => {
         prisma as unknown as PrismaService,
         armazenamento as unknown as ArmazenamentoService,
         new AuditoriaService(prisma as unknown as PrismaService),
+        auth as never,
+        mfa as never,
       ),
       prisma,
       armazenamento,
+      auth,
+      mfa,
     };
   }
 
@@ -191,7 +198,87 @@ describe("OrganizationsService, gestão da equipe", () => {
     ]);
 
     await expect(service.listMembers("org-1")).resolves.toEqual([
-      { userId: "u1", name: "Ana", email: "ana@x.com", role: "OWNER", joinedAt: new Date(0) },
+      { userId: "u1", name: "Ana", email: "ana@x.com", role: "OWNER", joinedAt: new Date(0), daEquipe: false },
     ]);
+  });
+
+  describe("transferir a posse da conta da equipe", () => {
+    const dono = { userId: "eu", organizationId: "org-equipe", role: "OWNER", impersonating: false, sessaoId: "s1", areas: null } as AuthenticatedUser;
+
+    function daEquipe(opcoes: { alvoDaEquipe?: boolean; souOperador?: boolean } = {}) {
+      const montado = buildService();
+      const { prisma } = montado;
+      prisma.user.findUnique.mockResolvedValue({ platformRole: opcoes.souOperador === false ? null : "ADMIN" });
+      prisma.membership.findUnique.mockResolvedValue({ role: "ADMIN" });
+      prisma.user.findMany.mockResolvedValue([
+        { id: "eu", name: "Adriano", email: "a@x.com", platformRole: "ADMIN", deletedAt: null },
+        { id: "gui", name: "Guilherme", email: "g@x.com", platformRole: opcoes.alvoDaEquipe === false ? null : "ADMIN", deletedAt: null },
+      ]);
+      return montado;
+    }
+
+    it("passa a posse, rebaixa quem transferiu a administrador e devolve a sessão com o papel novo", async () => {
+      const { service, prisma, auth } = daEquipe();
+
+      await service.transferePosse(dono, "gui", "123 456");
+
+      expect(prisma.membership.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { organizationId_userId: { organizationId: "org-equipe", userId: "gui" } }, data: { role: "OWNER", areas: [] } }),
+      );
+      expect(prisma.membership.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { organizationId_userId: { organizationId: "org-equipe", userId: "eu" } }, data: { role: "ADMIN" } }),
+      );
+      expect(prisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ action: "OWNERSHIP_TRANSFERRED" }) }),
+      );
+      expect(auth.issueTokenPair).toHaveBeenCalledWith("eu", "org-equipe", "ADMIN", undefined, { id: "s1" });
+    });
+
+    it("nunca para quem não é da equipe", async () => {
+      const { service, prisma } = daEquipe({ alvoDaEquipe: false });
+      await expect(service.transferePosse(dono, "gui", "123456")).rejects.toMatchObject({ response: { code: "SO_PARA_A_EQUIPE" } });
+      expect(prisma.membership.update).not.toHaveBeenCalled();
+    });
+
+    it("não existe fora da conta da equipe", async () => {
+      const { service } = daEquipe({ souOperador: false });
+      await expect(service.transferePosse(dono, "gui", "123456")).rejects.toMatchObject({ response: { code: "TRANSFERENCIA_PROIBIDA" } });
+    });
+
+    it("não vale numa visita de suporte", async () => {
+      const { service } = daEquipe();
+      await expect(service.transferePosse({ ...dono, impersonating: true }, "gui", "123456")).rejects.toMatchObject({
+        response: { code: "TRANSFERENCIA_PROIBIDA" },
+      });
+    });
+
+    it("código errado não muda nada", async () => {
+      const { service, prisma, mfa } = daEquipe();
+      mfa.confereSegundoFator.mockResolvedValue(false);
+      prisma.userMfa.findFirst.mockResolvedValue({ userId: "eu" });
+
+      await expect(service.transferePosse(dono, "gui", "000000")).rejects.toMatchObject({ response: { code: "CODIGO_INVALIDO" } });
+      expect(prisma.membership.update).not.toHaveBeenCalled();
+    });
+
+    it("sem autenticador configurado, pede para ativar antes", async () => {
+      const { service, prisma, mfa } = daEquipe();
+      mfa.confereSegundoFator.mockResolvedValue(false);
+      prisma.userMfa.findFirst.mockResolvedValue(null);
+
+      await expect(service.transferePosse(dono, "gui", "000000")).rejects.toMatchObject({ response: { code: "MFA_OBRIGATORIO" } });
+    });
+
+    it("só o dono transfere", async () => {
+      const { service } = daEquipe();
+      await expect(service.transferePosse({ ...dono, role: "ADMIN" }, "gui", "123456")).rejects.toMatchObject({
+        response: { code: "OWNER_REQUIRED" },
+      });
+    });
+
+    it("na conta da equipe, promover a dono pela troca de papel é recusado: tem de ser pela transferência", async () => {
+      const { service } = daEquipe();
+      await expect(service.updateMember(dono, "gui", "OWNER")).rejects.toMatchObject({ response: { code: "USE_A_TRANSFERENCIA" } });
+    });
   });
 });

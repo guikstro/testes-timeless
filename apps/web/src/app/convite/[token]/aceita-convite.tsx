@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { BOTAO, CAMPO, LinkDaEntrada, MolduraDeAutenticacao } from "@/components/moldura-de-autenticacao";
 
-type Convite = { fase: "carregando" } | { fase: "valido"; organizacao: string; email: string } | { fase: "invalido"; mensagem: string };
+type Convite =
+  | { fase: "carregando" }
+  | { fase: "valido"; organizacao: string; email: string; contaExiste: boolean }
+  | { fase: "invalido"; mensagem: string };
 
 const rotulo = "mb-1.5 block text-apoio font-medium uppercase tracking-[0.12em] text-ink-mute";
 
@@ -20,7 +23,7 @@ export function AceitaConvite({ token }: { token: string }) {
         const corpo = await resposta.json().catch(() => null);
         setConvite(
           resposta.ok && corpo
-            ? { fase: "valido", organizacao: corpo.organizacao, email: corpo.email }
+            ? { fase: "valido", organizacao: corpo.organizacao, email: corpo.email, contaExiste: Boolean(corpo.contaExiste) }
             : { fase: "invalido", mensagem: corpo?.message ?? "Este convite é inválido ou já venceu." },
         );
       })
@@ -49,6 +52,54 @@ export function AceitaConvite({ token }: { token: string }) {
     } finally {
       setEnviando(false);
     }
+  }
+
+  /*
+    Quem já tem conta não cria senha: entra com a que tem (e com o
+    autenticador, se usar) e aceita. Sem sessão aberta, vai ao login e volta
+    para cá.
+  */
+  async function aceitarComConta() {
+    setErro(null);
+    setEnviando(true);
+    try {
+      const resposta = await fetch(`/api/convites/${encodeURIComponent(token)}/com-conta`, { method: "POST" });
+      if (resposta.status === 401) {
+        window.location.assign(`/login?next=${encodeURIComponent(`/convite/${token}`)}`);
+        return;
+      }
+      if (!resposta.ok) {
+        const corpo = await resposta.json().catch(() => null);
+        setErro(corpo?.message ?? "Não foi possível aceitar o convite.");
+        return;
+      }
+      window.location.assign("/");
+    } catch {
+      setErro("Sem conexão com o servidor.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  if (convite.fase === "valido" && convite.contaExiste) {
+    return (
+      <MolduraDeAutenticacao
+        rodape={null}
+        titulo={`Acesso a ${convite.organizacao}`}
+        descricao={`Você já tem conta com ${convite.email}. Entre com ela para aceitar: se não estiver logado, a entrada pede sua senha e volta para cá.`}
+      >
+        <div className="mt-10 flex flex-col gap-5">
+          {erro ? (
+            <p role="alert" className="border-l-2 border-red-500 pl-3 text-corpo text-red-600 dark:text-red-400">
+              {erro}
+            </p>
+          ) : null}
+          <button type="button" onClick={aceitarComConta} disabled={enviando} aria-busy={enviando || undefined} className={BOTAO}>
+            {enviando ? "Aceitando" : "Aceitar com a minha conta"}
+          </button>
+        </div>
+      </MolduraDeAutenticacao>
+    );
   }
 
   if (convite.fase !== "valido") {

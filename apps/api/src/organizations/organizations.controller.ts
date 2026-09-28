@@ -8,6 +8,9 @@ import { UpdateOrganizationDto } from "./dto/update-organization.dto";
 import { UpdateMemberDto } from "./dto/update-member.dto";
 import { autorDe } from "../auditoria/auditoria.service";
 import { EnviarLogoDto } from "./dto/enviar-logo.dto";
+import { TransferePosseDto } from "./dto/transfere-posse.dto";
+import { Throttle } from "@nestjs/throttler";
+import { CREDENCIAL } from "../common/throttling/limites";
 
 @Controller("organizations")
 @UseGuards(JwtAuthGuard)
@@ -47,6 +50,18 @@ export class OrganizationsController {
     @Body() dto: UpdateMemberDto,
   ) {
     return this.organizationsService.updateMember(user, userId, dto.role);
+  }
+
+  /**
+   * Passa a posse da conta da equipe. Pede o código do autenticador, com
+   * poucas tentativas: é o código que decide, e ele não pode ser chutado.
+   */
+  @Requer("owner.manage")
+  @Post("current/transferir-posse")
+  @Throttle({ default: CREDENCIAL })
+  @HttpCode(HttpStatus.OK)
+  transferePosse(@CurrentUser() user: AuthenticatedUser, @Body() dto: TransferePosseDto) {
+    return this.organizationsService.transferePosse(user, dto.userId, dto.codigo);
   }
 
   @Requer("member.manage")

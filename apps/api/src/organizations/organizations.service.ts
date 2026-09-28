@@ -9,6 +9,8 @@ import { ErroDaImagem, validaImagem } from "./upload/imagem-enviada";
 import { Autor, AuditoriaService, autorDe } from "../auditoria/auditoria.service";
 import { enderecoPublico } from "../common/configuracao/ambiente";
 import { exige } from "../common/permissoes/capacidades";
+import { AuthService, TokenPair } from "../auth/auth.service";
+import { MfaService } from "../auth/mfa/mfa.service";
 
 @Injectable()
 export class OrganizationsService {
@@ -16,6 +18,8 @@ export class OrganizationsService {
     private readonly prisma: PrismaService,
     private readonly armazenamento: ArmazenamentoService,
     private readonly auditoria: AuditoriaService,
+    private readonly auth: AuthService,
+    private readonly mfa: MfaService,
   ) {}
 
   /**
@@ -190,7 +194,7 @@ export class OrganizationsService {
       select: {
         role: true,
         createdAt: true,
-        user: { select: { id: true, name: true, email: true } },
+        user: { select: { id: true, name: true, email: true, platformRole: true } },
       },
     });
 
@@ -200,6 +204,8 @@ export class OrganizationsService {
       email: membro.user.email,
       role: membro.role,
       joinedAt: membro.createdAt,
+      // Da equipe Timeless: é para quem a posse da conta da equipe pode ir.
+      daEquipe: Boolean(membro.user.platformRole),
     }));
   }
 
@@ -227,6 +233,13 @@ export class OrganizationsService {
       );
     }
     if (alvo.role === "OWNER" || role === "OWNER") exige(quem, "owner.manage");
+    if (role === "OWNER" && alvo.role !== "OWNER" && (await this.ehOperador(quem))) {
+      throw new AppException(
+        "USE_A_TRANSFERENCIA",
+        "Na conta da equipe, a posse passa pela transferência, que pede o código do autenticador.",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
     if (alvo.role === "OWNER" && role !== "OWNER") {
       await this.exigeOutroDono(quem.organizationId, alvoUserId);
     }
@@ -325,6 +338,98 @@ export class OrganizationsService {
         tx,
       );
     });
+  }
+
+  /**
+   * Passa a posse da conta da equipe para outra pessoa da equipe.
+   *
+   * Só existe na conta da equipe Timeless, e só para quem já é da equipe:
+   * quem é dono dela enxerga todos os clientes, e isso nunca pode ir para um
+   * cliente. Pede o código do autenticador porque é a ação mais poderosa da
+   * conta, e uma sessão esquecida aberta não pode bastar para ela.
+   *
+   * Quem transfere vira administrador. Devolve a sessão dele já renovada, com
+   * o papel novo, para a tela não continuar achando que ele é dono.
+   */
+  async transferePosse(quem: AuthenticatedUser, alvoUserId: string, codigo: string): Promise<TokenPair> {
+    exige(quem, "owner.manage");
+    if (quem.impersonating) {
+      throw new AppException("TRANSFERENCIA_PROIBIDA", "Numa visita de suporte não se transfere a posse da conta.", HttpStatus.FORBIDDEN);
+    }
+    if (!(await this.ehOperador(quem))) {
+      throw new AppException(
+        "TRANSFERENCIA_PROIBIDA",
+        "A transferência de posse existe só na conta da equipe Timeless.",
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    if (alvoUserId === quem.userId) {
+      throw new AppException("TRANSFERENCIA_PROIBIDA", "Escolha outra pessoa da equipe.", HttpStatus.BAD_REQUEST);
+    }
+
+    const alvo = await this.membroOuErro(quem.organizationId, alvoUserId);
+    const pessoas = await this.prisma.user.findMany({
+      where: { id: { in: [quem.userId, alvoUserId] } },
+      select: { id: true, name: true, email: true, platformRole: true, deletedAt: true },
+    });
+    const eu = pessoas.find((p) => p.id === quem.userId);
+    const novoDono = pessoas.find((p) => p.id === alvoUserId);
+    if (!novoDono || novoDono.deletedAt || !novoDono.platformRole) {
+      throw new AppException(
+        "SO_PARA_A_EQUIPE",
+        "Só alguém da equipe Timeless pode ser dono desta conta.",
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    // O código por último: um erro de escolha não gasta o código.
+    if (!(await this.mfa.confereSegundoFator(quem.userId, codigo.replace(/\s/g, "")))) {
+      const temFator = await this.prisma.userMfa.findFirst({ where: { userId: quem.userId, confirmadoEm: { not: null } } });
+      throw temFator
+        ? new AppException("CODIGO_INVALIDO", "Código de verificação inválido.", HttpStatus.BAD_REQUEST)
+        : new AppException(
+            "MFA_OBRIGATORIO",
+            "Ative a verificação em duas etapas em Segurança antes de transferir a posse.",
+            HttpStatus.FORBIDDEN,
+          );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.membership.update({
+        where: { organizationId_userId: { organizationId: quem.organizationId, userId: alvoUserId } },
+        data: { role: "OWNER", areas: [] },
+      });
+      await tx.membership.update({
+        where: { organizationId_userId: { organizationId: quem.organizationId, userId: quem.userId } },
+        data: { role: "ADMIN" },
+      });
+      await this.auditoria.registra(
+        autorDe(quem),
+        {
+          acao: "OWNERSHIP_TRANSFERRED",
+          entidade: "Membership",
+          entidadeId: alvoUserId,
+          antes: { dono: eu?.name ?? null, email: eu?.email ?? null, papelDoNovoDono: alvo.role },
+          depois: { dono: novoDono.name, email: novoDono.email },
+        },
+        tx,
+      );
+    });
+
+    return this.auth.issueTokenPair(
+      quem.userId,
+      quem.organizationId,
+      "ADMIN",
+      undefined,
+      quem.sessaoId ? { id: quem.sessaoId } : undefined,
+    );
+  }
+
+  /** Operador da plataforma na própria conta: é o que diz que esta é a conta da equipe. */
+  private async ehOperador(quem: AuthenticatedUser): Promise<boolean> {
+    if (quem.impersonating) return false;
+    const eu = await this.prisma.user.findUnique({ where: { id: quem.userId }, select: { platformRole: true } });
+    return Boolean(eu?.platformRole);
   }
 
   private async membroOuErro(organizationId: string, userId: string) {

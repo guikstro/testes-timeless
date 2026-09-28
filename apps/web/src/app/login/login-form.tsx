@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { destinoSeguro } from "@/lib/destino-seguro";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { esquecerUltimoNome, gravarUltimoNome, lerUltimoNome } from "@/lib/last-user";
@@ -96,7 +97,7 @@ export function LoginForm() {
       // sempre de quem provou ser quem diz ser neste navegador.
       gravarUltimoNome(body?.firstName ?? null);
 
-      router.push(searchParams.get("next") ?? "/");
+      router.push(destinoSeguro(searchParams.get("next")));
       router.refresh();
     } catch {
       setError("Sem conexão com o servidor.");
@@ -133,7 +134,7 @@ export function LoginForm() {
 
       const body = await response.json().catch(() => null);
       gravarUltimoNome(body?.firstName ?? null);
-      router.push(searchParams.get("next") ?? "/");
+      router.push(destinoSeguro(searchParams.get("next")));
       router.refresh();
     } catch {
       setError("Sem conexão com o servidor.");

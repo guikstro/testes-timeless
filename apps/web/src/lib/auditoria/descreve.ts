@@ -130,6 +130,8 @@ export function descreveRegistro(r: Pick<RegistroDeAuditoria, "action" | "entity
       return `Removeu ${texto(antes.nome) ?? texto(antes.email) ?? "uma pessoa"} da equipe`;
     case "INVITE_CREATED":
       return convite(depois);
+    case "OWNERSHIP_TRANSFERRED":
+      return `Passou a posse da conta para ${texto(depois.dono) ?? texto(depois.email) ?? "outra pessoa"}, com o código do autenticador`;
 
     case "IMPERSONATION_STARTED":
       return "Entrou na conta pelo suporte da plataforma";

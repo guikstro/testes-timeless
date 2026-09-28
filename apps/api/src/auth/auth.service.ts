@@ -43,7 +43,7 @@ const BCRYPT_ROUNDS = 12;
 // exists (real accounts take ~bcrypt-compare-time longer to reject).
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync("not-a-real-password", BCRYPT_ROUNDS);
 
-interface TokenPair {
+export interface TokenPair {
   accessToken: string;
   refreshToken: string;
 }
