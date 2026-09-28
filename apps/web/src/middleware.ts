@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cabecalhosDoCliente } from "@/lib/ip-do-cliente";
 import { redireciona } from "@/lib/redireciona";
+import { CABECALHO_DO_CAMINHO } from "@/lib/areas";
 import {
   ACCESS_TOKEN_COOKIE,
   ACCESS_TOKEN_MAX_AGE,
@@ -16,6 +17,13 @@ import {
 const PROTECTED_PREFIXES = ["/dashboard", "/conversas", "/leads", "/links", "/integrations", "/settings", "/campanhas", "/verba", "/relatorio", "/notifications", "/clientes", "/relatorio-geral"];
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
 
+/** Segue para a tela levando o caminho. Sobrescreve o que vier do navegador. */
+function segue(request: NextRequest): NextResponse {
+  const cabecalhos = new Headers(request.headers);
+  cabecalhos.set(CABECALHO_DO_CAMINHO, request.nextUrl.pathname);
+  return NextResponse.next({ request: { headers: cabecalhos } });
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isProtected = PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
@@ -25,7 +33,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (request.cookies.get(ACCESS_TOKEN_COOKIE)?.value) {
-    return NextResponse.next();
+    return segue(request);
   }
 
   // The access token (15 min TTL) is gone but the refresh token (7 days) may
@@ -48,7 +56,7 @@ export async function middleware(request: NextRequest) {
         // the browser's *next* request).
         request.cookies.set(ACCESS_TOKEN_COOKIE, body.accessToken);
 
-        const response = NextResponse.next({ request });
+        const response = segue(request);
         response.cookies.set(ACCESS_TOKEN_COOKIE, body.accessToken, {
           ...SESSION_COOKIE_OPTIONS,
           maxAge: ACCESS_TOKEN_MAX_AGE,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BOTAO, CAMPO, MolduraDeAutenticacao } from "@/components/moldura-de-autenticacao";
+import { BOTAO, CAMPO, LinkDaEntrada, MolduraDeAutenticacao } from "@/components/moldura-de-autenticacao";
 
 type Convite = { fase: "carregando" } | { fase: "valido"; organizacao: string; email: string } | { fase: "invalido"; mensagem: string };
 
@@ -53,7 +53,7 @@ export function AceitaConvite({ token }: { token: string }) {
 
   if (convite.fase !== "valido") {
     return (
-      <MolduraDeAutenticacao
+      <MolduraDeAutenticacao rodape={<LinkDaEntrada pergunta="Já criou sua senha?" acao="Entrar" />}
         titulo={convite.fase === "carregando" ? "Abrindo o convite..." : "Convite indisponível"}
         descricao={convite.fase === "invalido" ? convite.mensagem : "Só um instante."}
       >
@@ -63,7 +63,7 @@ export function AceitaConvite({ token }: { token: string }) {
   }
 
   return (
-    <MolduraDeAutenticacao titulo={`Acesso a ${convite.organizacao}`} descricao={`Crie sua senha para entrar como ${convite.email}.`}>
+    <MolduraDeAutenticacao rodape={<LinkDaEntrada pergunta="Já criou sua senha?" acao="Entrar" />} titulo={`Acesso a ${convite.organizacao}`} descricao={`Crie sua senha para entrar como ${convite.email}.`}>
       <form onSubmit={enviar} className="mt-10 flex flex-col gap-7">
         <div>
           <label htmlFor="nome" className={rotulo}>

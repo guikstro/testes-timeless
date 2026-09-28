@@ -16,13 +16,25 @@ export const AREAS = [
 
 export type Area = (typeof AREAS)[number]["chave"];
 
-/** `null` é sem limite (dono, administrador, equipe Timeless). */
-export function podeVer(areas: string[] | null | undefined, href: string): boolean {
+/**
+ * Cabeçalho com o caminho pedido, posto pelo middleware: o layout não recebe
+ * a rota e precisa dela para mandar quem não pode abrir a tela para uma que
+ * pode, em vez de deixá-la cair na tela de erro.
+ */
+export const CABECALHO_DO_CAMINHO = "x-caminho";
+
+/**
+ * Se a pessoa pode abrir o caminho, incluindo o que fica dentro de uma área
+ * (`/leads/123`, `/integrations/whatsapp`). `null` é sem limite (dono,
+ * administrador, equipe Timeless). Caminho fora das áreas, como as
+ * notificações, abre para todos.
+ */
+export function podeVer(areas: string[] | null | undefined, caminho: string): boolean {
   if (!areas) return true;
+  const area = AREAS.find((item) => caminho === item.href || caminho.startsWith(`${item.href}/`));
   // Configurações sempre abre: é lá que a pessoa troca a própria senha.
-  if (href === "/settings") return true;
-  const area = AREAS.find((item) => item.href === href);
-  return !area || areas.includes(area.chave);
+  if (!area || area.chave === "configuracoes") return true;
+  return areas.includes(area.chave);
 }
 
 /** A primeira tela que a pessoa pode abrir, para onde ela vai ao entrar. */

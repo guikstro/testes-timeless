@@ -133,6 +133,15 @@ describe("Administração da plataforma (e2e)", () => {
       expect(response.body.items[0].owner.email).toBe("cliente@admin-e2e.local");
     });
 
+    it("a conta da própria equipe não aparece como cliente", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/admin/organizations?search=Admin E2E")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body.items.map((item: { name: string }) => item.name)).toEqual(["Admin E2E Cliente"]);
+    });
+
     it("continua sem permitir que o cliente acesse a administração", async () => {
       await request(app.getHttpServer())
         .get("/api/admin/organizations")

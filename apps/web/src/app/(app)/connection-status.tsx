@@ -13,8 +13,10 @@ import type { ConexaoDoWhatsApp } from "@/lib/conexao-do-whatsapp";
  * normal treina quem lê a ignorar a faixa, e aí o aviso que importa passa
  * despercebido junto.
  */
-export function ConnectionStatus({ conexao }: { conexao: ConexaoDoWhatsApp | null }) {
+export function ConnectionStatus({ conexao, podeAbrir }: { conexao: ConexaoDoWhatsApp | null; podeAbrir: boolean }) {
   const estado = descreve(conexao);
+  // Quem não usa Integrações vê o estado, mas não um atalho que não abre.
+  if (!podeAbrir) estado.href = null;
 
   const conteudo = (
     <>

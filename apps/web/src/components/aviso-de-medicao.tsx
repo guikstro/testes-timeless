@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formataDia } from "@/lib/periodo";
 import { Medicao } from "@/lib/medicao-de-leads";
+import { SePuderAbrir } from "@/components/acesso";
 
 /**
  * O aviso de que os números de lead desta tela não são medida.
@@ -50,12 +51,17 @@ export function AvisoDeMedicao({
         </p>
       </div>
       {texto.acao ? (
+        <SePuderAbrir
+          href="/integrations/whatsapp"
+          senao={<p className="shrink-0 text-apoio text-amber-800 dark:text-amber-200/90">Quem administra a conta resolve isso em Integrações.</p>}
+        >
         <Link
           href="/integrations/whatsapp"
           className="focus-ring inline-flex h-9 shrink-0 items-center justify-center rounded-full bg-amber-900 px-4 text-apoio font-semibold text-amber-50 transition-transform duration-200 ease-soft active:scale-95 dark:bg-amber-100 dark:text-amber-950"
         >
           {texto.acao}
         </Link>
+        </SePuderAbrir>
       ) : null}
     </div>
   );

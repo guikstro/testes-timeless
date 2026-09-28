@@ -1,4 +1,7 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
+import { CABECALHO_DO_CAMINHO, podeVer, telaInicial } from "@/lib/areas";
+import { AcessoProvider } from "@/components/acesso";
 import { apiFetch, ApiRequestError } from "@/lib/api-client";
 import { BrandStyle } from "@/components/brand-style";
 import { LivingBackground } from "@/components/living-background";
@@ -30,6 +33,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   /*
+    Tela fora das áreas da pessoa (link salvo, endereço digitado): vai para
+    uma que ela pode abrir. Sem isto a API recusa, a tela cai no erro e cada
+    tentativa vira um alerta falso para a equipe.
+  */
+  const caminho = (await headers()).get(CABECALHO_DO_CAMINHO);
+  if (caminho && !podeVer(session.areas, caminho)) redirect(telaInicial(session.areas));
+
+  /*
     A faixa do topo mostra o estado da conexão, então ele é buscado aqui. O
     try/catch não é zelo excessivo: sem ele, uma falha nesta consulta derruba
     o layout inteiro, e o app ficaria inacessível por causa de um indicador.
@@ -40,6 +51,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <NotificationProvider>
+    <AcessoProvider areas={session.areas}>
     <div className="flex min-h-screen flex-col">
       {/* Não empurra nada: o fio flutua sobre a borda da janela. */}
       {session.impersonating ? <ImpersonationHairline /> : null}
@@ -76,7 +88,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               expande sobre este canto, e um indicador que some quando o mouse
               passa no menu não serve como sinal permanente.
             */}
-            {areaDaTimeless ? null : <ConnectionStatus conexao={conexao} />}
+            {areaDaTimeless ? null : <ConnectionStatus conexao={conexao} podeAbrir={podeVer(session.areas, "/integrations")} />}
             <NotificationBell />
           </div>
 
@@ -88,6 +100,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       <NotificationToasts />
     </div>
+    </AcessoProvider>
     </NotificationProvider>
   );
 }

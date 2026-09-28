@@ -42,8 +42,8 @@ export class AdminController {
   ) {}
 
   @Get("organizations")
-  listOrganizations(@Query() query: ListOrganizationsDto) {
-    return this.adminService.listOrganizations(query, query.search);
+  listOrganizations(@CurrentUser() user: AuthenticatedUser, @Query() query: ListOrganizationsDto) {
+    return this.adminService.listOrganizations(query, query.search, user.userId);
   }
 
   /** "Novo cliente": só a organização. Quem usa a conta entra pelo link do WhatsApp ou pelo suporte. */

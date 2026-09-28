@@ -45,7 +45,7 @@ export function ConexaoPeloLink({ token }: { token: string }) {
 
   if (situacao.fase === "conectado") {
     return (
-      <MolduraDeAutenticacao titulo="WhatsApp conectado ✓" descricao={`O WhatsApp de ${situacao.organizacao} já está ligado à plataforma. Pode fechar esta página.`}>
+      <MolduraDeAutenticacao rodape={null} titulo="WhatsApp conectado ✓" descricao={`O WhatsApp de ${situacao.organizacao} já está ligado à plataforma. Pode fechar esta página.`}>
         <span />
       </MolduraDeAutenticacao>
     );
@@ -53,7 +53,7 @@ export function ConexaoPeloLink({ token }: { token: string }) {
 
   if (situacao.fase === "invalido") {
     return (
-      <MolduraDeAutenticacao titulo="Link indisponível" descricao={situacao.mensagem}>
+      <MolduraDeAutenticacao rodape={null} titulo="Link indisponível" descricao={situacao.mensagem}>
         <span />
       </MolduraDeAutenticacao>
     );
@@ -61,7 +61,7 @@ export function ConexaoPeloLink({ token }: { token: string }) {
 
   const organizacao = situacao.fase === "qr" ? situacao.organizacao : null;
   return (
-    <MolduraDeAutenticacao
+    <MolduraDeAutenticacao rodape={null}
       titulo="Conectar WhatsApp"
       descricao={organizacao ? `Leia o QR Code com o WhatsApp de ${organizacao}.` : "Preparando o QR Code..."}
     >

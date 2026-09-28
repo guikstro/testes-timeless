@@ -20,6 +20,7 @@ export function MolduraDeAutenticacao({
   titulo: string;
   descricao: string;
   children: React.ReactNode;
+  /** Sem valor, o "voltar para a entrada" das telas de senha; `null` tira o rodapé. */
   rodape?: React.ReactNode;
 }) {
   return (
@@ -46,19 +47,11 @@ export function MolduraDeAutenticacao({
 
           {children}
 
-          <p className="mt-8 text-corpo text-ink-mute">
-            {rodape ?? (
-              <>
-                Lembrou a senha?{" "}
-                <Link
-                  href="/login"
-                  className="focus-ring rounded font-medium text-ink underline decoration-line underline-offset-4 transition-colors hover:decoration-accent"
-                >
-                  Voltar para a entrada
-                </Link>
-              </>
-            )}
-          </p>
+          {rodape === null ? null : (
+            <p className="mt-8 text-corpo text-ink-mute">
+              {rodape ?? <LinkDaEntrada pergunta="Lembrou a senha?" acao="Voltar para a entrada" />}
+            </p>
+          )}
         </div>
       </main>
 
@@ -66,6 +59,21 @@ export function MolduraDeAutenticacao({
         Tracking e atribuição de conversões
       </footer>
     </div>
+  );
+}
+
+/** "Pergunta? Ação", levando à tela de entrada. */
+export function LinkDaEntrada({ pergunta, acao }: { pergunta: string; acao: string }) {
+  return (
+    <>
+      {pergunta}{" "}
+      <Link
+        href="/login"
+        className="focus-ring rounded font-medium text-ink underline decoration-line underline-offset-4 transition-colors hover:decoration-accent"
+      >
+        {acao}
+      </Link>
+    </>
   );
 }
 

@@ -22,12 +22,15 @@ interface SupportAccess {
 export async function AbaSeguranca({
   emailAtual,
   impersonando,
+  veAcessosDoSuporte,
 }: {
   emailAtual: string;
   impersonando: boolean;
+  /** Quem responde pela conta. A API só mostra para quem tem a área de configurações. */
+  veAcessosDoSuporte: boolean;
 }) {
   const [acessos, mfa, sessoes] = await Promise.all([
-    apiFetch<SupportAccess[]>("/organizations/current/support-accesses"),
+    veAcessosDoSuporte ? apiFetch<SupportAccess[]>("/organizations/current/support-accesses") : null,
     apiFetch<SituacaoDoMfa>("/auth/mfa"),
     apiFetch<Sessao[]>("/auth/sessoes"),
   ]);
@@ -101,6 +104,7 @@ export async function AbaSeguranca({
         </>
       )}
 
+      {acessos ? (
       <Card className="p-6">
         <CardHeader
           title="Acessos do suporte à sua conta"
@@ -131,6 +135,7 @@ export async function AbaSeguranca({
           </ul>
         )}
       </Card>
+      ) : null}
     </div>
   );
 }

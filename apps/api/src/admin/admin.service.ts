@@ -48,12 +48,16 @@ export class AdminService {
   async listOrganizations(
     pagination: PaginationQueryDto,
     search?: string,
+    operadorId?: string,
   ): Promise<PaginatedResult<unknown>> {
     const offset = pagination.offset ?? 0;
     const limit = pagination.limit ?? 20;
 
     const where: Prisma.OrganizationWhereInput = {
       deletedAt: null,
+      // A conta da própria equipe não é cliente: fora da lista, do relatório
+      // geral e da escolha do convite, que leem todos daqui.
+      ...(operadorId ? { memberships: { none: { userId: operadorId } } } : {}),
       ...(search?.trim()
         ? {
             OR: [

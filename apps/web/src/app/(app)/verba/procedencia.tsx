@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formataDia } from "@/lib/periodo";
+import { SePuderAbrir } from "@/components/acesso";
 import { Anuncios } from "./tipos";
 
 /**
@@ -21,9 +22,11 @@ export function Procedencia({ dados, periodo }: { dados: Anuncios; periodo: { de
           A sincronização com a Meta parou
           {procedencia.sincronizadoEm ? ` em ${formataDia(procedencia.sincronizadoEm.slice(0, 10))}` : ""}. Os
           números abaixo são os da última que funcionou.{" "}
-          <Link href="/integrations/meta" className="font-medium underline underline-offset-2">
-            Reconectar
-          </Link>
+          <SePuderAbrir href="/integrations/meta">
+            <Link href="/integrations/meta" className="font-medium underline underline-offset-2">
+              Reconectar
+            </Link>
+          </SePuderAbrir>
         </p>
       ) : null}
 

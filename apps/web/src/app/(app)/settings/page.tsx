@@ -66,7 +66,9 @@ export default async function SettingsPage({
       <p className="mt-1 text-corpo text-ink-mute">
         {areaDaTimeless
           ? "Sua conta e a equipe Timeless: quem tem acesso, a aparência e a segurança."
-          : "Identidade, gatilhos, credenciais, quem tem acesso e o que foi feito."}
+          : sessao.areas
+            ? "Sua senha, o segundo fator e onde a sua conta está aberta."
+            : "Identidade, gatilhos, credenciais, quem tem acesso e o que foi feito."}
       </p>
 
       {/*
@@ -89,7 +91,11 @@ export default async function SettingsPage({
       {atual === "operacao" ? <AbaOperacao /> : null}
       {atual === "aparencia" ? <AbaAparencia /> : null}
       {atual === "seguranca" ? (
-        <AbaSeguranca emailAtual={sessao.user.email} impersonando={sessao.impersonating} />
+        <AbaSeguranca
+          emailAtual={sessao.user.email}
+          impersonando={sessao.impersonating}
+          veAcessosDoSuporte={!sessao.areas || sessao.areas.includes("configuracoes")}
+        />
       ) : null}
       {atual === "equipe" ? <AbaEquipe euId={sessao.user.id} meuPapel={sessao.role} areaDaTimeless={areaDaTimeless} /> : null}
       {atual === "auditoria" ? <AbaAuditoria filtro={{ categoria, pessoa, depoisDe }} /> : null}
