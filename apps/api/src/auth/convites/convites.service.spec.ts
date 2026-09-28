@@ -1,3 +1,4 @@
+import * as bcrypt from "bcrypt";
 import { ConvitesService } from "./convites.service";
 
 const mockRedis = (() => {
@@ -30,7 +31,8 @@ describe("ConvitesService", () => {
     $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
   };
   const auth = { issueTokenPair: jest.fn().mockResolvedValue({ accessToken: "a", refreshToken: "r" }) };
-  const service = new ConvitesService(prisma as never, auth as never);
+  const mfa = { confereSegundoFator: jest.fn().mockResolvedValue(true) };
+  const service = new ConvitesService(prisma as never, auth as never, mfa as never);
   const paraOCliente = { organizationId: "org-1", email: "ana@x.com", papel: "MEMBER" as const, areas: ["conversas"], operador: false };
 
   beforeEach(() => {
@@ -94,11 +96,20 @@ describe("ConvitesService", () => {
       await expect(service.le(token)).resolves.toMatchObject({ email: "ana@x.com" });
     });
 
-    it("entrando com a conta do e-mail certo, entra na equipe e vira operadora", async () => {
-      const token = tokenDe((await service.cria(daEquipe)).url);
-      prisma.user.findUnique.mockResolvedValue({ email: "ana@x.com", platformRole: null, deletedAt: null });
+    const conta = (extra: Record<string, unknown> = {}) => ({
+      id: "u-ana",
+      passwordHash: bcrypt.hashSync("senha-da-ana", 4),
+      platformRole: null,
+      deletedAt: null,
+      mfa: null,
+      ...extra,
+    });
 
-      await service.aceitaComConta(token, sessao);
+    it("com a senha certa, entra na equipe e vira operadora, mesmo sem conseguir entrar pelo login", async () => {
+      const token = tokenDe((await service.cria(daEquipe)).url);
+      prisma.user.findUnique.mockResolvedValue(conta());
+
+      await service.aceitaComSenha(token, "senha-da-ana", undefined);
 
       expect(tx.membership.create).toHaveBeenCalledWith(
         expect.objectContaining({ data: { organizationId: "org-1", userId: "u-ana", role: "ADMIN", areas: [] } }),
@@ -107,14 +118,27 @@ describe("ConvitesService", () => {
       expect(auth.issueTokenPair).toHaveBeenCalledWith("u-ana", "org-1", "ADMIN", undefined, { contexto: undefined });
     });
 
-    it("com a conta de outro e-mail, recusa e o link continua valendo", async () => {
+    it("senha errada recusa e o link continua valendo", async () => {
       const token = tokenDe((await service.cria(daEquipe)).url);
-      prisma.user.findUnique.mockResolvedValue({ email: "outra@x.com", platformRole: null, deletedAt: null });
+      prisma.user.findUnique.mockResolvedValue(conta());
 
-      await expect(service.aceitaComConta(token, sessao)).rejects.toMatchObject({ response: { code: "CONVITE_DE_OUTRO_EMAIL" } });
+      await expect(service.aceitaComSenha(token, "chute", undefined)).rejects.toMatchObject({ response: { code: "INVALID_CREDENTIALS" } });
       expect(tx.membership.create).not.toHaveBeenCalled();
-      prisma.user.findUnique.mockResolvedValue(null);
       await expect(service.le(token)).resolves.toMatchObject({ email: "ana@x.com" });
+    });
+
+    it("quem usa autenticador precisa do código, e código errado não passa", async () => {
+      const token = tokenDe((await service.cria(daEquipe)).url);
+      prisma.user.findUnique.mockResolvedValue(conta({ mfa: { confirmadoEm: new Date() } }));
+
+      await expect(service.aceitaComSenha(token, "senha-da-ana", undefined)).rejects.toMatchObject({ response: { code: "MFA_NECESSARIO" } });
+      mfa.confereSegundoFator.mockResolvedValueOnce(false);
+      await expect(service.aceitaComSenha(token, "senha-da-ana", "000000")).rejects.toMatchObject({ response: { code: "MFA_CODIGO_INVALIDO" } });
+      expect(tx.membership.create).not.toHaveBeenCalled();
+
+      await service.aceitaComSenha(token, "senha-da-ana", "123 456");
+      expect(mfa.confereSegundoFator).toHaveBeenLastCalledWith("u-ana", "123456");
+      expect(tx.membership.create).toHaveBeenCalled();
     });
   });
 });

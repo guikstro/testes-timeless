@@ -11,11 +11,13 @@ import { isUniqueConstraintError } from "../../common/utils/is-unique-constraint
 import { enderecoDaAplicacao } from "../../common/configuracao/ambiente";
 import { AuthService } from "../auth.service";
 import { ContextoDoCliente } from "../sessoes/contexto-do-cliente";
-import { AuthenticatedUser } from "../jwt-payload.interface";
+import { MfaService } from "../mfa/mfa.service";
 
 /** Três dias: tempo de a pessoa ver a mensagem e abrir, sem o link valer para sempre. */
 const VALIDADE_EM_SEGUNDOS = 72 * 60 * 60;
 const BCRYPT_ROUNDS = 12;
+/** Para pagar o mesmo custo de bcrypt quando a conta sumiu entre abrir e aceitar o convite. */
+const SENHA_QUE_NUNCA_CONFERE = bcrypt.hashSync("nao-e-uma-senha-de-verdade", BCRYPT_ROUNDS);
 
 export interface DadosDoConvite {
   organizationId: string;
@@ -50,6 +52,7 @@ export class ConvitesService implements OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auth: AuthService,
+    private readonly mfa: MfaService,
   ) {}
 
   async onModuleDestroy(): Promise<void> {
@@ -110,44 +113,51 @@ export class ConvitesService implements OnModuleDestroy {
   }
 
   /**
-   * Aceite de quem já tem conta, com a sessão aberta. A sessão prova a senha
-   * (e o autenticador, se a pessoa tiver); o e-mail do convite prova que o
-   * link é para ela. Devolve uma sessão nova, já na conta do convite.
+   * Aceite de quem já tem conta: a pessoa prova que é dona dela com a senha e,
+   * se usar, com o código do autenticador, ali mesmo na página do convite.
+   *
+   * Não passa pelo login de propósito: quem ficou sem nenhuma conta (a única
+   * foi excluída) não consegue entrar, e é justamente quem mais precisa de um
+   * convite. O e-mail vem do convite, nunca de quem digita. Devolve a sessão,
+   * já na conta do convite.
    */
-  async aceitaComConta(token: string, quem: AuthenticatedUser, contexto?: ContextoDoCliente) {
-    if (quem.impersonating) {
-      throw new AppException("CONVITE_DE_OUTRO_EMAIL", "Saia da visita de suporte para aceitar um convite.", HttpStatus.FORBIDDEN);
-    }
+  async aceitaComSenha(token: string, senha: string, codigo: string | undefined, contexto?: ContextoDoCliente) {
     const lido = await this.dados(token, false);
     const pessoa = await this.prisma.user.findUnique({
-      where: { id: quem.userId },
-      select: { email: true, platformRole: true, deletedAt: true },
+      where: { email: lido.email },
+      select: { id: true, passwordHash: true, platformRole: true, deletedAt: true, mfa: { select: { confirmadoEm: true } } },
     });
-    if (!pessoa || pessoa.deletedAt || pessoa.email !== lido.email) {
-      throw new AppException(
-        "CONVITE_DE_OUTRO_EMAIL",
-        `Este convite é para ${lido.email}. Saia e entre com essa conta para aceitar.`,
-        HttpStatus.FORBIDDEN,
-      );
+    const senhaConfere = await bcrypt.compare(senha, pessoa?.passwordHash ?? SENHA_QUE_NUNCA_CONFERE);
+    if (!pessoa || pessoa.deletedAt || !senhaConfere) {
+      throw new AppException("INVALID_CREDENTIALS", "Senha incorreta.", HttpStatus.UNAUTHORIZED);
+    }
+    if (pessoa.mfa?.confirmadoEm) {
+      if (!codigo) {
+        throw new AppException("MFA_NECESSARIO", "Digite o código do autenticador.", HttpStatus.UNAUTHORIZED);
+      }
+      if (!(await this.mfa.confereSegundoFator(pessoa.id, codigo.replace(/\s/g, "")))) {
+        throw new AppException("MFA_CODIGO_INVALIDO", "Código do autenticador inválido.", HttpStatus.UNAUTHORIZED);
+      }
     }
 
+    // Só gasta o link depois de a pessoa provar quem é.
     const dados = await this.dados(token, true);
     const vinculo = await this.prisma.$transaction(async (tx) => {
       const existente = await tx.membership.findUnique({
-        where: { organizationId_userId: { organizationId: dados.organizationId, userId: quem.userId } },
+        where: { organizationId_userId: { organizationId: dados.organizationId, userId: pessoa.id } },
         select: { role: true },
       });
       if (dados.operador && !pessoa.platformRole) {
-        await tx.user.update({ where: { id: quem.userId }, data: { platformRole: "ADMIN" } });
+        await tx.user.update({ where: { id: pessoa.id }, data: { platformRole: "ADMIN" } });
       }
       if (existente) return existente;
       return tx.membership.create({
-        data: { organizationId: dados.organizationId, userId: quem.userId, role: dados.papel, areas: dados.areas },
+        data: { organizationId: dados.organizationId, userId: pessoa.id, role: dados.papel, areas: dados.areas },
         select: { role: true },
       });
     });
 
-    return this.auth.issueTokenPair(quem.userId, dados.organizationId, vinculo.role, undefined, { contexto });
+    return this.auth.issueTokenPair(pessoa.id, dados.organizationId, vinculo.role, undefined, { contexto });
   }
 
   private async dados(token: string, gasta: boolean): Promise<DadosDoConvite> {

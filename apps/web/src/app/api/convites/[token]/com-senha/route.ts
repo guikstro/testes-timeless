@@ -13,19 +13,16 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
 type Params = { params: Promise<{ token: string }> };
 
 /**
- * Aceite de quem já tem conta. A sessão aberta prova quem é; a API confere
- * se o e-mail é o do convite e devolve uma sessão nova, já na conta do
- * convite, que vira cookie aqui. Sem sessão, responde 401 e a página manda
- * entrar e voltar.
+ * Aceite de quem já tem conta: repassa a senha (e o código, se houver) para a
+ * API, que confere se são da conta do e-mail convidado e devolve a sessão, já
+ * na conta do convite. A sessão vira cookie aqui.
  */
 export async function POST(request: NextRequest, { params }: Params) {
   const { token } = await params;
-  const acesso = request.cookies.get(ACCESS_TOKEN_COOKIE)?.value;
-  if (!acesso) return NextResponse.json({ message: "Entre com a sua conta para aceitar." }, { status: 401 });
-
-  const resposta = await fetch(`${API_URL}/publico/convites/${encodeURIComponent(token)}/com-conta`, {
+  const resposta = await fetch(`${API_URL}/publico/convites/${encodeURIComponent(token)}/com-senha`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${acesso}`, ...cabecalhosDoCliente(request) },
+    headers: { "Content-Type": "application/json", ...cabecalhosDoCliente(request) },
+    body: JSON.stringify(await request.json()),
     cache: "no-store",
   });
   const corpo = await resposta.json().catch(() => null);

@@ -16,6 +16,8 @@ export function AceitaConvite({ token }: { token: string }) {
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [codigo, setCodigo] = useState("");
+  const [pedindoCodigo, setPedindoCodigo] = useState(false);
 
   useEffect(() => {
     fetch(`/api/convites/${encodeURIComponent(token)}`, { cache: "no-store" })
@@ -55,21 +57,26 @@ export function AceitaConvite({ token }: { token: string }) {
   }
 
   /*
-    Quem já tem conta não cria senha: entra com a que tem (e com o
-    autenticador, se usar) e aceita. Sem sessão aberta, vai ao login e volta
-    para cá.
+    Quem já tem conta não cria senha: prova que é dona dela aqui mesmo, com a
+    senha e, se usar, o código do autenticador. Não passa pela entrada porque
+    quem ficou sem nenhuma conta (a única foi excluída) não consegue entrar.
   */
-  async function aceitarComConta() {
+  async function aceitarComSenha(evento: React.FormEvent) {
+    evento.preventDefault();
     setErro(null);
     setEnviando(true);
     try {
-      const resposta = await fetch(`/api/convites/${encodeURIComponent(token)}/com-conta`, { method: "POST" });
-      if (resposta.status === 401) {
-        window.location.assign(`/login?next=${encodeURIComponent(`/convite/${token}`)}`);
-        return;
-      }
+      const resposta = await fetch(`/api/convites/${encodeURIComponent(token)}/com-senha`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(pedindoCodigo ? { senha, codigo } : { senha }),
+      });
       if (!resposta.ok) {
         const corpo = await resposta.json().catch(() => null);
+        if (corpo?.code === "MFA_NECESSARIO") {
+          setPedindoCodigo(true);
+          return;
+        }
         setErro(corpo?.message ?? "Não foi possível aceitar o convite.");
         return;
       }
@@ -84,20 +91,54 @@ export function AceitaConvite({ token }: { token: string }) {
   if (convite.fase === "valido" && convite.contaExiste) {
     return (
       <MolduraDeAutenticacao
-        rodape={null}
+        rodape={<LinkDaEntrada pergunta="Esqueceu a senha?" acao="Entrar e recuperar" />}
         titulo={`Acesso a ${convite.organizacao}`}
-        descricao={`Você já tem conta com ${convite.email}. Entre com ela para aceitar: se não estiver logado, a entrada pede sua senha e volta para cá.`}
+        descricao={`Você já tem conta com ${convite.email}. Digite a senha dela para aceitar.`}
       >
-        <div className="mt-10 flex flex-col gap-5">
+        <form onSubmit={aceitarComSenha} className="mt-10 flex flex-col gap-7">
+          <div>
+            <label htmlFor="senha" className={rotulo}>
+              Senha
+            </label>
+            <input
+              id="senha"
+              type="password"
+              required
+              autoComplete="current-password"
+              value={senha}
+              onChange={(e) => setSenha(e.target.value)}
+              className={CAMPO}
+            />
+          </div>
+          {pedindoCodigo ? (
+            <div>
+              <label htmlFor="codigo" className={rotulo}>
+                Código do autenticador
+              </label>
+              <input
+                id="codigo"
+                required
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                minLength={6}
+                maxLength={32}
+                placeholder="000000"
+                value={codigo}
+                onChange={(e) => setCodigo(e.target.value)}
+                className={CAMPO}
+                autoFocus
+              />
+            </div>
+          ) : null}
           {erro ? (
             <p role="alert" className="border-l-2 border-red-500 pl-3 text-corpo text-red-600 dark:text-red-400">
               {erro}
             </p>
           ) : null}
-          <button type="button" onClick={aceitarComConta} disabled={enviando} aria-busy={enviando || undefined} className={BOTAO}>
-            {enviando ? "Aceitando" : "Aceitar com a minha conta"}
+          <button type="submit" disabled={enviando} aria-busy={enviando || undefined} className={BOTAO}>
+            {enviando ? "Aceitando" : "Aceitar convite"}
           </button>
-        </div>
+        </form>
       </MolduraDeAutenticacao>
     );
   }

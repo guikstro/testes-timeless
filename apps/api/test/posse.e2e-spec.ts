@@ -68,7 +68,7 @@ describe("Posse da conta da equipe (e2e)", () => {
     await app.close();
   });
 
-  it("quem já tem conta entra na equipe pelo convite, entrando com a própria conta", async () => {
+  it("quem já tem conta entra na equipe pelo convite com a própria senha, mesmo sem nenhuma conta onde entrar", async () => {
     const convite = await request(app.getHttpServer())
       .post("/api/admin/convites")
       .set("Authorization", `Bearer ${tokenDoDono}`)
@@ -79,20 +79,27 @@ describe("Posse da conta da equipe (e2e)", () => {
     const pagina = await request(app.getHttpServer()).get(`/api/publico/convites/${token}`).expect(200);
     expect(pagina.body).toMatchObject({ email: gui.email, contaExiste: true });
 
-    // Com a conta de outra pessoa, não.
-    const tokenDoCliente = await entra(cliente.email);
+    // A única conta do Gui foi excluída: o login não tem para onde levá-lo.
+    await prisma.organization.updateMany({ where: { name: gui.organizationName }, data: { deletedAt: new Date() } });
+    const semConta = await request(app.getHttpServer()).post("/api/auth/login").send({ email: gui.email, password: senha }).expect(403);
+    expect(semConta.body.code).toBe("NO_ORGANIZATION");
+
+    // Senha errada não aceita, e não gasta o link.
     const recusa = await request(app.getHttpServer())
-      .post(`/api/publico/convites/${token}/com-conta`)
-      .set("Authorization", `Bearer ${tokenDoCliente}`)
-      .expect(403);
-    expect(recusa.body.code).toBe("CONVITE_DE_OUTRO_EMAIL");
+      .post(`/api/publico/convites/${token}/com-senha`)
+      .send({ senha: "senha-de-outra-pessoa" })
+      .expect(401);
+    expect(recusa.body.code).toBe("INVALID_CREDENTIALS");
 
     const aceite = await request(app.getHttpServer())
-      .post(`/api/publico/convites/${token}/com-conta`)
-      .set("Authorization", `Bearer ${await entra(gui.email)}`)
+      .post(`/api/publico/convites/${token}/com-senha`)
+      .send({ senha })
       .expect(200);
     expect(doToken(aceite.body.accessToken)).toMatchObject({ organizationId: equipeId, role: "ADMIN" });
     expect((await prisma.user.findUniqueOrThrow({ where: { id: guiId } })).platformRole).toBe("ADMIN");
+
+    // E agora o login volta a funcionar, levando para a equipe.
+    expect(doToken(await entra(gui.email))).toMatchObject({ organizationId: equipeId });
 
     // O link valeu uma vez.
     await request(app.getHttpServer()).get(`/api/publico/convites/${token}`).expect(404);

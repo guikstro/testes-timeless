@@ -1,10 +1,6 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, UseGuards } from "@nestjs/common";
-import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
-import { Requer } from "../../common/permissoes/requer.decorator";
-import { CurrentUser } from "../../common/decorators/current-user.decorator";
-import { AuthenticatedUser } from "../jwt-payload.interface";
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
-import { IsString, Length } from "class-validator";
+import { IsOptional, IsString, Length } from "class-validator";
 import { Transform } from "class-transformer";
 import { AUTENTICACAO } from "../../common/throttling/limites";
 import { Contexto, ContextoDoCliente } from "../sessoes/contexto-do-cliente";
@@ -21,6 +17,18 @@ class AceitaConviteDto {
   senha!: string;
 }
 
+class AceitaComSenhaDto {
+  @IsString()
+  @Length(1, 128)
+  senha!: string;
+
+  /** Só para quem usa autenticador: os seis dígitos, ou um código de recuperação. */
+  @IsOptional()
+  @IsString()
+  @Length(6, 32)
+  codigo?: string;
+}
+
 /** A página pública do convite. Quem autentica é o token do link. */
 @Controller("publico/convites")
 @Throttle({ default: AUTENTICACAO })
@@ -32,16 +40,11 @@ export class ConvitesController {
     return this.convites.le(token);
   }
 
-  /**
-   * Aceite de quem já tem conta. Exige sessão, mas nenhuma capacidade: a
-   * sessão pode ser de qualquer conta, e o que decide é o e-mail do convite.
-   */
-  @Post(":token/com-conta")
-  @UseGuards(JwtAuthGuard)
-  @Requer()
+  /** Aceite de quem já tem conta: a senha dela, e o código do autenticador se ela usar. */
+  @Post(":token/com-senha")
   @HttpCode(HttpStatus.OK)
-  aceitaComConta(@Param("token") token: string, @CurrentUser() quem: AuthenticatedUser, @Contexto() contexto: ContextoDoCliente) {
-    return this.convites.aceitaComConta(token, quem, contexto);
+  aceitaComSenha(@Param("token") token: string, @Body() dto: AceitaComSenhaDto, @Contexto() contexto: ContextoDoCliente) {
+    return this.convites.aceitaComSenha(token, dto.senha, dto.codigo, contexto);
   }
 
   @Post(":token")
