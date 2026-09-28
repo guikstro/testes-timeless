@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { podeVer } from "@/lib/areas";
 import { AcessoProvider } from "@/components/acesso";
+import { ToastProvider } from "@/components/ui/toast";
 import { ApiRequestError } from "@/lib/api-client";
 import { sessaoAtual, SessaoAtual } from "@/lib/sessao";
 import { BrandStyle } from "@/components/brand-style";
@@ -37,6 +38,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <NotificationProvider>
     <AcessoProvider areas={session.areas}>
+    <ToastProvider>
     <div className="flex min-h-screen flex-col">
       {/* Não empurra nada: o fio flutua sobre a borda da janela. */}
       {session.impersonating ? <ImpersonationHairline /> : null}
@@ -85,6 +87,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       <NotificationToasts />
     </div>
+    </ToastProvider>
     </AcessoProvider>
     </NotificationProvider>
   );

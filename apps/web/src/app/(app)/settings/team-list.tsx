@@ -115,7 +115,8 @@ function Linha({
           disabled={pendente}
           onChange={(evento) => executar(() => mudarPapel(membro.userId, evento.target.value))}
           aria-label={`Papel de ${membro.name}`}
-          className="h-8 w-auto text-apoio"
+          className="h-8 w-auto pr-8 text-apoio"
+          envolucro="inline-block"
         >
           {(Object.keys(PAPEL) as Papel[])
             .filter((papel) => !(semVirarDono && papel === "OWNER" && membro.role !== "OWNER"))

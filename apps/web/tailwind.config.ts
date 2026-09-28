@@ -40,6 +40,31 @@ const config: Config = {
           DEFAULT: "rgb(var(--accent) / <alpha-value>)",
           contrast: "rgb(var(--accent-contrast) / <alpha-value>)",
         },
+        /**
+         * Estados, com tinta, fundo suave e borda: `text-danger`,
+         * `bg-danger-soft`, `border-danger-line`. Nunca `red-600` solto:
+         * a cor de um estado é decisão do sistema, não da tela.
+         */
+        danger: {
+          DEFAULT: "rgb(var(--danger) / <alpha-value>)",
+          soft: "rgb(var(--danger-soft) / <alpha-value>)",
+          line: "rgb(var(--danger-line) / <alpha-value>)",
+        },
+        warning: {
+          DEFAULT: "rgb(var(--warning) / <alpha-value>)",
+          soft: "rgb(var(--warning-soft) / <alpha-value>)",
+          line: "rgb(var(--warning-line) / <alpha-value>)",
+        },
+        success: {
+          DEFAULT: "rgb(var(--success) / <alpha-value>)",
+          soft: "rgb(var(--success-soft) / <alpha-value>)",
+          line: "rgb(var(--success-line) / <alpha-value>)",
+        },
+        info: {
+          DEFAULT: "rgb(var(--info) / <alpha-value>)",
+          soft: "rgb(var(--info-soft) / <alpha-value>)",
+          line: "rgb(var(--info-line) / <alpha-value>)",
+        },
       },
       /**
        * Quatro degraus, com nome.
@@ -98,6 +123,8 @@ const config: Config = {
           to: { opacity: "1", transform: "none" },
         },
         shimmer: { from: { backgroundPosition: "200% 0" }, to: { backgroundPosition: "-200% 0" } },
+        /* Gaveta: entra pela borda de onde ela mora. */
+        "slide-in-right": { from: { transform: "translateX(100%)" }, to: { transform: "none" } },
         /* Corrente percorrendo o caminho da atribuição: o produto em movimento. */
         flow: { from: { strokeDashoffset: "220" }, to: { strokeDashoffset: "0" } },
         "pulse-node": {
@@ -114,6 +141,7 @@ const config: Config = {
         "fade-in": "fade-in 0.4s ease-out both",
         "pop-in": "pop-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both",
         shimmer: "shimmer 1.6s linear infinite",
+        "slide-in-right": "slide-in-right 0.36s cubic-bezier(0.16, 1, 0.3, 1) both",
         flow: "flow 3.2s linear infinite",
         "pulse-node": "pulse-node 3.2s ease-in-out infinite",
         drift: "drift 18s ease-in-out infinite",

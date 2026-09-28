@@ -9,10 +9,10 @@ type Tone = "neutral" | "info" | "success" | "warning" | "danger" | "brand";
 
 const TONES: Record<Tone, string> = {
   neutral: "bg-panel-soft text-ink-soft ring-line/60",
-  info: "bg-blue-50 text-blue-700 ring-blue-200/60",
-  success: "bg-emerald-50 text-emerald-700 ring-emerald-200/60",
-  warning: "bg-amber-50 text-amber-800 ring-amber-200/60",
-  danger: "bg-red-50 text-red-700 ring-red-200/60",
+  info: "bg-info-soft text-info ring-info-line/70",
+  success: "bg-success-soft text-success ring-success-line/70",
+  warning: "bg-warning-soft text-warning ring-warning-line/70",
+  danger: "bg-danger-soft text-danger ring-danger-line/70",
   brand: "bg-brand-soft text-brand-ink ring-brand/20",
 };
 

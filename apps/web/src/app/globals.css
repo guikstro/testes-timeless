@@ -49,6 +49,25 @@
   --serie-2: 235 104 52;
   --grade: 226 219 205;
   --guia: 148 141 128;
+
+  /**
+   * Estados: erro, atenção, sucesso e informação. Cada um tem a tinta (texto
+   * e ícone), o fundo suave e a borda, com um valor por tema. Eram as mesmas
+   * cores do Tailwind escritas à mão em mais de cem lugares, cada tela com o
+   * seu par claro e escuro; agora o tema troca num lugar só.
+   */
+  --danger: 220 38 38;
+  --danger-soft: 254 242 242;
+  --danger-line: 252 165 165;
+  --warning: 120 53 15;
+  --warning-soft: 255 251 235;
+  --warning-line: 252 211 77;
+  --success: 4 120 87;
+  --success-soft: 236 253 245;
+  --success-line: 167 243 208;
+  --info: 29 78 216;
+  --info-soft: 239 246 255;
+  --info-line: 191 219 254;
 }
 
 .dark {
@@ -74,6 +93,19 @@
   --serie-2: 217 89 38;
   --grade: 48 47 44;
   --guia: 130 124 114;
+
+  --danger: 248 113 113;
+  --danger-soft: 40 16 15;
+  --danger-line: 84 25 25;
+  --warning: 254 243 199;
+  --warning-soft: 40 22 13;
+  --warning-line: 80 40 17;
+  --success: 52 211 153;
+  --success-soft: 13 30 25;
+  --success-line: 6 78 59;
+  --info: 96 165 250;
+  --info-soft: 21 27 45;
+  --info-line: 30 58 138;
 }
 
 body {
@@ -139,6 +171,19 @@ body {
     --ink-soft: 51 51 51;
     --ink-mute: 102 102 102;
     --line: 214 214 210;
+    /* Estados no papel: os do tema claro, mesmo impressos do tema escuro. */
+    --danger: 220 38 38;
+    --danger-soft: 254 242 242;
+    --danger-line: 252 165 165;
+    --warning: 120 53 15;
+    --warning-soft: 255 251 235;
+    --warning-line: 252 211 77;
+    --success: 4 120 87;
+    --success-soft: 236 253 245;
+    --success-line: 167 243 208;
+    --info: 29 78 216;
+    --info-soft: 239 246 255;
+    --info-line: 191 219 254;
   }
 
   body {
