@@ -220,7 +220,7 @@ export function AppNav({
           target="_blank"
           rel="noopener noreferrer"
           title={item.label}
-          className={`focus-ring group/item relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-ink-soft transition-all duration-200 ease-soft hover:bg-panel-soft/80 hover:text-ink active:scale-[0.98] ${extraClasses}`}
+          className={`focus-ring group/item relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-corpo text-ink-soft transition-all duration-200 ease-soft hover:bg-panel-soft/80 hover:text-ink active:scale-[0.98] ${extraClasses}`}
         >
           {item.icon}
           <span className={label}>{item.label}</span>
@@ -234,7 +234,7 @@ export function AppNav({
         href={item.href}
         aria-current={active ? "page" : undefined}
         title={item.label}
-        className={`focus-ring group/item relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 ease-soft active:scale-[0.98] ${
+        className={`focus-ring group/item relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-corpo transition-all duration-200 ease-soft active:scale-[0.98] ${
           active
             ? "bg-brand-soft font-medium text-brand-ink"
             : "text-ink-soft hover:bg-panel-soft/80 hover:text-ink"
@@ -291,11 +291,11 @@ export function AppNav({
           </span>
           <span className={`min-w-0 ${label}`}>
             {impersonating ? (
-              <span className="block text-rotulo font-semibold uppercase tracking-[0.14em] text-amber-700 dark:text-amber-400">
+              <span className="block text-rotulo font-semibold uppercase tracking-[0.14em] text-warning">
                 Dentro do cliente
               </span>
             ) : null}
-            <span className="block truncate font-display text-sm font-semibold tracking-tight text-ink">
+            <span className="block truncate font-display text-corpo font-semibold tracking-tight text-ink">
               {organizationName}
             </span>
           </span>
@@ -309,7 +309,7 @@ export function AppNav({
             onClick={() => setPinned((current) => !current)}
             aria-pressed={pinned}
             title={pinned ? "Soltar o menu" : "Manter o menu aberto"}
-            className="focus-ring flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-ink-mute transition-all duration-200 ease-soft hover:bg-panel-soft/80 hover:text-ink active:scale-[0.98]"
+            className="focus-ring flex items-center gap-3 rounded-xl px-3 py-2.5 text-corpo text-ink-mute transition-all duration-200 ease-soft hover:bg-panel-soft/80 hover:text-ink active:scale-[0.98]"
           >
             <svg {...ICON_PROPS}>
               {pinned ? (

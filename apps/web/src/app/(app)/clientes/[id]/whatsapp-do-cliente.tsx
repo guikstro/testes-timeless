@@ -78,7 +78,7 @@ export function WhatsAppDoCliente({ dados }: { dados: WhatsAppDoClienteDados }) 
 
   return (
     <section className="mt-6 rounded-xl border border-line bg-panel p-5">
-      <h2 className="text-sm font-medium uppercase tracking-wide text-ink-mute">WhatsApp</h2>
+      <h2 className="text-corpo font-medium uppercase tracking-wide text-ink-mute">WhatsApp</h2>
 
       <p className="mt-3 flex items-center gap-2 text-ink" aria-live="polite">
         <span className={`inline-block h-2.5 w-2.5 rounded-full ${rotulo.cor}`} aria-hidden />
@@ -88,21 +88,21 @@ export function WhatsAppDoCliente({ dados }: { dados: WhatsAppDoClienteDados }) 
 
       {link ? (
         <div className="mt-4 rounded-md border border-line bg-panel-soft p-3">
-          <p className="text-sm text-ink-soft">Envie este link ao cliente. Vale até {dataHora(link.expiraEm)} e uma vez só.</p>
+          <p className="text-corpo text-ink-soft">Envie este link ao cliente. Vale até {dataHora(link.expiraEm)} e uma vez só.</p>
           <div className="mt-2 flex gap-2">
-            <input readOnly value={link.url} aria-label="Link de conexão" className="min-w-0 flex-1 rounded-md border border-line px-3 py-2 text-xs" />
+            <input readOnly value={link.url} aria-label="Link de conexão" className="min-w-0 flex-1 rounded-md border border-line px-3 py-2 text-apoio" />
             <Button type="button" variant="secondary" size="sm" onClick={copiar}>
               {copiado ? "Copiado" : "Copiar"}
             </Button>
           </div>
         </div>
       ) : dados.linkExpiraEm && !conectado ? (
-        <p className="mt-4 text-sm text-ink-soft">
+        <p className="mt-4 text-corpo text-ink-soft">
           Há um link ativo até {dataHora(dados.linkExpiraEm)}. Para enviar de novo, gere outro: o anterior deixa de valer.
         </p>
       ) : null}
 
-      {erro ? <p className="mt-3 text-sm text-red-600">{erro}</p> : null}
+      {erro ? <p className="mt-3 text-corpo text-danger">{erro}</p> : null}
 
       <div className="mt-5 flex flex-wrap gap-2">
         {!conectado ? (

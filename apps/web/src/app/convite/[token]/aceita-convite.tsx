@@ -131,7 +131,7 @@ export function AceitaConvite({ token }: { token: string }) {
             </div>
           ) : null}
           {erro ? (
-            <p role="alert" className="border-l-2 border-red-500 pl-3 text-corpo text-red-600 dark:text-red-400">
+            <p role="alert" className="border-l-2 border-danger pl-3 text-corpo text-danger">
               {erro}
             </p>
           ) : null}
@@ -181,7 +181,7 @@ export function AceitaConvite({ token }: { token: string }) {
           />
         </div>
         {erro ? (
-          <p role="alert" className="border-l-2 border-red-500 pl-3 text-corpo text-red-600 dark:text-red-400">
+          <p role="alert" className="border-l-2 border-danger pl-3 text-corpo text-danger">
             {erro}
           </p>
         ) : null}

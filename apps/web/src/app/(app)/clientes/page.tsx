@@ -29,7 +29,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
   } catch (error) {
     if (error instanceof ApiRequestError && error.status === 403) {
       return (
-        <div className="max-w-lg rounded-xl border border-line bg-panel p-6 text-sm text-ink-soft">
+        <div className="max-w-lg rounded-xl border border-line bg-panel p-6 text-corpo text-ink-soft">
           <h1 className="mb-2 font-display text-xl font-semibold text-ink">Clientes</h1>
           {error.body.message}
         </div>
@@ -43,7 +43,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Clientes</h1>
-          <p className="mt-1 text-sm text-ink-mute">
+          <p className="mt-1 text-corpo text-ink-mute">
             {clientes.total} {clientes.total === 1 ? "cliente" : "clientes"}
           </p>
         </div>
@@ -55,12 +55,12 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
               defaultValue={busca}
               placeholder="Buscar por nome..."
               aria-label="Buscar cliente"
-              className="rounded-md border border-line bg-panel px-3 py-2 text-sm focus:border-accent focus:outline-none"
+              className="rounded-md border border-line bg-panel px-3 py-2 text-corpo focus:border-accent focus:outline-none"
             />
           </form>
           <Link
             href="/clientes/novo"
-            className="focus-ring rounded-md bg-ink px-3 py-2 text-sm font-medium text-canvas hover:opacity-90"
+            className="focus-ring rounded-md bg-ink px-3 py-2 text-corpo font-medium text-canvas hover:opacity-90"
           >
             + Novo cliente
           </Link>
@@ -68,12 +68,12 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
       </div>
 
       {clientes.items.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-line bg-panel p-10 text-center text-sm text-ink-soft">
+        <div className="rounded-xl border border-dashed border-line bg-panel p-10 text-center text-corpo text-ink-soft">
           {busca ? `Nenhum cliente encontrado para "${busca}".` : "Nenhum cliente ainda. Comece em Novo cliente."}
         </div>
       ) : (
         <ul className="divide-y divide-line/70 rounded-xl border border-line bg-panel">
-          <li className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-ink-mute">
+          <li className="px-4 py-3 text-apoio font-medium uppercase tracking-wide text-ink-mute">
             Nome do cliente <span className="ml-1 rounded bg-panel-soft px-1.5 py-0.5">{clientes.total}</span>
           </li>
           {clientes.items.map((cliente) => {
@@ -88,11 +88,11 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
                   <span className="min-w-0 flex-1 truncate font-medium text-ink underline decoration-line underline-offset-4">
                     {cliente.name}
                   </span>
-                  <span className="flex items-center gap-1.5 text-xs text-ink-mute">
+                  <span className="flex items-center gap-1.5 text-apoio text-ink-mute">
                     <span className={`inline-block h-2 w-2 rounded-full ${status?.cor ?? "bg-ink-mute/40"}`} aria-hidden />
                     WhatsApp: {status?.texto ?? "Desconectado"}
                   </span>
-                  <span className="hidden w-20 text-right text-xs text-ink-mute sm:inline">
+                  <span className="hidden w-20 text-right text-apoio text-ink-mute sm:inline">
                     {cliente.leadCount} {cliente.leadCount === 1 ? "lead" : "leads"}
                   </span>
                 </Link>

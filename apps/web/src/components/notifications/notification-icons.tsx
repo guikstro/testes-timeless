@@ -68,7 +68,7 @@ export function IconeDaNotificacao({ tipo }: { tipo: TipoDeNotificacao }) {
 }
 
 export function corDaNotificacao(tipo: TipoDeNotificacao): string {
-  if (tipo === "lead.won") return "text-emerald-600 dark:text-emerald-400";
-  if (tipo === "message.failed" || tipo === "sistema.erro") return "text-red-600 dark:text-red-400";
+  if (tipo === "lead.won") return "text-success";
+  if (tipo === "message.failed" || tipo === "sistema.erro") return "text-danger";
   return "text-accent";
 }

@@ -95,11 +95,11 @@ export function RegraDeLeads({
           {pending ? "Salvando..." : "Salvar regra"}
         </Button>
         {state.error ? (
-          <p className="text-apoio text-red-600 dark:text-red-400" role="alert">
+          <p className="text-apoio text-danger" role="alert">
             {state.error}
           </p>
         ) : state.salvoEm && escolhida === atual ? (
-          <p className="text-apoio text-emerald-700 dark:text-emerald-400" role="status">
+          <p className="text-apoio text-success" role="status">
             Regra salva. Vale para as próximas conversas.
           </p>
         ) : null}

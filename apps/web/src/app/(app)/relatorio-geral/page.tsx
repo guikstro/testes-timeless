@@ -24,7 +24,7 @@ export default async function RelatorioGeralPage() {
   } catch (error) {
     if (error instanceof ApiRequestError && error.status === 403) {
       return (
-        <div className="max-w-lg rounded-xl border border-line bg-panel p-6 text-sm text-ink-soft">
+        <div className="max-w-lg rounded-xl border border-line bg-panel p-6 text-corpo text-ink-soft">
           <h1 className="mb-2 font-display text-xl font-semibold text-ink">Relatório geral</h1>
           {error.body.message}
         </div>
@@ -52,25 +52,25 @@ export default async function RelatorioGeralPage() {
   return (
     <div>
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Relatório geral</h1>
-      <p className="mt-1 text-sm text-ink-mute">Todos os clientes, desde o início de cada um.</p>
+      <p className="mt-1 text-corpo text-ink-mute">Todos os clientes, desde o início de cada um.</p>
 
       <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
         {cartoes.map((cartao) => (
           <div key={cartao.rotulo} className="rounded-xl border border-line bg-panel p-4">
-            <dt className="text-xs font-medium uppercase tracking-wide text-ink-mute">{cartao.rotulo}</dt>
+            <dt className="text-apoio font-medium uppercase tracking-wide text-ink-mute">{cartao.rotulo}</dt>
             <dd className="mt-1 font-display text-xl font-semibold text-ink">{cartao.valor}</dd>
           </div>
         ))}
       </dl>
 
       {porReceita.length === 0 ? (
-        <div className="mt-6 rounded-xl border border-dashed border-line bg-panel p-10 text-center text-sm text-ink-soft">
+        <div className="mt-6 rounded-xl border border-dashed border-line bg-panel p-10 text-center text-corpo text-ink-soft">
           Nenhum cliente ainda.
         </div>
       ) : (
         <div className="mt-6 overflow-x-auto rounded-xl border border-line bg-panel">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-line text-xs uppercase tracking-wide text-ink-mute">
+          <table className="w-full text-left text-corpo">
+            <thead className="border-b border-line text-apoio uppercase tracking-wide text-ink-mute">
               <tr>
                 <th className="px-4 py-3 font-medium">Cliente</th>
                 <th className="px-4 py-3 text-right font-medium">Leads</th>

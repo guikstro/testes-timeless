@@ -44,7 +44,7 @@ export function ReplyBox({
 
   if (disabledReason) {
     return (
-      <p className={`rounded-lg border border-dashed border-line p-3 text-sm text-ink-mute ${compacta ? "" : "mt-4"}`}>
+      <p className={`rounded-lg border border-dashed border-line p-3 text-corpo text-ink-mute ${compacta ? "" : "mt-4"}`}>
         {disabledReason}
       </p>
     );
@@ -59,17 +59,17 @@ export function ReplyBox({
           required
           maxLength={4096}
           placeholder="Escreva uma resposta..."
-          className={`focus-ring w-full resize-none border border-line px-3 py-2 text-sm text-ink placeholder:text-ink-mute ${
+          className={`focus-ring w-full resize-none border border-line px-3 py-2 text-corpo text-ink placeholder:text-ink-mute ${
             compacta ? "min-h-[2.75rem] rounded-2xl bg-panel-soft/60" : "rounded-md"
           }`}
         />
         <div className={compacta ? "shrink-0" : "flex items-center gap-3"}>
           <Button type="submit" loading={pending}>{pending ? "Enviando..." : "Enviar"}</Button>
-          {!compacta && state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
+          {!compacta && state.error ? <p className="text-corpo text-danger">{state.error}</p> : null}
         </div>
       </div>
       {compacta && state.error ? (
-        <p className="text-apoio text-red-600 dark:text-red-400">{state.error}</p>
+        <p className="text-apoio text-danger">{state.error}</p>
       ) : null}
     </form>
   );

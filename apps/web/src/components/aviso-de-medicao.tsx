@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { Alert } from "@/components/ui/alert";
+import { ButtonLink } from "@/components/ui/button";
 import { formataDia } from "@/lib/periodo";
 import { Medicao } from "@/lib/medicao-de-leads";
 import { SePuderAbrir } from "@/components/acesso";
@@ -28,42 +29,37 @@ export function AvisoDeMedicao({
   const conversas = conversasNaPlataforma ?? 0;
 
   return (
-    <div
-      role="status"
-      className="mb-6 flex flex-col gap-4 rounded-2xl border border-amber-300/60 bg-amber-50 p-5 text-amber-900 sm:flex-row sm:items-center sm:justify-between dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100"
+    <Alert
+      tom="warning"
+      titulo={texto.titulo}
+      className="mb-6"
+      acao={
+        texto.acao ? (
+          <SePuderAbrir
+            href="/integrations/whatsapp"
+            senao={<p className="text-apoio">Quem administra a conta resolve isso em Integrações.</p>}
+          >
+            <ButtonLink href="/integrations/whatsapp" variant="secondary" size="sm">
+              {texto.acao}
+            </ButtonLink>
+          </SePuderAbrir>
+        ) : undefined
+      }
     >
-      <div className="min-w-0">
-        <p className="text-corpo font-semibold">{texto.titulo}</p>
-        <p className="mt-1 text-apoio leading-relaxed text-amber-800 dark:text-amber-200/90">
-          {medicao === "antes-do-whatsapp" && desde
-            ? `O WhatsApp foi configurado em ${formataDia(desde)}. O que aconteceu antes disso não passou pelo sistema, então leads, vendas e retorno deste período ficam sem medida.`
-            : texto.corpo}
-          {conversas > 0 ? (
-            <>
-              {" "}
-              Neste período a Meta registrou{" "}
-              <strong className="font-semibold">
-                {conversas} {conversas === 1 ? "conversa iniciada" : "conversas iniciadas"}
-              </strong>{" "}
-              pelos seus anúncios, e {conversas === 1 ? "ela não chegou" : "nenhuma chegou"} aqui.
-            </>
-          ) : null}
-        </p>
-      </div>
-      {texto.acao ? (
-        <SePuderAbrir
-          href="/integrations/whatsapp"
-          senao={<p className="shrink-0 text-apoio text-amber-800 dark:text-amber-200/90">Quem administra a conta resolve isso em Integrações.</p>}
-        >
-        <Link
-          href="/integrations/whatsapp"
-          className="focus-ring inline-flex h-9 shrink-0 items-center justify-center rounded-full bg-amber-900 px-4 text-apoio font-semibold text-amber-50 transition-transform duration-200 ease-soft active:scale-95 dark:bg-amber-100 dark:text-amber-950"
-        >
-          {texto.acao}
-        </Link>
-        </SePuderAbrir>
+      {medicao === "antes-do-whatsapp" && desde
+        ? `O WhatsApp foi configurado em ${formataDia(desde)}. O que aconteceu antes disso não passou pelo sistema, então leads, vendas e retorno deste período ficam sem medida.`
+        : texto.corpo}
+      {conversas > 0 ? (
+        <>
+          {" "}
+          Neste período a Meta registrou{" "}
+          <strong className="font-semibold">
+            {conversas} {conversas === 1 ? "conversa iniciada" : "conversas iniciadas"}
+          </strong>{" "}
+          pelos seus anúncios, e {conversas === 1 ? "ela não chegou" : "nenhuma chegou"} aqui.
+        </>
       ) : null}
-    </div>
+    </Alert>
   );
 }
 

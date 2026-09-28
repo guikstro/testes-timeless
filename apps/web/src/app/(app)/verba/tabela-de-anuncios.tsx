@@ -69,7 +69,7 @@ export function TabelaDeAnuncios({
                   <td className="px-4 py-3 text-right tabular-nums text-corpo text-ink">{anuncio.leads}</td>
                   <td
                     className={`px-4 py-3 text-right tabular-nums text-corpo ${
-                      desperdicio ? "text-red-600 dark:text-red-400" : "text-ink"
+                      desperdicio ? "text-danger" : "text-ink"
                     }`}
                   >
                     {/*

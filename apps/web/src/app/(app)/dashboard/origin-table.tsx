@@ -50,7 +50,7 @@ export function OriginTable({ origens }: { origens: Origem[] }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
+      <table className="w-full text-left text-corpo">
         <thead>
           <tr className="border-b border-line/70">
             <th className="py-2 pr-4 text-rotulo font-semibold uppercase tracking-[0.08em] text-ink-mute">Origem</th>

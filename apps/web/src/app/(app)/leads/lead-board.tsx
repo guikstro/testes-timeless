@@ -70,7 +70,7 @@ export function LeadBoard({ colunas }: { colunas: ColunaDoQuadro[] }) {
       </div>
 
       {erro ? (
-        <p role="alert" className="mb-3 rounded-xl bg-red-500/10 px-4 py-2.5 text-corpo text-red-700 dark:text-red-300">
+        <p role="alert" className="mb-3 rounded-xl bg-red-500/10 px-4 py-2.5 text-corpo text-danger">
           {erro}
         </p>
       ) : null}

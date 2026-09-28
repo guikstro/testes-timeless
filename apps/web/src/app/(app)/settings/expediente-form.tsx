@@ -111,11 +111,11 @@ export function ExpedienteForm({
           {salvando ? "Salvando..." : "Salvar horário"}
         </Button>
         {estado.erro ? (
-          <p className="text-apoio text-red-600 dark:text-red-400" role="alert">
+          <p className="text-apoio text-danger" role="alert">
             {estado.erro}
           </p>
         ) : estado.salvoEm ? (
-          <p className="text-apoio text-emerald-700 dark:text-emerald-400" role="status">
+          <p className="text-apoio text-success" role="status">
             Horário salvo. O tempo de resposta no dashboard já reflete a mudança.
           </p>
         ) : null}

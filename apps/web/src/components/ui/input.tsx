@@ -14,7 +14,7 @@ import { cn } from "@/lib/cn";
  * Sem largura: quem precisa de outra usa esta e põe a sua (ver `cn`).
  */
 export const CAMPO_SEM_LARGURA =
-  "rounded-xl border border-line bg-panel px-3.5 text-sm text-ink shadow-subtle " +
+  "rounded-xl border border-line bg-panel px-3.5 text-corpo text-ink shadow-subtle " +
   "transition-all duration-200 ease-soft placeholder:text-ink-mute " +
   "hover:border-line focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/10 " +
   "disabled:cursor-not-allowed disabled:bg-panel-soft disabled:text-ink-mute " +

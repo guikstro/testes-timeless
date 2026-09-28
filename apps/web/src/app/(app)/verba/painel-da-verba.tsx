@@ -51,7 +51,7 @@ export function PainelDaVerba({
           </p>
           <p
             className={`mt-1 font-display text-[clamp(2rem,5vw,2.75rem)] font-semibold tabular-nums tracking-tight ${
-              estourou ? "text-red-600 dark:text-red-400" : "text-ink"
+              estourou ? "text-danger" : "text-ink"
             }`}
           >
             {formatCentsAsBRL(situacao.saldoCentavos)}
@@ -151,8 +151,8 @@ function Aviso({ children, tom }: { children: React.ReactNode; tom: "atencao" | 
     <p
       className={`mt-5 rounded-xl border px-3.5 py-2.5 text-apoio leading-relaxed ${
         tom === "alerta"
-          ? "border-red-300/60 bg-red-50 text-red-900 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-100"
-          : "border-amber-300/60 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100"
+          ? "border-danger-line/70 bg-danger-soft text-danger"
+          : "border-warning-line/70 bg-warning-soft text-warning"
       }`}
     >
       {children}

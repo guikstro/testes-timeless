@@ -27,7 +27,7 @@ export function ArrivalHeatmap({ celulas }: { celulas: Celula[] }) {
   const total = celulas.reduce((soma, c) => soma + c.leads, 0);
 
   if (total === 0) {
-    return <p className="py-8 text-center text-sm text-ink-mute">Nenhum lead no período.</p>;
+    return <p className="py-8 text-center text-corpo text-ink-mute">Nenhum lead no período.</p>;
   }
 
   return (

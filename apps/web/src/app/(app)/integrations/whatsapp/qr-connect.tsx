@@ -68,7 +68,7 @@ export function QrConnect({ alreadyPending }: { alreadyPending: boolean }) {
 
   if (phase === "connected") {
     return (
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-6 text-sm text-emerald-800">
+      <div className="rounded-xl border border-success-line bg-success-soft p-6 text-corpo text-success">
         WhatsApp conectado. Já pode receber e responder mensagens.
       </div>
     );
@@ -76,8 +76,8 @@ export function QrConnect({ alreadyPending }: { alreadyPending: boolean }) {
 
   return (
     <div className="rounded-xl border border-line bg-panel p-6">
-      <h2 className="text-sm font-semibold text-ink">Conectar por QR Code</h2>
-      <p className="mt-1 text-sm text-ink-mute">
+      <h2 className="text-corpo font-semibold text-ink">Conectar por QR Code</h2>
+      <p className="mt-1 text-corpo text-ink-mute">
         Abra o WhatsApp no celular, toque em <span className="font-medium">Aparelhos conectados</span> e leia o código
         abaixo. Não é preciso configurar nada na Meta.
       </p>
@@ -88,7 +88,7 @@ export function QrConnect({ alreadyPending }: { alreadyPending: boolean }) {
         </Button>
       ) : null}
 
-      {phase === "starting" ? <p className="mt-4 text-sm text-ink-mute">Preparando a conexão...</p> : null}
+      {phase === "starting" ? <p className="mt-4 text-corpo text-ink-mute">Preparando a conexão...</p> : null}
 
       {phase === "waiting" ? (
         <div className="mt-4">
@@ -99,11 +99,11 @@ export function QrConnect({ alreadyPending }: { alreadyPending: boolean }) {
               className="h-64 w-64 rounded-lg border border-line bg-panel p-2"
             />
           ) : (
-            <div className="flex h-64 w-64 items-center justify-center rounded-lg border border-dashed border-line text-sm text-ink-mute">
+            <div className="flex h-64 w-64 items-center justify-center rounded-lg border border-dashed border-line text-corpo text-ink-mute">
               Gerando código...
             </div>
           )}
-          <p className="mt-3 text-xs text-ink-mute">
+          <p className="mt-3 text-apoio text-ink-mute">
             O código se renova sozinho a cada poucos segundos. Assim que você ler, esta tela muda automaticamente.
           </p>
         </div>
@@ -111,10 +111,10 @@ export function QrConnect({ alreadyPending }: { alreadyPending: boolean }) {
 
       {phase === "error" ? (
         <div className="mt-4">
-          <p className="text-sm text-red-600">{error}</p>
+          <p className="text-corpo text-danger">{error}</p>
           <button
             onClick={() => void start()}
-            className="mt-3 rounded-md border border-line px-3 py-1.5 text-sm text-ink-soft hover:bg-panel-soft"
+            className="mt-3 rounded-md border border-line px-3 py-1.5 text-corpo text-ink-soft hover:bg-panel-soft"
           >
             Tentar de novo
           </button>

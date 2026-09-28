@@ -29,7 +29,7 @@ export default function ErroDoApp({
 
   return (
     <div className="mx-auto flex max-w-lg flex-col items-center px-6 py-16 text-center">
-      <span className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-400">
+      <span className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-danger-soft text-danger">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6" aria-hidden>
           <path d="M12 9v4M12 17h.01" />
           <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />

@@ -121,7 +121,7 @@ export function LogoUpload({
           PNG, JPEG ou WebP, até 2 MB. Quadrada fica melhor no menu.
         </p>
         {erro ? (
-          <p className="mt-1 text-apoio text-red-600 dark:text-red-400" role="alert">
+          <p className="mt-1 text-apoio text-danger" role="alert">
             {erro}
           </p>
         ) : null}

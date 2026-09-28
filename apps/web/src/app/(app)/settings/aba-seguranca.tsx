@@ -5,6 +5,7 @@ import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
 import { FormularioDeEmail, FormularioDeSenha } from "./security-forms";
 import { SegundaEtapa } from "./mfa-forms";
 import { ListaDeSessoes, Sessao } from "./lista-de-sessoes";
+import { Alert } from "@/components/ui/alert";
 
 interface SituacaoDoMfa {
   ativo: boolean;
@@ -43,12 +44,9 @@ export async function AbaSeguranca({
         esconder os formulários evita a pessoa preencher para tomar erro.
       */}
       {impersonando ? (
-        <Card className="border-amber-300/60 bg-amber-50 p-5 dark:border-amber-900/60 dark:bg-amber-950/40">
-          <p className="text-corpo leading-relaxed text-amber-900 dark:text-amber-100">
-            Você está dentro de um cliente como operador da plataforma. Trocar senha ou e-mail está bloqueado aqui,
-            de propósito: as credenciais são de quem é dono da conta.
-          </p>
-        </Card>
+        <Alert tom="warning" titulo="Trocar senha ou e-mail está bloqueado nesta visita">
+          Você está dentro de um cliente como operador da plataforma, e as credenciais são de quem é dono da conta.
+        </Alert>
       ) : (
         <>
           {/*

@@ -116,7 +116,7 @@ export function CampanhasView({
 
       {campanhas.length === 0 ? (
         <div className="surface p-8 text-center">
-          <p className="text-sm text-ink-soft">Nenhuma campanha com gasto ou lead em {rotuloDoIntervalo(periodo)}.</p>
+          <p className="text-corpo text-ink-soft">Nenhuma campanha com gasto ou lead em {rotuloDoIntervalo(periodo)}.</p>
           <p className="mt-1.5 text-apoio text-ink-mute">
             Conecte a Meta em Integrações, ou lance o gasto por CSV ou à mão, para as campanhas aparecerem aqui.
           </p>

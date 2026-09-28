@@ -47,9 +47,9 @@ const EVENT_STATUS_LABELS: Record<ConversionEventStatus, string> = {
 
 const EVENT_STATUS_COLORS: Record<ConversionEventStatus, string> = {
   PENDING: "text-ink-mute",
-  SENT: "text-emerald-600",
-  RETRYING: "text-amber-600",
-  FAILED: "text-red-600",
+  SENT: "text-success",
+  RETRYING: "text-warning",
+  FAILED: "text-danger",
 };
 
 interface Ad {
@@ -82,10 +82,10 @@ const STATUS_LABELS: Record<MetaConnection["status"], string> = {
 };
 
 const STATUS_COLORS: Record<MetaConnection["status"], string> = {
-  CONNECTED: "text-emerald-600",
+  CONNECTED: "text-success",
   DISCONNECTED: "text-ink-mute",
-  TOKEN_EXPIRED: "text-red-600",
-  SYNC_FAILED: "text-red-600",
+  TOKEN_EXPIRED: "text-danger",
+  SYNC_FAILED: "text-danger",
 };
 
 export default async function MetaIntegrationPage() {
@@ -102,7 +102,7 @@ export default async function MetaIntegrationPage() {
 
       <div className="mb-8 rounded-xl border border-line bg-panel p-6">
         {connection ? (
-          <div className="space-y-2 text-sm text-ink-soft">
+          <div className="space-y-2 text-corpo text-ink-soft">
             <p>
               <span className="font-medium">Status:</span>{" "}
               <span className={STATUS_COLORS[connection.status]}>{STATUS_LABELS[connection.status]}</span>
@@ -116,18 +116,18 @@ export default async function MetaIntegrationPage() {
             </p>
             {/* Desligada, o erro de antes já não diz nada sobre a conta, e sincronizar não tem o que buscar. */}
             {desligada ? (
-              <p className="text-sm text-ink-mute">
+              <p className="text-corpo text-ink-mute">
                 Para voltar a sincronizar, cole um access token abaixo e clique em Conectar.
               </p>
             ) : (
               <>
                 {connection.lastSyncError ? (
-                  <p className="text-red-600">
+                  <p className="text-danger">
                     <span className="font-medium">Erro:</span> {connection.lastSyncError}
                   </p>
                 ) : null}
                 {connection.status === "TOKEN_EXPIRED" ? (
-                  <p className="text-sm text-ink-mute">
+                  <p className="text-corpo text-ink-mute">
                     A conexão com a Meta precisa ser renovada. Reconecte com um access token válido abaixo.
                   </p>
                 ) : null}
@@ -136,7 +136,7 @@ export default async function MetaIntegrationPage() {
             )}
           </div>
         ) : (
-          <p className="text-sm text-ink-soft">Nenhuma conta de anúncio conectada ainda.</p>
+          <p className="text-corpo text-ink-soft">Nenhuma conta de anúncio conectada ainda.</p>
         )}
       </div>
 
@@ -144,9 +144,9 @@ export default async function MetaIntegrationPage() {
 
       {connection ? (
         <div className="mt-8">
-          <h2 className="mb-3 text-sm font-semibold text-ink">Campanhas sincronizadas</h2>
+          <h2 className="mb-3 text-corpo font-semibold text-ink">Campanhas sincronizadas</h2>
           {campaigns.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-line bg-panel p-8 text-center text-sm text-ink-soft">
+            <div className="rounded-xl border border-dashed border-line bg-panel p-8 text-center text-corpo text-ink-soft">
               {desligada
                 ? "Nenhuma campanha sincronizada ainda. Conecte a conta acima para buscar as campanhas."
                 : "Nenhuma campanha sincronizada ainda. Clique em “Sincronizar agora”."}
@@ -157,17 +157,17 @@ export default async function MetaIntegrationPage() {
                 <div key={campaign.id} className="rounded-xl border border-line bg-panel p-4">
                   <div className="mb-2 flex items-center justify-between">
                     <p className="font-medium text-ink">{campaign.name}</p>
-                    <p className="text-sm text-ink-mute">
+                    <p className="text-corpo text-ink-mute">
                       {campaign.status} · Investimento (30d): {formatCentsAsBRL(campaign.totalSpendCents)}
                     </p>
                   </div>
                   {campaign.adSets.map((adSet) => (
                     <div key={adSet.id} className="ml-4 mt-2 border-l border-line/60 pl-4">
-                      <p className="text-sm text-ink-soft">
+                      <p className="text-corpo text-ink-soft">
                         {adSet.name} <span className="text-ink-mute">{adSet.status}</span>
                       </p>
                       {adSet.ads.map((ad) => (
-                        <p key={ad.id} className="ml-4 text-xs text-ink-mute">
+                        <p key={ad.id} className="ml-4 text-apoio text-ink-mute">
                           {ad.name} · {ad.status}
                         </p>
                       ))}
@@ -182,8 +182,8 @@ export default async function MetaIntegrationPage() {
 
       {connection ? (
         <div className="mt-10">
-          <h2 className="mb-3 text-sm font-semibold text-ink">Meta Conversions API</h2>
-          <div className="mb-4 rounded-xl border border-line bg-panel p-6 text-sm text-ink-soft">
+          <h2 className="mb-3 text-corpo font-semibold text-ink">Meta Conversions API</h2>
+          <div className="mb-4 rounded-xl border border-line bg-panel p-6 text-corpo text-ink-soft">
             {connection.hasCapiAccessToken ? (
               <p>
                 <span className="font-medium">Configurado</span> · Pixel ID {connection.pixelId} · enviando eventos de
@@ -199,15 +199,15 @@ export default async function MetaIntegrationPage() {
           <ConnectMetaCapiForm />
 
           <div className="mt-6">
-            <h3 className="mb-3 text-sm font-semibold text-ink">Eventos enviados</h3>
+            <h3 className="mb-3 text-corpo font-semibold text-ink">Eventos enviados</h3>
             {conversionEvents.items.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-line bg-panel p-8 text-center text-sm text-ink-soft">
+              <div className="rounded-xl border border-dashed border-line bg-panel p-8 text-center text-corpo text-ink-soft">
                 Nenhum evento registrado ainda.
               </div>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-line bg-panel">
-                <table className="w-full text-left text-sm">
-                  <thead className="border-b border-line text-xs uppercase text-ink-mute">
+                <table className="w-full text-left text-corpo">
+                  <thead className="border-b border-line text-apoio uppercase text-ink-mute">
                     <tr>
                       <th className="px-4 py-2">Lead</th>
                       <th className="px-4 py-2">Evento</th>
@@ -224,7 +224,7 @@ export default async function MetaIntegrationPage() {
                         <td className="px-4 py-2">{formatCentsAsBRL(event.valueCents)}</td>
                         <td className={`px-4 py-2 ${EVENT_STATUS_COLORS[event.status]}`}>
                           {EVENT_STATUS_LABELS[event.status]}
-                          {event.lastError ? <span className="block text-xs text-ink-mute">{event.lastError}</span> : null}
+                          {event.lastError ? <span className="block text-apoio text-ink-mute">{event.lastError}</span> : null}
                         </td>
                         <td className="px-4 py-2 text-ink-mute">{new Date(event.occurredAt).toLocaleString("pt-BR")}</td>
                       </tr>

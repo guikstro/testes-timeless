@@ -63,14 +63,14 @@ export function LeaveClientButton({ collapsedLabelClassName = "" }: { collapsedL
         disabled={pending}
         title="Encerrar a visita a este cliente"
         aria-busy={pending || undefined}
-        className="focus-ring flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-amber-700 transition-all duration-200 ease-soft hover:bg-amber-500/10 active:scale-[0.98] disabled:opacity-50 dark:text-amber-400"
+        className="focus-ring flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-corpo text-warning transition-all duration-200 ease-soft hover:bg-amber-500/10 active:scale-[0.98] disabled:opacity-50"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0" aria-hidden>
           <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
         </svg>
         <span className={collapsedLabelClassName}>{pending ? "Saindo" : "Encerrar visita"}</span>
       </button>
-      {error ? <p className={`px-3 text-xs text-red-600 ${collapsedLabelClassName}`}>{error}</p> : null}
+      {error ? <p className={`px-3 text-apoio text-danger ${collapsedLabelClassName}`}>{error}</p> : null}
     </>
   );
 }

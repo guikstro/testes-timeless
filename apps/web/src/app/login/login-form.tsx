@@ -274,7 +274,7 @@ export function LoginForm() {
               </div>
 
               {error ? (
-                <p role="alert" className="animate-rise-in border-l-2 border-red-500 pl-3 text-corpo text-red-600 dark:text-red-400">
+                <p role="alert" className="animate-rise-in border-l-2 border-danger pl-3 text-corpo text-danger">
                   {error}
                 </p>
               ) : null}
@@ -382,7 +382,7 @@ export function LoginForm() {
             </Link>
 
             {error ? (
-              <p role="alert" className="animate-rise-in border-l-2 border-red-500 pl-3 text-corpo text-red-600 dark:text-red-400">
+              <p role="alert" className="animate-rise-in border-l-2 border-danger pl-3 text-corpo text-danger">
                 {error}
               </p>
             ) : null}

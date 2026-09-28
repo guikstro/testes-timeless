@@ -39,7 +39,7 @@ export function ManualEditForm({ leadId, status }: { leadId: string; status: Lea
         className="h-10 w-full rounded-xl border border-line bg-panel px-3 text-corpo text-ink shadow-subtle transition-all duration-200 ease-soft placeholder:text-ink-mute hover:border-ink/20 focus:border-accent focus:outline-none focus:ring-4 focus:ring-accent/10"
       />
       <Button type="submit" loading={pending} size="sm" className="w-full">{pending ? "Salvando..." : "Salvar correção"}</Button>
-      {state.error ? <p className="text-apoio text-red-600 dark:text-red-400">{state.error}</p> : null}
+      {state.error ? <p className="text-apoio text-danger">{state.error}</p> : null}
     </form>
   );
 }
@@ -67,18 +67,18 @@ export function DisqualifyForm({
   if (disqualifiedAt) {
     return (
       <form action={formAction} className="flex flex-wrap items-center gap-3">
-        <p className="text-sm text-ink-soft">
+        <p className="text-corpo text-ink-soft">
           Desqualificado em {new Date(disqualifiedAt).toLocaleString("pt-BR")}
           {disqualifiedReason ? `. Motivo: ${disqualifiedReason}` : ""}
         </p>
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-soft hover:bg-panel-soft disabled:opacity-50"
+          className="rounded-md border border-line px-3 py-1.5 text-corpo font-medium text-ink-soft hover:bg-panel-soft disabled:opacity-50"
         >
           {pending ? "Reativando..." : "Reativar lead"}
         </button>
-        {state.error ? <p className="w-full text-sm text-red-600">{state.error}</p> : null}
+        {state.error ? <p className="w-full text-corpo text-danger">{state.error}</p> : null}
       </form>
     );
   }
@@ -89,16 +89,16 @@ export function DisqualifyForm({
         name="reason"
         placeholder="Motivo (opcional)"
         maxLength={200}
-        className="min-w-[200px] flex-1 rounded-md border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
+        className="min-w-[200px] flex-1 rounded-md border border-line px-3 py-2 text-corpo focus:border-accent focus:outline-none"
       />
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md border border-line px-3 py-2 text-sm font-medium text-ink-soft hover:bg-panel-soft disabled:opacity-50"
+        className="rounded-md border border-line px-3 py-2 text-corpo font-medium text-ink-soft hover:bg-panel-soft disabled:opacity-50"
       >
         {pending ? "Salvando..." : "Desqualificar"}
       </button>
-      {state.error ? <p className="w-full text-sm text-red-600">{state.error}</p> : null}
+      {state.error ? <p className="w-full text-corpo text-danger">{state.error}</p> : null}
     </form>
   );
 }

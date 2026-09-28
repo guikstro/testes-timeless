@@ -57,7 +57,7 @@ export function LeadSidePanel({ ficha }: { ficha: FichaDoLead }) {
             {metrics.inboundCount} recebidas · {metrics.outboundCount} enviadas
           </p>
           {metrics.awaitingReply ? (
-            <p className="mt-2 text-apoio font-medium text-amber-700 dark:text-amber-400">
+            <p className="mt-2 text-apoio font-medium text-warning">
               Aguardando resposta {metrics.lastMessageAt ? tempoRelativo(metrics.lastMessageAt) : ""}
             </p>
           ) : null}

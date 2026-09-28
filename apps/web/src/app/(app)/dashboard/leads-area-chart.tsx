@@ -413,10 +413,10 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
             {modo === "acumulado" ? " · acumulado" : ""}
           </p>
           {SERIES.map((series) => (
-            <div key={series.key} className="flex items-center gap-2 text-sm">
+            <div key={series.key} className="flex items-center gap-2 text-corpo">
               <span className="h-0.5 w-3 rounded-full" style={{ backgroundColor: series.color }} />
               <span className="font-semibold tabular-nums text-ink">{active[series.key]}</span>
-              <span className="text-xs text-ink-mute">{series.label}</span>
+              <span className="text-apoio text-ink-mute">{series.label}</span>
             </div>
           ))}
         </div>

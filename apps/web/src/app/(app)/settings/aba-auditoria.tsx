@@ -159,7 +159,7 @@ function Linha({ item }: { item: RegistroDeAuditoria }) {
     <li className="px-4 py-3.5">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
         <div className="min-w-0">
-          <p className={`text-corpo ${falhou ? "text-red-700 dark:text-red-300" : "text-ink"}`}>
+          <p className={`text-corpo ${falhou ? "text-danger" : "text-ink"}`}>
             {destino ? (
               <Link href={destino} className="hover:underline">
                 {descricao}

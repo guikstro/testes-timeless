@@ -15,6 +15,7 @@ import { AbaAtendimento } from "./aba-atendimento";
 import { Procedencia } from "./procedencia";
 import { concluiAtendimento, concluiFunil, concluiOrigem, concluiVisaoGeral } from "./conclusao";
 import { Overview } from "./tipos";
+import { Alert } from "@/components/ui/alert";
 
 const PERIODOS = [7, 30, 90];
 
@@ -156,14 +157,13 @@ export default async function DashboardPage({
         continua condicionado.
       */}
       {medicao === "medido" && maioriaSemOrigem ? (
-        <div className="mt-6 rounded-2xl border border-amber-300/60 bg-amber-50 p-5 text-corpo text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
-          <p className="font-medium">A maior parte dos leads está sem origem identificada.</p>
-          <p className="mt-1 text-amber-800 dark:text-amber-200/90">
+        <Alert tom="warning" className="mt-6" titulo="A maior parte dos leads está sem origem identificada.">
+          <p>
             A origem só é registrada quando a pessoa chega por um anúncio Click-to-WhatsApp ou por um link
             rastreável. Quem manda mensagem direto para o número não carrega essa evidência, e ela nunca é deduzida
             por aproximação.
           </p>
-          <ul className="mt-2 space-y-1 text-amber-800 dark:text-amber-200/90">
+          <ul className="mt-2 space-y-1">
             {!setup.metaConnected ? (
               <li>
                 · <Link href="/integrations/meta" className="underline">Conecte sua conta Meta</Link> para
@@ -183,7 +183,7 @@ export default async function DashboardPage({
               </li>
             ) : null}
           </ul>
-        </div>
+        </Alert>
       ) : null}
 
       {medicao === "medido" ? <Procedencia overview={overview} /> : null}

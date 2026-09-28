@@ -201,11 +201,11 @@ export function CreateLinkForm() {
           {pending ? "Criando..." : "Criar link"}
         </Button>
         {state.error ? (
-          <p className="text-apoio text-red-600 dark:text-red-400" role="alert">
+          <p className="text-apoio text-danger" role="alert">
             {state.error}
           </p>
         ) : state.criadoEm ? (
-          <p className="text-apoio text-emerald-700 dark:text-emerald-400" role="status">
+          <p className="text-apoio text-success" role="status">
             Link criado. Copie ele na lista abaixo.
           </p>
         ) : null}

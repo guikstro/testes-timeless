@@ -11,6 +11,7 @@ import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
 import { contaExportaveis, LinhaDeConversao, montaCsv, NomesDasAcoes } from "@/lib/google/conversoes-csv";
 import { EstadoDasAcoes, registraExportacao, salvarAcoesDeConversao } from "./conversion-actions";
 import { PERIODOS } from "./periodos";
+import { Alert } from "@/components/ui/alert";
 
 const inicial: EstadoDasAcoes = {};
 
@@ -81,9 +82,9 @@ export function ConversionsExport({
             {salvando ? "Salvando..." : "Salvar nomes"}
           </Button>
           {estado.erro ? (
-            <p className="text-apoio text-red-600 dark:text-red-400">{estado.erro}</p>
+            <p className="text-apoio text-danger">{estado.erro}</p>
           ) : estado.salvoEm ? (
-            <p className="text-apoio text-emerald-700 dark:text-emerald-400">Nomes salvos.</p>
+            <p className="text-apoio text-success">Nomes salvos.</p>
           ) : null}
         </div>
         {/*
@@ -111,9 +112,9 @@ export function ConversionsExport({
       </div>
 
       {faltamNomes ? (
-        <p className="rounded-xl border border-amber-300/60 bg-amber-50 px-3.5 py-2.5 text-apoio leading-relaxed text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
+        <Alert tom="warning">
           Informe ao menos um nome de ação acima. Sem ele, a linha não teria como casar com nada no Google.
-        </p>
+        </Alert>
       ) : null}
 
       {linhas.length === 0 ? (

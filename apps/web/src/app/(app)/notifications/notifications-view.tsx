@@ -108,7 +108,7 @@ export function NotificationsView({
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Avisos</h1>
-      <p className="mb-6 mt-1 text-sm text-ink-mute">
+      <p className="mb-6 mt-1 text-corpo text-ink-mute">
         Tudo o que aconteceu enquanto você estava em outra tela, ou fora dela.
       </p>
 
@@ -146,7 +146,7 @@ export function NotificationsView({
 
       {linhas.length === 0 ? (
         <div className="surface p-10 text-center">
-          <p className="text-sm text-ink-soft">Nada por aqui.</p>
+          <p className="text-corpo text-ink-soft">Nada por aqui.</p>
           <p className="mt-1.5 text-apoio text-ink-mute">
             Avisos aparecem quando um lead chega, avança no funil ou uma mensagem não sai.
           </p>

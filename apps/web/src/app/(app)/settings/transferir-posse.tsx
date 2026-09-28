@@ -85,7 +85,7 @@ export function TransferirPosse({ candidatos }: { candidatos: { userId: string; 
       </div>
 
       {erro ? (
-        <p role="alert" className="text-apoio text-red-600 dark:text-red-400">
+        <p role="alert" className="text-apoio text-danger">
           {erro}
         </p>
       ) : null}

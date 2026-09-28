@@ -25,8 +25,8 @@ const STATUS_LABELS: Record<WhatsAppConnection["status"], string> = {
 };
 
 const STATUS_COLORS: Record<WhatsAppConnection["status"], string> = {
-  PENDING_QR: "text-amber-600",
-  CONNECTED: "text-emerald-600",
+  PENDING_QR: "text-warning",
+  CONNECTED: "text-success",
   DISCONNECTED: "text-ink-mute",
 };
 
@@ -50,7 +50,7 @@ export default async function WhatsAppIntegrationPage() {
 
       <div className="mb-8 rounded-xl border border-line bg-panel p-6">
         {connection ? (
-          <div className="space-y-2 text-sm text-ink-soft">
+          <div className="space-y-2 text-corpo text-ink-soft">
             <p>
               <span className="font-medium">Status:</span>{" "}
               <span className={STATUS_COLORS[connection.status]}>{STATUS_LABELS[connection.status]}</span>
@@ -72,7 +72,7 @@ export default async function WhatsAppIntegrationPage() {
             ) : null}
           </div>
         ) : (
-          <p className="text-sm text-ink-soft">Nenhum número conectado ainda.</p>
+          <p className="text-corpo text-ink-soft">Nenhum número conectado ainda.</p>
         )}
       </div>
 
@@ -89,10 +89,10 @@ export default async function WhatsAppIntegrationPage() {
           <QrConnect alreadyPending={connection?.status === "PENDING_QR"} />
 
           <details className="rounded-xl border border-line bg-panel p-6">
-            <summary className="cursor-pointer text-sm font-semibold text-ink">
+            <summary className="cursor-pointer text-corpo font-semibold text-ink">
               Conectar pela Cloud API oficial da Meta
             </summary>
-            <p className="mb-4 mt-2 text-sm text-ink-mute">
+            <p className="mb-4 mt-2 text-corpo text-ink-mute">
               Alternativa sem risco de bloqueio, mas exige um número já verificado no Meta for Developers e a
               configuração manual do webhook. Só recebe mensagens. O envio pela plataforma está disponível apenas na
               conexão por QR Code.

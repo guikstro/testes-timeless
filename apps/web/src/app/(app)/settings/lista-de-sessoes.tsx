@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { encerrarOutrasSessoes, encerrarSessao } from "./sessoes-actions";
+import { InlineConfirm } from "@/components/ui/inline-confirm";
 
 export interface Sessao {
   id: string;
@@ -25,22 +26,18 @@ export interface Sessao {
 export function ListaDeSessoes({ sessoes }: { sessoes: Sessao[] }) {
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
-  const [confirmandoTodas, setConfirmandoTodas] = useState(false);
-  const [encerrando, iniciar] = useTransition();
 
   const atual = sessoes.find((s) => s.atual);
   const outras = sessoes.filter((s) => !s.atual);
 
-  function encerrarTodas() {
+  async function encerrarTodas() {
     setErro(null);
-    iniciar(async () => {
-      const resultado = await encerrarOutrasSessoes();
-      setConfirmandoTodas(false);
-      if (resultado.erro) return setErro(resultado.erro);
-      setAviso(
-        resultado.encerradas === 1 ? "Uma sessão foi encerrada." : `${resultado.encerradas} sessões foram encerradas.`,
-      );
-    });
+    setAviso(null);
+    const resultado = await encerrarOutrasSessoes();
+    if (resultado.erro) return { erro: resultado.erro };
+    setAviso(
+      resultado.encerradas === 1 ? "Uma sessão foi encerrada." : `${resultado.encerradas} sessões foram encerradas.`,
+    );
   }
 
   return (
@@ -56,7 +53,7 @@ export function ListaDeSessoes({ sessoes }: { sessoes: Sessao[] }) {
         <p className="text-apoio text-ink-mute">Esta é a única sessão aberta na sua conta.</p>
       ) : null}
 
-      {erro ? <p className="text-apoio text-red-700 dark:text-red-300">{erro}</p> : null}
+      {erro ? <p className="text-apoio text-danger">{erro}</p> : null}
       {aviso ? <p role="status" className="text-apoio text-ink-soft">{aviso}</p> : null}
 
       {/*
@@ -65,39 +62,15 @@ export function ListaDeSessoes({ sessoes }: { sessoes: Sessao[] }) {
         com o celular no bolso logado.
       */}
       {outras.length > 0 ? (
-        confirmandoTodas ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-apoio text-ink-soft">
-              Encerrar {outras.length === 1 ? "a outra sessão" : `as outras ${outras.length} sessões`}?
-            </span>
-            <button
-              type="button"
-              disabled={encerrando}
-              onClick={encerrarTodas}
-              className="focus-ring h-9 rounded-xl bg-red-600 px-4 text-apoio font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-            >
-              {encerrando ? "Encerrando" : "Encerrar"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmandoTodas(false)}
-              className="focus-ring h-9 rounded-xl px-3 text-apoio text-ink-mute transition-colors hover:text-ink"
-            >
-              Cancelar
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => {
-              setAviso(null);
-              setConfirmandoTodas(true);
-            }}
-            className="focus-ring h-10 rounded-xl border border-line px-4 text-corpo text-ink transition-colors hover:bg-panel-soft"
-          >
-            Encerrar todas as outras sessões
-          </button>
-        )
+        <InlineConfirm
+          aparencia="contorno"
+          pergunta={`Encerrar ${outras.length === 1 ? "a outra sessão" : `as outras ${outras.length} sessões`}?`}
+          rotuloConfirmar="Encerrar"
+          rotuloPendente="Encerrando"
+          aoConfirmar={encerrarTodas}
+        >
+          Encerrar todas as outras sessões
+        </InlineConfirm>
       ) : null}
     </div>
   );
@@ -132,7 +105,7 @@ function Linha({ sessao, aoErro }: { sessao: Sessao; aoErro?: (erro: string | nu
               </span>
             ) : null}
             {sessao.visita ? (
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-rotulo font-semibold uppercase tracking-[0.1em] text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+              <span className="rounded-full bg-warning-soft px-2 py-0.5 text-rotulo font-semibold uppercase tracking-[0.1em] text-warning">
                 Visita de suporte
               </span>
             ) : null}
@@ -161,7 +134,7 @@ function Linha({ sessao, aoErro }: { sessao: Sessao; aoErro?: (erro: string | nu
               if (resultado.erro) aoErro?.(resultado.erro);
             })
           }
-          className="focus-ring rounded-lg px-3 py-1.5 text-apoio font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60 dark:text-red-400 dark:hover:bg-red-950/40"
+          className="focus-ring rounded-lg px-3 py-1.5 text-apoio font-medium text-danger transition-colors hover:bg-danger-soft disabled:opacity-60"
           aria-label={`Encerrar a sessão de ${sessao.aparelho}`}
         >
           {encerrando ? "Encerrando" : "Encerrar"}

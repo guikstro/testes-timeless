@@ -232,7 +232,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           <h1 className="font-display text-[28px] font-semibold leading-tight tracking-tight text-ink">
             {lead.name ?? "Sem nome"}
           </h1>
-          <p className="mt-0.5 text-sm tabular-nums text-ink-mute">{lead.normalizedPhone}</p>
+          <p className="mt-0.5 text-corpo tabular-nums text-ink-mute">{lead.normalizedPhone}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -385,7 +385,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                       {evento.sentAt ? tempoRelativo(evento.sentAt) : tempoRelativo(evento.occurredAt)}
                     </span>
                     {evento.lastError ? (
-                      <span className="w-full text-rotulo text-red-600 dark:text-red-400">{evento.lastError}</span>
+                      <span className="w-full text-rotulo text-danger">{evento.lastError}</span>
                     ) : null}
                   </li>
                 ))}

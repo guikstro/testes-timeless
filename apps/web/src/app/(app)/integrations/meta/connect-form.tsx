@@ -12,7 +12,7 @@ export function ConnectMetaForm() {
   return (
     <form action={formAction} className="grid grid-cols-1 gap-3 rounded-xl border border-line bg-panel p-4 sm:grid-cols-2">
       <div>
-        <label className="mb-1 block text-sm font-medium text-ink-soft" htmlFor="adAccountId">
+        <label className="mb-1 block text-corpo font-medium text-ink-soft" htmlFor="adAccountId">
           Ad Account ID
         </label>
         <input
@@ -20,11 +20,11 @@ export function ConnectMetaForm() {
           name="adAccountId"
           placeholder="act_1234567890 ou só o número"
           required
-          className="w-full rounded-md border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
+          className="w-full rounded-md border border-line px-3 py-2 text-corpo focus:border-accent focus:outline-none"
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium text-ink-soft" htmlFor="accessToken">
+        <label className="mb-1 block text-corpo font-medium text-ink-soft" htmlFor="accessToken">
           Access token
         </label>
         <input
@@ -32,12 +32,12 @@ export function ConnectMetaForm() {
           name="accessToken"
           type="password"
           required
-          className="w-full rounded-md border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
+          className="w-full rounded-md border border-line px-3 py-2 text-corpo focus:border-accent focus:outline-none"
         />
       </div>
       <div className="flex items-center gap-3 sm:col-span-2">
         <Button type="submit" loading={pending}>{pending ? "Conectando..." : "Conectar"}</Button>
-        {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
+        {state.error ? <p className="text-corpo text-danger">{state.error}</p> : null}
       </div>
     </form>
   );

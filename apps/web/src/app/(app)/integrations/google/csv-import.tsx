@@ -101,7 +101,7 @@ export function ImportarCsv({ campaignId }: { campaignId: string }) {
 
         {resultado.totalIgnoradas > 0 ? (
           <details className="mt-3">
-            <summary className="cursor-pointer text-apoio text-amber-700 dark:text-amber-400">
+            <summary className="cursor-pointer text-apoio text-warning">
               {resultado.totalIgnoradas} linha(s) não foram lidas
             </summary>
             <ul className="mt-2 space-y-0.5">
@@ -223,7 +223,7 @@ export function ImportarCsv({ campaignId }: { campaignId: string }) {
         </div>
       )}
 
-      {erro ? <p className="mt-2 text-apoio text-red-600 dark:text-red-400">{erro}</p> : null}
+      {erro ? <p className="mt-2 text-apoio text-danger">{erro}</p> : null}
     </div>
   );
 }

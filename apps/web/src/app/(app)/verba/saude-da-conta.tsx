@@ -102,11 +102,11 @@ const TONS = {
     ponto: "bg-accent",
   },
   atencao: {
-    caixa: "border-amber-300/60 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100",
+    caixa: "border-warning-line/70 bg-warning-soft text-warning",
     ponto: "bg-amber-500",
   },
   parada: {
-    caixa: "border-red-300/60 bg-red-50 text-red-900 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-100",
+    caixa: "border-danger-line/70 bg-danger-soft text-danger",
     ponto: "bg-red-500",
   },
 } as const;

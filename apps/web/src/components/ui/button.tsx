@@ -1,4 +1,5 @@
-import { ButtonHTMLAttributes, forwardRef } from "react";
+import Link from "next/link";
+import { ButtonHTMLAttributes, ComponentProps, forwardRef } from "react";
 import { cn } from "@/lib/cn";
 
 /**
@@ -34,9 +35,19 @@ const VARIANTS: Record<Variant, string> = {
 
 const SIZES: Record<Size, string> = {
   sm: "h-9 gap-1.5 px-3.5 text-corpo",
-  md: "h-11 gap-2 px-5 text-sm",
+  md: "h-11 gap-2 px-5 text-corpo",
   lg: "h-13 gap-2.5 px-6 text-destaque",
 };
+
+const BASE =
+  "focus-ring relative isolate inline-flex select-none items-center justify-center overflow-hidden " +
+  "rounded-full font-medium transition-[transform,box-shadow,background-color,border-color,filter] " +
+  "duration-300 ease-soft active:scale-[0.97] active:duration-75";
+
+/** A aparência de botão, para o raro elemento que não é `<button>` nem link. */
+export function estiloDeBotao(variant: Variant = "primary", size: Size = "md"): string {
+  return cn(BASE, VARIANTS[variant], SIZES[size]);
+}
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
@@ -56,9 +67,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       aria-busy={loading || undefined}
       disabled={disabled || loading}
       className={cn(
-        "focus-ring relative isolate inline-flex select-none items-center justify-center overflow-hidden",
-        "rounded-full font-medium transition-[transform,box-shadow,background-color,border-color,filter]",
-        "duration-300 ease-soft active:scale-[0.97] active:duration-75",
+        BASE,
         "disabled:pointer-events-none disabled:opacity-45",
         VARIANTS[variant],
         SIZES[size],
@@ -71,6 +80,20 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     </button>
   );
 });
+
+/**
+ * Um link com cara de botão: quando a ação é ir para outra tela ("Conectar
+ * WhatsApp" leva a Integrações). Link de verdade, e não botão com
+ * `router.push`, para abrir em nova aba e o leitor de tela anunciar "link".
+ */
+export function ButtonLink({
+  variant = "primary",
+  size = "md",
+  className,
+  ...props
+}: ComponentProps<typeof Link> & { variant?: Variant; size?: Size }) {
+  return <Link className={cn(estiloDeBotao(variant, size), className)} {...props} />;
+}
 
 function Spinner() {
   return (

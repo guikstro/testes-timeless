@@ -53,7 +53,7 @@ export default async function GoogleAdsPage({
   return (
     <div className="mx-auto max-w-4xl">
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Google Ads</h1>
-      <p className="mb-6 mt-1 text-sm text-ink-mute">
+      <p className="mb-6 mt-1 text-corpo text-ink-mute">
         Quanto cada campanha gasta e o que ela traz, e as vendas devolvidas ao Google.
       </p>
 

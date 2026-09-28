@@ -6,13 +6,10 @@ import { Button } from "@/components/ui/button";
 import { formatCentsAsBRL } from "@/lib/currency";
 import { criarCampanha, EstadoFormulario, lancarGasto, removerCampanha } from "./actions";
 import { ImportarCsv } from "./csv-import";
+import { DatePicker } from "@/components/ui/date";
+import { Input } from "@/components/ui/input";
 
 const inicial: EstadoFormulario = {};
-
-const campo =
-  "h-10 w-full rounded-xl border border-line bg-panel px-3 text-corpo text-ink shadow-subtle " +
-  "transition-all duration-200 ease-soft placeholder:text-ink-mute hover:border-ink/20 " +
-  "focus:border-accent focus:outline-none focus:ring-4 focus:ring-accent/10";
 
 export function NovaCampanha() {
   const [estado, acao, pendente] = useActionState(criarCampanha, inicial);
@@ -23,14 +20,14 @@ export function NovaCampanha() {
         <label htmlFor="g-nome" className="mb-1.5 block text-apoio font-medium text-ink-soft">
           Nome da campanha
         </label>
-        <input id="g-nome" name="name" required placeholder="Busca marca, Performance Max" className={campo} />
+        <Input id="g-nome" name="name" required placeholder="Busca marca, Performance Max" />
       </div>
 
       <div>
         <label htmlFor="g-id" className="mb-1.5 block text-apoio font-medium text-ink-soft">
           ID da campanha <span className="font-normal text-ink-mute">(opcional)</span>
         </label>
-        <input id="g-id" name="externalId" placeholder="1234567890" inputMode="numeric" className={campo} />
+        <Input id="g-id" name="externalId" placeholder="1234567890" inputMode="numeric" />
       </div>
 
       <div className="flex items-end">
@@ -40,7 +37,7 @@ export function NovaCampanha() {
       </div>
 
       {estado.error ? (
-        <p className="text-apoio text-red-600 dark:text-red-400 sm:col-span-3">{estado.error}</p>
+        <p className="text-apoio text-danger sm:col-span-3">{estado.error}</p>
       ) : null}
     </form>
   );
@@ -55,11 +52,11 @@ export function LancarGasto({ campaignId }: { campaignId: string }) {
     <form action={acao} className="flex flex-wrap items-end gap-2">
       <div>
         <label className="mb-1 block text-rotulo text-ink-mute">Dia</label>
-        <input type="date" name="date" defaultValue={hoje} max={hoje} required className={`${campo} w-[9.5rem]`} />
+        <DatePicker name="date" defaultValue={hoje} max={hoje} required />
       </div>
       <div>
         <label className="mb-1 block text-rotulo text-ink-mute">Gasto em R$</label>
-        <input name="reais" placeholder="250,00" inputMode="decimal" required className={`${campo} w-28`} />
+        <Input name="reais" placeholder="250,00" inputMode="decimal" required className="w-28" />
       </div>
       <Button type="submit" loading={pendente} size="sm" variant="secondary">
         {pendente ? "Salvando" : "Lançar"}
@@ -69,7 +66,7 @@ export function LancarGasto({ campaignId }: { campaignId: string }) {
           Lançado
         </span>
       ) : null}
-      {estado.error ? <span className="text-apoio text-red-600 dark:text-red-400">{estado.error}</span> : null}
+      {estado.error ? <span className="text-apoio text-danger">{estado.error}</span> : null}
     </form>
   );
 }
@@ -148,11 +145,11 @@ export function CartaoCampanha({
                 type="button"
                 onClick={remover}
                 disabled={removendo}
-                className="focus-ring rounded-lg text-apoio text-red-600 underline decoration-red-300 underline-offset-4 transition-colors hover:text-red-700 disabled:opacity-50 dark:text-red-400"
+                className="focus-ring rounded-lg text-apoio text-danger underline decoration-danger-line underline-offset-4 transition-colors hover:text-danger/80 disabled:opacity-50"
               >
                 {removendo ? "Removendo" : "Remover campanha"}
               </button>
-              {erro ? <span className="text-apoio text-red-600 dark:text-red-400">{erro}</span> : null}
+              {erro ? <span className="text-apoio text-danger">{erro}</span> : null}
             </div>
           ) : null}
         </div>

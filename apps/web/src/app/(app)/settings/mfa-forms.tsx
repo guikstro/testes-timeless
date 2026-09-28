@@ -12,12 +12,11 @@ import {
   regenerarCodigos,
 } from "./mfa-actions";
 import { desenhaQr } from "./mfa-qr";
+import { Alert } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
 
 const inicial: EstadoDoMfa = {};
 
-const CAMPO =
-  "h-11 w-full rounded-xl border border-line bg-panel px-3 text-corpo text-ink transition-colors " +
-  "placeholder:text-ink-mute/60 focus:border-accent focus:outline-none";
 const ROTULO = "mb-1.5 block text-apoio font-medium uppercase tracking-[0.12em] text-ink-mute";
 const BOTAO =
   "h-11 rounded-xl bg-accent px-5 text-corpo font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60";
@@ -70,10 +69,10 @@ export function SegundaEtapa({ situacao }: { situacao: Situacao }) {
         pessoa descobrir tomando 403 na administração.
       */}
       {situacao.exigido ? (
-        <p className="rounded-xl border border-amber-300/60 bg-amber-50 px-3.5 py-2.5 text-apoio leading-relaxed text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
+        <Alert tom="warning">
           Sua conta opera a plataforma, e a administração exige esta verificação. O restante do sistema continua
           acessível enquanto você não configura.
-        </p>
+        </Alert>
       ) : null}
 
       {situacao.pendente ? (
@@ -82,7 +81,7 @@ export function SegundaEtapa({ situacao }: { situacao: Situacao }) {
         </p>
       ) : null}
 
-      {erroInicio ? <p className="text-apoio text-red-700 dark:text-red-300">{erroInicio}</p> : null}
+      {erroInicio ? <p className="text-apoio text-danger">{erroInicio}</p> : null}
 
       <button type="button" onClick={comecar} disabled={iniciando} className={BOTAO}>
         {iniciando ? "Preparando" : "Ativar verificação em duas etapas"}
@@ -136,19 +135,18 @@ function Configurando({
               <label htmlFor="mfa-codigo" className={ROTULO}>
                 Código do aplicativo
               </label>
-              <input
+              <Input
                 id="mfa-codigo"
                 name="codigo"
                 required
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 placeholder="000000"
-                maxLength={7}
-                className={`${CAMPO} font-mono tracking-[0.3em]`}
+                maxLength={7} className="font-mono tracking-[0.3em]"
               />
             </div>
 
-            {estado.erro ? <p className="text-apoio text-red-700 dark:text-red-300">{estado.erro}</p> : null}
+            {estado.erro ? <p className="text-apoio text-danger">{estado.erro}</p> : null}
 
             <div className="flex flex-wrap gap-2">
               <button type="submit" disabled={enviando} className={BOTAO}>
@@ -182,15 +180,10 @@ function Configurando({
 function CodigosEntregues({ codigos }: { codigos: string[] }) {
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-amber-300/60 bg-amber-50 p-5 dark:border-amber-900/60 dark:bg-amber-950/40">
-        <p className="text-corpo font-medium text-amber-900 dark:text-amber-100">
-          Guarde estes códigos agora. Eles não aparecem de novo.
-        </p>
-        <p className="mt-1 max-w-prose text-apoio leading-relaxed text-amber-800 dark:text-amber-200/90">
-          Cada um serve uma vez, para entrar quando você não tiver o telefone em mãos. Sem eles, perder o aparelho
-          significa perder o acesso à conta.
-        </p>
-      </div>
+      <Alert tom="warning" titulo="Guarde estes códigos agora. Eles não aparecem de novo.">
+        Cada um serve uma vez, para entrar quando você não tiver o telefone em mãos. Sem eles, perder o aparelho
+        significa perder o acesso à conta.
+      </Alert>
 
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {codigos.map((codigo) => (
@@ -233,9 +226,9 @@ function Ativa({ situacao }: { situacao: Situacao }) {
         dependendo só do telefone e pode nem perceber.
       */}
       {situacao.codigosRestantes <= 3 ? (
-        <p className="rounded-xl border border-amber-300/60 bg-amber-50 px-3.5 py-2.5 text-apoio leading-relaxed text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
+        <Alert tom="warning">
           Restam poucos códigos. Gere um lote novo enquanto ainda tem um para confirmar a operação.
-        </p>
+        </Alert>
       ) : null}
 
       <div className="flex flex-wrap gap-2">
@@ -276,9 +269,9 @@ function FormularioDeRegeneracao() {
         <label htmlFor="regen-codigo" className={ROTULO}>
           Confirme com o código do aplicativo
         </label>
-        <input id="regen-codigo" name="codigo" required inputMode="numeric" autoComplete="one-time-code" placeholder="000000" className={`${CAMPO} font-mono tracking-[0.3em]`} />
+        <Input id="regen-codigo" name="codigo" required inputMode="numeric" autoComplete="one-time-code" placeholder="000000" className="font-mono tracking-[0.3em]" />
       </div>
-      {estado.erro ? <p className="text-apoio text-red-700 dark:text-red-300">{estado.erro}</p> : null}
+      {estado.erro ? <p className="text-apoio text-danger">{estado.erro}</p> : null}
       <button type="submit" disabled={enviando} className={BOTAO}>
         {enviando ? "Gerando" : "Gerar lote novo"}
       </button>
@@ -299,19 +292,19 @@ function FormularioDeDesativacao() {
         <label htmlFor="off-senha" className={ROTULO}>
           Sua senha
         </label>
-        <input id="off-senha" name="senha" type="password" required autoComplete="current-password" className={CAMPO} />
+        <Input id="off-senha" name="senha" type="password" required autoComplete="current-password" />
       </div>
       <div>
         <label htmlFor="off-codigo" className={ROTULO}>
           Código do aplicativo ou de recuperação
         </label>
-        <input id="off-codigo" name="codigo" required autoComplete="one-time-code" placeholder="000000" className={`${CAMPO} font-mono`} />
+        <Input id="off-codigo" name="codigo" required autoComplete="one-time-code" placeholder="000000" className="font-mono" />
       </div>
-      {estado.erro ? <p className="text-apoio text-red-700 dark:text-red-300">{estado.erro}</p> : null}
+      {estado.erro ? <p className="text-apoio text-danger">{estado.erro}</p> : null}
       <button
         type="submit"
         disabled={enviando}
-        className="h-11 rounded-xl bg-red-600 px-5 text-corpo font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+        className="h-11 rounded-xl bg-danger px-5 text-corpo font-medium text-canvas transition-opacity hover:opacity-90 disabled:opacity-60"
       >
         {enviando ? "Desativando" : "Desativar verificação"}
       </button>

@@ -44,7 +44,7 @@ export function Conversation({ messages }: { messages: Message[] }) {
                   ? // Uma mensagem que não saiu não pode ter a mesma cara de uma
                     // entregue: o operador varre a conversa procurando o que
                     // precisa refazer, e a cor é o que a faz saltar.
-                    "rounded-br-md bg-red-50 text-red-900 ring-1 ring-inset ring-red-200 dark:bg-red-950/50 dark:text-red-100 dark:ring-red-900"
+                    "rounded-br-md bg-danger-soft text-danger ring-1 ring-inset ring-danger-line"
                   : nossa
                     ? // Preenchida com o acento, como em qualquer aplicativo de
                       // mensagem: a própria fala é a que se destaca, porque é
@@ -66,7 +66,7 @@ export function Conversation({ messages }: { messages: Message[] }) {
               */}
               <p
                 className={`mt-1 text-rotulo ${
-                  falhou ? "text-red-700 dark:text-red-200" : nossa ? "text-accent-contrast" : "text-ink-mute"
+                  falhou ? "text-danger" : nossa ? "text-accent-contrast" : "text-ink-mute"
                 }`}
                 title={dataCompleta(message.timestamp)}
               >
@@ -76,7 +76,7 @@ export function Conversation({ messages }: { messages: Message[] }) {
                 {falhou ? " · não entregue" : null}
               </p>
               {falhou ? (
-                <p className="mt-1 text-rotulo font-medium text-red-700 dark:text-red-200">
+                <p className="mt-1 text-rotulo font-medium text-danger">
                   {message.sendError}
                 </p>
               ) : null}
@@ -85,7 +85,7 @@ export function Conversation({ messages }: { messages: Message[] }) {
         );
       })}
       {messages.length === 0 ? (
-        <li className="py-10 text-center text-sm text-ink-mute">Nenhuma mensagem ainda.</li>
+        <li className="py-10 text-center text-corpo text-ink-mute">Nenhuma mensagem ainda.</li>
       ) : null}
       <div ref={fim} />
     </ol>

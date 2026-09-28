@@ -30,8 +30,8 @@ export interface LeadCartao {
 const TONS = [
   "bg-sky-500/15 text-sky-700 dark:text-sky-300",
   "bg-violet-500/15 text-violet-700 dark:text-violet-300",
-  "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  "bg-amber-500/15 text-warning",
+  "bg-emerald-500/15 text-success",
   "bg-rose-500/15 text-rose-700 dark:text-rose-300",
   "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300",
 ];
@@ -114,7 +114,7 @@ export function LeadCard({
               Transforma a lista em fila de trabalho: o tempo de espera é a
               informação que decide o que fazer primeiro.
             */
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/12 px-2 py-0.5 text-rotulo font-medium text-amber-700 dark:text-amber-400">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/12 px-2 py-0.5 text-rotulo font-medium text-warning">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="absolute inline-flex h-full w-full rounded-full bg-current opacity-60 motion-safe:animate-ping" />
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-current" />

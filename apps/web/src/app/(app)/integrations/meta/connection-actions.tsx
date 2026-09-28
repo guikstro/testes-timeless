@@ -16,7 +16,7 @@ export function ConnectionActions() {
       <button
         onClick={() => startDisconnect(() => disconnectMeta())}
         disabled={disconnecting}
-        className="rounded-md border border-line px-3 py-1.5 text-sm text-ink-soft hover:bg-panel-soft disabled:opacity-50"
+        className="rounded-md border border-line px-3 py-1.5 text-corpo text-ink-soft hover:bg-panel-soft disabled:opacity-50"
       >
         {disconnecting ? "Desconectando..." : "Desconectar"}
       </button>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Identificacao as Dados } from "./tipos";
+import { Alert } from "@/components/ui/alert";
 
 /**
  * Até onde a identificação chega, e o que fica de fora.
@@ -100,14 +101,14 @@ export function Identificacao({ dados }: { dados: Dados }) {
       </div>
 
       {dados.semOrigem > dados.atePeloAnuncio ? (
-        <p className="mt-4 rounded-xl border border-amber-300/60 bg-amber-50 px-3.5 py-2.5 text-apoio leading-relaxed text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
+        <Alert tom="warning" className="mt-4">
           A maior parte dos leads chegou sem origem, então o custo por lead da tabela acima está
           calculado sobre a minoria identificada e sai mais alto que o real.{" "}
           <Link href="/links" className="link font-medium">
             Links rastreados
           </Link>{" "}
           e anúncios de clique para o WhatsApp são os dois caminhos que fecham essa lacuna.
-        </p>
+        </Alert>
       ) : null}
     </section>
   );

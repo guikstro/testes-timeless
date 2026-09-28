@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { mudarStatusDoAnuncio } from "./controle-actions";
+import { InlineConfirm } from "@/components/ui/inline-confirm";
 
 /**
  * Pausar e reativar um criativo direto daqui.
@@ -23,7 +24,6 @@ export function BotaoDePausa({
   nome: string;
   pausado: boolean;
 }) {
-  const [confirmando, setConfirmando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [executando, iniciar] = useTransition();
 
@@ -31,7 +31,6 @@ export function BotaoDePausa({
     setErro(null);
     iniciar(async () => {
       const resultado = await mudarStatusDoAnuncio(externalId, acao);
-      setConfirmando(false);
       if (resultado.erro) setErro(resultado.erro);
     });
   }
@@ -44,7 +43,7 @@ export function BotaoDePausa({
           ads_management no token" tem conserto, e quem lê precisa poder
           copiar isso para quem configura a conta.
         */}
-        <span className="max-w-[16rem] text-right text-apoio leading-snug text-red-700 dark:text-red-300">
+        <span className="max-w-[16rem] text-right text-apoio leading-snug text-danger">
           {erro}
         </span>
         <button
@@ -71,36 +70,16 @@ export function BotaoDePausa({
     );
   }
 
-  if (!confirmando) {
-    return (
-      <button
-        type="button"
-        onClick={() => setConfirmando(true)}
-        className="focus-ring rounded-lg px-2.5 py-1 text-apoio text-ink-mute transition-colors hover:bg-panel-soft hover:text-ink"
-        aria-label={`Pausar o anúncio ${nome}`}
-      >
-        Pausar
-      </button>
-    );
-  }
-
   return (
-    <span className="flex items-center justify-end gap-1">
-      <button
-        type="button"
-        disabled={executando}
-        onClick={() => agir("pausar")}
-        className="focus-ring rounded-lg px-2.5 py-1 text-apoio font-medium text-amber-700 transition-colors hover:bg-amber-50 disabled:opacity-60 dark:text-amber-400 dark:hover:bg-amber-950/40"
-      >
-        {executando ? "Pausando" : "Confirmar"}
-      </button>
-      <button
-        type="button"
-        onClick={() => setConfirmando(false)}
-        className="focus-ring rounded-lg px-2 py-1 text-apoio text-ink-mute transition-colors hover:text-ink"
-      >
-        Não
-      </button>
-    </span>
+    <InlineConfirm
+      tom="warning"
+      aoConfirmar={() => mudarStatusDoAnuncio(externalId, "pausar")}
+      rotuloPendente="Pausando"
+      rotuloCancelar="Não"
+      aria-label={`Pausar o anúncio ${nome}`}
+      className="justify-end"
+    >
+      Pausar
+    </InlineConfirm>
   );
 }

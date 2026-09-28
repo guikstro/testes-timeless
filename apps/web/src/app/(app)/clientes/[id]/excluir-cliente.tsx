@@ -3,8 +3,7 @@
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { excluiCliente } from "../actions";
-
-const CAMPO = "w-full rounded-md border border-line bg-panel px-3 py-2 text-sm focus:border-accent focus:outline-none";
+import { Input } from "@/components/ui/input";
 
 /**
  * Excluir pede a frase com o nome do cliente e o código de duas etapas. A
@@ -31,12 +30,12 @@ export function ExcluirCliente({ organizationId, nome }: { organizationId: strin
   };
 
   return (
-    <section className="mt-6 rounded-xl border border-red-300/60 bg-panel p-5">
-      <h2 className="text-sm font-medium uppercase tracking-wide text-red-600 dark:text-red-400">Zona de perigo</h2>
+    <section className="mt-6 rounded-xl border border-danger-line/70 bg-panel p-5">
+      <h2 className="text-corpo font-medium uppercase tracking-wide text-danger">Zona de perigo</h2>
 
       {!aberto ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-ink-soft">Excluir o cliente desliga o WhatsApp dele e tira o acesso de todos.</p>
+          <p className="text-corpo text-ink-soft">Excluir o cliente desliga o WhatsApp dele e tira o acesso de todos.</p>
           <Button type="button" variant="danger" onClick={() => setAberto(true)}>
             Excluir cliente
           </Button>
@@ -44,34 +43,33 @@ export function ExcluirCliente({ organizationId, nome }: { organizationId: strin
       ) : (
         <form onSubmit={excluir} className="mt-3 space-y-4">
           <div>
-            <label htmlFor="confirmacao" className="mb-1 block text-sm text-ink-soft">
+            <label htmlFor="confirmacao" className="mb-1 block text-corpo text-ink-soft">
               Para confirmar, digite <strong className="text-ink">{frase}</strong>
             </label>
-            <input
+            <Input
               id="confirmacao"
               value={confirmacao}
               onChange={(e) => setConfirmacao(e.target.value)}
               autoComplete="off"
               spellCheck={false}
               placeholder={frase}
-              className={CAMPO}
             />
           </div>
           <div>
-            <label htmlFor="codigo" className="mb-1 block text-sm text-ink-soft">
+            <label htmlFor="codigo" className="mb-1 block text-corpo text-ink-soft">
               Código do app autenticador
             </label>
-            <input
+            <Input
               id="codigo"
               value={codigo}
               onChange={(e) => setCodigo(e.target.value)}
               inputMode="numeric"
               autoComplete="one-time-code"
               placeholder="000000"
-              className={`${CAMPO} max-w-40 tracking-widest`}
+              className="w-40 tracking-widest"
             />
           </div>
-          {erro ? <p className="text-sm text-red-600">{erro}</p> : null}
+          {erro ? <p className="text-corpo text-danger">{erro}</p> : null}
           <div className="flex flex-wrap gap-2">
             <Button type="submit" variant="danger" loading={pending} disabled={!fraseCerta || codigo.replace(/\s/g, "").length < 6}>
               {pending ? "Excluindo..." : `Excluir ${nome}`}

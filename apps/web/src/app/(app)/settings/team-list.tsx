@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/input";
 import { tempoRelativo } from "@/lib/relative-time";
 import { mudarPapel, removerMembro } from "./team-actions";
+import { InlineConfirm } from "@/components/ui/inline-confirm";
 import { PAPEL, Papel } from "./papeis";
 
 
@@ -52,7 +53,7 @@ export function TeamList({
       </ul>
 
       {erro ? (
-        <p className="mt-3 text-apoio text-red-600 dark:text-red-400" role="alert">
+        <p className="mt-3 text-apoio text-danger" role="alert">
           {erro}
         </p>
       ) : null}
@@ -75,7 +76,6 @@ function Linha({
   semVirarDono: boolean;
   aoFalhar: (erro: string | null) => void;
 }) {
-  const [confirmando, setConfirmando] = useState(false);
   const [pendente, iniciar] = useTransition();
 
   /*
@@ -91,7 +91,6 @@ function Linha({
     iniciar(async () => {
       const resultado = await acao();
       if (resultado.erro) aoFalhar(resultado.erro);
-      setConfirmando(false);
     });
   }
 
@@ -130,35 +129,19 @@ function Linha({
 
       {bloqueado ? (
         <span className="w-[5.5rem] shrink-0" />
-      ) : confirmando ? (
-        <span className="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            disabled={pendente}
-            onClick={() => executar(() => removerMembro(membro.userId))}
-            className="focus-ring rounded-full bg-red-600 px-2.5 py-1 text-rotulo font-medium text-white transition-all duration-200 ease-soft hover:brightness-110 active:scale-95 disabled:opacity-50"
-          >
-            {pendente ? "Removendo" : "Confirmar"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setConfirmando(false)}
-            className="focus-ring rounded-full px-2 py-1 text-rotulo text-ink-mute transition-colors hover:text-ink"
-          >
-            Cancelar
-          </button>
-        </span>
       ) : (
         // Dois passos, e não um alerta do navegador: remover alguém da conta
         // não se desfaz com um clique de volta, e a confirmação fica no lugar
         // do próprio botão em vez de num diálogo que se fecha no reflexo.
-        <button
-          type="button"
-          onClick={() => setConfirmando(true)}
-          className="focus-ring w-[5.5rem] shrink-0 rounded-full border border-line px-2.5 py-1 text-rotulo font-medium text-ink-soft transition-all duration-200 ease-soft hover:border-red-400 hover:text-red-600 active:scale-95 dark:hover:text-red-400"
+        <InlineConfirm
+          aparencia="contorno"
+          aoConfirmar={() => removerMembro(membro.userId)}
+          rotuloPendente="Removendo"
+          aria-label={`Remover ${membro.name} da conta`}
+          className="shrink-0"
         >
           Remover
-        </button>
+        </InlineConfirm>
       )}
     </li>
   );

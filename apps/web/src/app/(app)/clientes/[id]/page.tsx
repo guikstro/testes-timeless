@@ -14,7 +14,7 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="max-w-2xl">
-      <Link href="/clientes" className="text-sm text-ink-mute hover:text-ink">
+      <Link href="/clientes" className="text-corpo text-ink-mute hover:text-ink">
         ← Clientes
       </Link>
       <h1 className="mt-2 flex items-center gap-3 font-display text-2xl font-semibold tracking-tight text-ink">

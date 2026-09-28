@@ -91,7 +91,7 @@ export function QuickActions({
           placeholder={`Responder ${nome.split(" ")[0]}`}
           className="w-full resize-none rounded-lg border border-line bg-canvas px-2.5 py-2 text-apoio text-ink placeholder:text-ink-mute focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15"
         />
-        {erro ? <p className="mt-1 text-rotulo text-red-600 dark:text-red-400">{erro}</p> : null}
+        {erro ? <p className="mt-1 text-rotulo text-danger">{erro}</p> : null}
         <div className="mt-1.5 flex items-center gap-1.5">
           <button
             type="button"
@@ -146,7 +146,7 @@ export function QuickActions({
         </button>
       ) : null}
 
-      {erro ? <span className="text-rotulo text-red-600 dark:text-red-400">{erro}</span> : null}
+      {erro ? <span className="text-rotulo text-danger">{erro}</span> : null}
     </div>
   );
 }

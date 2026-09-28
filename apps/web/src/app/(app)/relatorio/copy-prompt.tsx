@@ -64,7 +64,7 @@ export function CopyPrompt({ prompt, nomeArquivo }: { prompt: string; nomeArquiv
         {prompt.length.toLocaleString("pt-BR")} caracteres
       </span>
 
-      {erro ? <span className="text-apoio text-red-600 dark:text-red-400">{erro}</span> : null}
+      {erro ? <span className="text-apoio text-danger">{erro}</span> : null}
     </div>
   );
 }

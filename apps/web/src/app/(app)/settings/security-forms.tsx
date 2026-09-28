@@ -96,7 +96,7 @@ function Aviso({ children, tom = "neutro" }: { children: React.ReactNode; tom?: 
     <p
       className={`rounded-xl border px-3.5 py-2.5 text-apoio leading-relaxed ${
         tom === "atencao"
-          ? "border-amber-300/60 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100"
+          ? "border-warning-line/70 bg-warning-soft text-warning"
           : "border-line bg-panel-soft/60 text-ink-mute"
       }`}
     >
@@ -122,11 +122,11 @@ function Rodape({
         {enviando ? "Salvando..." : rotulo}
       </Button>
       {estado.erro ? (
-        <p className="text-apoio text-red-600 dark:text-red-400" role="alert">
+        <p className="text-apoio text-danger" role="alert">
           {estado.erro}
         </p>
       ) : estado.okEm ? (
-        <p className="text-apoio text-emerald-700 dark:text-emerald-400" role="status">
+        <p className="text-apoio text-success" role="status">
           {sucesso}
         </p>
       ) : null}

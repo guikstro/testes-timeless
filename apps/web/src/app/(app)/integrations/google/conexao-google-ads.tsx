@@ -7,6 +7,7 @@ import { BotaoCopiar } from "@/components/ui/copy-button";
 import { formatCentsAsBRL } from "@/lib/currency";
 import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
 import { desligaScriptDoGoogleAds, geraScriptDoGoogleAds } from "./script-actions";
+import { Alert } from "@/components/ui/alert";
 
 export interface SituacaoDoGoogleAds {
   conexao: {
@@ -97,7 +98,7 @@ export function ConexaoGoogleAds({ situacao, rotuloDoPeriodo }: { situacao: Situ
       </div>
 
       {erro ? (
-        <p className="mt-3 text-apoio text-red-600 dark:text-red-400" role="alert">
+        <p className="mt-3 text-apoio text-danger" role="alert">
           {erro}
         </p>
       ) : null}
@@ -107,10 +108,10 @@ export function ConexaoGoogleAds({ situacao, rotuloDoPeriodo }: { situacao: Situ
         e os números da tabela estão velhos sem parecer.
       */}
       {conexao?.atrasado ? (
-        <p className="mt-3 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-apoio text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
+        <Alert tom="warning" className="mt-3">
           O script parou de enviar. No Google Ads, abra Ferramentas → Ações em massa → Scripts e confira se ele está
           agendado e sem erro.
-        </p>
+        </Alert>
       ) : null}
 
       {script ? <PassoAPasso script={script} /> : null}

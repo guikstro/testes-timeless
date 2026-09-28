@@ -3,12 +3,10 @@
 import { useActionState, useEffect, useRef } from "react";
 import { EstadoDaVerba, salvarVerba } from "./verba-actions";
 import { Verba } from "./tipos";
+import { DatePicker } from "@/components/ui/date";
+import { Input } from "@/components/ui/input";
 
 const inicial: EstadoDaVerba = {};
-
-const CAMPO =
-  "h-11 w-full rounded-xl border border-line bg-panel px-3 text-corpo text-ink transition-colors " +
-  "placeholder:text-ink-mute/60 focus:border-accent focus:outline-none";
 
 const ROTULO = "mb-1.5 block text-apoio font-medium uppercase tracking-[0.12em] text-ink-mute";
 
@@ -29,27 +27,26 @@ export function FormularioDaVerba({ verba }: { verba?: Verba }) {
           <label htmlFor="verba-valor" className={ROTULO}>
             Valor da verba
           </label>
-          <input
+          <Input
             id="verba-valor"
             name="valor"
             required
             inputMode="decimal"
             placeholder="5.000,00"
             defaultValue={verba ? (verba.amountCents / 100).toFixed(2).replace(".", ",") : ""}
-            className={`${CAMPO} tabular-nums`}
+            className="tabular-nums"
           />
         </div>
         <div>
           <label htmlFor="verba-rotulo" className={ROTULO}>
             Como chamar <span className="normal-case tracking-normal text-ink-mute/70">(opcional)</span>
           </label>
-          <input
+          <Input
             id="verba-rotulo"
             name="rotulo"
             maxLength={60}
             placeholder="Setembro"
             defaultValue={verba?.label ?? ""}
-            className={CAMPO}
           />
         </div>
       </div>
@@ -59,13 +56,11 @@ export function FormularioDaVerba({ verba }: { verba?: Verba }) {
           <label htmlFor="verba-de" className={ROTULO}>
             Vale a partir de
           </label>
-          <input
+          <DatePicker
             id="verba-de"
             name="de"
-            type="date"
             required
             defaultValue={verba?.startsOn.slice(0, 10) ?? new Date().toISOString().slice(0, 10)}
-            className={CAMPO}
           />
         </div>
         <div>
@@ -76,18 +71,16 @@ export function FormularioDaVerba({ verba }: { verba?: Verba }) {
           <label htmlFor="verba-ate" className={ROTULO}>
             Até <span className="normal-case tracking-normal text-ink-mute/70">(vazio = até acabar)</span>
           </label>
-          <input
+          <DatePicker
             id="verba-ate"
             name="ate"
-            type="date"
             defaultValue={verba?.endsOn?.slice(0, 10) ?? ""}
-            className={CAMPO}
           />
         </div>
       </div>
 
       {estado.erro ? (
-        <p role="alert" className="border-l-2 border-red-500 pl-3 text-corpo text-red-600 dark:text-red-400">
+        <p role="alert" className="border-l-2 border-danger pl-3 text-corpo text-danger">
           {estado.erro}
         </p>
       ) : null}

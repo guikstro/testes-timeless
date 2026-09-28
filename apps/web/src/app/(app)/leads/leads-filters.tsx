@@ -71,7 +71,7 @@ export function LeadsFilters({ total }: { total: number }) {
           onChange={(e) => setTexto(e.target.value)}
           placeholder="Buscar por nome ou telefone"
           aria-label="Buscar leads"
-          className="h-11 w-full rounded-xl border border-line bg-panel pl-10 pr-4 text-sm text-ink shadow-subtle transition-all duration-200 ease-soft placeholder:text-ink-mute hover:border-ink/20 focus:border-accent focus:outline-none focus:ring-4 focus:ring-accent/10"
+          className="h-11 w-full rounded-xl border border-line bg-panel pl-10 pr-4 text-corpo text-ink shadow-subtle transition-all duration-200 ease-soft placeholder:text-ink-mute hover:border-ink/20 focus:border-accent focus:outline-none focus:ring-4 focus:ring-accent/10"
         />
         {pendente ? (
           <span className="absolute right-4 top-1/2 -translate-y-1/2">
@@ -90,7 +90,7 @@ export function LeadsFilters({ total }: { total: number }) {
           aria-pressed={soAguardando}
           className={`focus-ring inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-corpo transition-all duration-200 ease-soft active:scale-95 ${
             soAguardando
-              ? "bg-amber-500/15 text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-300"
+              ? "bg-amber-500/15 text-warning ring-1 ring-inset ring-amber-500/30"
               : "border border-line bg-panel text-ink-soft hover:border-ink/20 hover:text-ink"
           }`}
         >

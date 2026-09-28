@@ -30,18 +30,18 @@ export function PessoasDoCliente({ organizationId, pessoas }: { organizationId: 
 
   return (
     <section className="mt-6 rounded-xl border border-line bg-panel p-5">
-      <h2 className="text-sm font-medium uppercase tracking-wide text-ink-mute">Pessoas com acesso</h2>
+      <h2 className="text-corpo font-medium uppercase tracking-wide text-ink-mute">Pessoas com acesso</h2>
 
       {pessoas.length === 0 ? (
-        <p className="mt-3 text-sm text-ink-soft">Ninguém além da equipe Timeless.</p>
+        <p className="mt-3 text-corpo text-ink-soft">Ninguém além da equipe Timeless.</p>
       ) : (
         <ul className="mt-3 divide-y divide-line/70">
           {pessoas.map((pessoa) => (
             <li key={pessoa.userId} className="flex flex-wrap items-center justify-between gap-3 py-3">
               <div className="min-w-0">
                 <p className="font-medium text-ink">{pessoa.nome}</p>
-                <p className="text-xs text-ink-mute">{pessoa.email}</p>
-                <p className="mt-1 text-xs text-ink-soft">
+                <p className="text-apoio text-ink-mute">{pessoa.email}</p>
+                <p className="mt-1 text-apoio text-ink-soft">
                   {pessoa.papel === "MEMBER" ? pessoa.areas.map(rotuloDaArea).join(", ") || "Nenhuma área" : "Acesso a tudo"}
                 </p>
               </div>
@@ -53,8 +53,8 @@ export function PessoasDoCliente({ organizationId, pessoas }: { organizationId: 
         </ul>
       )}
 
-      {erro ? <p className="mt-3 text-sm text-red-600">{erro}</p> : null}
-      <p className="mt-4 text-xs text-ink-mute">
+      {erro ? <p className="mt-3 text-corpo text-danger">{erro}</p> : null}
+      <p className="mt-4 text-apoio text-ink-mute">
         Para dar acesso a alguém, use{" "}
         <Link href="/settings?aba=equipe" className="underline underline-offset-4 hover:text-ink">
           Configurações → Equipe → Adicionar pessoa

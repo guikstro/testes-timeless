@@ -2,6 +2,7 @@ import Link from "next/link";
 import { formataDia } from "@/lib/periodo";
 import { SePuderAbrir } from "@/components/acesso";
 import { Anuncios } from "./tipos";
+import { Alert } from "@/components/ui/alert";
 
 /**
  * De onde o número veio, de quando ele é, e o que não está nele.
@@ -18,7 +19,7 @@ export function Procedencia({ dados, periodo }: { dados: Anuncios; periodo: { de
   return (
     <footer className="border-t border-line pt-5">
       {quebrada ? (
-        <p className="mb-3 rounded-xl border border-amber-300/60 bg-amber-50 px-3.5 py-2.5 text-apoio leading-relaxed text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
+        <Alert tom="warning" className="mb-3">
           A sincronização com a Meta parou
           {procedencia.sincronizadoEm ? ` em ${formataDia(procedencia.sincronizadoEm.slice(0, 10))}` : ""}. Os
           números abaixo são os da última que funcionou.{" "}
@@ -27,7 +28,7 @@ export function Procedencia({ dados, periodo }: { dados: Anuncios; periodo: { de
               Reconectar
             </Link>
           </SePuderAbrir>
-        </p>
+        </Alert>
       ) : null}
 
       <dl className="flex flex-wrap gap-x-8 gap-y-2 text-rotulo leading-relaxed text-ink-mute">
