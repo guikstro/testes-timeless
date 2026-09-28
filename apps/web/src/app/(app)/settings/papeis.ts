@@ -22,6 +22,6 @@ export const PAPEL: Record<Papel, { rotulo: string; tom: "success" | "info" | "n
   MEMBER: {
     rotulo: "Membro",
     tom: "neutral",
-    explica: "Trabalha os leads e vê os relatórios, sem gerenciar a conta.",
+    explica: "Usa só as áreas liberadas para ele, sem mexer na equipe, nos anúncios ou na auditoria.",
   },
 };

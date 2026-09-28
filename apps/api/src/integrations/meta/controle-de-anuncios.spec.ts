@@ -1,9 +1,7 @@
 import { SituacaoDaVerba } from "../../budgets/calculo-da-verba";
-import {
-  confereOrcamentoDiario,
-  planejaMudancaDeStatus,
-  podeEscreverNaConta,
-} from "./controle-de-anuncios";
+import { AREAS } from "../../common/decorators/areas.decorator";
+import { pode } from "../../common/permissoes/capacidades";
+import { confereOrcamentoDiario, planejaMudancaDeStatus } from "./controle-de-anuncios";
 
 function verba(over: Partial<SituacaoDaVerba> = {}): SituacaoDaVerba {
   return {
@@ -22,16 +20,16 @@ function verba(over: Partial<SituacaoDaVerba> = {}): SituacaoDaVerba {
   };
 }
 
-describe("podeEscreverNaConta", () => {
+describe("quem pode escrever na conta de anúncios", () => {
   it("deixa quem responde pela conta escrever", () => {
-    expect(podeEscreverNaConta("OWNER")).toBe(true);
-    expect(podeEscreverNaConta("ADMIN")).toBe(true);
+    expect(pode({ role: "OWNER" }, "ad.manage")).toBe(true);
+    expect(pode({ role: "ADMIN" }, "ad.manage")).toBe(true);
   });
 
-  it("não deixa quem só atende", () => {
+  it("não deixa quem só atende, nem com todas as áreas", () => {
     // Um erro de leitura gera relatório errado. Um erro aqui gera cobrança
     // errada, e é por isso que os dois não têm a mesma porta.
-    expect(podeEscreverNaConta("MEMBER")).toBe(false);
+    expect(pode({ role: "MEMBER", areas: [...AREAS] }, "ad.manage")).toBe(false);
   });
 });
 

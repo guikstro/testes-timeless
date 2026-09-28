@@ -22,6 +22,7 @@ import { EmailService } from "../common/email/email.service";
 import { confirmacaoDeEmail, emailAlterado, recuperacaoDeSenha, senhaAlterada } from "../common/email/mensagens";
 import { AuditoriaService } from "../auditoria/auditoria.service";
 import { AuthenticatedUser, JwtPayload } from "./jwt-payload.interface";
+import { capacidadesDe } from "../common/permissoes/capacidades";
 
 const ACCESS_TOKEN_TTL = "15m";
 const REFRESH_TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
@@ -733,6 +734,9 @@ export class AuthService {
       role: user.role,
       impersonating: user.impersonating,
       areas: user.areas ?? null,
+      // O site esconde o que a pessoa não pode fazer a partir desta lista, em
+      // vez de repetir as regras de papel do lado dele.
+      capacidades: [...capacidadesDe(user)].sort(),
     };
   }
 

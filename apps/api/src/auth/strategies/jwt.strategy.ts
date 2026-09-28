@@ -4,6 +4,7 @@ import { ExtractJwt, Strategy } from "passport-jwt";
 import { AppException } from "../../common/exceptions/app-exception";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { JwtPayload, AuthenticatedUser } from "../jwt-payload.interface";
+import { PAPEIS } from "../../common/permissoes/capacidades";
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -61,10 +62,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       }
     }
 
-    // Só MEMBER tem áreas limitadas, e só ele paga a consulta. Lido do banco a
-    // cada requisição: tirar uma área vale na hora, sem esperar o token vencer.
+    // Só quem trabalha por áreas as tem, e só ele paga a consulta. Lido do
+    // banco a cada requisição: tirar uma área vale na hora, sem esperar o
+    // token vencer.
     let areas: string[] | null = null;
-    if (payload.role === "MEMBER" && payload.impersonating !== true) {
+    if (PAPEIS[payload.role].pelasAreas && payload.impersonating !== true) {
       const vinculo = await this.prisma.membership.findUnique({
         where: { organizationId_userId: { organizationId: payload.organizationId, userId: payload.sub } },
         select: { areas: true },

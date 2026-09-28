@@ -6,6 +6,7 @@ import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { limpaSegredos } from "./limpa-segredos";
 import { origemDaRequisicao } from "./contexto-da-requisicao";
 import { CATEGORIAS, CategoriaDeAuditoria } from "./categorias";
+import { exige } from "../common/permissoes/capacidades";
 
 /** Quem fez, do jeito que os serviços já conhecem a pessoa. */
 export interface Autor {
@@ -28,9 +29,6 @@ export interface Registro {
 type Cliente = Prisma.TransactionClient | PrismaService;
 
 const POR_PAGINA = 50;
-
-/** Quem pode ler a auditoria da conta. */
-const PAPEIS_QUE_LEEM = new Set(["OWNER", "ADMIN"]);
 
 export function autorDe(quem: AuthenticatedUser): Autor {
   return { organizationId: quem.organizationId, userId: quem.userId, impersonating: quem.impersonating };
@@ -174,13 +172,7 @@ export class AuditoriaService {
    * O operador da plataforma visitando a conta entra como dono.
    */
   private async exigeQuemLe(quem: AuthenticatedUser): Promise<void> {
-    if (!PAPEIS_QUE_LEEM.has(quem.role)) {
-      throw new AppException(
-        "AUDITORIA_RESTRITA",
-        "Só o dono e os administradores da conta veem a auditoria.",
-        HttpStatus.FORBIDDEN,
-      );
-    }
+    exige(quem, "audit.read");
   }
 }
 

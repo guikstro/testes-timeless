@@ -74,7 +74,7 @@ describe("OrganizationsService, gestão da equipe", () => {
       prisma.membership.findUnique.mockResolvedValue(membro("OWNER"));
 
       await expect(service.removeMember(quem({ role: "ADMIN" }), "outro")).rejects.toThrow(
-        "Só um dono pode remover outro dono.",
+        "Só um dono pode promover, rebaixar ou remover outro dono.",
       );
     });
 
@@ -150,7 +150,7 @@ describe("OrganizationsService, gestão da equipe", () => {
       prisma.membership.findUnique.mockResolvedValue(membro("MEMBER"));
 
       await expect(service.updateMember(quem({ role: "ADMIN" }), "outro", "OWNER")).rejects.toThrow(
-        "Só um dono pode promover ou rebaixar outro dono.",
+        "Só um dono pode promover, rebaixar ou remover outro dono.",
       );
     });
 

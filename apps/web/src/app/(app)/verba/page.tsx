@@ -10,6 +10,7 @@ import { HistoricoDeVerbas } from "./historico-de-verbas";
 import { Procedencia } from "./procedencia";
 import { SaudeDaContaMeta } from "./saude-da-conta";
 import { Anuncios, SaudeDaConta, SituacaoDaVerba, Verba } from "./tipos";
+import { pode } from "@/lib/permissoes";
 
 interface Busca {
   de?: string;
@@ -44,7 +45,7 @@ export default async function VerbaPage({ searchParams }: { searchParams: Promis
     apiFetch<SituacaoDaVerba | null>("/verbas/resumo"),
     apiFetch<Verba[]>("/verbas"),
     apiFetch<Anuncios>(`/analytics/anuncios?de=${periodo.de}&ate=${periodo.ate}`),
-    apiFetch<{ role: "OWNER" | "ADMIN" | "MEMBER" }>("/auth/session"),
+    apiFetch<{ capacidades: string[] }>("/auth/session"),
     apiFetch<SaudeDaConta | null>("/integrations/meta/saude"),
   ]);
 
@@ -53,7 +54,7 @@ export default async function VerbaPage({ searchParams }: { searchParams: Promis
     trava de verdade está no servidor, que confere papel, escopo e verba antes
     de tocar na conta.
   */
-  const podeControlar = sessao.role === "OWNER" || sessao.role === "ADMIN";
+  const podeControlar = pode(sessao, "ad.manage");
 
   const hoje = hojeEmBrasilia();
   const mesesRecentes = ultimosMeses(6);

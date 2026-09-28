@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/co
 import { NivelDoAnuncio } from "@prisma/client";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
-import { Areas } from "../../common/decorators/areas.decorator";
+import { Requer } from "../../common/permissoes/requer.decorator";
 import { AuthenticatedUser } from "../../auth/jwt-payload.interface";
 import { ControleDeAnunciosService } from "./controle-de-anuncios.service";
 import { MudarOrcamentoDto } from "./dto/controle-de-anuncios.dto";
@@ -16,7 +16,7 @@ import { MudarOrcamentoDto } from "./dto/controle-de-anuncios.dto";
  */
 @Controller("controle-de-anuncios")
 @UseGuards(JwtAuthGuard)
-@Areas("verba")
+@Requer("ad.manage")
 export class ControleDeAnunciosController {
   constructor(private readonly controle: ControleDeAnunciosService) {}
 
@@ -61,10 +61,11 @@ export class ControleDeAnunciosController {
   }
 
   /**
-   * O histórico é leitura, e por isso não passa por `podeEscreverNaConta`:
+   * O histórico é leitura, e por isso não exige `ad.manage`:
    * quem atende precisa poder ver que um anúncio foi pausado ontem, mesmo sem
    * poder pausar nenhum.
    */
+  @Requer("ad.read")
   @Get("historico")
   historico(@CurrentUser() user: AuthenticatedUser) {
     return this.controle.historico(user.organizationId);

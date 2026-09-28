@@ -3,7 +3,7 @@ import { Throttle } from "@nestjs/throttler";
 import { IsOptional, Matches } from "class-validator";
 import { JwtAuthGuard } from "../../../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../../../common/decorators/current-user.decorator";
-import { Areas } from "../../../common/decorators/areas.decorator";
+import { Requer } from "../../../common/permissoes/requer.decorator";
 import { AuthenticatedUser } from "../../../auth/jwt-payload.interface";
 import { AppException } from "../../../common/exceptions/app-exception";
 import { autorDe } from "../../../auditoria/auditoria.service";
@@ -28,10 +28,10 @@ function mesCorrente(): { de: string; ate: string } {
 
 @Controller("integrations/google/script")
 @UseGuards(JwtAuthGuard)
-@Areas("integracoes")
 export class GoogleAdsScriptController {
   constructor(private readonly servico: GoogleAdsScriptService) {}
 
+  @Requer("integration.read")
   @Get()
   situacao(@CurrentUser() user: AuthenticatedUser, @Query() periodo: PeriodoDto) {
     const padrao = mesCorrente();
@@ -47,16 +47,16 @@ export class GoogleAdsScriptController {
    * Gera o script. Só dono e administrador: a chave dentro dele escreve gasto
    * na conta, e quem só trabalha os leads não precisa disso.
    */
+  @Requer("apikey.manage")
   @Post()
   geraScript(@CurrentUser() user: AuthenticatedUser) {
-    exigeGestao(user);
     return this.servico.geraScript(autorDe(user));
   }
 
+  @Requer("apikey.manage")
   @Delete()
   @HttpCode(HttpStatus.NO_CONTENT)
   async desconecta(@CurrentUser() user: AuthenticatedUser): Promise<void> {
-    exigeGestao(user);
     await this.servico.desconecta(autorDe(user));
   }
 }
@@ -78,15 +78,5 @@ export class EnvioDoGoogleAdsController {
   @Throttle({ default: { ttl: 60_000, limit: 120 } })
   recebe(@Headers("x-chave-timeless") chave: string | undefined, @Body() envio: EnvioDoScriptDto) {
     return this.servico.recebe(chave, envio);
-  }
-}
-
-function exigeGestao(user: AuthenticatedUser): void {
-  if (user.role === "MEMBER") {
-    throw new AppException(
-      "FORBIDDEN",
-      "Só o dono e os administradores ligam o Google Ads.",
-      HttpStatus.FORBIDDEN,
-    );
   }
 }

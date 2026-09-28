@@ -1,4 +1,3 @@
-import { MembershipRole } from "@prisma/client";
 import { SituacaoDaVerba } from "../../budgets/calculo-da-verba";
 
 /**
@@ -9,18 +8,6 @@ import { SituacaoDaVerba } from "../../budgets/calculo-da-verba";
  * do cliente, e uma regra escondida dentro de um serviço que também fala HTTP
  * com a Meta é uma regra que ninguém consegue testar nem revisar direito.
  */
-
-/**
- * Quem pode mexer.
- *
- * MEMBER lê tudo e não escreve nada. A leitura é o trabalho diário de quem
- * atende; desligar um criativo ou mudar um orçamento é decisão de quem
- * responde pela conta. Um erro aqui não gera um relatório errado, gera uma
- * cobrança errada.
- */
-export function podeEscreverNaConta(role: MembershipRole): boolean {
-  return role === "OWNER" || role === "ADMIN";
-}
 
 export type StatusNaMeta = "ACTIVE" | "PAUSED";
 

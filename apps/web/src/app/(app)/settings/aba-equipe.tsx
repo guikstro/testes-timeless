@@ -6,11 +6,13 @@ import { AdicionarPessoa } from "./adicionar-pessoa";
 
 export async function AbaEquipe({
   euId,
-  meuPapel,
+  possoGerir,
+  possoMexerEmDono,
   areaDaTimeless = false,
 }: {
   euId: string;
-  meuPapel: Papel;
+  possoGerir: boolean;
+  possoMexerEmDono: boolean;
   areaDaTimeless?: boolean;
 }) {
   const membros = await apiFetch<Membro[]>("/organizations/current/members");
@@ -20,7 +22,6 @@ export async function AbaEquipe({
         .then((resposta) => resposta.items)
         .catch((erro: Error) => erro.message)
     : null;
-  const posso = meuPapel === "OWNER" || meuPapel === "ADMIN";
 
   return (
     <div className="space-y-5">
@@ -28,16 +29,16 @@ export async function AbaEquipe({
         <CardHeader
           title="Quem tem acesso"
           description={
-            posso
+            possoGerir
               ? "Mude o papel ou tire alguém da conta. A pessoa perde o acesso na hora, em todos os aparelhos."
               : "Estas são as pessoas com acesso a esta conta."
           }
           className="mb-5"
         />
 
-        <TeamList membros={membros} euId={euId} meuPapel={meuPapel} />
+        <TeamList membros={membros} euId={euId} possoGerir={possoGerir} possoMexerEmDono={possoMexerEmDono} />
 
-        {!posso ? (
+        {!possoGerir ? (
           <p className="mt-3 text-apoio text-ink-mute">
             Só donos e administradores mudam papéis ou removem alguém.
           </p>

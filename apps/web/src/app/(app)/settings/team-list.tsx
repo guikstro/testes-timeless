@@ -17,8 +17,17 @@ export interface Membro {
 }
 
 
-export function TeamList({ membros, euId, meuPapel }: { membros: Membro[]; euId: string; meuPapel: Papel }) {
-  const posso = meuPapel === "OWNER" || meuPapel === "ADMIN";
+export function TeamList({
+  membros,
+  euId,
+  possoGerir,
+  possoMexerEmDono,
+}: {
+  membros: Membro[];
+  euId: string;
+  possoGerir: boolean;
+  possoMexerEmDono: boolean;
+}) {
   const [erro, setErro] = useState<string | null>(null);
 
   return (
@@ -29,8 +38,8 @@ export function TeamList({ membros, euId, meuPapel }: { membros: Membro[]; euId:
             key={membro.userId}
             membro={membro}
             souEu={membro.userId === euId}
-            posso={posso}
-            meuPapel={meuPapel}
+            posso={possoGerir}
+            possoMexerEmDono={possoMexerEmDono}
             aoFalhar={setErro}
           />
         ))}
@@ -49,13 +58,13 @@ function Linha({
   membro,
   souEu,
   posso,
-  meuPapel,
+  possoMexerEmDono,
   aoFalhar,
 }: {
   membro: Membro;
   souEu: boolean;
   posso: boolean;
-  meuPapel: Papel;
+  possoMexerEmDono: boolean;
   aoFalhar: (erro: string | null) => void;
 }) {
   const [confirmando, setConfirmando] = useState(false);
@@ -66,8 +75,8 @@ function Linha({
     verificadas de novo no servidor: esconder um botão não impede ninguém de
     chamar a rota, e é lá que a conta fica protegida de ficar sem dono.
   */
-  const souAdminMexendoEmDono = meuPapel === "ADMIN" && membro.role === "OWNER";
-  const bloqueado = !posso || souEu || souAdminMexendoEmDono;
+  const donoForaDoMeuAlcance = membro.role === "OWNER" && !possoMexerEmDono;
+  const bloqueado = !posso || souEu || donoForaDoMeuAlcance;
 
   function executar(acao: () => Promise<{ erro?: string }>) {
     aoFalhar(null);

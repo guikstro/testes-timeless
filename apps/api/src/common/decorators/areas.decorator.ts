@@ -1,6 +1,9 @@
 import { SetMetadata } from "@nestjs/common";
 
-/** As áreas do painel do cliente, uma por item do menu. */
+/**
+ * As áreas do painel do cliente, uma por item do menu. É o que se escolhe ao
+ * convidar alguém; o que cada uma libera está em `permissoes/capacidades.ts`.
+ */
 export const AREAS = [
   "dashboard",
   "conversas",
@@ -14,12 +17,3 @@ export const AREAS = [
 ] as const;
 
 export type Area = (typeof AREAS)[number];
-
-export const AREAS_KEY = "areas";
-
-/**
- * Quem tem **qualquer uma** destas áreas pode usar a rota. Sem argumentos,
- * libera a rota para todos (serve para abrir uma rota dentro de um
- * controller restrito). Conferido pelo `JwtAuthGuard`.
- */
-export const Areas = (...areas: Area[]) => SetMetadata(AREAS_KEY, areas);

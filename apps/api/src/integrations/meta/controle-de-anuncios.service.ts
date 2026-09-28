@@ -15,9 +15,9 @@ import { AuditoriaService, autorDe } from "../../auditoria/auditoria.service";
 import {
   confereOrcamentoDiario,
   planejaMudancaDeStatus,
-  podeEscreverNaConta,
   StatusNaMeta,
 } from "./controle-de-anuncios";
+import { exige } from "../../common/permissoes/capacidades";
 
 /**
  * Escrita na conta de anúncios: pausar, ativar e mudar orçamento diário.
@@ -26,7 +26,7 @@ import {
  * produto, um defeito nesta classe não gera um número errado numa tela, gera
  * uma cobrança errada no cartão do cliente. Daí as quatro travas:
  *
- * 1. **Papel.** Só OWNER e ADMIN. Ver `podeEscreverNaConta`.
+ * 1. **Papel.** Quem tem `ad.manage` (dono e administrador). Ver `permissoes/capacidades.ts`.
  * 2. **Escopo na consulta, não numa conferência depois.** Anúncio e conjunto
  *    não carregam organização, então a busca desce pela campanha. Um escopo
  *    esquecido não devolve nada; uma conferência esquecida vaza.
@@ -147,13 +147,9 @@ export class ControleDeAnunciosService {
   }
 
   private exigePermissao(user: AuthenticatedUser): void {
-    if (!podeEscreverNaConta(user.role)) {
-      throw new AppException(
-        "SEM_PERMISSAO",
-        "Só quem administra a organização pode pausar anúncios ou mudar orçamento.",
-        HttpStatus.FORBIDDEN,
-      );
-    }
+    // A rota já exige; repetido aqui porque é dinheiro do cliente, e o
+    // serviço não deve depender de quem o chama lembrar.
+    exige(user, "ad.manage");
   }
 
   /**

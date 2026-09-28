@@ -7,6 +7,8 @@ export interface SessaoAtual {
   impersonating: boolean;
   /** `null` é sem limite. */
   areas: string[] | null;
+  /** O que a pessoa pode fazer, decidido pela API. Ver `lib/permissoes.ts`. */
+  capacidades: string[];
 }
 
 /** A sessão de quem está usando, lida uma vez por requisição: o layout e as áreas perguntam a mesma coisa. */

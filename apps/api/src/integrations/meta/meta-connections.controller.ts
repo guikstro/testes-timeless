@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Res, UseGuard
 import { Response } from "express";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
-import { Areas } from "../../common/decorators/areas.decorator";
+import { Requer } from "../../common/permissoes/requer.decorator";
 import { AuthenticatedUser } from "../../auth/jwt-payload.interface";
 import { PaginationQueryDto } from "../../common/dto/pagination.dto";
 import { MetaConnectionsService } from "./meta-connections.service";
@@ -13,7 +13,6 @@ import { ConnectMetaCapiDto } from "./dto/connect-meta-capi.dto";
 
 @Controller("integrations/meta")
 @UseGuards(JwtAuthGuard)
-@Areas("integracoes")
 export class MetaConnectionsController {
   constructor(
     private readonly metaConnectionsService: MetaConnectionsService,
@@ -22,7 +21,7 @@ export class MetaConnectionsController {
   ) {}
 
   /** See the identical note in WhatsAppConnectionsController — Nest sends an empty body, not "null", for a null return value. */
-  @Areas("integracoes", "verba")
+  @Requer("adaccount.read")
   @Get()
   async getCurrent(@CurrentUser() user: AuthenticatedUser, @Res() res: Response): Promise<void> {
     const result = await this.metaConnectionsService.getCurrent(user.organizationId);
@@ -35,7 +34,7 @@ export class MetaConnectionsController {
    * Rota separada da conexão porque responde outra pergunta. A de conexão diz
    * se o vínculo existe; esta diz se o dinheiro do outro lado está de pé.
    */
-  @Areas("integracoes", "verba")
+  @Requer("adaccount.read")
   @Get("saude")
   saude(@CurrentUser() user: AuthenticatedUser) {
     return this.metaConnectionsService.saudeDaConta(user.organizationId);
@@ -46,6 +45,7 @@ export class MetaConnectionsController {
     é o estado antes e depois como a tela o vê, que é o mesmo que `getCurrent`
     devolve, já sem token nenhum.
   */
+  @Requer("integration.manage")
   @Post("connect")
   async connect(@CurrentUser() user: AuthenticatedUser, @Body() dto: ConnectMetaDto) {
     const antes = await this.metaConnectionsService.getCurrent(user.organizationId);
@@ -60,6 +60,7 @@ export class MetaConnectionsController {
     return conexao;
   }
 
+  @Requer("integration.manage")
   @Post("disconnect")
   @HttpCode(HttpStatus.NO_CONTENT)
   async disconnect(@CurrentUser() user: AuthenticatedUser): Promise<void> {
@@ -73,12 +74,14 @@ export class MetaConnectionsController {
     });
   }
 
+  @Requer("integration.manage")
   @Post("sync")
   @HttpCode(HttpStatus.NO_CONTENT)
   async sync(@CurrentUser() user: AuthenticatedUser): Promise<void> {
     await this.metaConnectionsService.triggerSync(user.organizationId);
   }
 
+  @Requer("integration.manage")
   @Post("capi/connect")
   async connectCapi(@CurrentUser() user: AuthenticatedUser, @Body() dto: ConnectMetaCapiDto) {
     const antes = await this.metaConnectionsService.getCurrent(user.organizationId);
@@ -93,6 +96,7 @@ export class MetaConnectionsController {
     return conexao;
   }
 
+  @Requer("integration.read")
   @Get("conversion-events")
   listConversionEvents(@CurrentUser() user: AuthenticatedUser, @Query() pagination: PaginationQueryDto) {
     return this.conversionEventsService.list(user.organizationId, pagination);

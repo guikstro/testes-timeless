@@ -6,6 +6,7 @@ import { AbaSeguranca } from "./aba-seguranca";
 import { AbaEquipe } from "./aba-equipe";
 import { AbaAuditoria } from "./aba-auditoria";
 import { Papel } from "./papeis";
+import { Capacidade, pode } from "@/lib/permissoes";
 
 /*
   Na ordem em que se usa, e não na ordem em que foram escritas. Gatilhos e
@@ -20,8 +21,14 @@ const ABAS = [
   { chave: "auditoria", rotulo: "Auditoria" },
 ] as const;
 
-/** Só dono e administrador veem a auditoria; é a mesma regra da API. */
-const PAPEIS_QUE_VEEM_AUDITORIA: Papel[] = ["OWNER", "ADMIN"];
+/** O que cada aba pede. A API decide quem tem; a tela só esconde a aba de quem não tem. */
+const PRECISA: Record<(typeof ABAS)[number]["chave"], Capacidade | null> = {
+  operacao: "settings.read",
+  equipe: "member.read",
+  aparencia: "settings.manage",
+  seguranca: null,
+  auditoria: "audit.read",
+};
 
 /**
  * Configurações da conta de quem opera a plataforma. Na área da Timeless são
@@ -37,6 +44,7 @@ interface Sessao {
   role: Papel;
   impersonating: boolean;
   areas: string[] | null;
+  capacidades: string[];
 }
 
 export default async function SettingsPage({
@@ -54,9 +62,9 @@ export default async function SettingsPage({
   const abas = ABAS.filter((opcao) => {
     if (areaDaTimeless) return DA_CONTA.includes(opcao.chave);
     if (sessao.impersonating && DA_CONTA.includes(opcao.chave)) return false;
-    // Quem tem áreas limitadas: a própria senha sempre; a operação, se tiver a área.
-    if (sessao.areas) return opcao.chave === "seguranca" || (opcao.chave === "operacao" && sessao.areas.includes("configuracoes"));
-    return opcao.chave !== "auditoria" || PAPEIS_QUE_VEEM_AUDITORIA.includes(sessao.role);
+    // A própria senha sempre; o resto, se a pessoa tiver o que a aba pede.
+    const precisa = PRECISA[opcao.chave];
+    return precisa === null || pode(sessao, precisa);
   });
   const atual: Aba = abas.some((opcao) => opcao.chave === aba) ? (aba as Aba) : abas[0].chave;
 
@@ -94,10 +102,17 @@ export default async function SettingsPage({
         <AbaSeguranca
           emailAtual={sessao.user.email}
           impersonando={sessao.impersonating}
-          veAcessosDoSuporte={!sessao.areas || sessao.areas.includes("configuracoes")}
+          veAcessosDoSuporte={sessao.capacidades.includes("support_access.read")}
         />
       ) : null}
-      {atual === "equipe" ? <AbaEquipe euId={sessao.user.id} meuPapel={sessao.role} areaDaTimeless={areaDaTimeless} /> : null}
+      {atual === "equipe" ? (
+        <AbaEquipe
+          euId={sessao.user.id}
+          possoGerir={pode(sessao, "member.manage")}
+          possoMexerEmDono={pode(sessao, "owner.manage")}
+          areaDaTimeless={areaDaTimeless}
+        />
+      ) : null}
       {atual === "auditoria" ? <AbaAuditoria filtro={{ categoria, pessoa, depoisDe }} /> : null}
     </div>
   );

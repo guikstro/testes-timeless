@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, Res, UseGuard
 import { Response } from "express";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
-import { Areas } from "../../common/decorators/areas.decorator";
+import { Requer } from "../../common/permissoes/requer.decorator";
 import { AuthenticatedUser } from "../../auth/jwt-payload.interface";
 import { WhatsAppConnectionsService } from "./whatsapp-connections.service";
 import { ConnectWhatsAppDto } from "./dto/connect-whatsapp.dto";
@@ -11,7 +11,6 @@ import { RegraDeLeadsDto } from "./dto/regra-de-leads.dto";
 
 @Controller("integrations/whatsapp")
 @UseGuards(JwtAuthGuard)
-@Areas("integracoes")
 export class WhatsAppConnectionsController {
   constructor(
     private readonly whatsappConnectionsService: WhatsAppConnectionsService,
@@ -26,7 +25,7 @@ export class WhatsAppConnectionsController {
    * a frontend fetch's response.json() throws on it, which is exactly the
    * "no connection yet" case this endpoint exists to report.
    */
-  @Areas()
+  @Requer()
   @Get()
   async getCurrent(@CurrentUser() user: AuthenticatedUser, @Res() res: Response): Promise<void> {
     const result = await this.whatsappConnectionsService.getCurrent(user.organizationId);
@@ -38,6 +37,7 @@ export class WhatsAppConnectionsController {
    * dias. Fica aqui, e não nas configurações gerais, porque é uma decisão
    * sobre o que o WhatsApp conectado recebe.
    */
+  @Requer("integration.read")
   @Get("regra")
   regra(@CurrentUser() user: AuthenticatedUser) {
     return this.whatsappConnectionsService.regra(user.organizationId);
@@ -48,6 +48,7 @@ export class WhatsAppConnectionsController {
     estado como a tela o vê, antes e depois, e isso é o que `getCurrent` e
     `regra` já devolvem, sem token nenhum.
   */
+  @Requer("integration.manage")
   @Patch("regra")
   async mudaRegra(@CurrentUser() user: AuthenticatedUser, @Body() dto: RegraDeLeadsDto) {
     const antes = await this.whatsappConnectionsService.regra(user.organizationId);
@@ -64,6 +65,7 @@ export class WhatsAppConnectionsController {
     return depois;
   }
 
+  @Requer("integration.manage")
   @Post("connect")
   async connect(@CurrentUser() user: AuthenticatedUser, @Body() dto: ConnectWhatsAppDto) {
     const conexao = await this.whatsappConnectionsService.connect(user.organizationId, dto);
@@ -82,6 +84,7 @@ export class WhatsAppConnectionsController {
    * Registrado aqui, quando alguém pede o QR: a leitura no celular chega
    * depois, pelo webhook, sem pessoa nenhuma por trás para constar.
    */
+  @Requer("integration.manage")
   @Post("qr/connect")
   async connectViaQrCode(@CurrentUser() user: AuthenticatedUser) {
     const resultado = await this.whatsappConnectionsService.connectViaQrCode(user.organizationId);
@@ -98,11 +101,13 @@ export class WhatsAppConnectionsController {
    * QR atual + status. A UI chama isto em intervalos enquanto o status for
    * PENDING_QR, porque a Evolution rotaciona o código a cada ~30s.
    */
+  @Requer("integration.manage")
   @Get("qr")
   getQrCode(@CurrentUser() user: AuthenticatedUser) {
     return this.whatsappConnectionsService.getQrCode(user.organizationId);
   }
 
+  @Requer("integration.manage")
   @Post("disconnect")
   @HttpCode(HttpStatus.NO_CONTENT)
   async disconnect(@CurrentUser() user: AuthenticatedUser): Promise<void> {

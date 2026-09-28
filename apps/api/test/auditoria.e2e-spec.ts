@@ -193,6 +193,15 @@ describe("Auditoria (e2e)", () => {
     const resposta = await auditoria(login.body.accessToken).expect(403);
     expect(resposta.body.code).toBe("AUDITORIA_RESTRITA");
 
+    // A sessão diz o mesmo ao site: a área de configurações sem a auditoria.
+    const sessao = await request(app.getHttpServer())
+      .get("/api/auth/session")
+      .set("Authorization", `Bearer ${login.body.accessToken}`)
+      .expect(200);
+    expect(sessao.body.capacidades).toEqual(expect.arrayContaining(["settings.manage", "member.read"]));
+    expect(sessao.body.capacidades).not.toContain("audit.read");
+    expect(sessao.body.capacidades).not.toContain("member.manage");
+
     await prisma.organization.deleteMany({ where: { name: "Org Descartável Auditoria E2E" } });
   });
 

@@ -8,6 +8,7 @@ import { ArmazenamentoService } from "./upload/armazenamento.service";
 import { ErroDaImagem, validaImagem } from "./upload/imagem-enviada";
 import { Autor, AuditoriaService, autorDe } from "../auditoria/auditoria.service";
 import { enderecoPublico } from "../common/configuracao/ambiente";
+import { exige } from "../common/permissoes/capacidades";
 
 @Injectable()
 export class OrganizationsService {
@@ -215,7 +216,7 @@ export class OrganizationsService {
     alvoUserId: string,
     role: MembershipRole,
   ) {
-    this.exigeGestao(quem);
+    exige(quem, "member.manage");
     const alvo = await this.membroOuErro(quem.organizationId, alvoUserId);
 
     if (alvoUserId === quem.userId) {
@@ -225,13 +226,7 @@ export class OrganizationsService {
         HttpStatus.BAD_REQUEST,
       );
     }
-    if (quem.role === "ADMIN" && (alvo.role === "OWNER" || role === "OWNER")) {
-      throw new AppException(
-        "OWNER_REQUIRED",
-        "Só um dono pode promover ou rebaixar outro dono.",
-        HttpStatus.FORBIDDEN,
-      );
-    }
+    if (alvo.role === "OWNER" || role === "OWNER") exige(quem, "owner.manage");
     if (alvo.role === "OWNER" && role !== "OWNER") {
       await this.exigeOutroDono(quem.organizationId, alvoUserId);
     }
@@ -264,7 +259,7 @@ export class OrganizationsService {
    * inteiros. Apagar o usuário reescreveria o histórico de quem fez o quê.
    */
   async removeMember(quem: AuthenticatedUser, alvoUserId: string): Promise<void> {
-    this.exigeGestao(quem);
+    exige(quem, "member.manage");
     const alvo = await this.membroOuErro(quem.organizationId, alvoUserId);
 
     if (alvoUserId === quem.userId) {
@@ -274,9 +269,7 @@ export class OrganizationsService {
         HttpStatus.BAD_REQUEST,
       );
     }
-    if (quem.role === "ADMIN" && alvo.role === "OWNER") {
-      throw new AppException("OWNER_REQUIRED", "Só um dono pode remover outro dono.", HttpStatus.FORBIDDEN);
-    }
+    if (alvo.role === "OWNER") exige(quem, "owner.manage");
     if (alvo.role === "OWNER") {
       await this.exigeOutroDono(quem.organizationId, alvoUserId);
     }
@@ -332,12 +325,6 @@ export class OrganizationsService {
         tx,
       );
     });
-  }
-
-  private exigeGestao(quem: AuthenticatedUser): void {
-    if (quem.role !== "OWNER" && quem.role !== "ADMIN") {
-      throw new AppException("FORBIDDEN", "Apenas donos e administradores gerenciam a equipe.", HttpStatus.FORBIDDEN);
-    }
   }
 
   private async membroOuErro(organizationId: string, userId: string) {

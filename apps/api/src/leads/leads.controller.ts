@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
-import { Areas } from "../common/decorators/areas.decorator";
+import { Requer } from "../common/permissoes/requer.decorator";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { ListLeadsDto } from "./dto/list-leads.dto";
 import { LeadsService } from "./leads.service";
@@ -10,20 +10,22 @@ import { SendMessageDto } from "./dto/send-message.dto";
 
 @Controller("leads")
 @UseGuards(JwtAuthGuard)
-@Areas("leads", "conversas")
 export class LeadsController {
   constructor(private readonly leadsService: LeadsService) {}
 
+  @Requer("lead.read")
   @Get()
   list(@CurrentUser() user: AuthenticatedUser, @Query() query: ListLeadsDto) {
     return this.leadsService.list(user.organizationId, query);
   }
 
+  @Requer("lead.read")
   @Get(":id")
   findOne(@CurrentUser() user: AuthenticatedUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.leadsService.findOne(user.organizationId, id);
   }
 
+  @Requer("lead.manage")
   @Patch(":id")
   update(
     @CurrentUser() user: AuthenticatedUser,
@@ -33,6 +35,7 @@ export class LeadsController {
     return this.leadsService.update(user.organizationId, id, user.userId, dto, user.impersonating);
   }
 
+  @Requer("conversation.reply")
   @Post(":id/messages")
   sendMessage(
     @CurrentUser() user: AuthenticatedUser,

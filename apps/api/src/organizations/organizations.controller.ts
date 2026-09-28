@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
-import { Areas } from "../common/decorators/areas.decorator";
+import { Requer } from "../common/permissoes/requer.decorator";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { OrganizationsService } from "./organizations.service";
 import { UpdateOrganizationDto } from "./dto/update-organization.dto";
@@ -11,32 +11,35 @@ import { EnviarLogoDto } from "./dto/enviar-logo.dto";
 
 @Controller("organizations")
 @UseGuards(JwtAuthGuard)
-@Areas("configuracoes")
 export class OrganizationsController {
   constructor(private readonly organizationsService: OrganizationsService) {}
 
-  @Areas()
+  @Requer()
   @Get("current")
   getCurrent(@CurrentUser() user: AuthenticatedUser) {
     return this.organizationsService.getCurrent(user.organizationId);
   }
 
+  @Requer("settings.manage")
   @Patch("current")
   updateCurrent(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateOrganizationDto) {
     return this.organizationsService.updateCurrent(autorDe(user), dto);
   }
 
   /** Quem da equipe da plataforma entrou nesta conta — visível para o próprio cliente. */
+  @Requer("support_access.read")
   @Get("current/support-accesses")
   listSupportAccesses(@CurrentUser() user: AuthenticatedUser) {
     return this.organizationsService.listSupportAccesses(user.organizationId);
   }
 
+  @Requer("member.read")
   @Get("current/members")
   listMembers(@CurrentUser() user: AuthenticatedUser) {
     return this.organizationsService.listMembers(user.organizationId);
   }
 
+  @Requer("member.manage")
   @Patch("current/members/:userId")
   updateMember(
     @CurrentUser() user: AuthenticatedUser,
@@ -46,6 +49,7 @@ export class OrganizationsController {
     return this.organizationsService.updateMember(user, userId, dto.role);
   }
 
+  @Requer("member.manage")
   @Delete("current/members/:userId")
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeMember(
@@ -55,11 +59,13 @@ export class OrganizationsController {
     await this.organizationsService.removeMember(user, userId);
   }
 
+  @Requer("settings.manage")
   @Post("current/logo")
   enviarLogo(@CurrentUser() user: AuthenticatedUser, @Body() dto: EnviarLogoDto) {
     return this.organizationsService.enviarLogo(autorDe(user), dto.arquivo);
   }
 
+  @Requer("settings.manage")
   @Delete("current/logo")
   removerLogo(@CurrentUser() user: AuthenticatedUser) {
     return this.organizationsService.removerLogo(autorDe(user));
