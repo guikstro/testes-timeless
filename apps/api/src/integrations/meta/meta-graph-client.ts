@@ -21,7 +21,15 @@ export interface MetaAccountHealth {
   balance?: string;
 }
 
-const DEFAULT_BASE_URL = "https://graph.facebook.com/v21.0";
+/**
+ * A versão da API. A Meta desliga cada uma cerca de dois anos depois de
+ * lançada, e a chamada a uma versão desligada falha ou é empurrada para outra
+ * sem aviso: a v21 parou em junho de 2026. Trocar aqui troca para tudo,
+ * inclusive a API de Conversões.
+ */
+export const VERSAO_DA_GRAPH_API = "v25.0";
+
+const DEFAULT_BASE_URL = `https://graph.facebook.com/${VERSAO_DA_GRAPH_API}`;
 
 export interface InsightsRange {
   since: string; // "YYYY-MM-DD"

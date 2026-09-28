@@ -248,7 +248,7 @@ describe("MetaSyncService", () => {
 
     expect(prisma.metaConnection.update).toHaveBeenCalledWith({
       where: { organizationId: "org-1" },
-      data: { status: "TOKEN_EXPIRED", lastSyncError: "Error validating access token" },
+      data: { status: "TOKEN_EXPIRED", lastSyncError: expect.stringContaining("(Meta: Error validating access token)") },
     });
   });
 

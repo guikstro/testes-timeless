@@ -27,7 +27,7 @@ describe("MetaGraphClient", () => {
 
     expect(campaigns).toEqual([{ id: "c1", name: "Direito Trabalhista", status: "ACTIVE" }]);
     const requestedUrl = new URL(fetchMock.mock.calls[0][0] as string);
-    expect(requestedUrl.pathname).toBe("/v21.0/act_123/campaigns");
+    expect(requestedUrl.pathname).toBe("/v25.0/act_123/campaigns");
     expect(requestedUrl.searchParams.get("fields")).toBe("id,name,status,created_time");
     expect(requestedUrl.searchParams.get("access_token")).toBe("token-abc");
   });
@@ -37,7 +37,7 @@ describe("MetaGraphClient", () => {
       .mockResolvedValueOnce(
         jsonResponse({
           data: [{ id: "c1", name: "Campanha 1", status: "ACTIVE" }],
-          paging: { next: "https://graph.facebook.com/v21.0/act_123/campaigns?after=cursor1" },
+          paging: { next: "https://graph.facebook.com/v25.0/act_123/campaigns?after=cursor1" },
         }),
       )
       .mockResolvedValueOnce(jsonResponse({ data: [{ id: "c2", name: "Campanha 2", status: "PAUSED" }] }));
@@ -48,7 +48,7 @@ describe("MetaGraphClient", () => {
     expect(campaigns).toHaveLength(2);
     expect(campaigns.map((c) => c.id)).toEqual(["c1", "c2"]);
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[1][0]).toBe("https://graph.facebook.com/v21.0/act_123/campaigns?after=cursor1");
+    expect(fetchMock.mock.calls[1][0]).toBe("https://graph.facebook.com/v25.0/act_123/campaigns?after=cursor1");
   });
 
   it("throws a MetaApiError with the parsed code when Meta returns an error body", async () => {
@@ -165,7 +165,7 @@ describe("MetaGraphClient", () => {
 
       expect(result).toEqual({ events_received: 1, fbtrace_id: "trace-1" });
       const [url, init] = fetchMock.mock.calls[0];
-      expect(new URL(url as string).pathname).toBe("/v21.0/1234567890/events");
+      expect(new URL(url as string).pathname).toBe("/v25.0/1234567890/events");
       expect(new URL(url as string).searchParams.get("access_token")).toBeNull();
       const body = JSON.parse((init as RequestInit).body as string);
       expect(body).toEqual({ data: [payload], access_token: "capi-token" });

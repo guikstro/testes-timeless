@@ -18,7 +18,7 @@ export function ConnectMetaForm() {
         <input
           id="adAccountId"
           name="adAccountId"
-          placeholder="act_1234567890"
+          placeholder="act_1234567890 ou só o número"
           required
           className="w-full rounded-md border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
         />

@@ -2,7 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { EncryptionService } from "../../common/encryption/encryption.service";
 import { MetaGraphClient, InsightsRange } from "../../integrations/meta/meta-graph-client";
-import { MetaApiError } from "../../integrations/meta/meta-api-error";
+import { MetaApiError, explicaErroDaMeta } from "../../integrations/meta/meta-api-error";
 import { normalizaRespostaDaConta } from "../../integrations/meta/saude-da-conta";
 import { conversasIniciadasDe, dataDaMeta } from "../../integrations/meta/conversas-iniciadas";
 import { NotificationsService } from "../../notifications/notifications.service";
@@ -224,7 +224,7 @@ export class MetaSyncService {
     if (error instanceof MetaApiError && error.isTokenExpired) {
       await this.prisma.metaConnection.update({
         where: { organizationId },
-        data: { status: "TOKEN_EXPIRED", lastSyncError: error.message },
+        data: { status: "TOKEN_EXPIRED", lastSyncError: explicaErroDaMeta(error) },
       });
       if (!jaEstavaQuebrada) {
         await this.avisar(
@@ -243,7 +243,12 @@ export class MetaSyncService {
       return;
     }
 
-    const message = error instanceof Error ? error.message : "Erro desconhecido na sincronização.";
+    const message =
+      error instanceof MetaApiError
+        ? explicaErroDaMeta(error)
+        : error instanceof Error
+          ? error.message
+          : "Erro desconhecido na sincronização.";
     await this.prisma.metaConnection.update({
       where: { organizationId },
       data: { status: "SYNC_FAILED", lastSyncError: message },
