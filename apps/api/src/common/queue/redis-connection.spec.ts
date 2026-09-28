@@ -13,7 +13,9 @@ import { criaConexaoRedis, getRedisConnectionOptions } from "./redis-connection"
 describe("getRedisConnectionOptions", () => {
   const original = process.env.REDIS_URL;
   afterEach(() => {
-    process.env.REDIS_URL = original;
+    // Atribuir `undefined` a process.env grava o texto "undefined".
+    if (original === undefined) delete process.env.REDIS_URL;
+    else process.env.REDIS_URL = original;
   });
 
   it("lê o índice do banco do endereço", () => {

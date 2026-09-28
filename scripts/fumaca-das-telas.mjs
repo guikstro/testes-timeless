@@ -15,7 +15,8 @@
  * com o verde na mão.
  *
  * Uso: node scripts/fumaca-das-telas.mjs [endereço]
- * Precisa da pilha no ar. Cria uma conta descartável e a apaga no fim.
+ * Precisa da pilha no ar. Cria uma conta descartável e a apaga no fim
+ * (`FUMACA_BANCO_DESCARTAVEL=1` pula a limpeza, para banco que vai ser jogado fora).
  */
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -119,8 +120,9 @@ async function main() {
   for (const tela of PUBLICAS) await conferir(tela, false);
 
   // A conta some mesmo se algo acima falhar: deixar sujeira no banco a cada
-  // execução tornaria o próprio teste um problema.
-  await executar("docker", [
+  // execução tornaria o próprio teste um problema. No CI o banco é jogado
+  // fora no fim, e não há docker compose para chamar.
+  if (process.env.FUMACA_BANCO_DESCARTAVEL !== "1") await executar("docker", [
     "compose", "exec", "-T", "postgres", "psql", "-U", "tintim", "-d", "tintim", "-c",
     `DELETE FROM organizations WHERE name = '${organizacao}'; DELETE FROM users WHERE email = '${email}';`,
   ]).catch(() => console.warn("\n(não consegui apagar a conta de teste; apague à mão)"));

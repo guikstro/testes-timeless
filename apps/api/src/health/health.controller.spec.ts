@@ -27,6 +27,24 @@ describe("HealthController", () => {
     return { controller, health, redis, eventos, sincronia };
   }
 
+  describe("versao", () => {
+    const antes = process.env.RENDER_GIT_COMMIT;
+    afterEach(() => {
+      if (antes === undefined) delete process.env.RENDER_GIT_COMMIT;
+      else process.env.RENDER_GIT_COMMIT = antes;
+    });
+
+    it("diz o commit que o Render publicou", () => {
+      process.env.RENDER_GIT_COMMIT = "abc123";
+      expect(montar().controller.versao()).toEqual({ commit: "abc123" });
+    });
+
+    it("fora do Render, não inventa versão", () => {
+      delete process.env.RENDER_GIT_COMMIT;
+      expect(montar().controller.versao()).toEqual({ commit: null });
+    });
+  });
+
   describe("filas", () => {
     it("diz quantos trabalhadores e quanto trabalho há em cada fila", async () => {
       const { controller } = montar(filaFalsa(1, { waiting: 4 }), filaFalsa(2, { delayed: 1 }));

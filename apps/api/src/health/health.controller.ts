@@ -46,6 +46,16 @@ export class HealthController {
    * propósito não entra aqui — ele é outro processo, e reprovar a API porque
    * o worker caiu faria um orquestrador reiniciar quem está saudável.
    */
+  /**
+   * Qual commit está no ar. O Render preenche `RENDER_GIT_COMMIT` sozinho a
+   * cada publicação; é por aqui que o CI sabe que a versão nova entrou antes
+   * de conferir a produção. Fora do Render, `null`.
+   */
+  @Get("versao")
+  versao() {
+    return { commit: process.env.RENDER_GIT_COMMIT ?? null };
+  }
+
   @Get()
   @HealthCheck()
   check() {

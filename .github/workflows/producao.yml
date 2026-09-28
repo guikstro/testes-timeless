@@ -1,0 +1,53 @@
+# Depois que a main muda: espera o Render publicar este commit e confere a
+# produção de fora, como um visitante. Não cria conta nem mexe em dado.
+name: Produção
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: producao
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  SITE: https://timeless-crm.onrender.com
+  API: https://crm-timeless.onrender.com
+
+jobs:
+  conferencia:
+    name: Publicação e fumaça em produção
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      # O Render diz qual commit está no ar (RENDER_GIT_COMMIT). Espera os dois
+      # serviços chegarem a este, até 30 minutos: é o tempo de build do Render,
+      # com folga para o plano gratuito acordar.
+      - name: Esperar o Render publicar ${{ github.sha }}
+        run: |
+          for i in $(seq 1 60); do
+            api=$(curl -s --max-time 60 "$API/health/versao" | sed -n 's/.*"commit":"\([0-9a-f]*\)".*/\1/p')
+            site=$(curl -s --max-time 60 "$SITE/api/versao" | sed -n 's/.*"commit":"\([0-9a-f]*\)".*/\1/p')
+            echo "tentativa $i: api=${api:-?} site=${site:-?}"
+            if [ "$api" = "$GITHUB_SHA" ] && [ "$site" = "$GITHUB_SHA" ]; then echo "publicado"; exit 0; fi
+            sleep 30
+          done
+          echo "::error::O Render não publicou $GITHUB_SHA em 30 minutos. Veja Events no painel do Render."
+          exit 1
+
+      - name: Fumaça em produção
+        run: |
+          falhou=0
+          confere() { # rótulo, endereço, código esperado
+            codigo=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "$2")
+            if [ "$codigo" = "$3" ]; then echo "ok    $1 ($codigo)"; else echo "FALHA $1: esperado $3, veio $codigo"; falhou=1; fi
+          }
+          confere "API saudável"                 "$API/health" 200
+          confere "Entrada abre"                  "$SITE/login" 200
+          confere "Cadastro abre"                 "$SITE/register" 200
+          confere "Tela interna pede login"       "$SITE/dashboard" 307
+          confere "Rota protegida da API recusa"  "$API/api/auth/session" 401
+          exit $falhou

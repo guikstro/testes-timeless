@@ -66,6 +66,7 @@ async function bootstrap() {
       // exato, então `health` sozinho deixava `health/filas` atrás do
       // prefixo, onde nenhum monitoramento iria procurar.
       "health/filas",
+      "health/versao",
       { path: "r/:code", method: RequestMethod.GET },
       // Imagens enviadas pelo cliente. Fora do prefixo e sem sessão: a logo
       // aparece em relatório impresso e em tela pública, e exigir token ali

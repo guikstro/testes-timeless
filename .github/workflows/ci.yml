@@ -1,0 +1,116 @@
+# Conferência de todo envio: o que chega na main precisa ter passado aqui.
+#
+# Roda em todo ramo e em todo pull request. Com a proteção da main ligada no
+# GitHub (docs/CI.md), nada entra nela sem este verde, e o Render, com
+# "After CI checks pass", só publica o que passou.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# Um envio novo no mesmo ramo cancela a conferência anterior, que já não vale.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verificacao:
+    name: Lint, tipos, testes, build e fumaça
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tintim
+          POSTGRES_PASSWORD: tintim
+          POSTGRES_DB: tintim
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tintim"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+
+    # Valores só de teste, para um banco que é jogado fora no fim. Nenhum é
+    # segredo de verdade, e por isso ficam aqui e não em Secrets.
+    env:
+      DATABASE_URL: postgresql://tintim:tintim@localhost:5432/tintim
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-somente-teste-nao-e-segredo-0123456789abcdef
+      TOKEN_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      WEB_APP_URL: http://localhost:3200
+      PUBLIC_TRACKING_BASE_URL: http://localhost:3201
+      NEXT_PUBLIC_API_URL: http://localhost:3201/api
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Instalar
+        run: pnpm install --frozen-lockfile
+
+      - name: Gerar o cliente do banco
+        run: pnpm --filter api exec prisma generate
+
+      # Sem `--fix`: aqui o lint aponta, não corrige.
+      - name: Lint
+        run: |
+          pnpm --filter api exec eslint "{src,test}/**/*.ts"
+          pnpm --filter web lint
+          pnpm --filter admin lint
+
+      - name: Tipos
+        run: pnpm -r typecheck
+
+      - name: Testes de unidade
+        run: |
+          pnpm --filter api test
+          pnpm --filter web test
+
+      # Aplica as migrations num schema próprio e testa a API inteira contra
+      # o Postgres e o Redis de verdade, incluindo o isolamento entre clientes.
+      - name: Testes de integração
+        run: pnpm --filter api test:e2e
+
+      - name: Build
+        run: pnpm -r build
+
+      # Sobe a API e o site a partir do build e abre cada tela com uma sessão
+      # de verdade. Pega o que tipo, lint e teste de unidade não veem: uma
+      # tela que estoura ao renderizar.
+      - name: Fumaça nas telas
+        env:
+          FUMACA_BANCO_DESCARTAVEL: "1"
+        run: |
+          pnpm --filter api exec prisma migrate deploy
+          (cd apps/api && NODE_ENV=test PORT=3201 node dist/src/main > ../../api.log 2>&1 &)
+          (cd apps/web && npx next start -p 3200 > ../../web.log 2>&1 &)
+          for i in $(seq 1 60); do curl -sf http://localhost:3201/health > /dev/null && curl -sf -o /dev/null http://localhost:3200/login && break; sleep 2; done
+          # A primeira conta nasce operadora da plataforma; a da fumaça tem de
+          # ser um cliente comum, como quem usa o produto.
+          curl -sf -X POST http://localhost:3200/api/auth/register -H 'Content-Type: application/json' \
+            -d '{"name":"Equipe","email":"equipe@ci.test","password":"senha-descartavel-ci-123","organizationName":"Equipe CI"}' > /dev/null
+          node scripts/fumaca-das-telas.mjs http://localhost:3200
+
+      - name: Logs da fumaça, se falhou
+        if: failure()
+        run: |
+          tail -n 80 api.log || true
+          tail -n 80 web.log || true
