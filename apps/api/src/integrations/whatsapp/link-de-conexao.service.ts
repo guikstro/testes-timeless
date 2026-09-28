@@ -11,6 +11,9 @@ import { AuditoriaService } from "../../auditoria/auditoria.service";
 import { WhatsAppConnectionsService } from "./whatsapp-connections.service";
 
 const VALIDADE_EM_SEGUNDOS = 24 * 60 * 60;
+/** Depois de conectar, o link só confirma que conectou, por tempo de a página mostrar. */
+const CONFIRMACAO_EM_SEGUNDOS = 10 * 60;
+const JA_CONECTADO = "conectado:";
 
 export interface LinkGerado {
   url: string;
@@ -33,7 +36,8 @@ const chaveDaOrganizacao = (organizationId: string) => `whatsapp-link-org:${orga
  * - O token é aleatório e só o hash dele é guardado. Quem lê o Redis não
  *   consegue remontar o link.
  * - Um link ativo por organização: gerar outro invalida o anterior.
- * - Vale 24 h e deixa de valer quando a conexão abre (uso único).
+ * - Vale 24 h e é de uso único: quando a conexão abre, com a página aberta
+ *   ou não, passa a só dizer "conectado" e nunca mais inicia um QR.
  * - A organização sai do Redis, nunca da URL. Não há como apontar o link para
  *   outro cliente.
  */
@@ -81,18 +85,36 @@ export class LinkDeConexaoService implements OnModuleDestroy {
   }
 
   /**
+   * A conexão abriu: o link deixa de iniciar QR na hora, mesmo que ninguém
+   * esteja com a página aberta. Fica uns minutos respondendo "conectado" para
+   * quem ainda está olhando a página.
+   */
+  async marcaConectado(organizationId: string): Promise<void> {
+    const hash = await this.redis.get(chaveDaOrganizacao(organizationId));
+    if (!hash) return;
+    const transacao = this.redis.multi();
+    transacao.del(chaveDaOrganizacao(organizationId));
+    transacao.set(chaveDoLink(hash), `${JA_CONECTADO}${organizationId}`, "EX", CONFIRMACAO_EM_SEGUNDOS);
+    await transacao.exec();
+  }
+
+  /**
    * O que a página pública mostra. Na primeira visita inicia o QR; nas
    * seguintes só consulta. Organização já conectada não é tocada: reiniciar o
    * QR ali derrubaria o status de uma conexão ativa.
    */
   async situacao(token: string): Promise<SituacaoPeloLink> {
-    const organizationId = await this.organizacaoDoLink(token);
+    const valor = await this.organizacaoDoLink(token);
+    const jaConectado = valor?.startsWith(JA_CONECTADO) ?? false;
+    const organizationId = jaConectado ? valor!.slice(JA_CONECTADO.length) : valor;
     const organizacao = organizationId
       ? await this.prisma.organization.findFirst({ where: { id: organizationId, deletedAt: null }, select: { name: true } })
       : null;
     if (!organizationId || !organizacao) {
       throw new AppException("LINK_INVALIDO", "Este link é inválido ou já venceu. Peça um novo.", HttpStatus.NOT_FOUND);
     }
+
+    if (jaConectado) return { organizacao: organizacao.name, status: "CONNECTED", qrCodeBase64: null };
 
     const atual = await this.conexoes.getCurrent(organizationId);
     if (atual?.status === "CONNECTED") {

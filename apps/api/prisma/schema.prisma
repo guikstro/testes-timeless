@@ -845,6 +845,15 @@ enum AuditAction {
 
   // Organização e integrações.
   ORGANIZATION_UPDATED
+  /**
+   * Cliente criado ou excluído pela equipe da plataforma.
+   */
+  ORGANIZATION_CREATED
+  ORGANIZATION_DELETED
+  /**
+   * Convite gerado, para a equipe da plataforma ou para um cliente.
+   */
+  INVITE_CREATED
   INTEGRATION_CONNECTED
   INTEGRATION_DISCONNECTED
   INTEGRATION_UPDATED

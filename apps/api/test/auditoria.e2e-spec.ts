@@ -174,14 +174,16 @@ describe("Auditoria (e2e)", () => {
     expect(JSON.stringify(resposta.body)).not.toContain("act_123");
   });
 
-  it("recusa quem não é dono nem administrador", async () => {
+  it("recusa quem não é dono nem administrador, mesmo com a área de configurações liberada", async () => {
     const senha = "senha-do-membro-bem-comprida";
     await request(app.getHttpServer())
       .post("/api/auth/register")
       .send({ ...membro, password: senha, organizationName: "Org Descartável Auditoria E2E" })
       .expect(201);
     const usuario = await prisma.user.findUniqueOrThrow({ where: { email: membro.email } });
-    await prisma.membership.create({ data: { organizationId: orgDaDona, userId: usuario.id, role: "MEMBER" } });
+    await prisma.membership.create({
+      data: { organizationId: orgDaDona, userId: usuario.id, role: "MEMBER", areas: ["configuracoes"] },
+    });
 
     const login = await request(app.getHttpServer())
       .post("/api/auth/login")

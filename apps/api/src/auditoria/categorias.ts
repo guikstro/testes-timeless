@@ -20,9 +20,9 @@ export const CATEGORIAS = {
       "SESSIONS_ENDED",
     ],
   },
-  equipe: { rotulo: "Equipe e permissões", acoes: ["MEMBER_ROLE_CHANGED", "MEMBER_REMOVED"] },
+  equipe: { rotulo: "Equipe e permissões", acoes: ["MEMBER_ROLE_CHANGED", "MEMBER_REMOVED", "INVITE_CREATED"] },
   suporte: { rotulo: "Acesso do suporte", acoes: ["IMPERSONATION_STARTED", "IMPERSONATION_ENDED"] },
-  conta: { rotulo: "Configurações e integrações", acoes: ["ORGANIZATION_UPDATED", "INTEGRATION_CONNECTED", "INTEGRATION_DISCONNECTED", "INTEGRATION_UPDATED", "CONNECTION_CHANGED"] },
+  conta: { rotulo: "Configurações e integrações", acoes: ["ORGANIZATION_UPDATED", "ORGANIZATION_CREATED", "ORGANIZATION_DELETED", "INTEGRATION_CONNECTED", "INTEGRATION_DISCONNECTED", "INTEGRATION_UPDATED", "CONNECTION_CHANGED"] },
   anuncios: {
     rotulo: "Anúncios e verba",
     acoes: ["AD_STATUS_CHANGED", "AD_BUDGET_CHANGED", "BUDGET_CREATED", "BUDGET_UPDATED", "BUDGET_DELETED"],

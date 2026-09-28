@@ -311,13 +311,21 @@ export class AdminService {
     );
     await this.auditoria.registra(
       { organizationId: cliente.id, userId: operadorId, impersonating: true },
-      { acao: "ORGANIZATION_UPDATED", entidade: "Organization", entidadeId: cliente.id, antes: null, depois: { nome, cor, criadaPor: "equipe da plataforma" } },
+      { acao: "ORGANIZATION_CREATED", entidade: "Organization", entidadeId: cliente.id, antes: null, depois: { nome, cor, criadaPor: "equipe da plataforma" } },
     );
     return cliente;
   }
 
   async criaConvite(operador: AuthenticatedUser, dto: CriaConviteDto): Promise<ConviteGerado> {
     const paraCliente = dto.acesso === "cliente";
+    // Quem entra pela equipe nasce ADMIN da plataforma; o SUPPORT não pode criar alguém acima dele.
+    if (!paraCliente && operador.platformRole !== "ADMIN") {
+      throw new AppException(
+        "INSUFFICIENT_PLATFORM_ROLE",
+        "Só um administrador da plataforma convida alguém para a equipe Timeless.",
+        HttpStatus.FORBIDDEN,
+      );
+    }
     const organizationId = paraCliente ? (await this.exigeCliente(dto.organizationId!)).id : operador.organizationId;
     const convite = await this.convites.cria({
       organizationId,
@@ -329,7 +337,7 @@ export class AdminService {
     await this.auditoria.registra(
       { organizationId, userId: operador.userId, impersonating: paraCliente },
       {
-        acao: "ORGANIZATION_UPDATED",
+        acao: "INVITE_CREATED",
         entidade: "Convite",
         entidadeId: organizationId,
         depois: { convidado: dto.email, acesso: paraCliente ? "cliente" : "equipe Timeless", areas: dto.areas ?? "todas" },
@@ -371,7 +379,7 @@ export class AdminService {
     ]);
     await this.auditoria.registra(
       { organizationId, userId: operador.userId, impersonating: true },
-      { acao: "ORGANIZATION_UPDATED", entidade: "Organization", entidadeId: organizationId, antes: { nome: cliente.name }, depois: { excluidoEm: agora } },
+      { acao: "ORGANIZATION_DELETED", entidade: "Organization", entidadeId: organizationId, antes: { nome: cliente.name }, depois: { excluidoEm: agora } },
     );
   }
   /** Quem tem acesso a um cliente, para a página dele no painel da Timeless. */

@@ -68,6 +68,20 @@ describe("LinkDeConexaoService", () => {
     await expect(service.situacao(antigo)).rejects.toMatchObject({ response: { code: "LINK_INVALIDO" } });
   });
 
+  it("depois que a conexão abre, o link não inicia QR nem numa queda: só confirma e depois vence", async () => {
+    const token = tokenDe((await service.gera("org-1")).url);
+    await service.marcaConectado("org-1");
+    // A conexão caiu logo depois: sem o uso único, o link daria um QR novo.
+    conexoes.getCurrent.mockResolvedValue({ status: "PENDING_QR", provider: "EVOLUTION" });
+    conexoes.connectViaQrCode.mockClear();
+    conexoes.getQrCode.mockClear();
+
+    await expect(service.situacao(token)).resolves.toEqual({ organizacao: "Acme", status: "CONNECTED", qrCodeBase64: null });
+    expect(conexoes.connectViaQrCode).not.toHaveBeenCalled();
+    expect(conexoes.getQrCode).not.toHaveBeenCalled();
+    await expect(service.expiracao("org-1")).resolves.toBeNull();
+  });
+
   it("organização já conectada: não reinicia o QR e o link deixa de valer", async () => {
     const token = tokenDe((await service.gera("org-1")).url);
     conexoes.getCurrent.mockResolvedValue({ status: "CONNECTED", provider: "EVOLUTION" });

@@ -5,6 +5,7 @@ import { WHATSAPP_EVENTS_QUEUE } from "../common/queue/queue.constants";
 import { WhatsAppInboundMessageJob } from "../common/queue/whatsapp-event.job";
 import { WhatsAppConnectionsService } from "../integrations/whatsapp/whatsapp-connections.service";
 import { MotorWhatsApp } from "../integrations/whatsapp/motor-whatsapp";
+import { LinkDeConexaoService } from "../integrations/whatsapp/link-de-conexao.service";
 import { parseWebhookPayload } from "./parse-webhook-payload";
 import { parseEvolutionPayload } from "./parse-evolution-payload";
 import { verifyWhatsAppSignature } from "./verify-signature";
@@ -17,6 +18,7 @@ export class WhatsAppWebhookService implements OnModuleInit {
     @InjectQueue(WHATSAPP_EVENTS_QUEUE) private readonly queue: Queue<WhatsAppInboundMessageJob>,
     private readonly connections: WhatsAppConnectionsService,
     private readonly motor: MotorWhatsApp,
+    private readonly links: LinkDeConexaoService,
   ) {}
 
   /** O WhatsApp por QR Code entrega seus eventos aqui, sem passar por HTTP. */
@@ -58,7 +60,11 @@ export class WhatsAppWebhookService implements OnModuleInit {
     if (!parsed) return 0;
 
     if (parsed.kind === "connection") {
-      await this.connections.syncEvolutionState(parsed.instanceName, parsed.state);
+      const conectou = await this.connections.syncEvolutionState(parsed.instanceName, parsed.state);
+      // O link de conexão é de uso único: conectou, deixa de valer, mesmo com
+      // a página já fechada. Senão, numa queda, quem tivesse o link poria
+      // outro celular na conta.
+      if (conectou) await this.links.marcaConectado(conectou);
       return 0;
     }
 

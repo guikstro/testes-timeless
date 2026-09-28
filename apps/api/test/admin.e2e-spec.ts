@@ -377,6 +377,21 @@ describe("Administração da plataforma (e2e)", () => {
           .expect(403);
       });
 
+      it("o SUPPORT convida para um cliente, mas não para a equipe: o convidado nasceria ADMIN", async () => {
+        const equipe = await request(app.getHttpServer())
+          .post("/api/admin/convites")
+          .set("Authorization", `Bearer ${supportToken}`)
+          .send({ email: "escalada@admin-e2e.local", acesso: "timeless" })
+          .expect(403);
+        expect(equipe.body.code).toBe("INSUFFICIENT_PLATFORM_ROLE");
+
+        await request(app.getHttpServer())
+          .post("/api/admin/convites")
+          .set("Authorization", `Bearer ${supportToken}`)
+          .send({ email: "convidado-do-cliente@admin-e2e.local", acesso: "cliente", organizationId: clientOrgId, areas: ["leads"] })
+          .expect(201);
+      });
+
       it("recusa promover um e-mail que não tem conta — promover não cria usuário", async () => {
         const response = await request(app.getHttpServer())
           .put("/api/admin/operators")

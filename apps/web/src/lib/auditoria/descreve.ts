@@ -127,14 +127,24 @@ export function descreveRegistro(r: Pick<RegistroDeAuditoria, "action" | "entity
       return `Mudou o papel de ${quem} de ${PAPEIS[String(antes.role)] ?? antes.role} para ${PAPEIS[String(depois.role)] ?? depois.role}`;
     }
     case "MEMBER_REMOVED":
-      return `Removeu ${texto(antes.nome) ?? "uma pessoa"} da equipe`;
+      return `Removeu ${texto(antes.nome) ?? texto(antes.email) ?? "uma pessoa"} da equipe`;
+    case "INVITE_CREATED":
+      return convite(depois);
 
     case "IMPERSONATION_STARTED":
       return "Entrou na conta pelo suporte da plataforma";
     case "IMPERSONATION_ENDED":
       return "Saiu da conta, encerrando a visita de suporte";
 
+    case "ORGANIZATION_CREATED":
+      return `Criou o cliente ${entre(texto(depois.nome))}`.trim();
+    case "ORGANIZATION_DELETED":
+      return `Excluiu o cliente ${entre(texto(antes.nome))}`.trim();
     case "ORGANIZATION_UPDATED": {
+      // Registros de antes destas ações terem nome próprio.
+      if (r.entity === "Convite") return convite(depois);
+      if ("excluidoEm" in depois) return `Excluiu o cliente ${entre(texto(antes.nome))}`.trim();
+      if ("criadaPor" in depois) return `Criou o cliente ${entre(texto(depois.nome))}`.trim();
       const campos = Object.keys(depois).length > 0 ? Object.keys(depois) : Object.keys(antes);
       if (campos.length === 1 && campos[0] === "logoUrl") return depois.logoUrl ? "Trocou a logo" : "Removeu a logo";
       const nomes = campos.map((c) => CAMPOS_DA_CONTA[c] ?? c);
@@ -151,6 +161,7 @@ export function descreveRegistro(r: Pick<RegistroDeAuditoria, "action" | "entity
       if (depois.quemViraLead) {
         return `Mudou quem vira lead no WhatsApp: de ${QUEM_VIRA_LEAD[String(antes.quemViraLead)] ?? antes.quemViraLead} para ${QUEM_VIRA_LEAD[String(depois.quemViraLead)] ?? depois.quemViraLead}`;
       }
+      if ("linkExpiraEm" in depois) return "Gerou um link para conectar o WhatsApp";
       if ("pixel" in depois) return `Configurou a API de Conversões da Meta (pixel ${texto(depois.pixel) ?? "?"})`;
       return `Alterou ${texto(depois.integracao) ?? "uma integração"}`;
     }
@@ -223,6 +234,11 @@ export function descreveRegistro(r: Pick<RegistroDeAuditoria, "action" | "entity
     default:
       return r.action;
   }
+}
+
+function convite(depois: Estado): string {
+  const quem = texto(depois.convidado) ?? "uma pessoa";
+  return depois.acesso === "equipe Timeless" ? `Convidou ${quem} para a equipe Timeless` : `Convidou ${quem} para a conta`;
 }
 
 function artigo(entidade: string): string {

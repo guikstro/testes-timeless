@@ -176,14 +176,18 @@ export class WhatsAppConnectionsService {
     });
   }
 
-  /** Chamado pelos eventos de conexão do motor, não pela UI. */
-  async syncEvolutionState(instanceName: string, state: "open" | "connecting" | "close"): Promise<void> {
+  /**
+   * Chamado pelos eventos de conexão do motor, não pela UI. Devolve a
+   * organização quando a conexão acabou de abrir, para quem chama encerrar o
+   * que só valia até ali (o link de conexão).
+   */
+  async syncEvolutionState(instanceName: string, state: "open" | "connecting" | "close"): Promise<string | null> {
     const connection = await this.prisma.whatsAppConnection.findUnique({ where: { instanceName } });
-    if (!connection) return;
+    if (!connection) return null;
 
     if (state === "open") {
       await this.markConnected(connection);
-      return;
+      return connection.organizationId;
     }
 
     if (state === "close" && connection.status === "CONNECTED") {
@@ -195,6 +199,7 @@ export class WhatsAppConnectionsService {
         data: { status: "PENDING_QR" },
       });
     }
+    return null;
   }
 
   private async markConnected(connection: WhatsAppConnection): Promise<WhatsAppConnection> {

@@ -27,6 +27,22 @@ describe("descreveRegistro", () => {
     expect(descreveRegistro(r("MEMBER_REMOVED", { role: "MEMBER", nome: "Bia" }))).toBe("Removeu Bia da equipe");
   });
 
+  it("chama convite de convite e exclusão de exclusão, também nos registros antigos", () => {
+    const convidou = { convidado: "ana@x.com", acesso: "cliente", areas: ["leads"] };
+    expect(descreveRegistro(r("INVITE_CREATED", null, convidou, "Convite"))).toBe("Convidou ana@x.com para a conta");
+    expect(descreveRegistro(r("ORGANIZATION_UPDATED", null, convidou, "Convite"))).toBe("Convidou ana@x.com para a conta");
+    expect(
+      descreveRegistro(r("INVITE_CREATED", null, { convidado: "rui@x.com", acesso: "equipe Timeless" }, "Convite")),
+    ).toBe("Convidou rui@x.com para a equipe Timeless");
+    const excluiu = [{ nome: "Loja" }, { excluidoEm: "2026-09-27T12:00:00Z" }, "Organization"] as const;
+    expect(descreveRegistro(r("ORGANIZATION_DELETED", ...excluiu))).toBe("Excluiu o cliente “Loja”");
+    expect(descreveRegistro(r("ORGANIZATION_UPDATED", ...excluiu))).toBe("Excluiu o cliente “Loja”");
+    expect(
+      descreveRegistro(r("ORGANIZATION_UPDATED", null, { nome: "Loja", cor: null, criadaPor: "equipe da plataforma" }, "Organization")),
+    ).toBe("Criou o cliente “Loja”");
+    expect(descreveRegistro(r("MEMBER_REMOVED", { email: "bia@x.com", papel: "MEMBER" }))).toBe("Removeu bia@x.com da equipe");
+  });
+
   it("escreve dinheiro em reais, e não em centavos", () => {
     const texto = descreveRegistro(
       r("AD_BUDGET_CHANGED", { nome: "Conjunto A", valor: "5000" }, { nome: "Conjunto A", valor: "8000" }, "Conjunto de anúncios"),

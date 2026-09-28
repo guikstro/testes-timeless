@@ -20,12 +20,14 @@ describe("WhatsAppWebhookService", () => {
   function buildService() {
     const queue = { add: jest.fn() };
     const connections = { syncEvolutionState: jest.fn() };
+    const links = { marcaConectado: jest.fn() };
     const service = new WhatsAppWebhookService(
       queue as unknown as Queue,
       connections as unknown as WhatsAppConnectionsService,
       { aoEvento: jest.fn() } as never,
+      links as never,
     );
-    return { service, queue, connections };
+    return { service, queue, connections, links };
   }
 
   describe("verifyHandshake", () => {
@@ -99,6 +101,28 @@ describe("WhatsAppWebhookService", () => {
       const { service, queue } = buildService();
       await service.enqueueEvents({ entry: [{ changes: [{ value: { metadata: { phone_number_id: "phone-1" } } }] }] });
       expect(queue.add).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("enqueueEvolutionEvent", () => {
+    const evento = (state: string) => ({ event: "connection.update", instance: "org_1", data: { state } });
+
+    it("conexão aberta gasta o link de conexão, mesmo com a página fechada", async () => {
+      const { service, connections, links } = buildService();
+      connections.syncEvolutionState.mockResolvedValue("org-1");
+
+      await service.enqueueEvolutionEvent(evento("open"));
+
+      expect(links.marcaConectado).toHaveBeenCalledWith("org-1");
+    });
+
+    it("queda não mexe no link", async () => {
+      const { service, connections, links } = buildService();
+      connections.syncEvolutionState.mockResolvedValue(null);
+
+      await service.enqueueEvolutionEvent(evento("close"));
+
+      expect(links.marcaConectado).not.toHaveBeenCalled();
     });
   });
 });
