@@ -17,13 +17,6 @@ export const AREAS = [
 export type Area = (typeof AREAS)[number]["chave"];
 
 /**
- * Cabeçalho com o caminho pedido, posto pelo middleware: o layout não recebe
- * a rota e precisa dela para mandar quem não pode abrir a tela para uma que
- * pode, em vez de deixá-la cair na tela de erro.
- */
-export const CABECALHO_DO_CAMINHO = "x-caminho";
-
-/**
  * Se a pessoa pode abrir o caminho, incluindo o que fica dentro de uma área
  * (`/leads/123`, `/integrations/whatsapp`). `null` é sem limite (dono,
  * administrador, equipe Timeless). Caminho fora das áreas, como as

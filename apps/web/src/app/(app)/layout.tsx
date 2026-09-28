@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
-import { CABECALHO_DO_CAMINHO, podeVer, telaInicial } from "@/lib/areas";
+import { podeVer } from "@/lib/areas";
 import { AcessoProvider } from "@/components/acesso";
-import { apiFetch, ApiRequestError } from "@/lib/api-client";
+import { ApiRequestError } from "@/lib/api-client";
+import { sessaoAtual, SessaoAtual } from "@/lib/sessao";
 import { BrandStyle } from "@/components/brand-style";
 import { LivingBackground } from "@/components/living-background";
 import { AppNav } from "./app-nav";
@@ -14,31 +14,16 @@ import { NotificationProvider } from "@/components/notifications/notification-pr
 import { NotificationToasts } from "@/components/notifications/notification-toasts";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 
-interface SessionContext {
-  user: { id: string; name: string; email: string; platformRole: "SUPPORT" | "ADMIN" | null };
-  organization: { id: string; name: string; logoUrl: string | null; brandColor: string | null };
-  impersonating: boolean;
-  areas: string[] | null;
-}
-
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  let session: SessionContext;
+  let session: SessaoAtual;
   try {
-    session = await apiFetch<SessionContext>("/auth/session");
+    session = await sessaoAtual();
   } catch (error) {
     if (error instanceof ApiRequestError && error.status === 401) {
       redirect("/login");
     }
     throw error;
   }
-
-  /*
-    Tela fora das áreas da pessoa (link salvo, endereço digitado): vai para
-    uma que ela pode abrir. Sem isto a API recusa, a tela cai no erro e cada
-    tentativa vira um alerta falso para a equipe.
-  */
-  const caminho = (await headers()).get(CABECALHO_DO_CAMINHO);
-  if (caminho && !podeVer(session.areas, caminho)) redirect(telaInicial(session.areas));
 
   /*
     A faixa do topo mostra o estado da conexão, então ele é buscado aqui. O
