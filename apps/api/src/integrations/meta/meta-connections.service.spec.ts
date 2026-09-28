@@ -91,7 +91,7 @@ describe("MetaConnectionsService", () => {
     );
   });
 
-  it("disconnect flips status without deleting the connection row", async () => {
+  it("disconnect flips status without deleting the connection row, and drops the old error", async () => {
     const { service, prisma } = buildService();
     prisma.metaConnection.findUnique.mockResolvedValue({ organizationId: "org-1" });
 
@@ -99,8 +99,16 @@ describe("MetaConnectionsService", () => {
 
     expect(prisma.metaConnection.update).toHaveBeenCalledWith({
       where: { organizationId: "org-1" },
-      data: { status: "DISCONNECTED", disconnectedAt: expect.any(Date) },
+      data: { status: "DISCONNECTED", disconnectedAt: expect.any(Date), lastSyncError: null },
     });
+  });
+
+  it("não sincroniza uma conexão desligada", async () => {
+    const { service, prisma, queue } = buildService();
+    prisma.metaConnection.findUnique.mockResolvedValue({ organizationId: "org-1", status: "DISCONNECTED" });
+
+    await expect(service.triggerSync("org-1")).rejects.toMatchObject({ response: { code: "NOT_CONNECTED" } });
+    expect(queue.add).not.toHaveBeenCalled();
   });
 
   it("throws when trying to disconnect or sync an organization with no connection", async () => {

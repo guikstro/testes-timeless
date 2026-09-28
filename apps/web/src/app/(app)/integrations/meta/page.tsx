@@ -94,6 +94,7 @@ export default async function MetaIntegrationPage() {
   const conversionEvents = connection
     ? await apiFetch<{ items: ConversionEvent[]; total: number }>("/integrations/meta/conversion-events?limit=20")
     : { items: [], total: 0 };
+  const desligada = connection?.status === "DISCONNECTED";
 
   return (
     <div>
@@ -113,17 +114,26 @@ export default async function MetaIntegrationPage() {
               <span className="font-medium">Última sincronização:</span>{" "}
               {connection.lastSyncedAt ? new Date(connection.lastSyncedAt).toLocaleString("pt-BR") : "Nunca"}
             </p>
-            {connection.lastSyncError ? (
-              <p className="text-red-600">
-                <span className="font-medium">Erro:</span> {connection.lastSyncError}
-              </p>
-            ) : null}
-            {connection.status === "TOKEN_EXPIRED" ? (
+            {/* Desligada, o erro de antes já não diz nada sobre a conta, e sincronizar não tem o que buscar. */}
+            {desligada ? (
               <p className="text-sm text-ink-mute">
-                A conexão com a Meta precisa ser renovada. Reconecte com um access token válido abaixo.
+                Para voltar a sincronizar, cole um access token abaixo e clique em Conectar.
               </p>
-            ) : null}
-            <ConnectionActions />
+            ) : (
+              <>
+                {connection.lastSyncError ? (
+                  <p className="text-red-600">
+                    <span className="font-medium">Erro:</span> {connection.lastSyncError}
+                  </p>
+                ) : null}
+                {connection.status === "TOKEN_EXPIRED" ? (
+                  <p className="text-sm text-ink-mute">
+                    A conexão com a Meta precisa ser renovada. Reconecte com um access token válido abaixo.
+                  </p>
+                ) : null}
+                <ConnectionActions />
+              </>
+            )}
           </div>
         ) : (
           <p className="text-sm text-ink-soft">Nenhuma conta de anúncio conectada ainda.</p>
@@ -137,7 +147,9 @@ export default async function MetaIntegrationPage() {
           <h2 className="mb-3 text-sm font-semibold text-ink">Campanhas sincronizadas</h2>
           {campaigns.length === 0 ? (
             <div className="rounded-xl border border-dashed border-line bg-panel p-8 text-center text-sm text-ink-soft">
-              Nenhuma campanha sincronizada ainda. Clique em &quot;Sincronizar agora&quot;.
+              {desligada
+                ? "Nenhuma campanha sincronizada ainda. Conecte a conta acima para buscar as campanhas."
+                : "Nenhuma campanha sincronizada ainda. Clique em “Sincronizar agora”."}
             </div>
           ) : (
             <div className="space-y-4">

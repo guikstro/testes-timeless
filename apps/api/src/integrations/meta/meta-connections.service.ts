@@ -96,7 +96,9 @@ export class MetaConnectionsService {
 
     await this.prisma.metaConnection.update({
       where: { organizationId },
-      data: { status: "DISCONNECTED", disconnectedAt: new Date() },
+      // O erro era da conexão que acabou de ser desligada: continuar mostrando
+      // faria parecer que a conta segue quebrada, quando ela só está desligada.
+      data: { status: "DISCONNECTED", disconnectedAt: new Date(), lastSyncError: null },
     });
   }
 
@@ -104,6 +106,9 @@ export class MetaConnectionsService {
     const connection = await this.prisma.metaConnection.findUnique({ where: { organizationId } });
     if (!connection) {
       throw new AppException("NOT_CONNECTED", "Nenhuma conexão com a Meta encontrada.", HttpStatus.NOT_FOUND);
+    }
+    if (connection.status === "DISCONNECTED") {
+      throw new AppException("NOT_CONNECTED", "Conecte a conta de anúncios antes de sincronizar.", HttpStatus.BAD_REQUEST);
     }
 
     await this.syncQueue.add(
