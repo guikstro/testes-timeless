@@ -167,6 +167,15 @@ const doCliente = (href: string) => NAV_ITEMS.find((item) => item.href === href)
 const ITENS_DA_TIMELESS: NavItem[] = [
   ADMIN_ITEM,
   { ...doCliente("/relatorio"), href: "/relatorio-geral", label: "Relatório geral" },
+  {
+    href: "/saude",
+    label: "Saúde da plataforma",
+    icon: (
+      <svg {...ICON_PROPS}>
+        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+      </svg>
+    ),
+  },
   doCliente("/settings"),
 ];
 

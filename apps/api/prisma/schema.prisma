@@ -1427,3 +1427,34 @@ model Notification {
   @@index([organizationId, createdAt])
   @@map("notifications")
 }
+
+/**
+ * Erros da própria plataforma, agrupados: a mesma falha repetida vira uma
+ * linha com contador, e não mil linhas. É o que a tela de saúde lista e o que
+ * dispara o aviso para a equipe quando algo novo quebra.
+ *
+ * Sem organização de propósito: um erro é da plataforma, mesmo quando
+ * aconteceu dentro de um cliente (o cliente fica no contexto).
+ */
+model ErroDaPlataforma {
+  id          String    @id @default(uuid())
+  /** api ou navegador. */
+  origem      String
+  /** O tipo do erro, como `TypeError` ou `erro_nao_tratado`. */
+  tipo        String
+  /** Hash de origem, tipo, mensagem sem números e lugar: o que agrupa. */
+  assinatura  String    @unique
+  mensagem    String
+  /** Pilha, cortada. */
+  detalhe     String?
+  /** Caminho, método, organização, pedido: o da última ocorrência. */
+  contexto    Json?
+  ocorrencias Int       @default(1)
+  primeiraEm  DateTime  @default(now()) @map("primeira_em")
+  ultimaEm    DateTime  @default(now()) @map("ultima_em")
+  /** Marcado pela equipe. Se acontecer de novo, volta a ficar aberto. */
+  resolvidoEm DateTime? @map("resolvido_em")
+
+  @@index([ultimaEm])
+  @@map("erros_da_plataforma")
+}

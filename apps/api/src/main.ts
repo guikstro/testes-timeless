@@ -6,6 +6,7 @@ import helmet from "helmet";
 import { AppModule } from "./app.module";
 import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
 import { confereAmbiente, origensPermitidas } from "./common/configuracao/ambiente";
+import { RegistroDeErros } from "./observabilidade/registro-de-erros.service";
 
 async function bootstrap() {
   // Antes de tudo: uma variável faltando precisa impedir a subida, e não virar
@@ -103,6 +104,13 @@ async function bootstrap() {
 process.on("unhandledRejection", (motivo) => {
   if (motivo instanceof Error && motivo.stack?.includes("baileys")) {
     Logger.error(JSON.stringify({ event: "whatsapp_rejeicao_sem_tratamento", message: motivo.message }), "Baileys");
+    RegistroDeErros.anota({
+      origem: "api",
+      tipo: "whatsapp_rejeicao_sem_tratamento",
+      mensagem: motivo.message,
+      detalhe: motivo.stack,
+      lugar: "WhatsApp (Baileys)",
+    });
     return;
   }
   throw motivo;

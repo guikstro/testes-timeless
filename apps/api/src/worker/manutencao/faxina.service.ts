@@ -48,6 +48,7 @@ export interface ResultadoDaFaxina {
   tokensDeRecuperacao: number;
   tokensDeTrocaDeEmail: number;
   avisos: number;
+  erros: number;
 }
 
 /**
@@ -87,6 +88,8 @@ export class FaxinaService {
       tokensDeRecuperacao: await this.apagarEmLotes("password_reset_tokens", "expires_at", limiteDeToken),
       tokensDeTrocaDeEmail: await this.apagarEmLotes("email_change_tokens", "expires_at", limiteDeToken),
       avisos: await this.apagarEmLotes("notifications", "created_at", limiteDeAviso),
+      // Erro que não acontece há 90 dias já disse o que tinha a dizer.
+      erros: await this.apagarEmLotes("erros_da_plataforma", "ultima_em", new Date(agora - 90 * DIA_EM_MS)),
     };
 
     this.logger.log(JSON.stringify({ event: "faxina_concluida", ...resultado }));

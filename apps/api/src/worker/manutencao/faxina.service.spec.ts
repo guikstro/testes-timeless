@@ -57,12 +57,14 @@ describe("FaxinaService", () => {
     expect(sqls).toContain("email_change_tokens");
     expect(sqls).toContain("notifications");
     expect(sqls).toContain("sessoes");
+    expect(sqls).toContain("erros_da_plataforma");
     expect(resultado).toEqual({
       sessoes: 0,
       tokensDeSessao: 0,
       tokensDeRecuperacao: 0,
       tokensDeTrocaDeEmail: 0,
       avisos: 0,
+      erros: 0,
     });
   });
 
@@ -103,7 +105,7 @@ describe("FaxinaService", () => {
     await servico.executar();
 
     // Uma consulta por tabela quando não há nada a apagar.
-    expect(prisma.$executeRaw).toHaveBeenCalledTimes(5);
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(6);
   });
 
   it("usa noventa dias de retenção de avisos por padrão", async () => {

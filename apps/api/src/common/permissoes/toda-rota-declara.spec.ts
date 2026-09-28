@@ -16,6 +16,7 @@ const SEM_CAPACIDADE_DE_PROPOSITO: Record<string, string> = {
   SessoesController: "as sessões de quem está logado",
   NotificationsController: "as notificações de quem está logado",
   AdminController: "administração da plataforma, conferida pelo PlatformAdminGuard",
+  SaudeDaPlataformaController: "saúde da plataforma, conferida pelo PlatformAdminGuard",
 };
 
 function controllers(dir: string): string[] {

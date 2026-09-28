@@ -355,6 +355,7 @@ describe("Isolamento entre organizações (e2e)", () => {
       "GET /api/admin/organizations/:id/whatsapp": "rota da administração da plataforma",
       "POST /api/admin/organizations/:id/whatsapp/link": "rota da administração da plataforma",
       "POST /api/admin/organizations/:id/whatsapp/desconectar": "rota da administração da plataforma",
+      "POST /api/admin/erros/:id/resolver": "saúde da plataforma, só para a equipe",
       // Sem sessão: o token, de 256 bits e guardado só como hash, é a própria
       // credencial e já aponta para uma única organização.
       "GET /api/publico/convites/:token": "convite pelo token aleatório",

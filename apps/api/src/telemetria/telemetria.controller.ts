@@ -2,6 +2,8 @@ import { Body, Controller, HttpCode, HttpStatus, Logger, Post, Req } from "@nest
 import { Throttle } from "@nestjs/throttler";
 import type { Request } from "express";
 import { RegistrarErroDto } from "./dto/registrar-erro.dto";
+import { RegistroDeErros } from "../observabilidade/registro-de-erros.service";
+import { normalizaCaminho } from "../observabilidade/assinatura";
 
 /**
  * Onde o erro que aconteceu no navegador vira registro.
@@ -14,6 +16,8 @@ import { RegistrarErroDto } from "./dto/registrar-erro.dto";
 @Controller("telemetria")
 export class TelemetriaController {
   private readonly logger = new Logger("Telemetria");
+
+  constructor(private readonly erros: RegistroDeErros) {}
 
   /**
    * Sem sessão de propósito: a tela de login também pode quebrar, e ali não
@@ -36,5 +40,14 @@ export class TelemetriaController {
         agente: String(req.headers["user-agent"] ?? "").slice(0, 200),
       }),
     );
+    // Agrupado por tela: a mesma tela quebrando para vinte pessoas é um erro só.
+    void this.erros.registra({
+      origem: "navegador",
+      tipo: "erro_na_tela",
+      mensagem: dto.mensagem,
+      detalhe: dto.pilha ?? undefined,
+      lugar: dto.caminho ? normalizaCaminho(dto.caminho) : null,
+      contexto: { caminho: dto.caminho, digest: dto.digest, requestId: req.idDaRequisicao },
+    });
   }
 }

@@ -7,6 +7,8 @@ import {
   Logger,
 } from "@nestjs/common";
 import { Request, Response } from "express";
+import { RegistroDeErros } from "../../observabilidade/registro-de-erros.service";
+import { normalizaCaminho } from "../../observabilidade/assinatura";
 
 interface ErrorBody {
   code: string;
@@ -118,6 +120,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
           stack: exception instanceof Error ? exception.stack : undefined,
         }),
       );
+      // E vira registro na tela de saúde, agrupado por rota e mensagem.
+      RegistroDeErros.anota({
+        origem: "api",
+        tipo: exception instanceof Error ? exception.name : "erro_nao_tratado",
+        mensagem: exception instanceof Error ? exception.message : String(exception),
+        detalhe: exception instanceof Error ? exception.stack : undefined,
+        lugar: `${request.method} ${normalizaCaminho(request.originalUrl ?? request.url)}`,
+        contexto: { requestId, status, caminho: request.url, organizationId: usuario?.organizationId },
+      });
     }
 
     response.status(status).json({ ...body, requestId });
