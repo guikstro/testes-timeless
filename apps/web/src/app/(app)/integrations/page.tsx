@@ -1,5 +1,7 @@
 import { apiFetch } from "@/lib/api-client";
+import { temLeads } from "@/lib/foco";
 import { tempoRelativo } from "@/lib/relative-time";
+import { sessaoAtual } from "@/lib/sessao";
 import { COR_DA_MARCA, LogoGoogleAds, LogoMeta, LogoWhatsApp } from "./logos";
 import { Cartao, Tom } from "./integration-card";
 
@@ -34,28 +36,53 @@ async function busca<T>(caminho: string): Promise<T | null> {
 }
 
 export default async function IntegrationsPage() {
+  const { organization } = await sessaoAtual();
+  // Presença local não usa WhatsApp: o que importa é o Google, e ele vem primeiro.
+  const comLeads = temLeads(organization.foco);
+
   const [whatsapp, meta, campanhasDoGoogle] = await Promise.all([
-    busca<ConexaoWhatsApp | null>("/integrations/whatsapp"),
+    comLeads ? busca<ConexaoWhatsApp | null>("/integrations/whatsapp") : Promise.resolve(null),
     busca<ConexaoMeta | null>("/integrations/meta"),
     busca<CampanhaDoGoogle[]>("/campaigns?platform=GOOGLE"),
   ]);
+
+  const google = (
+    <Cartao
+      href="/integrations/google"
+      nome="Google Ads"
+      descricao={
+        comLeads
+          ? "Registre campanhas e o gasto diário para medir custo por lead."
+          : "O script manda o gasto, as ligações e os pedidos de rota de cada campanha."
+      }
+      cor={COR_DA_MARCA.google}
+      logo={<LogoGoogleAds />}
+      {...estadoDoGoogle(campanhasDoGoogle)}
+    />
+  );
 
   return (
     <div className="mx-auto max-w-5xl">
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Integrações</h1>
       <p className="mb-6 mt-1 text-corpo text-ink-mute">
-        De onde os leads chegam e de onde vem o gasto que os produziu.
+        {comLeads
+          ? "De onde os leads chegam e de onde vem o gasto que os produziu."
+          : "De onde vêm o gasto, as ligações e os pedidos de rota dos anúncios."}
       </p>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Cartao
-          href="/integrations/whatsapp"
-          nome="WhatsApp"
-          descricao="Conecte um número para capturar e responder leads dentro da plataforma."
-          cor={COR_DA_MARCA.whatsapp}
-          logo={<LogoWhatsApp />}
-          {...estadoDoWhatsApp(whatsapp)}
-        />
+        {comLeads ? (
+          <Cartao
+            href="/integrations/whatsapp"
+            nome="WhatsApp"
+            descricao="Conecte um número para capturar e responder leads dentro da plataforma."
+            cor={COR_DA_MARCA.whatsapp}
+            logo={<LogoWhatsApp />}
+            {...estadoDoWhatsApp(whatsapp)}
+          />
+        ) : (
+          google
+        )}
 
         <Cartao
           href="/integrations/meta"
@@ -66,14 +93,7 @@ export default async function IntegrationsPage() {
           {...estadoDoMeta(meta)}
         />
 
-        <Cartao
-          href="/integrations/google"
-          nome="Google Ads"
-          descricao="Registre campanhas e o gasto diário para medir custo por lead."
-          cor={COR_DA_MARCA.google}
-          logo={<LogoGoogleAds />}
-          {...estadoDoGoogle(campanhasDoGoogle)}
-        />
+        {comLeads ? google : null}
       </div>
     </div>
   );

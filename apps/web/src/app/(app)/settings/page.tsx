@@ -7,6 +7,7 @@ import { AbaEquipe } from "./aba-equipe";
 import { AbaAuditoria } from "./aba-auditoria";
 import { Papel } from "./papeis";
 import { Capacidade, pode } from "@/lib/permissoes";
+import { Foco, temLeads } from "@/lib/foco";
 
 /*
   Na ordem em que se usa, e não na ordem em que foram escritas. Gatilhos e
@@ -45,6 +46,7 @@ interface Sessao {
   impersonating: boolean;
   areas: string[] | null;
   capacidades: string[];
+  organization: { foco: Foco } | null;
 }
 
 export default async function SettingsPage({
@@ -59,9 +61,12 @@ export default async function SettingsPage({
   const sessao = await apiFetch<Sessao>("/auth/session");
 
   const areaDaTimeless = Boolean(sessao.user.platformRole) && !sessao.impersonating;
+  // Horário de atendimento e gatilhos só existem em volta do lead.
+  const comLeads = temLeads(sessao.organization?.foco);
   const abas = ABAS.filter((opcao) => {
     if (areaDaTimeless) return DA_CONTA.includes(opcao.chave);
     if (sessao.impersonating && DA_CONTA.includes(opcao.chave)) return false;
+    if (opcao.chave === "operacao" && !comLeads) return false;
     // A própria senha sempre; o resto, se a pessoa tiver o que a aba pede.
     const precisa = PRECISA[opcao.chave];
     return precisa === null || pode(sessao, precisa);
@@ -76,7 +81,9 @@ export default async function SettingsPage({
           ? "Sua conta e a equipe Timeless: quem tem acesso, a aparência e a segurança."
           : sessao.areas
             ? "Sua senha, o segundo fator e onde a sua conta está aberta."
-            : "Identidade, gatilhos, credenciais, quem tem acesso e o que foi feito."}
+            : comLeads
+              ? "Identidade, gatilhos, credenciais, quem tem acesso e o que foi feito."
+              : "Identidade, credenciais, quem tem acesso e o que foi feito."}
       </p>
 
       {/*

@@ -8,6 +8,8 @@ describe("foco do cliente", () => {
     expect(focoMostra("PRESENCA_LOCAL", "/links")).toBe(false);
     expect(focoMostra("PRESENCA_LOCAL", "/dashboard")).toBe(true);
     expect(focoMostra("PRESENCA_LOCAL", "/integrations/google")).toBe(true);
+    expect(focoMostra("PRESENCA_LOCAL", "/integrations/whatsapp")).toBe(false);
+    expect(focoMostra("PRESENCA_LOCAL", "/integrations")).toBe(true);
   });
 
   it("leads e os dois mostram tudo", () => {
