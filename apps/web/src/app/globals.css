@@ -42,11 +42,13 @@
   --brand-ink: 0 95 71;
 
   /**
-   * Séries dos gráficos. Valores validados para daltonismo, com um passo por
-   * tema: a mesma tinta que lê sobre marfim desaparece sobre o preto.
+   * Séries dos gráficos: a primeira é a cor da marca e a segunda um âmbar de
+   * outra claridade, para quem não separa as cores ainda distinguir as linhas.
+   * Na área logada, a BrandStyle troca pelas da organização; estas são as da
+   * Timeless, iguais nos dois temas (ver `lib/brand.ts`).
    */
-  --serie-1: 42 120 214;
-  --serie-2: 235 104 52;
+  --serie-1: 0 125 94;
+  --serie-2: 217 119 6;
   --grade: 226 219 205;
   --guia: 148 141 128;
 
@@ -89,8 +91,8 @@
   --brand-soft: 10 38 30;
   --brand-ink: 108 226 184;
 
-  --serie-1: 57 135 229;
-  --serie-2: 217 89 38;
+  --serie-1: 0 125 94;
+  --serie-2: 217 119 6;
   --grade: 48 47 44;
   --guia: 130 124 114;
 

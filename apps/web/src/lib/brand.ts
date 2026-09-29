@@ -119,3 +119,61 @@ export function brandPalette(hex: string | null | undefined): BrandPalette {
     serie2: canais(serie2),
   };
 }
+
+/**
+ * O passo escuro da Timeless, medido nas artes: o mesmo de `globals.css`. O
+ * verde que lê sobre o marfim fica apagado sobre o quase-preto, então o tema
+ * escuro tem o seu próprio tom, e não o do claro repetido. As séries do
+ * gráfico ficam as mesmas nos dois temas: a segunda é escolhida pela
+ * diferença de claridade para a primeira, e clarear só uma apagaria isso.
+ */
+const PADRAO_ESCURO: BrandPalette = {
+  ...PADRAO,
+  base: "0 168 123",
+  soft: "10 38 30",
+  ink: "108 226 184",
+  accent: "0 168 123",
+  accentContrast: "3 4 3",
+};
+
+/** O fundo do tema escuro (`--canvas`), contra o qual a cor precisa ler. */
+const FUNDO_ESCURO: [number, number, number] = [3, 4, 3];
+const BRANCO: [number, number, number] = [255, 255, 255];
+
+/** Contraste do WCAG entre duas cores: de 1 (iguais) a 21 (preto e branco). */
+function contraste(a: [number, number, number], b: [number, number, number]): number {
+  const [clara, escura] = [luminancia(a), luminancia(b)].sort((x, y) => y - x);
+  return (clara + 0.05) / (escura + 0.05);
+}
+
+const mistura = (de: number[], para: number[], quanto: number) => de.map((valor, i) => valor + (para[i] - valor) * quanto);
+
+/**
+ * A mesma cor da organização, no passo do tema escuro.
+ *
+ * Antes o tema escuro recebia a paleta do claro: o fundo suave virava um
+ * bloco quase branco no menu, e o acento escuro sumia sobre o preto. Aqui a
+ * cor clareia até ler sobre o fundo escuro (contraste 6, o do verde da
+ * Timeless no escuro), o fundo suave é a cor diluída no preto, e a tinta
+ * sobre ele é a cor clareada.
+ */
+export function brandPaletteEscura(hex: string | null | undefined): BrandPalette {
+  const rgb = hex ? parseHex(hex) : null;
+  // O verde da Timeless escolhido à mão também usa o passo medido nas artes.
+  if (!rgb || canais(rgb) === PADRAO.base) return PADRAO_ESCURO;
+
+  const [h, s, l] = paraHsl(rgb);
+  let cor: [number, number, number] = rgb;
+  for (let claridade = l; contraste(cor, FUNDO_ESCURO) < 6 && claridade < 0.85; claridade += 0.02) {
+    cor = paraRgb([h, s, claridade]).map(Math.round) as [number, number, number];
+  }
+
+  return {
+    ...brandPalette(hex),
+    base: canais(cor),
+    soft: canais(mistura(FUNDO_ESCURO, cor, 0.2)),
+    ink: canais(mistura(cor, BRANCO, 0.45)),
+    accent: canais(cor),
+    accentContrast: contraste(cor, BRANCO) >= contraste(cor, FUNDO_ESCURO) ? "255 255 255" : "3 4 3",
+  };
+}

@@ -13,8 +13,9 @@ import { GrupoDePilulas } from "@/components/ui/pill-group";
  *
  * As escolhas visuais seguem regras, não gosto: preenchimento em lavagem (o
  * dado é o que pode ser forte, não o fundo), linha de 2px, grade sólida de
- * 1px recuada, e um par de cores validado para daltonismo — azul #2a78d6 e
- * laranja #eb6834 têm separação ΔE 24.7 em protanopia.
+ * 1px recuada, e as séries da marca (`--serie-1`, `--serie-2`, ver
+ * `lib/brand.ts`): a cor da organização e um tom oposto com outra claridade,
+ * para quem não separa as cores ainda distinguir as linhas.
  */
 
 export interface DailyPoint {

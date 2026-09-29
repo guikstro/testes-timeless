@@ -1,4 +1,16 @@
-import { brandPalette } from "./brand";
+import { brandPalette, brandPaletteEscura } from "./brand";
+
+const luminancia = (triplo: string) => {
+  const [r, g, b] = triplo.split(" ").map((canal) => {
+    const c = Number(canal) / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contraste = (a: string, b: string) => {
+  const [clara, escura] = [luminancia(a), luminancia(b)].sort((x, y) => y - x);
+  return (clara + 0.05) / (escura + 0.05);
+};
 
 describe("brandPalette", () => {
   it("usa o verde da Timeless quando a organização não escolheu cor", () => {
@@ -36,5 +48,40 @@ describe("brandPalette", () => {
 
   it("aceita a forma curta de três dígitos", () => {
     expect(brandPalette("#0a5").accent).toBe(brandPalette("#00aa55").accent);
+  });
+});
+
+describe("brandPaletteEscura", () => {
+  it("sem cor escolhida, usa o passo escuro da Timeless medido nas artes", () => {
+    expect(brandPaletteEscura(null)).toMatchObject({
+      accent: "0 168 123",
+      soft: "10 38 30",
+      ink: "108 226 184",
+      accentContrast: "3 4 3",
+    });
+    // O verde da Timeless escolhido à mão é o mesmo caso.
+    expect(brandPaletteEscura("#007D5E")).toEqual(brandPaletteEscura(null));
+  });
+
+  it("clareia a cor até ler sobre o fundo escuro", () => {
+    const p = brandPaletteEscura("#1E3A8A");
+    expect(contraste(p.accent, "3 4 3")).toBeGreaterThanOrEqual(6);
+    expect(p.accent).not.toBe(brandPalette("#1E3A8A").accent);
+  });
+
+  it("o fundo suave é escuro e a tinta sobre ele é clara", () => {
+    const p = brandPaletteEscura("#7C3AED");
+    expect(luminancia(p.soft)).toBeLessThan(0.05);
+    expect(contraste(p.ink, p.soft)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("o texto sobre o acento é o de maior contraste", () => {
+    const p = brandPaletteEscura("#FACC15");
+    expect(p.accentContrast).toBe("3 4 3");
+  });
+
+  it("as séries do gráfico são as mesmas do tema claro", () => {
+    expect(brandPaletteEscura("#0F766E").serie2).toBe(brandPalette("#0F766E").serie2);
+    expect(brandPaletteEscura(null).serie1).toBe(brandPalette(null).serie1);
   });
 });

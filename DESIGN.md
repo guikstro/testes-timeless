@@ -46,9 +46,11 @@ As telas usam o **papel** (`text-ink`, `bg-panel`, `border-line`), nunca o tom
 
 ### Marca
 
-O verde é da marca Timeless, medido nas artes. **Muda por cliente:** a cor da
-organização (Configurações, Aparência) sobrescreve estas variáveis em
-`components/brand-style.tsx`. Por isso a tela nunca escreve o verde em hex.
+O verde é da marca Timeless, medido nas artes, com um passo por tema. **Muda
+por cliente:** a cor da organização (Configurações, Aparência) sobrescreve
+estas variáveis em `components/brand-style.tsx`, derivando o passo escuro da
+mesma cor (`brandPaletteEscura` em `lib/brand.ts`). Por isso a tela nunca
+escreve o verde em hex.
 
 | Papel | Token | Claro | Escuro | Uso |
 |---|---|---|---|---|
@@ -85,13 +87,14 @@ ponto quase branco.
 
 ### Gráficos
 
-Validados para daltonismo, com um passo por tema. Também mudam com a cor do
-cliente.
+A primeira série é a cor da marca; a segunda, um tom oposto com outra
+claridade, para quem não separa as cores ainda distinguir as linhas. Mudam com
+a cor do cliente e são iguais nos dois temas.
 
 | Papel | Token | Claro | Escuro |
 |---|---|---|---|
-| Série principal | `serie-1` | `#2A78D6` | `#3987E5` |
-| Série de comparação | `serie-2` | `#EB6834` | `#D95926` |
+| Série principal | `serie-1` | `#007D5E` | `#007D5E` |
+| Série de comparação | `serie-2` | `#D97706` | `#D97706` |
 | Grade | `grade` | `#E2DBCD` | `#302F2C` |
 | Linha guia, eixo | `guia` | `#948D80` | `#827C72` |
 
