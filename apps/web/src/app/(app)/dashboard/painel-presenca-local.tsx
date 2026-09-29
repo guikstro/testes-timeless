@@ -7,6 +7,7 @@ import { DataTable } from "@/components/ui/table";
 import { formatCentsAsBRL } from "@/lib/currency";
 import { tempoRelativo } from "@/lib/relative-time";
 import { StatCard } from "./stat-card";
+import { LeadsAreaChart } from "./leads-area-chart";
 
 type Par = { atual: number | null; anterior: number | null };
 
@@ -76,6 +77,23 @@ export function PainelPresencaLocal({ dados }: { dados: PresencaLocal }) {
         <Numero rotulo="Visitas à loja" par={totais.VISITAS_A_LOJA} nota="Estimadas pelo Google" />
         <Numero rotulo="Vezes que o telefone apareceu" par={totais.EXIBICOES_DO_TELEFONE} />
       </div>
+
+      {/*
+        Os números em cima e o dia a dia embaixo, como o painel de leads. Só
+        com as duas medidas chegando: uma série sem medida desenhada como zero
+        diria que ninguém ligou.
+      */}
+      {totais.LIGACOES_DOS_ANUNCIOS.atual !== null && totais.ROTAS.atual !== null ? (
+        <section className="surface p-6">
+          <h2 className="font-display text-destaque font-semibold tracking-tight text-ink">Ligações e rotas por dia</h2>
+          <p className="mb-5 mt-0.5 text-apoio text-ink-mute">Passe o mouse para ver um dia específico</p>
+          <LeadsAreaChart
+            data={dados.serie.map((dia) => ({ date: dia.dia, leads: dia.ligacoes ?? 0, won: dia.rotas ?? 0 }))}
+            rotulos={{ leads: "Ligações", won: "Pedidos de rota" }}
+            descricao="Ligações e pedidos de rota por dia no período"
+          />
+        </section>
+      ) : null}
 
       <Card className="p-6">
         <CardHeader

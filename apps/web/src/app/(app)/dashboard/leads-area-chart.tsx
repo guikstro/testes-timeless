@@ -127,7 +127,18 @@ function niceCeiling(value: number): number {
   return Math.ceil(value / magnitude) * magnitude;
 }
 
-export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
+export function LeadsAreaChart({
+  data,
+  rotulos,
+  descricao = "Leads e vendas por dia no período",
+}: {
+  data: DailyPoint[];
+  /** Outros nomes para as duas séries, quando o gráfico não é de leads e vendas. */
+  rotulos?: { leads: string; won: string };
+  /** O que o leitor de tela anuncia. */
+  descricao?: string;
+}) {
+  const comRotulos = SERIES.map((serie) => ({ ...serie, label: rotulos?.[serie.key] ?? serie.label }));
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(720);
   const [hovered, setHovered] = useState<number | null>(null);
@@ -247,7 +258,7 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
         />
 
         <div className="flex items-center gap-4">
-          {SERIES.map((series) => (
+          {comRotulos.map((series) => (
             <span key={series.key} className="flex items-center gap-1.5 text-apoio text-ink-soft">
               <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: series.color }} />
               {series.label}
@@ -260,7 +271,7 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
         width={width}
         height={HEIGHT}
         role="img"
-        aria-label="Leads e vendas por dia no período"
+        aria-label={descricao}
         onPointerMove={handleMove}
         onPointerLeave={() => setHovered(null)}
         // Trava de segurança: mesmo com a largura medida errada, o gráfico
@@ -268,7 +279,7 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
         className="max-w-full touch-pan-y"
       >
         <defs>
-          {SERIES.map((series) => (
+          {comRotulos.map((series) => (
             <linearGradient key={series.key} id={`fill-${series.key}`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={series.color} stopOpacity={0.16} />
               <stop offset="100%" stopColor={series.color} stopOpacity={0} />
@@ -306,7 +317,7 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
           ) : null,
         )}
 
-        {SERIES.map((series, ordem) => {
+        {comRotulos.map((series, ordem) => {
           const points = dados.map((point, index) => ({ x: xAt(index), y: yAt(point[series.key]) }));
           const baseline = PAD.top + innerHeight;
 
@@ -383,7 +394,7 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
               stroke="rgb(var(--guia))"
               strokeWidth={1}
             />
-            {SERIES.map((series) => (
+            {comRotulos.map((series) => (
               // Anel na cor da superfície: mantém o ponto legível onde as duas
               // séries se cruzam, sem desenhar contorno de dado que não é dado.
               <circle
@@ -412,7 +423,7 @@ export function LeadsAreaChart({ data }: { data: DailyPoint[] }) {
             {formatDay(active.date)}
             {modo === "acumulado" ? " · acumulado" : ""}
           </p>
-          {SERIES.map((series) => (
+          {comRotulos.map((series) => (
             <div key={series.key} className="flex items-center gap-2 text-corpo">
               <span className="h-0.5 w-3 rounded-full" style={{ backgroundColor: series.color }} />
               <span className="font-semibold tabular-nums text-ink">{active[series.key]}</span>

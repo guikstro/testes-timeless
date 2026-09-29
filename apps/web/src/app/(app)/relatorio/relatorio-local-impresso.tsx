@@ -2,7 +2,8 @@ import { formatCentsAsBRL } from "@/lib/currency";
 import { formataDia } from "@/lib/periodo";
 import { Marca } from "@/components/marca";
 import type { DadosDePresencaLocal } from "@/lib/relatorio/dados";
-import { Numero, Secao } from "./relatorio-impresso";
+import { concluiRelatorioLocal } from "@/lib/relatorio/conclusao";
+import { Conclusao, Numero, Secao } from "./relatorio-impresso";
 
 function variacao(atual: number | null, anterior: number | null): string | null {
   if (atual === null || anterior === null || anterior === 0) return null;
@@ -22,6 +23,7 @@ export function RelatorioLocalImpresso({ dados }: { dados: DadosDePresencaLocal 
   const investido = investimento.atual;
   const custoPorLigacao = investido && ligacoes.atual ? Math.round(investido / ligacoes.atual) : null;
   const custoPorRota = investido && rotas.atual ? Math.round(investido / rotas.atual) : null;
+  const frase = concluiRelatorioLocal({ ligacoes: ligacoes.atual, rotas: rotas.atual, investidoCentavos: investido });
 
   return (
     <article className="space-y-8 print:space-y-6">
@@ -36,6 +38,7 @@ export function RelatorioLocalImpresso({ dados }: { dados: DadosDePresencaLocal 
         <p className="mt-1 text-corpo text-ink-soft">
           {formataDia(dados.periodo.de)} a {formataDia(dados.periodo.ate)} · {dados.periodo.dias} dias
         </p>
+        {frase ? <Conclusao frase={frase} /> : null}
       </header>
 
       <Secao titulo="O período em números">

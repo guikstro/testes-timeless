@@ -72,6 +72,7 @@ export default async function RelatorioPage({
 
   const inicio = overview.period.from.slice(0, 10);
   const fim = overview.period.to.slice(0, 10);
+  const medicao = medicaoDeLeads({ conexao, ate: fim, leads: overview.totals.leads });
 
   const bloco = montaBlocoDeDados({
     cliente: organizacao.name,
@@ -118,6 +119,7 @@ export default async function RelatorioPage({
 
   const dados: DadosDoRelatorio = {
     cliente: organizacao.name,
+    medido: medicao === "medido",
     periodo: { de: inicio, ate: fim, dias: days },
     totais: {
       leads: overview.totals.leads,
@@ -167,7 +169,7 @@ export default async function RelatorioPage({
         // WhatsApp nem recebia seria a afirmação falsa mais cara do produto:
         // é o documento que o cliente leva para decidir se continua.
         <AvisoDeMedicao
-          medicao={medicaoDeLeads({ conexao, ate: fim, leads: overview.totals.leads })}
+          medicao={medicao}
           desde={conexao ? inicioDaMedicao(conexao) : null}
         />
       }

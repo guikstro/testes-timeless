@@ -3,6 +3,7 @@ import { formatCentsAsBRL } from "@/lib/currency";
 import { formatDuration } from "@/lib/duration";
 import { formataDia } from "@/lib/periodo";
 import { Marca } from "@/components/marca";
+import { concluiRelatorioDeLeads, FraseDeConclusao } from "@/lib/relatorio/conclusao";
 
 /**
  * O relatório em si, pronto para ser lido e impresso.
@@ -18,6 +19,8 @@ import { Marca } from "@/components/marca";
  */
 export interface DadosDoRelatorio {
   cliente: string;
+  /** O WhatsApp estava recebendo no período: sem isso, zero lead não é medida. */
+  medido: boolean;
   periodo: { de: string; ate: string; dias: number };
   totais: {
     leads: number;
@@ -52,6 +55,13 @@ export function RelatorioImpresso({ dados }: { dados: DadosDoRelatorio }) {
   const custoPorVenda = investido > 0 && totais.vendas > 0 ? Math.round(investido / totais.vendas) : null;
   const retorno = investido > 0 ? totais.receitaCentavos / investido : null;
   const ticket = totais.vendas > 0 ? Math.round(totais.receitaCentavos / totais.vendas) : null;
+  const frase = concluiRelatorioDeLeads({
+    medido: dados.medido,
+    leads: totais.leads,
+    vendas: totais.vendas,
+    receitaCentavos: totais.receitaCentavos,
+    investidoCentavos: investido,
+  });
 
   return (
     <article className="space-y-8 print:space-y-6">
@@ -73,6 +83,7 @@ export function RelatorioImpresso({ dados }: { dados: DadosDoRelatorio }) {
         <p className="mt-1 text-corpo text-ink-soft">
           {formataDia(dados.periodo.de)} a {formataDia(dados.periodo.ate)} · {dados.periodo.dias} dias
         </p>
+        {frase ? <Conclusao frase={frase} /> : null}
       </header>
 
       <Secao titulo="O período em números">
@@ -205,6 +216,26 @@ export function RelatorioImpresso({ dados }: { dados: DadosDoRelatorio }) {
         </p>
       </Secao>
     </article>
+  );
+}
+
+/**
+ * A frase que abre o relatório, com um trecho em destaque: a lavagem da cor de
+ * ação atrás das palavras, como um marca-texto. O texto continua na cor do
+ * texto, para ler nos dois temas e no papel. `print-color-adjust` faz o fundo
+ * sair na impressão, que por padrão descarta cor de fundo.
+ */
+export function Conclusao({ frase }: { frase: FraseDeConclusao }) {
+  return (
+    <p className="mt-5 max-w-3xl font-display text-[clamp(1.15rem,2.6vw,1.45rem)] font-medium leading-snug tracking-tight text-ink">
+      {frase.antes}
+      {frase.destaque ? (
+        <mark className="rounded-md bg-accent/15 px-1 text-ink [-webkit-box-decoration-break:clone] [-webkit-print-color-adjust:exact] [box-decoration-break:clone] [print-color-adjust:exact]">
+          {frase.destaque}
+        </mark>
+      ) : null}
+      {frase.depois}
+    </p>
   );
 }
 

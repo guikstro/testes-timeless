@@ -257,6 +257,24 @@ horas sem dado novo (a régua da Saúde da plataforma). Fonte sem conexão não
 aparece. "Ao vivo" só onde a tela se atualiza sozinha; com o canal fora, diz
 "Atualiza a cada 30 s".
 
+### Gráfico diário (`LeadsAreaChart`)
+Duas séries por dia, em SVG, com os modos Área, Linha, Barras e Acumulado, e
+dica por dia. Cores das séries da marca (`serie-1`, `serie-2`). Os rótulos
+mudam com o assunto: "Leads" e "Vendas" no painel de leads, "Ligações" e
+"Pedidos de rota" no de presença local. Série sem medida não é desenhada: um
+zero no gráfico diria que ninguém ligou. Fica num `.surface p-6` com título
+`font-display text-destaque` e a dica "Passe o mouse para ver um dia
+específico", logo abaixo dos cartões de número.
+
+### Frase de abertura do relatório (`Conclusao`)
+Embaixo do período, no relatório para o cliente: uma frase em `font-display`
+(18 a 23px, `font-medium`, `leading-snug`) que conclui o período, com **um**
+trecho em destaque, como um marca-texto: `<mark>` com `bg-accent/15`, texto
+`ink`, `rounded-md px-1` e `print-color-adjust: exact` para sair no papel.
+"**214 ligações e 360 pedidos de rota** pelos anúncios do Google, com R$
+2.104,00 investidos." Sem medida, não há frase. Não afirma causa que o número
+não prova: "6 clientes novos **e** 42 leads", e não "vieram de".
+
 ### Tabela (`DataTable`, `Pagination`)
 Cabeçalho `text-rotulo uppercase` em `ink-mute`, linhas com borda `line/50` e
 hover `panel-soft/50`. Números à direita, com `tnum`. No celular, cada linha
