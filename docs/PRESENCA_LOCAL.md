@@ -12,7 +12,7 @@ cliente**). A troca vale na hora e fica na auditoria.
 | Foco | Menu | Dashboard | Campanhas | Relatório |
 |---|---|---|---|---|
 | Leads (padrão) | Tudo | Abas de leads | Leads, vendas, retorno | De leads |
-| Presença local | Sem Conversas, Leads e Links; sem o aviso de WhatsApp | Só o painel de presença local | Ligações e rotas por campanha | De presença local |
+| Presença local | Sem Conversas, Leads e Links; sem o aviso e a integração de WhatsApp; sem a aba Operação das Configurações | Só o painel de presença local | Ligações e rotas por campanha | De presença local |
 | Os dois | Tudo | Abas de leads e a aba Presença local | Abas Leads e Presença local | De leads |
 
 As telas escondidas também não abrem pelo endereço: quem digita `/leads` volta
