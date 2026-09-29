@@ -58,6 +58,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     /*
+      Rota que não existe: o Express responde "Cannot PUT /api/...", em inglês
+      e com o caminho, e isso chegava cru à tela. Acontece quando o site já
+      foi publicado e a API ainda não, e a pessoa só precisa saber disso.
+    */
+    if (status === HttpStatus.NOT_FOUND && ROTA_INEXISTENTE.test(body.message)) {
+      body = { code: "ROTA_INEXISTENTE", message: "Esta função não existe na versão da API que está no ar." };
+    }
+
+    /*
       Corpo maior que o limite do body parser.
 
       Sem este ramo virava 500 com pilha de dez quadros, e o log dizia "erro
@@ -134,6 +143,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
     response.status(status).json({ ...body, requestId });
   }
 }
+
+/** A mensagem padrão do Express para rota desconhecida. */
+const ROTA_INEXISTENTE = /^Cannot (GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS) \//;
 
 function defaultCodeForStatus(status: number): string {
   switch (status) {

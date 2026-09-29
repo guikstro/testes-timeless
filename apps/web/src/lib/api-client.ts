@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
 import { ACCESS_TOKEN_COOKIE } from "./session";
+import { erroLegivel } from "./erro-da-api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
 
@@ -93,7 +94,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 
   if (!response.ok) {
     redirecionaSeASessaoAcabou(response.status, (body as ApiError | null)?.code);
-    throw new ApiRequestError((body as ApiError) ?? { code: "UNKNOWN", message: "Erro desconhecido." }, response.status);
+    throw new ApiRequestError(erroLegivel(body as ApiError | null, response.status), response.status);
   }
 
   return body as T;

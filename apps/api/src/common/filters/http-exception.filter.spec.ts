@@ -94,4 +94,24 @@ describe("HttpExceptionFilter", () => {
 
     expect(erro).not.toHaveBeenCalled();
   });
+
+  describe("rota que não existe", () => {
+    it("troca a mensagem do Express por uma frase em português", () => {
+      const { host, status, json } = contexto("/api/admin/organizations/1/foco");
+
+      new HttpExceptionFilter().catch(new HttpException("Cannot PUT /api/admin/organizations/1/foco", HttpStatus.NOT_FOUND), host);
+
+      expect(status).toHaveBeenCalledWith(HttpStatus.NOT_FOUND);
+      expect(json).toHaveBeenCalledWith(expect.objectContaining({ code: "ROTA_INEXISTENTE" }));
+      expect(JSON.stringify(json.mock.calls[0][0])).not.toContain("Cannot");
+    });
+
+    it("não mexe no 404 que a própria API escreveu", () => {
+      const { host, json } = contexto("/api/leads/1");
+
+      new HttpExceptionFilter().catch(new HttpException({ code: "NOT_FOUND", message: "Lead não encontrado." }, HttpStatus.NOT_FOUND), host);
+
+      expect(json).toHaveBeenCalledWith(expect.objectContaining({ code: "NOT_FOUND", message: "Lead não encontrado." }));
+    });
+  });
 });
