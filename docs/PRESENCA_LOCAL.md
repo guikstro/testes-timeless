@@ -55,8 +55,16 @@ Zero é medida; ausência é "Sem medida". O painel diz em que situação está:
 ## Perfil da Empresa no Google (próxima fase)
 
 As ligações e rotas que não vêm de anúncio, e as visualizações do perfil no
-Maps e na busca, vêm da API de desempenho do Perfil da Empresa. Ela exige
-aprovação do Google para o projeto da equipe Timeless; depois dela, a conexão
-será por "Entrar com Google" com a conta da equipe, que precisa ser
-administradora do perfil de cada cliente. Os números entram na mesma tabela,
-com a fonte `PERFIL_DA_EMPRESA`.
+Maps e na busca, vêm da API de desempenho do Perfil da Empresa. Antes de usar:
+
+- O Google exige que toda agência tenha uma conta de organização no Perfil da
+  Empresa (`business.google.com/agencysignup`, com e-mail do domínio da
+  agência) e aprove o projeto da equipe Timeless no Google Cloud
+  ("Application for Basic API Access"). Sem aprovação, a cota fica em 0 pedidos
+  por minuto; aprovado, 300.
+- O perfil de cada cliente é ligado à organização: a organização pede acesso
+  em Gerenciar convites, no Gerenciador de Perfis, e o dono do perfil aprova.
+
+Depois disso, a conexão será por "Entrar com Google" com a conta da equipe.
+Os números entram na mesma tabela, com a fonte `PERFIL_DA_EMPRESA`, e chegam
+com uns três dias de atraso, que é o tempo do próprio Google.
