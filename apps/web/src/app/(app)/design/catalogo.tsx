@@ -18,6 +18,7 @@ import { ConfirmButton, Dialog, Drawer, Sheet } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
 import { DataTable } from "@/components/ui/table";
 import { GrupoDePilulas } from "@/components/ui/pill-group";
+import { FrescorDosDados } from "@/components/ui/frescor";
 import { formatCentsAsBRL } from "@/lib/currency";
 
 /*
@@ -29,6 +30,9 @@ const CAMPANHAS = [
   { id: "2", nome: "Remarketing | Carrossel", gasto: 61_900, leads: 11, vendas: 3 },
   { id: "3", nome: "Institucional", gasto: 22_400, leads: 0, vendas: 0 },
 ];
+
+/** Horários relativos a agora, para o exemplo sempre ler "há 12 min". */
+const haMinutos = (minutos: number) => new Date(Date.now() - minutos * 60_000).toISOString();
 
 const PESSOAS = [
   { valor: "1", rotulo: "Ana Beatriz", descricao: "ana@exemplo.com" },
@@ -219,6 +223,31 @@ export function Catalogo() {
               Aviso de falha
             </Button>
           </div>
+        </div>
+      </Secao>
+
+      <Secao
+        titulo="Frescor do dado"
+        descricao="De quando é o número: embaixo do subtítulo das telas de dados. Mais de 3 horas sem dado novo é atraso."
+      >
+        <div className="space-y-2">
+          <FrescorDosDados
+            aoVivo
+            frescor={{
+              meta: { estado: "em-dia", atualizadoEm: haMinutos(20), motivo: null },
+              google: { estado: "em-dia", atualizadoEm: haMinutos(12), motivo: null },
+            }}
+          />
+          <FrescorDosDados
+            frescor={{
+              meta: { estado: "falha", atualizadoEm: haMinutos(300), motivo: "O acesso à Meta venceu; reconecte em Integrações." },
+              google: {
+                estado: "atrasada",
+                atualizadoEm: haMinutos(320),
+                motivo: "O script roda de hora em hora e passou de 3 horas sem enviar.",
+              },
+            }}
+          />
         </div>
       </Secao>
 

@@ -5,6 +5,11 @@ espaço, pouca decoração, e densidade só onde o dado pede. Este documento diz
 de onde vêm as peças e como usá-las. Para ver todas em uso, nos dois temas,
 abra `/design` logado como alguém da equipe Timeless.
 
+Os valores (cor por tema, tamanhos, raios, sombras), a especificação de cada
+componente e as regras do produto, no formato que ferramentas de IA leem,
+estão em [`DESIGN.md`](../DESIGN.md), na raiz. Um teste confere as cores de lá
+contra o `globals.css`.
+
 ## Regra de ouro
 
 Tela não inventa estilo. Cor, tamanho de texto, raio, sombra e movimento vêm
@@ -55,6 +60,7 @@ marca a visita do suporte.
 | `Tabs` | `tabs.tsx` | Trocar conteúdo na mesma tela, sem mudar o endereço |
 | `DataTable`, `Pagination` | `table.tsx`, `pagination.tsx` | Dados em tabela (empilha no celular) e páginas por link |
 | `Skeleton`, `EmptyState`, `ErrorState` | `skeleton.tsx`, `state.tsx` | Carregando com a forma do conteúdo; vazio e erro com o próximo passo |
+| `FrescorDosDados` | `frescor.tsx` | De quando é o dado da tela ("Google Ads atualizado há 12 min"), embaixo do subtítulo |
 
 ## Como não quebrar
 

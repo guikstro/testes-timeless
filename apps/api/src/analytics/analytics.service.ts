@@ -27,6 +27,7 @@ import { fimDoDia, inicioDoDia, diaCivilLocal, FUSO } from "../common/tempo";
 import { gastoPorDia, medidoAte } from "./gasto-por-dia";
 import { identificacaoDosLeads, LeadIdentificado, MetodoDeIdentificacao } from "./identificacao-dos-leads";
 import { completaIdsDoAnuncio, HierarquiaDoAnuncio } from "./vinculo-do-anuncio";
+import { frescorDaMeta, frescorDoGoogle } from "./frescor";
 import {
   agregaDesempenhoPorCampanha,
   CampanhaComparada,
@@ -97,6 +98,15 @@ function mensagensDoAtendimento(atendimento: AtendimentoDoLead | undefined): Met
 @Injectable()
 export class AnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /** De quando é o último dado de cada fonte de gasto, para a tela dizer se o número é de agora. */
+  async frescor(organizationId: string) {
+    const [meta, google] = await Promise.all([
+      this.prisma.metaConnection.findUnique({ where: { organizationId }, select: { status: true, lastSyncedAt: true } }),
+      this.prisma.googleAdsConexao.findUnique({ where: { organizationId }, select: { ultimoEnvioEm: true } }),
+    ]);
+    return { meta: frescorDaMeta(meta), google: frescorDoGoogle(google) };
+  }
 
   async overview(organizationId: string, days: number): Promise<Overview> {
     const to = new Date();

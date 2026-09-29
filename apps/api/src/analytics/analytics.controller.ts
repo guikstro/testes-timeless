@@ -19,6 +19,12 @@ export class AnalyticsController {
     return this.analyticsService.overview(user.organizationId, query.days ?? 30);
   }
 
+  /** De quando é o último dado da Meta e do Google Ads: a tela diz se o número é de agora. */
+  @Get("frescor")
+  frescor(@CurrentUser() user: AuthenticatedUser) {
+    return this.analyticsService.frescor(user.organizationId);
+  }
+
   /** Desempenho por campanha em dois períodos livres, para comparar meses. */
   @Get("campanhas")
   campanhas(@CurrentUser() user: AuthenticatedUser, @Query() query: CampanhasQueryDto) {

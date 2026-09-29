@@ -124,6 +124,16 @@ describe("Google Ads por script (e2e)", () => {
     expect(busca.gastoCentavos).toBe(4567);
   });
 
+  it("o frescor diz que o Google está em dia, e o outro cliente não tem fonte nenhuma", async () => {
+    const deA = await request(app.getHttpServer()).get("/api/analytics/frescor").set("Authorization", `Bearer ${tokenA}`).expect(200);
+    expect(deA.body.google).toMatchObject({ estado: "em-dia", motivo: null });
+    expect(Date.now() - Date.parse(deA.body.google.atualizadoEm)).toBeLessThan(60_000);
+    expect(deA.body.meta).toBeNull();
+
+    const deB = await request(app.getHttpServer()).get("/api/analytics/frescor").set("Authorization", `Bearer ${tokenB}`).expect(200);
+    expect(deB.body).toEqual({ meta: null, google: null });
+  });
+
   describe("presença local: ligações e rotas", () => {
     const painel = async (token = tokenA) =>
       (await request(app.getHttpServer()).get("/api/presenca-local?days=7").set("Authorization", `Bearer ${token}`).expect(200)).body;

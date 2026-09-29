@@ -168,6 +168,7 @@ dessas variáveis; elas servem para testes locais/seed.
 
 ## Documentação
 
+- [`DESIGN.md`](DESIGN.md): referência de design (cores por tema, tipografia, componentes, regras), para quem gera tela, pessoa ou IA
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — arquitetura geral, decisões técnicas, observabilidade, segurança
 - [`docs/TRACKING.md`](docs/TRACKING.md) — links rastreáveis e captura de UTMs/IDs de mídia (Fase 2)
 - [`docs/ATTRIBUTION.md`](docs/ATTRIBUTION.md) — motor de atribuição, regras de precedência (Fase 4)

@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Frescor, FrescorDosDados } from "@/components/ui/frescor";
 import { formatCentsAsBRL } from "@/lib/currency";
 import { rotuloDoIntervalo } from "@/lib/periodo";
 import { MedicaoLocal, SituacaoDaMedicao } from "../dashboard/painel-presenca-local";
@@ -45,11 +46,14 @@ export function CampanhasLocaisView({
   dados,
   abas,
   aba,
+  frescor = null,
 }: {
   dados: CampanhasDePresencaLocal;
   abas?: ReactNode;
   /** A aba a manter na troca de mês, para quem tem os dois focos. */
   aba?: string;
+  /** De quando é o último envio do Google Ads. */
+  frescor?: Frescor | null;
 }) {
   const { periodo, comparacao, totais } = dados;
   const comparando = comparacao !== null;
@@ -74,6 +78,7 @@ export function CampanhasLocaisView({
           <p className="mt-1 max-w-2xl text-corpo text-ink-mute">
             Quanto cada campanha do Google custou, e quantas ligações e pedidos de rota ela trouxe.
           </p>
+          <FrescorDosDados frescor={frescor} fontes={["google"]} className="mt-2" />
         </div>
         <SeletorDePeriodo periodo={periodo} comparacao={comparacao} aba={aba} />
       </header>

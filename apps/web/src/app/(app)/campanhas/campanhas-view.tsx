@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AvisoDeMedicao } from "@/components/aviso-de-medicao";
 import { Badge } from "@/components/ui/badge";
 import { Delta } from "@/components/ui/delta";
+import { Frescor, FrescorDosDados } from "@/components/ui/frescor";
 import { GrupoDePilulas } from "@/components/ui/pill-group";
 import { formatCentsAsBRL } from "@/lib/currency";
 import { Medicao } from "@/lib/medicao-de-leads";
@@ -31,12 +32,15 @@ export function CampanhasView({
   medicao,
   desdeDoWhatsApp,
   abas,
+  frescor = null,
 }: {
   dados: DesempenhoDeCampanhas;
   medicao: Medicao;
   desdeDoWhatsApp: string | null;
   /** Leads e presença local, para quem tem os dois focos. */
   abas?: ReactNode;
+  /** De quando é o gasto que chegou da Meta e do Google. */
+  frescor?: Frescor | null;
 }) {
   const { periodo, comparacao, campanhas, semCampanha, totais } = dados;
   const medido = medicao === "medido";
@@ -79,6 +83,7 @@ export function CampanhasView({
             Quanto cada campanha custou, quantas conversas a Meta diz que ela abriu, e quantas viraram lead e venda
             aqui.
           </p>
+          <FrescorDosDados frescor={frescor} className="mt-2" />
         </div>
         <SeletorDePeriodo periodo={periodo} comparacao={comparacao} />
       </header>

@@ -16,6 +16,7 @@ import { Procedencia } from "./procedencia";
 import { concluiAtendimento, concluiFunil, concluiOrigem, concluiVisaoGeral } from "./conclusao";
 import { Overview } from "./tipos";
 import { Alert } from "@/components/ui/alert";
+import { Frescor, FrescorDosDados } from "@/components/ui/frescor";
 import { sessaoAtual } from "@/lib/sessao";
 import { temPresencaLocal } from "@/lib/foco";
 import { concluiPresencaLocal, PainelPresencaLocal, PresencaLocal } from "./painel-presenca-local";
@@ -58,9 +59,10 @@ export default async function DashboardPage({
   const aba: Aba = ABAS.some((opcao) => opcao.chave === params.aba) ? (params.aba as Aba) : "geral";
   const local = aba === "local" ? await apiFetch<PresencaLocal>(`/presenca-local?days=${days}`) : null;
 
-  const [overview, conexao] = await Promise.all([
+  const [overview, conexao, frescor] = await Promise.all([
     apiFetch<Overview>(`/analytics/overview?days=${days}`),
     conexaoDoWhatsApp(),
+    buscaFrescor(),
   ]);
   const { totals, setup } = overview;
 
@@ -117,6 +119,12 @@ export default async function DashboardPage({
                   ? escolhida.conclui(overview)
                   : "Sem WhatsApp recebendo, não há lead para medir neste período."}
             </p>
+            <FrescorDosDados
+              frescor={frescor}
+              fontes={local ? ["google"] : ["meta", "google"]}
+              aoVivo={!local && medicao === "medido"}
+              className="mt-2"
+            />
           </div>
 
           <GrupoDePilulas
@@ -293,7 +301,7 @@ function Numero({
 
 /** O dashboard de quem é só presença local: cabeçalho com período e o painel do Google. */
 async function DashboardDePresencaLocal({ days }: { days: number }) {
-  const dados = await apiFetch<PresencaLocal>(`/presenca-local?days=${days}`);
+  const [dados, frescor] = await Promise.all([apiFetch<PresencaLocal>(`/presenca-local?days=${days}`), buscaFrescor()]);
   return (
     <div className="mx-auto max-w-6xl">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -303,6 +311,7 @@ async function DashboardDePresencaLocal({ days }: { days: number }) {
           </p>
           <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink">Presença local</h1>
           <p className="mt-0.5 text-corpo text-ink-mute">{concluiPresencaLocal(dados)}</p>
+          <FrescorDosDados frescor={frescor} fontes={["google"]} className="mt-2" />
         </div>
         <GrupoDePilulas
           ativo={String(days)}
@@ -312,4 +321,9 @@ async function DashboardDePresencaLocal({ days }: { days: number }) {
       <PainelPresencaLocal dados={dados} />
     </div>
   );
+}
+
+/** De quando é o dado. Opcional: sem ele a tela continua, só sem a linha. */
+function buscaFrescor(): Promise<Frescor | null> {
+  return apiFetch<Frescor>("/analytics/frescor").catch(() => null);
 }

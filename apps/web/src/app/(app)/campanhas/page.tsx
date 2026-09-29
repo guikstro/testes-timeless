@@ -5,6 +5,7 @@ import { inicioDaMedicao, medicaoDeLeads } from "@/lib/medicao-de-leads";
 import { intervaloDoMes, leIntervalo, mesAtual } from "@/lib/periodo";
 import { sessaoAtual } from "@/lib/sessao";
 import { GrupoDePilulas } from "@/components/ui/pill-group";
+import { Frescor } from "@/components/ui/frescor";
 import { CampanhasView } from "./campanhas-view";
 import { CampanhasDePresencaLocal, CampanhasLocaisView } from "./campanhas-locais";
 import { DesempenhoDeCampanhas } from "./tipos";
@@ -32,10 +33,13 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
     query.set("compararAte", comparacao.ate);
   }
 
+  // De quando é o gasto. Opcional: sem ele a tela continua, só sem a linha.
+  const frescor = apiFetch<Frescor>("/analytics/frescor").catch(() => null);
+
   // Só presença local: as colunas são ligação e rota, sem nada de lead.
   if (organization.foco === "PRESENCA_LOCAL") {
     const dados = await apiFetch<CampanhasDePresencaLocal>(`/presenca-local/campanhas?${query.toString()}`);
-    return <CampanhasLocaisView dados={dados} />;
+    return <CampanhasLocaisView dados={dados} frescor={await frescor} />;
   }
 
   // Os dois focos: a mesma tela com duas abas, e a aba vai no endereço.
@@ -45,12 +49,13 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
 
   if (aba === "local") {
     const dados = await apiFetch<CampanhasDePresencaLocal>(`/presenca-local/campanhas?${query.toString()}`);
-    return <CampanhasLocaisView dados={dados} abas={abas} aba="local" />;
+    return <CampanhasLocaisView dados={dados} abas={abas} aba="local" frescor={await frescor} />;
   }
 
-  const [dados, conexao] = await Promise.all([
+  const [dados, conexao, fontes] = await Promise.all([
     apiFetch<DesempenhoDeCampanhas>(`/analytics/campanhas?${query.toString()}`),
     conexaoDoWhatsApp(),
+    frescor,
   ]);
 
   // Todos os leads do período, e não só os ligados a campanha: um lead sem
@@ -67,6 +72,7 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
       medicao={medicao}
       desdeDoWhatsApp={conexao ? inicioDaMedicao(conexao) : null}
       abas={abas}
+      frescor={fontes}
     />
   );
 }
