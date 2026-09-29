@@ -6,7 +6,11 @@ import { montaBlocoDeDados } from "@/lib/relatorio/dados";
 import { montaPrompt } from "@/lib/relatorio/prompt";
 import { RelatorioView } from "./relatorio-view";
 import { periodoValido } from "./periodos";
-import { DadosDoRelatorio } from "./relatorio-impresso";
+import { DadosDoRelatorio, RelatorioImpresso } from "./relatorio-impresso";
+import { RelatorioLocalImpresso } from "./relatorio-local-impresso";
+import { montaBlocoDePresencaLocal, DadosDePresencaLocal } from "@/lib/relatorio/dados";
+import { sessaoAtual } from "@/lib/sessao";
+import type { PresencaLocal } from "../dashboard/painel-presenca-local";
 
 interface Overview {
   period: { days: number; from: string; to: string };
@@ -54,6 +58,10 @@ export default async function RelatorioPage({
 }) {
   const params = await searchParams;
   const days = periodoValido(params.days);
+
+  // Quem é só presença local recebe o relatório de ligações e rotas.
+  const { organization } = await sessaoAtual();
+  if (organization.foco === "PRESENCA_LOCAL") return <RelatorioDePresencaLocal days={days} cliente={organization.name} />;
 
   const [overview, investimentos, organizacao, conexao] = await Promise.all([
     apiFetch<Overview>(`/analytics/overview?days=${days}`),
@@ -149,7 +157,7 @@ export default async function RelatorioPage({
 
   return (
     <RelatorioView
-      dados={dados}
+      impresso={<RelatorioImpresso dados={dados} />}
       bloco={bloco}
       prompt={prompt}
       nomeArquivo={nomeArquivo}
@@ -163,6 +171,31 @@ export default async function RelatorioPage({
           desde={conexao ? inicioDaMedicao(conexao) : null}
         />
       }
+    />
+  );
+}
+
+async function RelatorioDePresencaLocal({ days, cliente }: { days: number; cliente: string }) {
+  const local = await apiFetch<PresencaLocal>(`/presenca-local?days=${days}`);
+  const dados: DadosDePresencaLocal = {
+    cliente,
+    periodo: { de: local.periodo.de, ate: local.periodo.ate, dias: days },
+    ligacoes: local.totais.LIGACOES_DOS_ANUNCIOS,
+    rotas: local.totais.ROTAS,
+    visitas: local.totais.VISITAS_A_LOJA,
+    ligacoesConversao: local.totais.LIGACOES_CONVERSAO,
+    investimento: local.investimento,
+    campanhas: local.campanhas,
+  };
+  const bloco = montaBlocoDePresencaLocal(dados);
+  return (
+    <RelatorioView
+      impresso={<RelatorioLocalImpresso dados={dados} />}
+      presencaLocal
+      bloco={bloco}
+      prompt={montaPrompt(bloco)}
+      nomeArquivo={`relatorio-${cliente.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${local.periodo.de}.txt`}
+      days={days}
     />
   );
 }

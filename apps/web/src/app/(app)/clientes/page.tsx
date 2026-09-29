@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { apiFetch, ApiRequestError } from "@/lib/api-client";
+import type { Foco } from "@/lib/foco";
 import { CorDoCliente } from "./cor-do-cliente";
 
 interface Cliente {
@@ -8,6 +9,7 @@ interface Cliente {
   brandColor: string | null;
   whatsappConnection: { status: string } | null;
   leadCount: number;
+  foco: Foco;
 }
 
 const STATUS_DO_WHATSAPP: Record<string, { texto: string; cor: string }> = {
@@ -88,13 +90,24 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
                   <span className="min-w-0 flex-1 truncate font-medium text-ink underline decoration-line underline-offset-4">
                     {cliente.name}
                   </span>
-                  <span className="flex items-center gap-1.5 text-apoio text-ink-mute">
-                    <span className={`inline-block h-2 w-2 rounded-full ${status?.cor ?? "bg-ink-mute/40"}`} aria-hidden />
-                    WhatsApp: {status?.texto ?? "Desconectado"}
-                  </span>
-                  <span className="hidden w-20 text-right text-apoio text-ink-mute sm:inline">
-                    {cliente.leadCount} {cliente.leadCount === 1 ? "lead" : "leads"}
-                  </span>
+                  {/* Cliente de presença local não usa WhatsApp nem tem lead:
+                      "desconectado, 0 leads" pareceria conta parada. */}
+                  {cliente.foco === "PRESENCA_LOCAL" ? (
+                    <span className="text-apoio text-ink-mute">Presença local</span>
+                  ) : (
+                    <>
+                      <span className="flex items-center gap-1.5 text-apoio text-ink-mute">
+                        <span
+                          className={`inline-block h-2 w-2 rounded-full ${status?.cor ?? "bg-ink-mute/40"}`}
+                          aria-hidden
+                        />
+                        WhatsApp: {status?.texto ?? "Desconectado"}
+                      </span>
+                      <span className="hidden w-20 text-right text-apoio text-ink-mute sm:inline">
+                        {cliente.leadCount} {cliente.leadCount === 1 ? "lead" : "leads"}
+                      </span>
+                    </>
+                  )}
                 </Link>
               </li>
             );

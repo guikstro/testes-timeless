@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { podeVer } from "@/lib/areas";
+import { temLeads } from "@/lib/foco";
 import { AcessoProvider } from "@/components/acesso";
 import { ToastProvider } from "@/components/ui/toast";
 import { ApiRequestError } from "@/lib/api-client";
@@ -33,7 +34,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   */
   // Na área da Timeless o WhatsApp que importa é o de cada cliente, não o da própria conta.
   const areaDaTimeless = Boolean(session.user.platformRole) && !session.impersonating;
-  const conexao = areaDaTimeless ? null : ((await conexaoDoWhatsApp()) ?? null);
+  // Quem é só presença local não tem WhatsApp no sistema: a faixa não diria nada a ele.
+  const mostraWhatsApp = !areaDaTimeless && temLeads(session.organization.foco);
+  const conexao = mostraWhatsApp ? ((await conexaoDoWhatsApp()) ?? null) : null;
 
   return (
     <NotificationProvider>
@@ -55,6 +58,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           showAdmin={areaDaTimeless}
           impersonating={session.impersonating}
           areas={session.areas}
+          foco={session.organization.foco}
         />
         <main className="min-w-0 flex-1">
           {/*
@@ -75,7 +79,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               expande sobre este canto, e um indicador que some quando o mouse
               passa no menu não serve como sinal permanente.
             */}
-            {areaDaTimeless ? null : <ConnectionStatus conexao={conexao} podeAbrir={podeVer(session.areas, "/integrations")} />}
+            {!mostraWhatsApp ? null : <ConnectionStatus conexao={conexao} podeAbrir={podeVer(session.areas, "/integrations")} />}
             <NotificationBell />
           </div>
 

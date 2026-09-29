@@ -17,7 +17,30 @@ const PARTE_DA_METRICA: Record<Metrica, keyof typeof METRICAS_DA_PARTE> = {
   VISITAS_A_LOJA: "acoesLocais",
 };
 
+type Par = { atual: number | null; anterior: number | null };
+
+/** O que uma campanha fez numa janela. Ligação e rota são `null` quando não medidas. */
+interface LinhaDaCampanha {
+  externalId: string;
+  nome: string;
+  status: string;
+  gastoCentavos: number;
+  cliques: number;
+  impressoes: number;
+  ligacoes: number | null;
+  rotas: number | null;
+}
+
+interface Medicao {
+  situacao: "sem-google-ads" | "script-desatualizado" | "parcial" | "medido";
+  partes: Record<string, string>;
+  ultimoEnvioEm: string | null;
+  temGoogle: boolean;
+  medida: (metrica: Metrica) => boolean;
+}
+
 const dataDe = (dia: string) => new Date(`${dia}T00:00:00.000Z`);
+const arredonda = (valor: number) => Math.round(valor * 100) / 100;
 
 /**
  * O painel de quem vive de presença local: ligações, pedidos de rota e visitas
@@ -34,45 +57,34 @@ export class PresencaLocalService {
 
   async painel(organizationId: string, dias: number, hoje = hojeLocal()) {
     const { atual, anterior } = janelas(hoje, dias);
-    const conexao = await this.prisma.googleAdsConexao.findUnique({
-      where: { organizationId },
-      select: { ultimoEnvioEm: true, versaoDoScript: true, partesDoScript: true },
-    });
+    const medicao = await this.medicao(organizationId);
 
-    const partes = (conexao?.partesDoScript as Record<string, string> | null) ?? {};
-    const medida = (metrica: Metrica) => (conexao?.versaoDoScript ?? 1) >= VERSAO_DO_SCRIPT && partes[PARTE_DA_METRICA[metrica]] === "ok";
-    const situacao = !conexao?.ultimoEnvioEm
-      ? "sem-google-ads"
-      : (conexao.versaoDoScript ?? 1) < VERSAO_DO_SCRIPT
-        ? "script-desatualizado"
-        : METRICAS.every(medida)
-          ? "medido"
-          : "parcial";
-
-    const [metricasAtual, metricasAnterior, gastoAtual, gastoAnterior, campanhas] = await Promise.all([
+    const [metricasAtual, metricasAnterior, somaAtual, somaAnterior, campanhas] = await Promise.all([
       this.metricasPorDia(organizationId, atual),
       this.metricasPorDia(organizationId, anterior),
-      this.gasto(organizationId, atual),
-      this.gasto(organizationId, anterior),
-      this.porCampanha(organizationId, atual),
+      this.somaDoGoogle(organizationId, atual),
+      this.somaDoGoogle(organizationId, anterior),
+      this.porCampanha(organizationId, atual, medicao),
     ]);
 
     const total = (linhas: { metrica: string; valor: number }[], metrica: Metrica) =>
-      medida(metrica) ? Math.round(linhas.filter((l) => l.metrica === metrica).reduce((s, l) => s + l.valor, 0) * 100) / 100 : null;
+      medicao.medida(metrica) ? arredonda(linhas.filter((l) => l.metrica === metrica).reduce((s, l) => s + l.valor, 0)) : null;
 
     const totais = Object.fromEntries(
       METRICAS.map((m) => [m, { atual: total(metricasAtual, m), anterior: total(metricasAnterior, m) }]),
-    ) as Record<Metrica, { atual: number | null; anterior: number | null }>;
+    ) as Record<Metrica, Par>;
 
-    const temGoogle = Boolean(conexao?.ultimoEnvioEm);
-    const investimento = { atual: temGoogle ? gastoAtual : null, anterior: temGoogle ? gastoAnterior : null };
+    const investimento = {
+      atual: medicao.temGoogle ? somaAtual.gastoCentavos : null,
+      anterior: medicao.temGoogle ? somaAnterior.gastoCentavos : null,
+    };
 
     return {
       periodo: atual,
       periodoAnterior: anterior,
-      situacao,
-      partes,
-      ultimoEnvioEm: conexao?.ultimoEnvioEm?.toISOString() ?? null,
+      situacao: medicao.situacao,
+      partes: medicao.partes,
+      ultimoEnvioEm: medicao.ultimoEnvioEm,
       totais,
       investimento,
       custo: {
@@ -87,10 +99,102 @@ export class PresencaLocalService {
       },
       serie: diasDa(atual).map((dia) => {
         const doDia = metricasAtual.filter((l) => l.dia === dia);
-        const soma = (m: Metrica) => (medida(m) ? doDia.filter((l) => l.metrica === m).reduce((s, l) => s + l.valor, 0) : null);
+        const soma = (m: Metrica) => (medicao.medida(m) ? doDia.filter((l) => l.metrica === m).reduce((s, l) => s + l.valor, 0) : null);
         return { dia, ligacoes: soma("LIGACOES_DOS_ANUNCIOS"), rotas: soma("ROTAS") };
       }),
       campanhas,
+    };
+  }
+
+  /**
+   * Cada campanha do Google num período livre, com a comparação escolhida à
+   * mão, para a tela de campanhas andar mês a mês como a de leads.
+   *
+   * A campanha que só rodou na comparação continua na lista, com `atual`
+   * nulo: "não rodou" é metade da explicação de uma queda.
+   */
+  async campanhas(organizationId: string, periodo: Janela, comparacao: Janela | null) {
+    const medicao = await this.medicao(organizationId);
+    const [linhasAtuais, linhasAnteriores, resumoAtual, resumoAnterior] = await Promise.all([
+      this.porCampanha(organizationId, periodo, medicao),
+      comparacao ? this.porCampanha(organizationId, comparacao, medicao) : Promise.resolve(null),
+      this.resumo(organizationId, periodo, medicao),
+      comparacao ? this.resumo(organizationId, comparacao, medicao) : Promise.resolve(null),
+    ]);
+
+    const anteriores = new Map((linhasAnteriores ?? []).map((l) => [l.externalId, l]));
+    const atuais = new Set(linhasAtuais.map((l) => l.externalId));
+    const campanhas = [
+      ...linhasAtuais.map((l) => ({ ...cabecalho(l), atual: numeros(l), anterior: anteriores.has(l.externalId) ? numeros(anteriores.get(l.externalId)!) : null })),
+      ...(linhasAnteriores ?? [])
+        .filter((l) => !atuais.has(l.externalId))
+        .map((l) => ({ ...cabecalho(l), atual: null, anterior: numeros(l) })),
+    ];
+
+    const par = (campo: keyof typeof resumoAtual): Par => ({ atual: resumoAtual[campo], anterior: resumoAnterior ? resumoAnterior[campo] : null });
+
+    return {
+      periodo,
+      comparacao,
+      situacao: medicao.situacao,
+      partes: medicao.partes,
+      ultimoEnvioEm: medicao.ultimoEnvioEm,
+      totais: {
+        gastoCentavos: par("gastoCentavos"),
+        cliques: par("cliques"),
+        impressoes: par("impressoes"),
+        ligacoes: par("ligacoes"),
+        rotas: par("rotas"),
+        custoPorLigacao: par("custoPorLigacao"),
+        custoPorRota: par("custoPorRota"),
+      },
+      campanhas,
+    };
+  }
+
+  /** Se o script manda ligações e rotas, e o que isso quer dizer para a tela. */
+  private async medicao(organizationId: string): Promise<Medicao> {
+    const conexao = await this.prisma.googleAdsConexao.findUnique({
+      where: { organizationId },
+      select: { ultimoEnvioEm: true, versaoDoScript: true, partesDoScript: true },
+    });
+
+    const partes = (conexao?.partesDoScript as Record<string, string> | null) ?? {};
+    const versao = conexao?.versaoDoScript ?? 1;
+    const medida = (metrica: Metrica) => versao >= VERSAO_DO_SCRIPT && partes[PARTE_DA_METRICA[metrica]] === "ok";
+    const situacao = !conexao?.ultimoEnvioEm
+      ? "sem-google-ads"
+      : versao < VERSAO_DO_SCRIPT
+        ? "script-desatualizado"
+        : METRICAS.every(medida)
+          ? "medido"
+          : "parcial";
+
+    return {
+      situacao,
+      partes,
+      ultimoEnvioEm: conexao?.ultimoEnvioEm?.toISOString() ?? null,
+      temGoogle: Boolean(conexao?.ultimoEnvioEm),
+      medida,
+    };
+  }
+
+  /** Os totais de uma janela, do jeito que a tela de campanhas mostra. */
+  private async resumo(organizationId: string, janela: Janela, medicao: Medicao) {
+    const [soma, metricas] = await Promise.all([this.somaDoGoogle(organizationId, janela), this.metricasPorDia(organizationId, janela)]);
+    const total = (metrica: Metrica) =>
+      medicao.medida(metrica) ? arredonda(metricas.filter((l) => l.metrica === metrica).reduce((s, l) => s + l.valor, 0)) : null;
+    const gastoCentavos = medicao.temGoogle ? soma.gastoCentavos : null;
+    const ligacoes = total("LIGACOES_DOS_ANUNCIOS");
+    const rotas = total("ROTAS");
+    return {
+      gastoCentavos,
+      cliques: medicao.temGoogle ? soma.cliques : null,
+      impressoes: medicao.temGoogle ? soma.impressoes : null,
+      ligacoes,
+      rotas,
+      custoPorLigacao: custoPor(gastoCentavos, ligacoes),
+      custoPorRota: custoPor(gastoCentavos, rotas),
     };
   }
 
@@ -107,19 +211,24 @@ export class PresencaLocalService {
     return linhas.map((l) => ({ metrica: l.metrica, dia: l.dia.toISOString().slice(0, 10), valor: l.valor }));
   }
 
-  private async gasto(organizationId: string, janela: Janela): Promise<number> {
+  /** Gasto, cliques e impressões das campanhas do Google na janela. */
+  private async somaDoGoogle(organizationId: string, janela: Janela) {
     const soma = await this.prisma.adSpend.aggregate({
       where: {
         campaign: { organizationId, platform: "GOOGLE" },
         date: { gte: dataDe(janela.de), lte: dataDe(janela.ate) },
       },
-      _sum: { spendCents: true },
+      _sum: { spendCents: true, cliques: true, impressoes: true },
     });
-    return soma._sum.spendCents ?? 0;
+    return {
+      gastoCentavos: soma._sum.spendCents ?? 0,
+      cliques: soma._sum.cliques ?? 0,
+      impressoes: soma._sum.impressoes ?? 0,
+    };
   }
 
   /** Cada campanha do Google no período: quanto gastou e o que trouxe. */
-  private async porCampanha(organizationId: string, janela: Janela) {
+  private async porCampanha(organizationId: string, janela: Janela, medicao: Medicao): Promise<LinhaDaCampanha[]> {
     const de = dataDe(janela.de);
     const ate = dataDe(janela.ate);
     const [campanhas, metricas] = await Promise.all([
@@ -138,11 +247,14 @@ export class PresencaLocalService {
         _sum: { valor: true },
       }),
     ]);
-    const daCampanha = (externalId: string | null, metrica: string) =>
-      metricas.find((m) => m.escopo === externalId && m.metrica === metrica)?._sum.valor ?? 0;
+    const daCampanha = (externalId: string, metrica: Metrica) =>
+      medicao.medida(metrica)
+        ? arredonda(metricas.find((m) => m.escopo === externalId && m.metrica === metrica)?._sum.valor ?? 0)
+        : null;
 
     return campanhas
       .map((c) => ({
+        externalId: c.externalId,
         nome: c.name,
         status: c.status,
         gastoCentavos: c.spend.reduce((s, d) => s + d.spendCents, 0),
@@ -151,7 +263,19 @@ export class PresencaLocalService {
         ligacoes: daCampanha(c.externalId, "LIGACOES_DOS_ANUNCIOS"),
         rotas: daCampanha(c.externalId, "ROTAS"),
       }))
-      .filter((c) => c.gastoCentavos > 0 || c.ligacoes > 0 || c.rotas > 0)
+      .filter((c) => c.gastoCentavos > 0 || (c.ligacoes ?? 0) > 0 || (c.rotas ?? 0) > 0)
       .sort((a, b) => b.gastoCentavos - a.gastoCentavos);
   }
 }
+
+const cabecalho = (l: LinhaDaCampanha) => ({ externalId: l.externalId, nome: l.nome, status: l.status });
+
+const numeros = (l: LinhaDaCampanha) => ({
+  gastoCentavos: l.gastoCentavos,
+  cliques: l.cliques,
+  impressoes: l.impressoes,
+  ligacoes: l.ligacoes,
+  rotas: l.rotas,
+  custoPorLigacao: custoPor(l.gastoCentavos, l.ligacoes),
+  custoPorRota: custoPor(l.gastoCentavos, l.rotas),
+});

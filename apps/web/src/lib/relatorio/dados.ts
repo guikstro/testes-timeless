@@ -180,3 +180,72 @@ export function montaBlocoDeDados(d: DadosDoRelatorio): string {
 
   return linhas.join("\n");
 }
+
+/** O que o relatório de presença local recebe: o mesmo painel do dashboard. */
+export interface DadosDePresencaLocal {
+  cliente: string;
+  periodo: { de: string; ate: string; dias: number };
+  ligacoes: { atual: number | null; anterior: number | null };
+  rotas: { atual: number | null; anterior: number | null };
+  visitas: { atual: number | null; anterior: number | null };
+  ligacoesConversao: { atual: number | null; anterior: number | null };
+  investimento: { atual: number | null; anterior: number | null };
+  /** Ligação e rota `null` quando não medidas. */
+  campanhas: {
+    nome: string;
+    gastoCentavos: number;
+    ligacoes: number | null;
+    rotas: number | null;
+    cliques: number;
+    impressoes: number;
+  }[];
+}
+
+/**
+ * O bloco de dados de um cliente de presença local. Diz ao modelo que a
+ * métrica principal é ligação e rota, e que não há lead nem venda nesta
+ * execução, para ele não inventar funil.
+ */
+export function montaBlocoDePresencaLocal(d: DadosDePresencaLocal): string {
+  const linhas: string[] = [];
+  linhas.push(`CLIENTE:\n${d.cliente}`);
+  linhas.push(`\nPERÍODO:\n${dataBr(d.periodo.de)} a ${dataBr(d.periodo.ate)} (${d.periodo.dias} dias)`);
+  linhas.push(
+    "\nOBJETIVO DAS CAMPANHAS:\nPresença local: fazer o cliente ligar e ir até o endereço. As métricas principais são ligações e pedidos de rota vindos dos anúncios do Google, e o custo de cada um.",
+  );
+
+  linhas.push("\nRESULTADOS DO PERÍODO (medidos pelo Google Ads):");
+  const medida = (rotulo: string, par: { atual: number | null; anterior: number | null }) => {
+    if (par.atual === null) {
+      linhas.push(`- ${rotulo}: não medido nesta execução. Não mencionar.`);
+    } else {
+      linhas.push(linhaComparada(rotulo, par.atual, par.anterior ?? 0));
+    }
+  };
+  medida("Ligações pelos anúncios", d.ligacoes);
+  medida("Pedidos de rota", d.rotas);
+  medida("Ligações contadas como conversão (inclui cliques para ligar)", d.ligacoesConversao);
+  medida("Visitas à loja (estimadas pelo Google)", d.visitas);
+
+  if (d.investimento.atual !== null && d.investimento.atual > 0) {
+    linhas.push("\nINVESTIMENTO NO GOOGLE ADS:");
+    linhas.push(linhaComparada("Total", d.investimento.atual, d.investimento.anterior ?? 0, reais));
+    if (d.ligacoes.atual) linhas.push(`- Custo por ligação: ${reais(Math.round(d.investimento.atual / d.ligacoes.atual))}`);
+    if (d.rotas.atual) linhas.push(`- Custo por pedido de rota: ${reais(Math.round(d.investimento.atual / d.rotas.atual))}`);
+  }
+
+  if (d.campanhas.length > 0) {
+    linhas.push("\nPOR CAMPANHA (gasto, ligações, rotas, cliques, impressões):");
+    const oQueFoiMedido = (valor: number | null) => (valor === null ? "não medido" : String(valor));
+    for (const c of d.campanhas) {
+      linhas.push(
+        `- ${c.nome}: ${reais(c.gastoCentavos)}, ${oQueFoiMedido(c.ligacoes)}, ${oQueFoiMedido(c.rotas)}, ${c.cliques}, ${c.impressoes}`,
+      );
+    }
+  }
+
+  linhas.push(
+    "\nOBSERVAÇÕES:\n- Este cliente não é medido por leads nem vendas. Não criar funil de leads, taxa de conversão de lead ou receita.\n- Ligações e rotas que não vieram de anúncio (as do Perfil da Empresa no Google) não estão nesta execução.",
+  );
+  return linhas.join("\n");
+}

@@ -1,9 +1,10 @@
 import { cache } from "react";
 import { apiFetch } from "./api-client";
+import type { Foco } from "./foco";
 
 export interface SessaoAtual {
   user: { id: string; name: string; email: string; platformRole: "SUPPORT" | "ADMIN" | null };
-  organization: { id: string; name: string; logoUrl: string | null; brandColor: string | null };
+  organization: { id: string; name: string; logoUrl: string | null; brandColor: string | null; foco: Foco };
   impersonating: boolean;
   /** `null` é sem limite. */
   areas: string[] | null;

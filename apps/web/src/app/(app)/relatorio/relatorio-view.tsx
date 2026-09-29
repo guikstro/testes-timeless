@@ -5,7 +5,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { GrupoDePilulas } from "@/components/ui/pill-group";
 import { CopyPrompt } from "./copy-prompt";
-import { DadosDoRelatorio, RelatorioImpresso } from "./relatorio-impresso";
 import { PERIODOS } from "./periodos";
 
 /**
@@ -18,14 +17,16 @@ import { PERIODOS } from "./periodos";
  * a outro lugar montar o documento.
  */
 export function RelatorioView({
-  dados,
+  impresso,
   bloco,
   prompt,
   nomeArquivo,
   days,
   aviso,
+  presencaLocal = false,
 }: {
-  dados: DadosDoRelatorio;
+  /** O documento pronto: o de leads ou o de presença local. */
+  impresso: React.ReactNode;
   /** O bloco de texto que vai dentro do prompt, mostrado na aba da IA. */
   bloco: string;
   prompt: string;
@@ -33,6 +34,8 @@ export function RelatorioView({
   days: number;
   /** Aviso de que os números de lead não são medida. Não vai para a impressão. */
   aviso?: React.ReactNode;
+  /** O investimento já vem do Google Ads, e não há lead para custear. */
+  presencaLocal?: boolean;
 }) {
   const [aba, setAba] = useState<"pronto" | "ia">("pronto");
 
@@ -81,7 +84,7 @@ export function RelatorioView({
 
       {aba === "pronto" ? (
         <div className="surface p-6 sm:p-8 print:border-0 print:p-0 print:shadow-none">
-          <RelatorioImpresso dados={dados} />
+          {impresso}
         </div>
       ) : (
         <div className="print:hidden">
@@ -105,11 +108,16 @@ export function RelatorioView({
             </ol>
             <p className="mt-3 text-apoio leading-relaxed text-ink-mute">
               Serve para quando você quer um documento desenhado, com imagens e identidade visual do cliente. Para o
-              envio do dia a dia, o relatório da outra aba já está pronto.{" "}
-              <Link href="/campanhas" className="text-ink underline decoration-line underline-offset-4">
-                Lance o investimento
-              </Link>{" "}
-              para os dois incluírem custo por lead e retorno.
+              envio do dia a dia, o relatório da outra aba já está pronto.
+              {presencaLocal ? null : (
+                <>
+                  {" "}
+                  <Link href="/campanhas" className="text-ink underline decoration-line underline-offset-4">
+                    Lance o investimento
+                  </Link>{" "}
+                  para os dois incluírem custo por lead e retorno.
+                </>
+              )}
             </p>
           </div>
         </div>

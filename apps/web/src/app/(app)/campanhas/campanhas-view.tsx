@@ -1,3 +1,4 @@
+import { ReactNode } from "react";
 import Link from "next/link";
 import { AvisoDeMedicao } from "@/components/aviso-de-medicao";
 import { Badge } from "@/components/ui/badge";
@@ -29,10 +30,13 @@ export function CampanhasView({
   dados,
   medicao,
   desdeDoWhatsApp,
+  abas,
 }: {
   dados: DesempenhoDeCampanhas;
   medicao: Medicao;
   desdeDoWhatsApp: string | null;
+  /** Leads e presença local, para quem tem os dois focos. */
+  abas?: ReactNode;
 }) {
   const { periodo, comparacao, campanhas, semCampanha, totais } = dados;
   const medido = medicao === "medido";
@@ -67,6 +71,7 @@ export function CampanhasView({
 
   return (
     <div className="mx-auto max-w-6xl">
+      {abas}
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Campanhas</h1>
@@ -197,7 +202,16 @@ function retorno(receitaCentavos: number, gastoCentavos: number, vendas: number)
  * quase toda comparação é contra o mês anterior ou o mesmo mês do ano
  * anterior: as setas e três opções cobrem isso sem grade nenhuma.
  */
-function SeletorDePeriodo({ periodo, comparacao }: { periodo: Intervalo; comparacao: Intervalo | null }) {
+export function SeletorDePeriodo({
+  periodo,
+  comparacao,
+  aba,
+}: {
+  periodo: Intervalo;
+  comparacao: Intervalo | null;
+  /** A aba da tela, que a troca de mês não pode perder. */
+  aba?: string;
+}) {
   const mes = mesDoIntervalo(periodo) ?? {
     ano: Number(periodo.de.slice(0, 4)),
     mes: Number(periodo.de.slice(5, 7)),
@@ -210,6 +224,7 @@ function SeletorDePeriodo({ periodo, comparacao }: { periodo: Intervalo; compara
 
   function url(p: Intervalo, c: Intervalo | null) {
     const params = new URLSearchParams({ de: p.de, ate: p.ate });
+    if (aba) params.set("aba", aba);
     if (c) {
       params.set("compararDe", c.de);
       params.set("compararAte", c.ate);
@@ -283,13 +298,14 @@ function SetaDeMes({ href, direcao }: { href: string; direcao: "anterior" | "pro
   );
 }
 
-function Resumo({
+export function Resumo({
   titulo,
   valor,
   atual,
   anterior,
   nota,
   apagado = false,
+  invertido = false,
 }: {
   titulo: string;
   valor: string;
@@ -299,6 +315,8 @@ function Resumo({
   nota?: string;
   /** Sem medida: o valor é escrito, mas não pode parecer um número. */
   apagado?: boolean;
+  /** Para custo: subir é ruim. */
+  invertido?: boolean;
 }) {
   const compara = anterior !== undefined && atual !== undefined;
 
@@ -314,7 +332,7 @@ function Resumo({
       </p>
       {compara && (
         <div className="mt-1">
-          <Delta delta={anterior === 0 ? null : (atual - anterior) / anterior} />
+          <Delta delta={anterior === 0 ? null : (atual - anterior) / anterior} invertido={invertido} />
         </div>
       )}
       {nota && <p className="mt-1 text-rotulo text-ink-mute">{nota}</p>}
@@ -324,7 +342,7 @@ function Resumo({
 
 const PLATAFORMAS: Record<string, string> = { GOOGLE: "Google Ads", META: "Meta Ads" };
 
-const STATUS: Record<string, { rotulo: string; tom: "success" | "neutral" }> = {
+export const STATUS: Record<string, { rotulo: string; tom: "success" | "neutral" }> = {
   ACTIVE: { rotulo: "Ativa", tom: "success" },
   PAUSED: { rotulo: "Pausada", tom: "neutral" },
   ARCHIVED: { rotulo: "Arquivada", tom: "neutral" },
@@ -508,16 +526,19 @@ function ColunasSemMedida() {
   );
 }
 
-function Numero({
+export function Numero({
   valor,
   variacao,
   nota,
   apagado = false,
+  invertido = false,
 }: {
   valor: string;
   variacao?: { delta: number | null; anterior: number };
   nota?: string;
   apagado?: boolean;
+  /** Para custo: subir é ruim. */
+  invertido?: boolean;
 }) {
   return (
     <td
@@ -528,7 +549,7 @@ function Numero({
       <span className="block">{valor}</span>
       {variacao && (
         <span className="mt-0.5 block">
-          <Delta delta={variacao.delta} />
+          <Delta delta={variacao.delta} invertido={invertido} />
         </span>
       )}
       {nota && <span className="mt-0.5 block whitespace-normal text-rotulo font-normal text-ink-mute">{nota}</span>}

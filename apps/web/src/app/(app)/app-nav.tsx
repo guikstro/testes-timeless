@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ReactNode, useState } from "react";
 import { OrgLogo } from "@/components/ui/logo";
 import { podeVer } from "@/lib/areas";
+import { Foco, focoMostra } from "@/lib/foco";
 import { LeaveClientButton } from "./impersonation-banner";
 import { LogoutButton } from "./logout-button";
 
@@ -201,12 +202,15 @@ export function AppNav({
   showAdmin,
   impersonating = false,
   areas = null,
+  foco = "LEADS",
 }: {
   organizationName: string;
   logoUrl?: string | null;
   showAdmin: boolean;
   impersonating?: boolean;
   areas?: string[] | null;
+  /** O foco do cliente: presença local tira do menu o que é de lead. */
+  foco?: Foco;
 }) {
   const [pinned, setPinned] = useState(false);
   const pathname = usePathname();
@@ -310,7 +314,7 @@ export function AppNav({
           </span>
         </Identidade>
 
-        <nav className="flex flex-1 flex-col gap-1">{(showAdmin ? ITENS_DA_TIMELESS : NAV_ITEMS.filter((item) => podeVer(areas, item.href))).map((item) => renderItem(item))}</nav>
+        <nav className="flex flex-1 flex-col gap-1">{(showAdmin ? ITENS_DA_TIMELESS : NAV_ITEMS.filter((item) => podeVer(areas, item.href) && focoMostra(foco, item.href))).map((item) => renderItem(item))}</nav>
 
         <div className="flex flex-col gap-1 pt-2">
           <button

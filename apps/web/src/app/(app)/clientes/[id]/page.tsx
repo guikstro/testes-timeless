@@ -4,6 +4,7 @@ import { WhatsAppDoCliente, WhatsAppDoClienteDados } from "./whatsapp-do-cliente
 import { CorDoCliente } from "../cor-do-cliente";
 import { PessoaDoCliente, PessoasDoCliente } from "./pessoas-do-cliente";
 import { ExcluirCliente } from "./excluir-cliente";
+import { FocoDoCliente } from "./foco-do-cliente";
 
 export default async function ClientePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -21,6 +22,7 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
         <CorDoCliente cor={dados.organizacao.brandColor} />
         {dados.organizacao.name}
       </h1>
+      <FocoDoCliente organizationId={id} foco={dados.organizacao.foco} />
       <WhatsAppDoCliente dados={dados} />
       <PessoasDoCliente organizationId={id} pessoas={pessoas} />
       <ExcluirCliente organizationId={id} nome={dados.organizacao.name} />

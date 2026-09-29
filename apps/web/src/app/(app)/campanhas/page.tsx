@@ -1,8 +1,12 @@
 import { apiFetch } from "@/lib/api-client";
 import { conexaoDoWhatsApp } from "@/lib/conexao-do-whatsapp";
+import { temPresencaLocal } from "@/lib/foco";
 import { inicioDaMedicao, medicaoDeLeads } from "@/lib/medicao-de-leads";
 import { intervaloDoMes, leIntervalo, mesAtual } from "@/lib/periodo";
+import { sessaoAtual } from "@/lib/sessao";
+import { GrupoDePilulas } from "@/components/ui/pill-group";
 import { CampanhasView } from "./campanhas-view";
+import { CampanhasDePresencaLocal, CampanhasLocaisView } from "./campanhas-locais";
 import { DesempenhoDeCampanhas } from "./tipos";
 
 interface Busca {
@@ -10,10 +14,12 @@ interface Busca {
   ate?: string;
   compararDe?: string;
   compararAte?: string;
+  aba?: string;
 }
 
 export default async function CampanhasPage({ searchParams }: { searchParams: Promise<Busca> }) {
   const params = await searchParams;
+  const { organization } = await sessaoAtual();
 
   // Sem período na URL, o mês corrente: é o que se quer ver ao abrir a tela.
   const agora = mesAtual();
@@ -24,6 +30,22 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
   if (comparacao) {
     query.set("compararDe", comparacao.de);
     query.set("compararAte", comparacao.ate);
+  }
+
+  // Só presença local: as colunas são ligação e rota, sem nada de lead.
+  if (organization.foco === "PRESENCA_LOCAL") {
+    const dados = await apiFetch<CampanhasDePresencaLocal>(`/presenca-local/campanhas?${query.toString()}`);
+    return <CampanhasLocaisView dados={dados} />;
+  }
+
+  // Os dois focos: a mesma tela com duas abas, e a aba vai no endereço.
+  const doisFocos = temPresencaLocal(organization.foco);
+  const aba = doisFocos && params.aba === "local" ? "local" : "leads";
+  const abas = doisFocos ? <AbasDoFoco ativa={aba} query={query} /> : undefined;
+
+  if (aba === "local") {
+    const dados = await apiFetch<CampanhasDePresencaLocal>(`/presenca-local/campanhas?${query.toString()}`);
+    return <CampanhasLocaisView dados={dados} abas={abas} aba="local" />;
   }
 
   const [dados, conexao] = await Promise.all([
@@ -44,6 +66,26 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
       dados={dados}
       medicao={medicao}
       desdeDoWhatsApp={conexao ? inicioDaMedicao(conexao) : null}
+      abas={abas}
+    />
+  );
+}
+
+/** Leads ou presença local, no mesmo mês e com a mesma comparação. */
+function AbasDoFoco({ ativa, query }: { ativa: "leads" | "local"; query: URLSearchParams }) {
+  const para = (aba: "leads" | "local") => {
+    const destino = new URLSearchParams(query);
+    if (aba === "local") destino.set("aba", "local");
+    return `/campanhas?${destino.toString()}`;
+  };
+  return (
+    <GrupoDePilulas
+      className="mb-5"
+      ativo={ativa}
+      opcoes={[
+        { chave: "leads", rotulo: "Leads", href: para("leads") },
+        { chave: "local", rotulo: "Presença local", href: para("local") },
+      ]}
     />
   );
 }

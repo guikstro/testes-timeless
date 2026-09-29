@@ -208,7 +208,7 @@ export function RelatorioImpresso({ dados }: { dados: DadosDoRelatorio }) {
   );
 }
 
-function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+export function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
     // `break-inside` evita a seção ser cortada ao meio na virada da página
     // impressa, que é o defeito mais comum de relatório feito para tela.
@@ -219,7 +219,7 @@ function Secao({ titulo, children }: { titulo: string; children: React.ReactNode
   );
 }
 
-function Numero({
+export function Numero({
   rotulo,
   valor,
   nota,

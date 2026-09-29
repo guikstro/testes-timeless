@@ -16,6 +16,10 @@ export interface SituacaoDoGoogleAds {
     moeda: string | null;
     ultimoEnvioEm: string | null;
     atrasado: boolean;
+    /** O script colado é anterior às ligações e rotas. */
+    scriptDesatualizado?: boolean;
+    /** O que cada parte nova conseguiu ler no último envio. */
+    partes?: Record<string, string> | null;
   } | null;
   campanhas: {
     id: string;
@@ -113,6 +117,23 @@ export function ConexaoGoogleAds({ situacao, rotuloDoPeriodo }: { situacao: Situ
           agendado e sem erro.
         </Alert>
       ) : null}
+
+      {conexao?.scriptDesatualizado && !script ? (
+        <Alert tom="warning" className="mt-3" titulo="O script colado no Google Ads é o antigo">
+          Ele manda o gasto, mas não as ligações e os pedidos de rota. Gere o script de novo aqui em cima e cole no lugar
+          do atual, no Google Ads.
+        </Alert>
+      ) : null}
+
+      {conexao && !conexao.scriptDesatualizado && conexao.partes
+        ? Object.entries(conexao.partes)
+            .filter(([, estado]) => estado !== "ok")
+            .map(([parte, estado]) => (
+              <Alert key={parte} tom="info" className="mt-3" titulo={`O Google não deixou ler ${parte === "ligacoes" ? "as ligações" : "as ações locais"}`}>
+                O resto chega normalmente. Motivo informado pelo Google: {estado.replace(/^falhou:\s*/, "")}
+              </Alert>
+            ))
+        : null}
 
       {script ? <PassoAPasso script={script} /> : null}
 

@@ -1,3 +1,5 @@
+import { Foco, focoMostra } from "./foco";
+
 /**
  * As áreas do painel do cliente, uma por item do menu. As chaves são as mesmas
  * da API (`areas.decorator.ts`), que é quem de fato confere o acesso.
@@ -30,9 +32,9 @@ export function podeVer(areas: string[] | null | undefined, caminho: string): bo
   return areas.includes(area.chave);
 }
 
-/** A primeira tela que a pessoa pode abrir, para onde ela vai ao entrar. */
-export function telaInicial(areas: string[] | null | undefined): string {
-  return AREAS.find((item) => podeVer(areas, item.href))?.href ?? "/settings";
+/** A primeira tela que a pessoa pode abrir, e que o foco do cliente mostra, para onde ela vai ao entrar. */
+export function telaInicial(areas: string[] | null | undefined, foco?: Foco | null): string {
+  return AREAS.find((item) => podeVer(areas, item.href) && focoMostra(foco, item.href))?.href ?? "/settings";
 }
 
 export const rotuloDaArea = (chave: string) => AREAS.find((item) => item.chave === chave)?.rotulo ?? chave;

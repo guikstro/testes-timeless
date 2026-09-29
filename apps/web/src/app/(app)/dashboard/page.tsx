@@ -16,6 +16,9 @@ import { Procedencia } from "./procedencia";
 import { concluiAtendimento, concluiFunil, concluiOrigem, concluiVisaoGeral } from "./conclusao";
 import { Overview } from "./tipos";
 import { Alert } from "@/components/ui/alert";
+import { sessaoAtual } from "@/lib/sessao";
+import { temPresencaLocal } from "@/lib/foco";
+import { concluiPresencaLocal, PainelPresencaLocal, PresencaLocal } from "./painel-presenca-local";
 
 const PERIODOS = [7, 30, 90];
 
@@ -27,14 +30,17 @@ const PERIODOS = [7, 30, 90];
  * origem e funil. Aqui cada aba responde uma coisa, e o que não é daquela
  * pergunta não aparece.
  */
-const ABAS = [
+const ABAS_DE_LEADS = [
   { chave: "geral", rotulo: "Visão geral", conclui: concluiVisaoGeral },
   { chave: "funil", rotulo: "Funil", conclui: concluiFunil },
   { chave: "origem", rotulo: "Origem", conclui: concluiOrigem },
   { chave: "atendimento", rotulo: "Atendimento", conclui: concluiAtendimento },
 ] as const;
 
-type Aba = (typeof ABAS)[number]["chave"];
+/** Para quem tem os dois focos, a presença local vira mais uma aba. */
+const ABA_LOCAL = { chave: "local", rotulo: "Presença local", conclui: () => "" } as const;
+
+type Aba = (typeof ABAS_DE_LEADS)[number]["chave"] | "local";
 
 export default async function DashboardPage({
   searchParams,
@@ -43,7 +49,14 @@ export default async function DashboardPage({
 }) {
   const params = await searchParams;
   const days = PERIODOS.includes(Number(params.days)) ? Number(params.days) : 30;
+  const { organization } = await sessaoAtual();
+
+  // Só presença local: o painel inteiro é o do Google, sem nada de lead.
+  if (organization.foco === "PRESENCA_LOCAL") return <DashboardDePresencaLocal days={days} />;
+
+  const ABAS = temPresencaLocal(organization.foco) ? [...ABAS_DE_LEADS, ABA_LOCAL] : ABAS_DE_LEADS;
   const aba: Aba = ABAS.some((opcao) => opcao.chave === params.aba) ? (params.aba as Aba) : "geral";
+  const local = aba === "local" ? await apiFetch<PresencaLocal>(`/presenca-local?days=${days}`) : null;
 
   const [overview, conexao] = await Promise.all([
     apiFetch<Overview>(`/analytics/overview?days=${days}`),
@@ -54,6 +67,10 @@ export default async function DashboardPage({
   const de = overview.period.from.slice(0, 10);
   const ate = overview.period.to.slice(0, 10);
   const medicao = medicaoDeLeads({ conexao, ate, leads: totals.leads });
+
+  // Sem o WhatsApp medindo, as abas de lead não têm o que mostrar; a de
+  // presença local continua, porque quem mede ligação e rota é o Google.
+  const abasVisiveis = medicao === "medido" ? ABAS : ABAS.filter((opcao) => opcao.chave === "geral" || opcao.chave === "local");
 
   // Só quando não há medida: é o que se sabe do período sem o WhatsApp, e a
   // tela precisa ter algo verdadeiro para mostrar no lugar das abas.
@@ -94,9 +111,11 @@ export default async function DashboardPage({
               linha. O título diz o assunto; esta linha diz o que aconteceu.
             */}
             <p className="mt-0.5 text-corpo text-ink-mute">
-              {medicao === "medido"
-                ? escolhida.conclui(overview)
-                : "Sem WhatsApp recebendo, não há lead para medir neste período."}
+              {local
+                ? concluiPresencaLocal(local)
+                : medicao === "medido"
+                  ? escolhida.conclui(overview)
+                  : "Sem WhatsApp recebendo, não há lead para medir neste período."}
             </p>
           </div>
 
@@ -110,9 +129,9 @@ export default async function DashboardPage({
           />
         </div>
 
-        {medicao === "medido" ? (
+        {abasVisiveis.length > 1 ? (
           <nav className="mt-5 flex gap-1 border-b border-line" aria-label="Seções do dashboard">
-            {ABAS.map((opcao) => {
+            {abasVisiveis.map((opcao) => {
               const ativa = opcao.chave === aba;
               return (
                 <Link
@@ -134,7 +153,9 @@ export default async function DashboardPage({
         ) : null}
       </header>
 
-      {medicao !== "medido" ? (
+      {local ? <PainelPresencaLocal dados={local} /> : null}
+
+      {!local && medicao !== "medido" ? (
         <SemMedicao
           medicao={medicao}
           desde={conexao ? inicioDaMedicao(conexao) : null}
@@ -156,7 +177,7 @@ export default async function DashboardPage({
         acrescenta o que fazer a respeito, que é outra coisa, e por isso ele
         continua condicionado.
       */}
-      {medicao === "medido" && maioriaSemOrigem ? (
+      {!local && medicao === "medido" && maioriaSemOrigem ? (
         <Alert tom="warning" className="mt-6" titulo="A maior parte dos leads está sem origem identificada.">
           <p>
             A origem só é registrada quando a pessoa chega por um anúncio Click-to-WhatsApp ou por um link
@@ -186,7 +207,7 @@ export default async function DashboardPage({
         </Alert>
       ) : null}
 
-      {medicao === "medido" ? <Procedencia overview={overview} /> : null}
+      {!local && medicao === "medido" ? <Procedencia overview={overview} /> : null}
     </div>
   );
 }
@@ -266,6 +287,29 @@ function Numero({
         {valor}
       </p>
       {nota ? <p className="mt-1 text-rotulo text-ink-mute">{nota}</p> : null}
+    </div>
+  );
+}
+
+/** O dashboard de quem é só presença local: cabeçalho com período e o painel do Google. */
+async function DashboardDePresencaLocal({ days }: { days: number }) {
+  const dados = await apiFetch<PresencaLocal>(`/presenca-local?days=${days}`);
+  return (
+    <div className="mx-auto max-w-6xl">
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-rotulo font-semibold uppercase tracking-[0.14em] text-ink-mute">
+            {formataDia(dados.periodo.de)} a {formataDia(dados.periodo.ate)}
+          </p>
+          <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink">Presença local</h1>
+          <p className="mt-0.5 text-corpo text-ink-mute">{concluiPresencaLocal(dados)}</p>
+        </div>
+        <GrupoDePilulas
+          ativo={String(days)}
+          opcoes={PERIODOS.map((opcao) => ({ chave: String(opcao), rotulo: `${opcao} dias`, href: `/dashboard?days=${opcao}` }))}
+        />
+      </header>
+      <PainelPresencaLocal dados={dados} />
     </div>
   );
 }

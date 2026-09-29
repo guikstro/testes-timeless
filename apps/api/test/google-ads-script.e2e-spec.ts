@@ -181,7 +181,55 @@ describe("Google Ads por script (e2e)", () => {
       expect(p.situacao).toBe("parcial");
       expect(p.totais.LIGACOES_DOS_ANUNCIOS.atual).toBe(5);
       expect(p.totais.ROTAS.atual).toBeNull();
+      // Na linha da campanha também: rota sem medida não vira zero.
+      expect(p.campanhas[0]).toMatchObject({ ligacoes: 5, rotas: null });
       expect(await prisma.metricaLocal.count({ where: { metrica: "ROTAS", organization: { name: "Org GAds A" } } })).toBe(1);
+    });
+
+    it("tela de campanhas: o mês escolhido contra outro, com a campanha que só rodou na comparação", async () => {
+      const antigo = new Date(Date.parse(`${hoje}T00:00:00Z`) - 40 * 864e5).toISOString().slice(0, 10);
+      const corpo = envio();
+      corpo.campanhas[1].dias = [{ data: antigo, custoMicros: 10_000_000, impressoes: 300, cliques: 20, conversoes: 0, valorConversoes: 0 }];
+      await manda(chaveA, {
+        ...corpo,
+        versao: 2,
+        partes: { ligacoes: "ok", acoesLocais: "ok" },
+        locais: [local("LIGACOES_DOS_ANUNCIOS", 3), local("ROTAS", 7), { campanha: "20002", data: antigo, metrica: "ROTAS", valor: 4 }],
+      }).expect(200);
+
+      const mes = `de=${hoje.slice(0, 8)}01&ate=${hoje}`;
+      const r = await request(app.getHttpServer())
+        .get(`/api/presenca-local/campanhas?${mes}&compararDe=${antigo}&compararAte=${antigo}`)
+        .set("Authorization", `Bearer ${tokenA}`)
+        .expect(200);
+
+      expect(r.body.situacao).toBe("medido");
+      expect(r.body.totais.gastoCentavos).toEqual({ atual: 4567, anterior: 1000 });
+      expect(r.body.totais.ligacoes).toEqual({ atual: 3, anterior: 0 });
+      expect(r.body.totais.rotas).toEqual({ atual: 7, anterior: 4 });
+      expect(r.body.totais.custoPorRota).toEqual({ atual: 652, anterior: 250 });
+      expect(r.body.campanhas).toEqual([
+        expect.objectContaining({ nome: "Busca | Implante", atual: expect.objectContaining({ ligacoes: 3, custoPorLigacao: 1522 }), anterior: null }),
+        expect.objectContaining({ nome: "PMax | Clareamento", atual: null, anterior: expect.objectContaining({ gastoCentavos: 1000, rotas: 4 }) }),
+      ]);
+
+      // Sem comparação, o outro lado é nulo, e não zero.
+      const so = await request(app.getHttpServer())
+        .get(`/api/presenca-local/campanhas?${mes}`)
+        .set("Authorization", `Bearer ${tokenA}`)
+        .expect(200);
+      expect(so.body.comparacao).toBeNull();
+      expect(so.body.totais.ligacoes).toEqual({ atual: 3, anterior: null });
+      expect(so.body.campanhas).toHaveLength(1);
+    });
+
+    it("tela de campanhas recusa período ao contrário ou data que não existe", async () => {
+      for (const busca of ["de=2026-09-30&ate=2026-09-01", "de=2026-02-31&ate=2026-03-01", "de=2026-09-01"]) {
+        await request(app.getHttpServer())
+          .get(`/api/presenca-local/campanhas?${busca}`)
+          .set("Authorization", `Bearer ${tokenA}`)
+          .expect(400);
+      }
     });
 
     it("o outro cliente não vê as ligações de A", async () => {
@@ -189,6 +237,12 @@ describe("Google Ads por script (e2e)", () => {
       expect(p.situacao).toBe("sem-google-ads");
       expect(p.totais.LIGACOES_DOS_ANUNCIOS.atual).toBeNull();
       expect(p.campanhas).toEqual([]);
+      const campanhas = await request(app.getHttpServer())
+        .get("/api/presenca-local/campanhas?de=2020-01-01&ate=2030-12-31&compararDe=2019-01-01&compararAte=2019-12-31")
+        .set("Authorization", `Bearer ${tokenB}`)
+        .expect(200);
+      expect(campanhas.body.campanhas).toEqual([]);
+      expect(JSON.stringify(campanhas.body)).not.toContain("Implante");
     });
 
     it("a sessão diz o foco do cliente; o padrão é leads", async () => {

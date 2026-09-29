@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { apiFetch, ApiRequestError } from "@/lib/api-client";
+import { apiFetch, ApiRequestError, rota } from "@/lib/api-client";
 
 export interface NovoClienteState {
   error?: string;
@@ -90,4 +90,15 @@ export async function excluiCliente(organizationId: string, confirmacao: string,
   }
   revalidatePath("/clientes");
   redirect("/clientes");
+}
+
+/** Leads, presença local ou os dois: o que o cliente vê no painel dele. */
+export async function mudaFoco(organizationId: string, foco: string): Promise<{ erro?: string }> {
+  try {
+    await apiFetch(rota`/admin/organizations/${organizationId}/foco`, { method: "PUT", body: JSON.stringify({ foco }) });
+  } catch (error) {
+    return { erro: mensagemDe(error, "Não foi possível mudar o foco.") };
+  }
+  revalidatePath(`/clientes/${organizationId}`);
+  return {};
 }

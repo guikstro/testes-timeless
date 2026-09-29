@@ -4,9 +4,10 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { desconecta, entra, geraLink, LinkGerado } from "../actions";
+import type { Foco } from "@/lib/foco";
 
 export interface WhatsAppDoClienteDados {
-  organizacao: { id: string; name: string; brandColor: string | null };
+  organizacao: { id: string; name: string; brandColor: string | null; foco: Foco };
   conexao: { status: string; provider: string; numero: string | null; ultimoEventoEm: string | null } | null;
   linkExpiraEm: string | null;
 }

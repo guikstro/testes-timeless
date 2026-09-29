@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { podeVer, telaInicial } from "@/lib/areas";
 import { sessaoAtual } from "@/lib/sessao";
+import { focoMostra } from "@/lib/foco";
 
 /**
  * Leva para uma tela que a pessoa pode abrir quando ela chega a uma área que
@@ -13,7 +14,7 @@ import { sessaoAtual } from "@/lib/sessao";
  * roda de novo quando se navega entre telas, o de cada área roda ao entrar nela.
  */
 export async function ExigeArea({ caminho, children }: { caminho: string; children: ReactNode }) {
-  const { areas } = await sessaoAtual();
-  if (!podeVer(areas, caminho)) redirect(telaInicial(areas));
+  const { areas, organization } = await sessaoAtual();
+  if (!podeVer(areas, caminho) || !focoMostra(organization.foco, caminho)) redirect(telaInicial(areas, organization.foco));
   return children;
 }
