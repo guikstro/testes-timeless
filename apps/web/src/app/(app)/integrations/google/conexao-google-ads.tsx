@@ -8,6 +8,7 @@ import { formatCentsAsBRL } from "@/lib/currency";
 import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
 import { desligaScriptDoGoogleAds, geraScriptDoGoogleAds } from "./script-actions";
 import { Alert } from "@/components/ui/alert";
+import { Foco, temPresencaLocal } from "@/lib/foco";
 
 export interface SituacaoDoGoogleAds {
   conexao: {
@@ -42,7 +43,17 @@ export interface SituacaoDoGoogleAds {
  * da própria conta e manda os números para cá. A chave vai dentro dele e
  * aparece uma vez só; se a pessoa perder, gera outro, e o antigo para.
  */
-export function ConexaoGoogleAds({ situacao, rotuloDoPeriodo }: { situacao: SituacaoDoGoogleAds; rotuloDoPeriodo: string }) {
+export function ConexaoGoogleAds({
+  situacao,
+  rotuloDoPeriodo,
+  foco = "LEADS",
+}: {
+  situacao: SituacaoDoGoogleAds;
+  rotuloDoPeriodo: string;
+  /** Com presença local, o script precisa mandar ligações e rotas; sem lead, não há WhatsApp a citar. */
+  foco?: Foco;
+}) {
+  const medeLigacoes = temPresencaLocal(foco);
   const [script, setScript] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [pendente, comecar] = useTransition();
@@ -118,14 +129,15 @@ export function ConexaoGoogleAds({ situacao, rotuloDoPeriodo }: { situacao: Situ
         </Alert>
       ) : null}
 
-      {conexao?.scriptDesatualizado && !script ? (
+      {/* Só para quem é medido por ligação e rota: para o cliente de leads, o script antigo basta. */}
+      {medeLigacoes && conexao?.scriptDesatualizado && !script ? (
         <Alert tom="warning" className="mt-3" titulo="O script colado no Google Ads é o antigo">
           Ele manda o gasto, mas não as ligações e os pedidos de rota. Gere o script de novo aqui em cima e cole no lugar
           do atual, no Google Ads.
         </Alert>
       ) : null}
 
-      {conexao && !conexao.scriptDesatualizado && conexao.partes
+      {medeLigacoes && conexao && !conexao.scriptDesatualizado && conexao.partes
         ? Object.entries(conexao.partes)
             .filter(([, estado]) => estado !== "ok")
             .map(([parte, estado]) => (
@@ -137,7 +149,7 @@ export function ConexaoGoogleAds({ situacao, rotuloDoPeriodo }: { situacao: Situ
 
       {script ? <PassoAPasso script={script} /> : null}
 
-      {campanhas.length > 0 ? <Tabela campanhas={campanhas} rotuloDoPeriodo={rotuloDoPeriodo} /> : null}
+      {campanhas.length > 0 ? <Tabela campanhas={campanhas} rotuloDoPeriodo={rotuloDoPeriodo} foco={foco} /> : null}
     </section>
   );
 }
@@ -176,7 +188,15 @@ const STATUS: Record<string, { rotulo: string; tom: "success" | "neutral" }> = {
 const inteiro = (n: number) => n.toLocaleString("pt-BR");
 const porcento = (n: number) => `${(n * 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
 
-function Tabela({ campanhas, rotuloDoPeriodo }: { campanhas: SituacaoDoGoogleAds["campanhas"]; rotuloDoPeriodo: string }) {
+function Tabela({
+  campanhas,
+  rotuloDoPeriodo,
+  foco,
+}: {
+  campanhas: SituacaoDoGoogleAds["campanhas"];
+  rotuloDoPeriodo: string;
+  foco: Foco;
+}) {
   const total = campanhas.reduce(
     (t, c) => ({
       gasto: t.gasto + c.gastoCentavos,
@@ -242,8 +262,12 @@ function Tabela({ campanhas, rotuloDoPeriodo }: { campanhas: SituacaoDoGoogleAds
         </table>
       </div>
       <p className="mt-2 text-apoio text-ink-mute">
-        Conversões como o Google conta, com as ações configuradas na conta. Os leads que chegam aqui pelo WhatsApp
-        aparecem em Campanhas.
+        Conversões como o Google conta, com as ações configuradas na conta.{" "}
+        {foco === "PRESENCA_LOCAL"
+          ? "As ligações e os pedidos de rota de cada campanha aparecem em Campanhas."
+          : foco === "AMBOS"
+            ? "Os leads que chegam aqui pelo WhatsApp, e as ligações e rotas, aparecem em Campanhas."
+            : "Os leads que chegam aqui pelo WhatsApp aparecem em Campanhas."}
       </p>
     </div>
   );

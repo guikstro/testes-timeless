@@ -7,6 +7,8 @@ import { ConexaoGoogleAds, SituacaoDoGoogleAds } from "./conexao-google-ads";
 import { periodoValido } from "./periodos";
 import { LinhaDeConversao } from "@/lib/google/conversoes-csv";
 import { diaCivil } from "@/lib/periodo";
+import { temLeads } from "@/lib/foco";
+import { sessaoAtual } from "@/lib/sessao";
 
 interface Campanha {
   id: string;
@@ -38,10 +40,14 @@ export default async function GoogleAdsPage({
   inicio.setDate(inicio.getDate() - (dias - 1));
   const de = diaCivil(inicio);
 
+  const { organization } = await sessaoAtual();
+  // Presença local não tem lead nem venda para devolver ao Google.
+  const comLeads = temLeads(organization.foco);
+
   const [situacao, campanhas, exportacao, organizacao] = await Promise.all([
     apiFetch<SituacaoDoGoogleAds>("/integrations/google/script"),
     apiFetch<Campanha[]>("/campaigns?platform=GOOGLE"),
-    apiFetch<Exportacao>(`/integrations/google/conversions?de=${de}&ate=${ate}`),
+    comLeads ? apiFetch<Exportacao>(`/integrations/google/conversions?de=${de}&ate=${ate}`) : Promise.resolve(null),
     apiFetch<{ currency: string }>("/organizations/current"),
   ]);
 
@@ -54,10 +60,16 @@ export default async function GoogleAdsPage({
     <div className="mx-auto max-w-4xl">
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Google Ads</h1>
       <p className="mb-6 mt-1 text-corpo text-ink-mute">
-        Quanto cada campanha gasta e o que ela traz, e as vendas devolvidas ao Google.
+        {comLeads
+          ? "Quanto cada campanha gasta e o que ela traz, e as vendas devolvidas ao Google."
+          : "Quanto cada campanha gasta, e as ligações e os pedidos de rota que ela traz."}
       </p>
 
-      <ConexaoGoogleAds situacao={situacao} rotuloDoPeriodo="este mês" />
+      <ConexaoGoogleAds
+        situacao={situacao}
+        rotuloDoPeriodo="este mês"
+        foco={organization.foco}
+      />
 
       {/*
         A API do Google Ads exige um token de desenvolvedor aprovado por eles,
@@ -72,24 +84,28 @@ export default async function GoogleAdsPage({
           campanha lançada à mão com o id real passa a ser atualizada pelo script quando ele for ligado, sem virar
           outra linha.
         </p>
-        <p className="mt-2.5 text-corpo leading-relaxed text-ink-soft">
-          A atribuição dos leads do Google já funciona hoje, por{" "}
-          <Link href="/links" className="text-ink underline decoration-line underline-offset-4 hover:decoration-accent">
-            link rastreável
-          </Link>
-          . Informar o ID da campanha aqui é o que liga esses leads ao gasto correspondente.
-        </p>
+        {comLeads ? (
+          <p className="mt-2.5 text-corpo leading-relaxed text-ink-soft">
+            A atribuição dos leads do Google já funciona hoje, por{" "}
+            <Link href="/links" className="text-ink underline decoration-line underline-offset-4 hover:decoration-accent">
+              link rastreável
+            </Link>
+            . Informar o ID da campanha aqui é o que liga esses leads ao gasto correspondente.
+          </p>
+        ) : null}
       </div>
 
-      <div className="mb-6">
-        <ConversionsExport
-          linhas={exportacao.linhas}
-          acoes={exportacao.acoes}
-          semGclid={exportacao.semGclid}
-          moeda={organizacao.currency}
-          dias={dias}
-        />
-      </div>
+      {exportacao ? (
+        <div className="mb-6">
+          <ConversionsExport
+            linhas={exportacao.linhas}
+            acoes={exportacao.acoes}
+            semGclid={exportacao.semGclid}
+            moeda={organizacao.currency}
+            dias={dias}
+          />
+        </div>
+      ) : null}
 
       <div className="surface mb-6 p-5">
         <h2 className="mb-4 text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">Nova campanha</h2>
