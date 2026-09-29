@@ -96,6 +96,13 @@ model Organization {
   currency String @default("BRL")
 
   /**
+   * O que importa para este cliente: leads (WhatsApp, vendas), presença local
+   * (ligações, rotas, visualizações no Google) ou os dois. Decide o menu, o
+   * dashboard e o relatório. Quem escolhe é a equipe Timeless.
+   */
+  foco FocoDoCliente @default(LEADS)
+
+  /**
    * Marca da organização na interface (Fase 12). Guardamos a URL, não o
    * arquivo: hospedar upload exige armazenamento, limites e varredura de
    * conteúdo — e o ganho para o cliente é o mesmo.
@@ -171,6 +178,7 @@ model Organization {
    */
   conversations        Conversation[]
   leadEvents           LeadEvent[]
+  metricasLocais       MetricaLocal[]
 
   @@map("organizations")
 }
@@ -990,6 +998,7 @@ model MetaConnection {
    * /**
    * /**
    * /**
+   * /**
    * /** Código numérico da Meta. Ver `leituraDoStatusDaConta`.
    */
   accountStatus    Int?      @map("account_status")
@@ -1287,6 +1296,17 @@ model GoogleAdsConexao {
   moeda          String?
   criadaEm       DateTime  @default(now()) @map("criada_em")
   ultimoEnvioEm  DateTime? @map("ultimo_envio_em")
+  /**
+   * A versão do script que enviou por último. Script antigo não manda
+   * ligações nem rotas, e a tela avisa para gerar de novo.
+   */
+  versaoDoScript Int?      @map("versao_do_script")
+  /**
+   * O que cada parte nova do script conseguiu ler no último envio, como
+   * `{ "ligacoes": "ok", "acoesLocais": "falhou: ..." }`. É o que separa
+   * "zero ligações" de "não deu para medir ligações".
+   */
+  partesDoScript Json?     @map("partes_do_script")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -1432,29 +1452,78 @@ model Notification {
  * Erros da própria plataforma, agrupados: a mesma falha repetida vira uma
  * linha com contador, e não mil linhas. É o que a tela de saúde lista e o que
  * dispara o aviso para a equipe quando algo novo quebra.
- *
  * Sem organização de propósito: um erro é da plataforma, mesmo quando
  * aconteceu dentro de um cliente (o cliente fica no contexto).
  */
 model ErroDaPlataforma {
   id          String    @id @default(uuid())
-  /** api ou navegador. */
+  /**
+   * api ou navegador.
+   */
   origem      String
-  /** O tipo do erro, como `TypeError` ou `erro_nao_tratado`. */
+  /**
+   * O tipo do erro, como `TypeError` ou `erro_nao_tratado`.
+   */
   tipo        String
-  /** Hash de origem, tipo, mensagem sem números e lugar: o que agrupa. */
+  /**
+   * Hash de origem, tipo, mensagem sem números e lugar: o que agrupa.
+   */
   assinatura  String    @unique
   mensagem    String
-  /** Pilha, cortada. */
+  /**
+   * Pilha, cortada.
+   */
   detalhe     String?
-  /** Caminho, método, organização, pedido: o da última ocorrência. */
+  /**
+   * Caminho, método, organização, pedido: o da última ocorrência.
+   */
   contexto    Json?
   ocorrencias Int       @default(1)
   primeiraEm  DateTime  @default(now()) @map("primeira_em")
   ultimaEm    DateTime  @default(now()) @map("ultima_em")
-  /** Marcado pela equipe. Se acontecer de novo, volta a ficar aberto. */
+  /**
+   * Marcado pela equipe. Se acontecer de novo, volta a ficar aberto.
+   */
   resolvidoEm DateTime? @map("resolvido_em")
 
   @@index([ultimaEm])
   @@map("erros_da_plataforma")
+}
+
+enum FocoDoCliente {
+  LEADS
+  PRESENCA_LOCAL
+  AMBOS
+}
+
+/**
+ * Métricas de presença local, por dia: ligações, pedidos de rota, visitas,
+ * visualizações. Uma tabela para todas as fontes (o Google Ads hoje, o Perfil
+ * da Empresa no Google depois), porque a tela soma e compara igual.
+ * `escopo` é o que o número descreve dentro da fonte: a campanha do Google Ads
+ * ou o local do Perfil da Empresa. Nunca vazio, para a unicidade valer.
+ */
+model MetricaLocal {
+  id             String              @id @default(uuid())
+  organizationId String              @map("organization_id")
+  fonte          FonteDeMetricaLocal
+  /**
+   * LIGACOES_DOS_ANUNCIOS, ROTAS, CLIQUES_PARA_LIGAR, VISITAS_A_LOJA...
+   */
+  metrica        String
+  escopo         String
+  dia            DateTime            @db.Date
+  valor          Float
+  atualizadoEm   DateTime            @default(now()) @updatedAt @map("atualizado_em")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, fonte, metrica, escopo, dia])
+  @@index([organizationId, dia])
+  @@map("metricas_locais")
+}
+
+enum FonteDeMetricaLocal {
+  GOOGLE_ADS
+  PERFIL_DA_EMPRESA
 }

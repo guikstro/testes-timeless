@@ -23,6 +23,7 @@ import { MetaConnectionsModule } from "./integrations/meta/meta-connections.modu
 import { CampaignsModule } from "./campaigns/campaigns.module";
 import { AdminModule } from "./admin/admin.module";
 import { AnalyticsModule } from "./analytics/analytics.module";
+import { PresencaLocalModule } from "./presenca-local/presenca-local.module";
 import { BudgetsModule } from "./budgets/budgets.module";
 import { ControleDeAnunciosModule } from "./integrations/meta/controle-de-anuncios.module";
 import { NotificationsStreamModule } from "./notifications/notifications-stream.module";
@@ -65,6 +66,7 @@ import { ObservabilidadeModule } from "./observabilidade/observabilidade.module"
     CampaignsModule,
     AdminModule,
     AnalyticsModule,
+    PresencaLocalModule,
     BudgetsModule,
     NotificationsStreamModule,
     ConversationsModule,

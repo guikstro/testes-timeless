@@ -82,3 +82,47 @@ export function contaLegivel(customerId: string): string {
   const digitos = customerId.replace(/\D/g, "");
   return digitos.length === 10 ? `${digitos.slice(0, 3)}-${digitos.slice(3, 6)}-${digitos.slice(6)}` : customerId;
 }
+
+/** As métricas locais que cada parte do script mede. */
+export const METRICAS_DA_PARTE = {
+  ligacoes: ["LIGACOES_DOS_ANUNCIOS", "EXIBICOES_DO_TELEFONE"],
+  acoesLocais: ["ROTAS", "LIGACOES_CONVERSAO", "VISITAS_A_LOJA"],
+} as const;
+
+export interface MetricaLocalConvertida {
+  escopo: string;
+  dia: Date;
+  metrica: string;
+  valor: number;
+}
+
+/**
+ * O que cada parte mediu de fato. Parte que falhou ou que o script antigo não
+ * tem fica de fora: os números dela no banco são mantidos, e a tela diz que
+ * aquela medida não está chegando.
+ */
+export function metricasMedidas(partes: { ligacoes?: string; acoesLocais?: string } | undefined): string[] {
+  if (!partes) return [];
+  return (Object.keys(METRICAS_DA_PARTE) as (keyof typeof METRICAS_DA_PARTE)[])
+    .filter((parte) => partes[parte] === "ok")
+    .flatMap((parte) => [...METRICAS_DA_PARTE[parte]]);
+}
+
+/** Uma linha por campanha, dia e métrica; se vier repetida, a última vence. */
+export function converteMetricasLocais(
+  locais: { campanha: string; data: string; metrica: string; valor: number }[] | undefined,
+  medidas: string[],
+): MetricaLocalConvertida[] {
+  const porChave = new Map<string, MetricaLocalConvertida>();
+  for (const l of locais ?? []) {
+    if (!medidas.includes(l.metrica) || l.valor <= 0) continue;
+    porChave.set(`${l.campanha}|${l.data}|${l.metrica}`, {
+      escopo: l.campanha,
+      dia: new Date(`${l.data}T00:00:00.000Z`),
+      metrica: l.metrica,
+      // Conversão pode vir fracionada (atribuição); duas casas bastam.
+      valor: Math.round(l.valor * 100) / 100,
+    });
+  }
+  return [...porChave.values()];
+}

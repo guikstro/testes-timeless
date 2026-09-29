@@ -124,6 +124,79 @@ describe("Google Ads por script (e2e)", () => {
     expect(busca.gastoCentavos).toBe(4567);
   });
 
+  describe("presença local: ligações e rotas", () => {
+    const painel = async (token = tokenA) =>
+      (await request(app.getHttpServer()).get("/api/presenca-local?days=7").set("Authorization", `Bearer ${token}`).expect(200)).body;
+    const local = (metrica: string, valor: number) => ({ campanha: "20001", data: hoje, metrica, valor });
+
+    it("script antigo: a tela pede o novo, e o painel diz que ligação e rota não estão sendo medidas", async () => {
+      const tela = await request(app.getHttpServer())
+        .get("/api/integrations/google/script")
+        .set("Authorization", `Bearer ${tokenA}`)
+        .expect(200);
+      expect(tela.body.conexao.scriptDesatualizado).toBe(true);
+
+      const p = await painel();
+      expect(p.situacao).toBe("script-desatualizado");
+      expect(p.totais.ROTAS.atual).toBeNull();
+      expect(p.investimento.atual).toBe(4567);
+      expect(p.custo.porRota.atual).toBeNull();
+    });
+
+    it("script novo: soma ligações e rotas e calcula o custo de cada uma", async () => {
+      await manda(chaveA, {
+        ...envio(),
+        versao: 2,
+        partes: { ligacoes: "ok", acoesLocais: "ok" },
+        locais: [local("LIGACOES_DOS_ANUNCIOS", 3), local("ROTAS", 7), local("LIGACOES_CONVERSAO", 2)],
+      }).expect(200);
+
+      const p = await painel();
+      expect(p.situacao).toBe("medido");
+      expect(p.totais.LIGACOES_DOS_ANUNCIOS.atual).toBe(3);
+      expect(p.totais.ROTAS.atual).toBe(7);
+      // Medido e sem nenhuma: zero, e não "sem medida".
+      expect(p.totais.VISITAS_A_LOJA.atual).toBe(0);
+      expect(p.custo.porLigacao.atual).toBe(1522);
+      expect(p.custo.porRota.atual).toBe(652);
+      expect(p.serie.find((d: { dia: string }) => d.dia === hoje)).toMatchObject({ ligacoes: 3, rotas: 7 });
+      expect(p.campanhas[0]).toMatchObject({ nome: "Busca | Implante", ligacoes: 3, rotas: 7 });
+
+      const tela = await request(app.getHttpServer())
+        .get("/api/integrations/google/script")
+        .set("Authorization", `Bearer ${tokenA}`)
+        .expect(200);
+      expect(tela.body.conexao.scriptDesatualizado).toBe(false);
+    });
+
+    it("parte que falhou não apaga o que já estava, e aparece como sem medida", async () => {
+      await manda(chaveA, {
+        ...envio(),
+        versao: 2,
+        partes: { ligacoes: "ok", acoesLocais: "falhou: consulta recusada" },
+        locais: [local("LIGACOES_DOS_ANUNCIOS", 5)],
+      }).expect(200);
+
+      const p = await painel();
+      expect(p.situacao).toBe("parcial");
+      expect(p.totais.LIGACOES_DOS_ANUNCIOS.atual).toBe(5);
+      expect(p.totais.ROTAS.atual).toBeNull();
+      expect(await prisma.metricaLocal.count({ where: { metrica: "ROTAS", organization: { name: "Org GAds A" } } })).toBe(1);
+    });
+
+    it("o outro cliente não vê as ligações de A", async () => {
+      const p = await painel(tokenB);
+      expect(p.situacao).toBe("sem-google-ads");
+      expect(p.totais.LIGACOES_DOS_ANUNCIOS.atual).toBeNull();
+      expect(p.campanhas).toEqual([]);
+    });
+
+    it("a sessão diz o foco do cliente; o padrão é leads", async () => {
+      const sessao = await request(app.getHttpServer()).get("/api/auth/session").set("Authorization", `Bearer ${tokenA}`).expect(200);
+      expect(sessao.body.organization.foco).toBe("LEADS");
+    });
+  });
+
   it("recusa envio sem chave ou com chave errada, e não grava nada", async () => {
     const antes = await prisma.adSpend.count();
     await manda(null, envio()).expect(401);

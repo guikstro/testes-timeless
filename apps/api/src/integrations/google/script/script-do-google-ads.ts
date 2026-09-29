@@ -7,16 +7,24 @@
  *
  * Janela de 35 dias, de hoje para trás: cobre o mês corrente inteiro mesmo no
  * dia 31, e reenviar um dia só substitui o que já estava.
+ *
+ * Versão 2: também ligações vindas dos anúncios e ações locais (rotas,
+ * ligações contadas como conversão, visitas à loja). Cada parte nova roda
+ * numa consulta separada e protegida: se o Google recusar numa conta, o gasto
+ * continua chegando, e o envio diz o que faltou.
  */
+export const VERSAO_DO_SCRIPT = 2;
+
 export function scriptDoGoogleAds(endereco: string, chave: string): string {
   return `/**
- * Timeless: envia o gasto e os números das campanhas desta conta.
+ * Timeless: envia o gasto, as ligações e as ações locais das campanhas desta conta.
  * Só lê. Não pausa, não muda orçamento, não mexe em nada.
  * Agende para rodar a cada hora.
  */
 var ENDERECO = ${JSON.stringify(endereco)};
 var CHAVE = ${JSON.stringify(chave)};
 var DIAS = 35;
+var VERSAO = ${VERSAO_DO_SCRIPT};
 
 function main() {
   var conta = AdsApp.currentAccount();
@@ -56,7 +64,48 @@ function main() {
     });
   }
 
+  // As partes novas não podem derrubar o envio do gasto.
+  var partes = {};
+  var locais = [];
+  var periodo = " WHERE segments.date BETWEEN '" + de + "' AND '" + ate + "'";
+
+  try {
+    var ligacoes = AdsApp.search(
+      "SELECT campaign.id, segments.date, metrics.phone_calls, metrics.phone_impressions FROM campaign" + periodo
+    );
+    while (ligacoes.hasNext()) {
+      var g = ligacoes.next();
+      var feitas = Number(g.metrics.phoneCalls || 0);
+      var vistas = Number(g.metrics.phoneImpressions || 0);
+      if (feitas > 0) locais.push({ campanha: String(g.campaign.id), data: g.segments.date, metrica: "LIGACOES_DOS_ANUNCIOS", valor: feitas });
+      if (vistas > 0) locais.push({ campanha: String(g.campaign.id), data: g.segments.date, metrica: "EXIBICOES_DO_TELEFONE", valor: vistas });
+    }
+    partes.ligacoes = "ok";
+  } catch (e) {
+    partes.ligacoes = "falhou: " + String(e).slice(0, 200);
+  }
+
+  var CATEGORIAS = { GET_DIRECTIONS: "ROTAS", PHONE_CALL_LEAD: "LIGACOES_CONVERSAO", STORE_VISIT: "VISITAS_A_LOJA" };
+  try {
+    var acoes = AdsApp.search(
+      "SELECT campaign.id, segments.date, segments.conversion_action_category, metrics.all_conversions FROM campaign" +
+      periodo + " AND segments.conversion_action_category IN ('GET_DIRECTIONS', 'PHONE_CALL_LEAD', 'STORE_VISIT')"
+    );
+    while (acoes.hasNext()) {
+      var a = acoes.next();
+      var valor = Number(a.metrics.allConversions || 0);
+      var metrica = CATEGORIAS[a.segments.conversionActionCategory];
+      if (metrica && valor > 0) locais.push({ campanha: String(a.campaign.id), data: a.segments.date, metrica: metrica, valor: valor });
+    }
+    partes.acoesLocais = "ok";
+  } catch (e) {
+    partes.acoesLocais = "falhou: " + String(e).slice(0, 200);
+  }
+
   var corpo = {
+    versao: VERSAO,
+    partes: partes,
+    locais: locais,
     conta: { id: String(conta.getCustomerId()).replace(/-/g, ""), nome: conta.getName(), moeda: conta.getCurrencyCode() },
     campanhas: Object.keys(campanhas).map(function (k) { return campanhas[k]; })
   };

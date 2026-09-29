@@ -5,8 +5,9 @@ import { AppException } from "../../../common/exceptions/app-exception";
 import { hashToken } from "../../../common/utils/hash-token";
 import { enderecoPublico } from "../../../common/configuracao/ambiente";
 import { AuditoriaService, Autor } from "../../../auditoria/auditoria.service";
-import { contaLegivel, converteCampanha } from "./converte-envio";
-import { scriptDoGoogleAds } from "./script-do-google-ads";
+import { contaLegivel, converteCampanha, converteMetricasLocais, metricasMedidas } from "./converte-envio";
+import { Prisma } from "@prisma/client";
+import { scriptDoGoogleAds, VERSAO_DO_SCRIPT } from "./script-do-google-ads";
 import { EnvioDoScriptDto } from "./envio.dto";
 
 /** Sem envio há mais que isto, a tela avisa que o script parou. */
@@ -126,6 +127,9 @@ export class GoogleAdsScriptService {
             moeda: conexao.moeda,
             ultimoEnvioEm: conexao.ultimoEnvioEm?.toISOString() ?? null,
             atrasado,
+            // Script colado antes das ligações e rotas: manda gasto, e só.
+            scriptDesatualizado: conexao.ultimoEnvioEm !== null && (conexao.versaoDoScript ?? 1) < VERSAO_DO_SCRIPT,
+            partes: (conexao.partesDoScript as Record<string, string> | null) ?? null,
           }
         : null,
       campanhas: linhas,
@@ -156,6 +160,13 @@ export class GoogleAdsScriptService {
     const organizationId = conexao.organizationId;
     const agora = new Date();
     const campanhas = envio.campanhas.map(converteCampanha);
+    const medidas = metricasMedidas(envio.partes);
+    const locais = converteMetricasLocais(envio.locais, medidas);
+    // A janela do envio: o que estiver nela e não vier de novo virou zero.
+    const datas = [...campanhas.flatMap((c) => c.dias.map((d) => d.data)), ...locais.map((l) => l.dia)];
+    const janela = datas.length
+      ? { gte: new Date(Math.min(...datas.map((d) => d.getTime()))), lte: new Date(Math.max(...datas.map((d) => d.getTime()))) }
+      : null;
     let dias = 0;
 
     await this.prisma.$transaction(
@@ -196,6 +207,19 @@ export class GoogleAdsScriptService {
           }
         }
 
+        // Só as métricas que a parte mediu desta vez são trocadas; as de uma
+        // parte que falhou ficam como estavam.
+        if (janela && medidas.length) {
+          await tx.metricaLocal.deleteMany({
+            where: { organizationId, fonte: "GOOGLE_ADS", metrica: { in: medidas }, dia: janela },
+          });
+          if (locais.length) {
+            await tx.metricaLocal.createMany({
+              data: locais.map((l) => ({ organizationId, fonte: "GOOGLE_ADS" as const, ...l })),
+            });
+          }
+        }
+
         await tx.googleAdsConexao.update({
           where: { id: conexao.id },
           data: {
@@ -203,6 +227,8 @@ export class GoogleAdsScriptService {
             nomeDaConta: envio.conta.nome.slice(0, 255),
             moeda: envio.conta.moeda,
             ultimoEnvioEm: agora,
+            versaoDoScript: envio.versao ?? 1,
+            partesDoScript: (envio.partes ?? Prisma.JsonNull) as Prisma.InputJsonValue | typeof Prisma.JsonNull,
           },
         });
       },
@@ -223,7 +249,7 @@ export class GoogleAdsScriptService {
       );
     }
 
-    return { recebido: true, campanhas: campanhas.length, dias };
+    return { recebido: true, campanhas: campanhas.length, dias, metricasLocais: locais.length };
   }
 }
 

@@ -133,6 +133,32 @@ describe("Administração da plataforma (e2e)", () => {
       expect(response.body.items[0].owner.email).toBe("cliente@admin-e2e.local");
     });
 
+    it("a equipe muda o foco do cliente, e a sessão dele passa a dizer o novo", async () => {
+      await request(app.getHttpServer())
+        .put(`/api/admin/organizations/${clientOrgId}/foco`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ foco: "PRESENCA_LOCAL" })
+        .expect(204);
+      const sessao = await request(app.getHttpServer())
+        .get("/api/auth/session")
+        .set("Authorization", `Bearer ${clientToken}`)
+        .expect(200);
+      expect(sessao.body.organization.foco).toBe("PRESENCA_LOCAL");
+
+      await request(app.getHttpServer())
+        .put(`/api/admin/organizations/${clientOrgId}/foco`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ foco: "QUALQUER" })
+        .expect(400);
+      // O próprio cliente não escolhe o foco.
+      await request(app.getHttpServer())
+        .put(`/api/admin/organizations/${clientOrgId}/foco`)
+        .set("Authorization", `Bearer ${clientToken}`)
+        .send({ foco: "LEADS" })
+        .expect(403);
+      await prisma.organization.update({ where: { id: clientOrgId }, data: { foco: "LEADS" } });
+    });
+
     it("a conta da própria equipe não aparece como cliente", async () => {
       const response = await request(app.getHttpServer())
         .get("/api/admin/organizations?search=Admin E2E")

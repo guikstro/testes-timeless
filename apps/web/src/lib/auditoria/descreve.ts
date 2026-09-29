@@ -54,6 +54,7 @@ const CAMPOS_DA_CONTA: Record<string, string> = {
   expedienteDias: "dias de atendimento",
   expedienteInicio: "abertura do atendimento",
   expedienteFim: "fechamento do atendimento",
+  foco: "foco do cliente",
 };
 
 function estado(valor: unknown): Estado {

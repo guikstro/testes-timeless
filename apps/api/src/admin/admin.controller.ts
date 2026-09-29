@@ -25,6 +25,7 @@ import { UpsertOperatorDto } from "./dto/upsert-operator.dto";
 import { CriaClienteDto } from "./dto/cria-cliente.dto";
 import { CriaConviteDto } from "./dto/cria-convite.dto";
 import { ExcluiClienteDto } from "./dto/exclui-cliente.dto";
+import { MudaFocoDto } from "./dto/muda-foco.dto";
 import { Throttle } from "@nestjs/throttler";
 import { CREDENCIAL } from "../common/throttling/limites";
 
@@ -72,6 +73,17 @@ export class AdminController {
     @Body() dto: ExcluiClienteDto,
   ): Promise<void> {
     return this.adminService.excluiCliente(user, id, dto.confirmacao, dto.codigo);
+  }
+
+  /** Leads, presença local ou os dois: o que o cliente vê no painel dele. */
+  @Put("organizations/:id/foco")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  mudaFoco(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: MudaFocoDto,
+  ): Promise<void> {
+    return this.adminService.mudaFoco(user, id, dto.foco);
   }
 
   @Get("organizations/:id/pessoas")

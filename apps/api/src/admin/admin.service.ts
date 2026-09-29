@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable, Logger } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { Prisma, FocoDoCliente } from "@prisma/client";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { AppException } from "../common/exceptions/app-exception";
 import { PaginatedResult, PaginationQueryDto } from "../common/dto/pagination.dto";
@@ -443,6 +443,20 @@ export class AdminService {
     };
   }
 
+  /**
+   * O que importa para o cliente: leads, presença local ou os dois. Muda o
+   * menu, o dashboard e o relatório dele na hora; os dados não mudam.
+   */
+  async mudaFoco(operador: AuthenticatedUser, organizationId: string, foco: FocoDoCliente): Promise<void> {
+    const cliente = await this.exigeCliente(organizationId);
+    if (cliente.foco === foco) return;
+    await this.prisma.organization.update({ where: { id: organizationId }, data: { foco } });
+    await this.auditoria.registra(
+      { organizationId, userId: operador.userId, impersonating: true },
+      { acao: "ORGANIZATION_UPDATED", entidade: "Organization", entidadeId: organizationId, antes: { foco: cliente.foco }, depois: { foco } },
+    );
+  }
+
   async geraLinkDoWhatsApp(operadorId: string, organizationId: string): Promise<LinkGerado> {
     await this.exigeCliente(organizationId);
     const link = await this.links.gera(organizationId);
@@ -466,10 +480,12 @@ export class AdminService {
     );
   }
 
-  private async exigeCliente(organizationId: string): Promise<{ id: string; name: string; brandColor: string | null }> {
+  private async exigeCliente(
+    organizationId: string,
+  ): Promise<{ id: string; name: string; brandColor: string | null; foco: FocoDoCliente }> {
     const organizacao = await this.prisma.organization.findFirst({
       where: { id: organizationId, deletedAt: null },
-      select: { id: true, name: true, brandColor: true },
+      select: { id: true, name: true, brandColor: true, foco: true },
     });
     if (!organizacao) throw new AppException("ORGANIZATION_NOT_FOUND", "Cliente não encontrado.", HttpStatus.NOT_FOUND);
     return organizacao;

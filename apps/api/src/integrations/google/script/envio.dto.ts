@@ -80,7 +80,56 @@ export class ContaDoEnvioDto {
   moeda!: string;
 }
 
+/** Um número de presença local: ligações, rotas, visitas. Só os maiores que zero vêm. */
+export class MetricaLocalDoEnvioDto {
+  @Matches(/^\d{1,20}$/)
+  campanha!: string;
+
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  data!: string;
+
+  @IsIn(["LIGACOES_DOS_ANUNCIOS", "EXIBICOES_DO_TELEFONE", "ROTAS", "LIGACOES_CONVERSAO", "VISITAS_A_LOJA"])
+  metrica!: string;
+
+  @IsNumber()
+  @Min(0)
+  @Max(1e9)
+  valor!: number;
+}
+
+/** O que cada parte nova conseguiu ler: "ok" ou "falhou: motivo". */
+export class PartesDoEnvioDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  ligacoes?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  acoesLocais?: string;
+}
+
 export class EnvioDoScriptDto {
+  /** Ausente no script da primeira versão, que só mandava gasto. */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  versao?: number;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PartesDoEnvioDto)
+  partes?: PartesDoEnvioDto;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50_000)
+  @ValidateNested({ each: true })
+  @Type(() => MetricaLocalDoEnvioDto)
+  locais?: MetricaLocalDoEnvioDto[];
+
   @ValidateNested()
   @Type(() => ContaDoEnvioDto)
   conta!: ContaDoEnvioDto;
