@@ -12,7 +12,7 @@ import { apiFetch, ApiRequestError, rota } from "@/lib/api-client";
  */
 export async function moverEstagio(
   leadId: string,
-  status: "QUALIFIED" | "MEETING_SCHEDULED" | "WON",
+  status: "IN_PROGRESS" | "QUALIFIED" | "MEETING_SCHEDULED" | "WON",
 ): Promise<{ error?: string } | void> {
   try {
     await apiFetch(rota`/leads/${leadId}`, { method: "PATCH", body: JSON.stringify({ status }) });

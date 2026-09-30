@@ -13,6 +13,8 @@ import { formatCentsAsBRL } from "@/lib/currency";
 import { formatDuration, responseSpeedTone, SPEED_TONE_CLASSES } from "@/lib/duration";
 import { Badge } from "@/components/ui/badge";
 import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
+import type { Responsavel } from "@/lib/leads/acompanhamento";
+import { AcompanhamentoForm } from "./acompanhamento-form";
 import { Conversation } from "./conversation";
 import { DisqualifyForm, ManualEditForm } from "./manual-edit-form";
 import { ReplyBox } from "./reply-box";
@@ -100,7 +102,7 @@ interface LeadDetail {
   id: string;
   name: string | null;
   normalizedPhone: string;
-  status: "NEW" | "QUALIFIED" | "MEETING_SCHEDULED" | "WON";
+  status: "NEW" | "IN_PROGRESS" | "QUALIFIED" | "MEETING_SCHEDULED" | "WON";
   qualifiedAt: string | null;
   meetingScheduledAt: string | null;
   wonAt: string | null;
@@ -108,6 +110,11 @@ interface LeadDetail {
   disqualifiedReason: string | null;
   firstContactAt: string;
   lastContactAt: string;
+  emAtendimentoAt: string | null;
+  responsavel: Responsavel | null;
+  valorPotencialCentavos: number | null;
+  proximaAcao: string | null;
+  proximaAcaoEm: string | null;
   events: LeadEvent[];
   messages: Message[];
   attribution: (AttributionSummary & { attributedAt: string; trackingClick: TrackingClick | null }) | null;
@@ -123,14 +130,26 @@ const EVENT_LABELS: Record<string, string> = {
   MESSAGE_RECEIVED: "Mensagem recebida",
   QUALIFIED: "Lead qualificado",
   MEETING_SCHEDULED: "Reunião marcada",
-  DISQUALIFIED: "Lead desqualificado",
+  DISQUALIFIED: "Marcado como perdido",
   REACTIVATED: "Lead reativado",
   SALE_DETECTED: "Venda detectada",
   REVENUE_DETECTED: "Receita registrada",
+  ATTENDANCE_STARTED: "Atendimento iniciado",
 };
+
+/** O nome de quem ficou com o lead vai no próprio evento, como era na hora. */
+function rotuloDoEvento(evento: LeadEvent): string {
+  if (evento.type === "OWNER_ASSIGNED") {
+    const dados = (evento.metadata ?? {}) as { responsavelNome?: string | null; automatico?: boolean };
+    if (!dados.responsavelNome) return "Responsável removido";
+    return `Responsável: ${dados.responsavelNome}${dados.automatico ? ", ao responder primeiro" : ""}`;
+  }
+  return EVENT_LABELS[evento.type] ?? evento.type;
+}
 
 const STATUS: Record<LeadDetail["status"], { rotulo: string; tom: "neutral" | "info" | "brand" | "success" }> = {
   NEW: { rotulo: "Novo", tom: "neutral" },
+  IN_PROGRESS: { rotulo: "Em atendimento", tom: "neutral" },
   QUALIFIED: { rotulo: "Qualificado", tom: "info" },
   MEETING_SCHEDULED: { rotulo: "Reunião marcada", tom: "brand" },
   WON: { rotulo: "Venda", tom: "success" },
@@ -194,8 +213,17 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     throw error;
   }
 
-  const connection = await apiFetch<WhatsAppConnectionSummary | null>("/integrations/whatsapp");
+  const [connection, pessoas] = await Promise.all([
+    apiFetch<WhatsAppConnectionSummary | null>("/integrations/whatsapp"),
+    // Sem a lista, o seletor mostra só "Sem responsável" e quem já está no lead.
+    apiFetch<Responsavel[]>("/leads/responsaveis").catch(() => [] as Responsavel[]),
+  ]);
   const replyDisabledReason = replyDisabledReasonFor(connection);
+  // Quem é responsável continua na lista mesmo se ela falhar ou a pessoa tiver saído.
+  const opcoes =
+    lead.responsavel && !pessoas.some((pessoa) => pessoa.id === lead.responsavel!.id)
+      ? [lead.responsavel, ...pessoas]
+      : pessoas;
 
   const { metrics, attribution, adReferences } = lead;
   const click = attribution?.trackingClick ?? null;
@@ -237,7 +265,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={STATUS[lead.status].tom}>{STATUS[lead.status].rotulo}</Badge>
-          {lead.disqualifiedAt ? <Badge tone="neutral">Descartado</Badge> : null}
+          {lead.disqualifiedAt ? <Badge tone="neutral">Perdido</Badge> : null}
           {/*
             O dado mais acionável da tela inteira: se a última mensagem é do
             lead, alguém precisa responder agora. Fica junto do nome, com ponto
@@ -278,6 +306,21 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         </section>
 
         <div className="flex flex-col gap-5">
+          {/*
+            Primeiro na coluna porque é o que se decide ao abrir o lead: de
+            quem ele é e o que fazer a seguir. Os números vêm depois.
+          */}
+          <Painel titulo="Acompanhamento">
+            <AcompanhamentoForm
+              leadId={lead.id}
+              responsavelId={lead.responsavel?.id ?? null}
+              pessoas={opcoes}
+              valorPotencialCentavos={lead.valorPotencialCentavos}
+              proximaAcao={lead.proximaAcao}
+              proximaAcaoEm={lead.proximaAcaoEm}
+            />
+          </Painel>
+
           <Painel titulo="Atendimento">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -348,6 +391,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           <Painel titulo="Estágio e venda">
             <dl className="mb-4 divide-y divide-line/50">
               <Linha rotulo="Primeiro contato" valor={tempoRelativo(lead.firstContactAt)} />
+              <Linha rotulo="Em atendimento" valor={lead.emAtendimentoAt ? tempoRelativo(lead.emAtendimentoAt) : "Sem data"} />
               <Linha rotulo="Qualificado" valor={lead.qualifiedAt ? tempoRelativo(lead.qualifiedAt) : "Sem data"} />
               <Linha rotulo="Reunião" valor={lead.meetingScheduledAt ? tempoRelativo(lead.meetingScheduledAt) : "Sem data"} />
               <Linha rotulo="Venda" valor={lead.wonAt ? tempoRelativo(lead.wonAt) : "Sem data"} />
@@ -407,7 +451,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {lead.events.map((evento) => (
                 <li key={evento.id} className="relative">
                   <span className="absolute -left-4 top-1.5 h-[7px] w-[7px] rounded-full bg-ink-mute ring-2 ring-panel" aria-hidden />
-                  <p className="text-corpo text-ink-soft">{EVENT_LABELS[evento.type] ?? evento.type}</p>
+                  <p className="text-corpo text-ink-soft">{rotuloDoEvento(evento)}</p>
                   <p className="text-rotulo text-ink-mute" title={formatDateTime(evento.occurredAt)}>
                     {tempoRelativo(evento.occurredAt)}
                   </p>

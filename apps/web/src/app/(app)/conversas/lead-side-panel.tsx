@@ -6,6 +6,7 @@ import { formatCentsAsBRL } from "@/lib/currency";
 import { formatDuration, responseSpeedTone, SPEED_TONE_CLASSES } from "@/lib/duration";
 import { ESTAGIO_ROTULO, FichaDoLead } from "@/lib/conversas/tipos";
 import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
+import { formataDia } from "@/lib/periodo";
 import { Badge } from "@/components/ui/badge";
 import { LinkParaFicha } from "./inbox-chat";
 
@@ -15,10 +16,12 @@ const ROTULO_DO_EVENTO: Record<string, string> = {
   MESSAGE_RECEIVED: "Mensagem recebida",
   QUALIFIED: "Lead qualificado",
   MEETING_SCHEDULED: "Reunião marcada",
-  DISQUALIFIED: "Lead desqualificado",
+  DISQUALIFIED: "Marcado como perdido",
   REACTIVATED: "Lead reativado",
   SALE_DETECTED: "Venda detectada",
   REVENUE_DETECTED: "Receita registrada",
+  ATTENDANCE_STARTED: "Atendimento iniciado",
+  OWNER_ASSIGNED: "Responsável definido",
 };
 
 /** Quantos passos do histórico cabem sem a coluna virar uma segunda tela. */
@@ -82,12 +85,21 @@ export function LeadSidePanel({ ficha }: { ficha: FichaDoLead }) {
         <Painel titulo="Estágio e venda">
           <div className="flex flex-wrap items-center gap-1.5">
             <Badge tone={ficha.status === "WON" ? "success" : "info"}>{ESTAGIO_ROTULO[ficha.status]}</Badge>
-            {ficha.disqualifiedAt ? <Badge tone="neutral">Descartado</Badge> : null}
+            {ficha.disqualifiedAt ? <Badge tone="neutral">Perdido</Badge> : null}
           </div>
           {ficha.disqualifiedReason ? (
             <p className="mt-2 text-apoio leading-relaxed text-ink-mute">{ficha.disqualifiedReason}</p>
           ) : null}
           <div className="mt-2">
+            <Linha rotulo="Responsável" valor={ficha.responsavel?.name ?? "Sem responsável"} />
+            {ficha.proximaAcao || ficha.proximaAcaoEm ? (
+              <Linha
+                rotulo="Próxima ação"
+                valor={[ficha.proximaAcao, ficha.proximaAcaoEm ? formataDia(ficha.proximaAcaoEm.slice(0, 10)) : null]
+                  .filter(Boolean)
+                  .join(" · ")}
+              />
+            ) : null}
             <Linha
               rotulo="Receita"
               valor={

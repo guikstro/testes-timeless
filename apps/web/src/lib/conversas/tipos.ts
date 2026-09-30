@@ -1,6 +1,6 @@
 /** O que `GET /conversations` devolve. */
 
-export type EstagioDoLead = "NEW" | "QUALIFIED" | "MEETING_SCHEDULED" | "WON";
+export type EstagioDoLead = "NEW" | "IN_PROGRESS" | "QUALIFIED" | "MEETING_SCHEDULED" | "WON";
 
 export interface ItemDaCaixa {
   id: string;
@@ -32,6 +32,7 @@ export const ATRASO_SEGUNDOS = 30 * 60;
 
 export const ESTAGIO_ROTULO: Record<EstagioDoLead, string> = {
   NEW: "Novo",
+  IN_PROGRESS: "Em atendimento",
   QUALIFIED: "Qualificado",
   MEETING_SCHEDULED: "Reunião",
   WON: "Cliente",
@@ -43,6 +44,7 @@ export function nomeDoLead(lead: { name: string | null; normalizedPhone: string 
 
 export const ESTAGIO_TOM: Record<EstagioDoLead, "neutral" | "info" | "warning" | "success"> = {
   NEW: "neutral",
+  IN_PROGRESS: "neutral",
   QUALIFIED: "info",
   MEETING_SCHEDULED: "warning",
   WON: "success",
@@ -73,6 +75,9 @@ export interface FichaDoLead {
   disqualifiedAt: string | null;
   disqualifiedReason: string | null;
   firstContactAt: string;
+  responsavel: { id: string; name: string } | null;
+  proximaAcao: string | null;
+  proximaAcaoEm: string | null;
   messages: MensagemDaFicha[];
   events: { id: string; type: string; occurredAt: string }[];
   attribution: {

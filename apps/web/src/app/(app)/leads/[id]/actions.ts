@@ -2,6 +2,47 @@
 
 import { revalidatePath } from "next/cache";
 import { apiFetch, ApiRequestError, rota } from "@/lib/api-client";
+import { centavosDoTexto } from "@/lib/leads/acompanhamento";
+
+export interface AcompanhamentoState {
+  error?: string;
+  /** Quando salvou, para a tela dizer "Salvo." e o próximo envio sumir com o aviso. */
+  salvoEm?: number;
+}
+
+/**
+ * Responsável, valor potencial e próxima ação, de uma vez. Campo vazio limpa:
+ * é assim que se tira o responsável ou a próxima ação que já foi feita.
+ */
+export async function salvaAcompanhamento(
+  leadId: string,
+  _prevState: AcompanhamentoState,
+  formData: FormData,
+): Promise<AcompanhamentoState> {
+  const valorPotencialCentavos = centavosDoTexto(String(formData.get("valorPotencial") ?? ""));
+  if (valorPotencialCentavos === undefined) {
+    return { error: "Valor potencial inválido. Escreva, por exemplo, 1.500,00." };
+  }
+
+  const texto = (campo: string) => String(formData.get(campo) ?? "").trim() || null;
+  const corpo = {
+    responsavelId: texto("responsavelId"),
+    valorPotencialCentavos,
+    proximaAcao: texto("proximaAcao"),
+    proximaAcaoEm: texto("proximaAcaoEm"),
+  };
+
+  try {
+    await apiFetch(rota`/leads/${leadId}`, { method: "PATCH", body: JSON.stringify(corpo) });
+  } catch (error) {
+    if (error instanceof ApiRequestError) return { error: error.body.message };
+    return { error: "Não foi possível salvar o acompanhamento." };
+  }
+
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/leads");
+  return { salvoEm: Date.now() };
+}
 
 export interface UpdateLeadState {
   error?: string;
@@ -69,7 +110,7 @@ export async function setDisqualified(
     if (error instanceof ApiRequestError) {
       return { error: error.body.message };
     }
-    return { error: disqualified ? "Não foi possível desqualificar." : "Não foi possível reativar." };
+    return { error: disqualified ? "Não foi possível marcar como perdido." : "Não foi possível reativar." };
   }
 
   revalidatePath(`/leads/${leadId}`);

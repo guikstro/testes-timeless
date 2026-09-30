@@ -1,15 +1,17 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { DisqualifyState, setDisqualified, updateLead, UpdateLeadState } from "./actions";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { MOTIVOS_DE_PERDA } from "@/lib/leads/acompanhamento";
 
 const initialState: UpdateLeadState = {};
 const initialDisqualifyState: DisqualifyState = {};
 
-export type LeadStage = "NEW" | "QUALIFIED" | "MEETING_SCHEDULED" | "WON";
+export type LeadStage = "NEW" | "IN_PROGRESS" | "QUALIFIED" | "MEETING_SCHEDULED" | "WON";
 
-const STAGE_RANK: Record<LeadStage, number> = { NEW: 0, QUALIFIED: 1, MEETING_SCHEDULED: 2, WON: 3 };
+const STAGE_RANK: Record<LeadStage, number> = { NEW: 0, IN_PROGRESS: 1, QUALIFIED: 2, MEETING_SCHEDULED: 3, WON: 4 };
 
 export function ManualEditForm({ leadId, status }: { leadId: string; status: LeadStage }) {
   const action = updateLead.bind(null, leadId);
@@ -24,6 +26,9 @@ export function ManualEditForm({ leadId, status }: { leadId: string; status: Lea
       >
         <option value="">Manter status atual</option>
         {/* O status só avança: oferecer um estágio já passado geraria um erro previsível. */}
+        {STAGE_RANK[status] < STAGE_RANK.IN_PROGRESS ? (
+          <option value="IN_PROGRESS">Marcar como Em atendimento</option>
+        ) : null}
         {STAGE_RANK[status] < STAGE_RANK.QUALIFIED ? (
           <option value="QUALIFIED">Marcar como Qualificado</option>
         ) : null}
@@ -57,6 +62,7 @@ export function DisqualifyForm({
 }) {
   const action = setDisqualified.bind(null, leadId, !disqualifiedAt);
   const [state, formAction, pending] = useActionState(action, initialDisqualifyState);
+  const [motivo, setMotivo] = useState("");
 
   // Uma venda registrada contradiz "não era oportunidade" — a API recusa, e a
   // tela não oferece o botão em vez de deixar o usuário descobrir pelo erro.
@@ -68,37 +74,50 @@ export function DisqualifyForm({
     return (
       <form action={formAction} className="flex flex-wrap items-center gap-3">
         <p className="text-corpo text-ink-soft">
-          Desqualificado em {new Date(disqualifiedAt).toLocaleString("pt-BR")}
+          Perdido em {new Date(disqualifiedAt).toLocaleString("pt-BR")}
           {disqualifiedReason ? `. Motivo: ${disqualifiedReason}` : ""}
         </p>
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md border border-line px-3 py-1.5 text-corpo font-medium text-ink-soft hover:bg-panel-soft disabled:opacity-50"
-        >
-          {pending ? "Reativando..." : "Reativar lead"}
-        </button>
+        <Button type="submit" size="sm" variant="secondary" loading={pending}>
+          Reativar lead
+        </Button>
         {state.error ? <p className="w-full text-corpo text-danger">{state.error}</p> : null}
       </form>
     );
   }
 
   return (
-    <form action={formAction} className="flex flex-wrap items-center gap-3">
-      <input
-        name="reason"
-        placeholder="Motivo (opcional)"
-        maxLength={200}
-        className="min-w-[200px] flex-1 rounded-md border border-line px-3 py-2 text-corpo focus:border-accent focus:outline-none"
-      />
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-md border border-line px-3 py-2 text-corpo font-medium text-ink-soft hover:bg-panel-soft disabled:opacity-50"
-      >
-        {pending ? "Salvando..." : "Desqualificar"}
-      </button>
-      {state.error ? <p className="w-full text-corpo text-danger">{state.error}</p> : null}
+    <form action={formAction} className="flex flex-col gap-2.5">
+      {/* Os motivos mais comuns num toque, para a perda ser contável depois; ainda dá para escrever outro. */}
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Motivos comuns">
+        {MOTIVOS_DE_PERDA.map((comum) => (
+          <button
+            key={comum}
+            type="button"
+            onClick={() => setMotivo(comum)}
+            aria-pressed={motivo === comum}
+            className={`focus-ring rounded-full px-2.5 py-1 text-rotulo font-medium transition-colors duration-200 ease-soft ${
+              motivo === comum ? "bg-ink text-canvas" : "bg-panel-soft text-ink-soft hover:text-ink"
+            }`}
+          >
+            {comum}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <Input
+          name="reason"
+          value={motivo}
+          onChange={(evento) => setMotivo(evento.target.value)}
+          placeholder="Motivo da perda (opcional)"
+          maxLength={200}
+          aria-label="Motivo da perda"
+          className="h-9 w-auto min-w-[12rem] flex-1"
+        />
+        <Button type="submit" size="sm" variant="danger" loading={pending}>
+          Marcar como perdido
+        </Button>
+      </div>
+      {state.error ? <p className="text-corpo text-danger">{state.error}</p> : null}
     </form>
   );
 }

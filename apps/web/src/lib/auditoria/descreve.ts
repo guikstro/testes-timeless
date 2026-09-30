@@ -31,6 +31,7 @@ const PAPEIS: Record<string, string> = { OWNER: "Dono", ADMIN: "Administrador", 
 
 const ESTAGIOS: Record<string, string> = {
   NEW: "Novo",
+  IN_PROGRESS: "Em atendimento",
   QUALIFIED: "Qualificado",
   MEETING_SCHEDULED: "Reunião marcada",
   WON: "Venda",

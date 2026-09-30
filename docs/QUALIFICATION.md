@@ -18,7 +18,7 @@ busca ClassificationRule da organização
         |
         +-- WON bate?  -> Lead.status = WON, Sale criada, timeline atualizada
         |
-        +-- QUALIFIED bate (só se lead ainda é NEW)? -> Lead.status = QUALIFIED
+        +-- QUALIFIED bate (só se o lead é NEW ou IN_PROGRESS)? -> Lead.status = QUALIFIED
         |
         +-- nenhuma bate -> nada muda
 ```
@@ -30,21 +30,27 @@ probabilística nesta fase — só regras determinísticas (Seção 62).
 ## Máquina de estados (só avança, nunca volta)
 
 ```
-NEW -> QUALIFIED -> MEETING_SCHEDULED -> WON
+NEW -> IN_PROGRESS -> QUALIFIED -> MEETING_SCHEDULED -> WON
 
                     (fora da linha)
-                    disqualifiedAt  <- pode ser marcado e desfeito
+                    disqualifiedAt  <- "Perdido": pode ser marcado e desfeito
 ```
+
+`IN_PROGRESS` ("Em atendimento") entra entre Novo e Qualificado: a equipe
+respondeu. Não conta como qualificado em número nenhum; responder não diz se o
+lead é oportunidade. Ver "Em atendimento e responsável", abaixo.
 
 `MEETING_SCHEDULED` entra entre qualificar e vender (Fase 11): existe horário
 combinado com o lead. Não é obrigatório — vender sem reunião é comum, e por
 isso marcar `WON` **não** preenche `meetingScheduledAt`. A assimetria é
 deliberada: qualificação é pressuposto de uma venda, reunião não é.
 
-A ordem do funil vive em `STATUS_ORDER`, no `LeadsService`, e não na ordem do
-enum no Postgres — `ALTER TYPE ... ADD VALUE` acrescenta ao fim do tipo, então
-`MEETING_SCHEDULED` aparece depois de `WON` lá. Nada consulta ordenando por
-status no banco.
+A ordem do funil vive em `ORDEM_DO_FUNIL` (`leads/ordem-do-funil.ts`), usada
+pelo `LeadsService` e pelo classificador, e não na ordem do enum no Postgres:
+`ALTER TYPE ... ADD VALUE` acrescenta ao fim do tipo, então `MEETING_SCHEDULED`
+aparece depois de `WON` lá. Nada consulta ordenando por status no banco. Os
+estágios que contam como qualificado estão em `ESTAGIOS_QUALIFICADOS`, no mesmo
+arquivo.
 
 - Rodada em **toda mensagem inbound**, não só na primeira (ao contrário da
   atribuição, que é first-touch) — qualificação/venda pode acontecer a
@@ -91,7 +97,32 @@ mensagens que nós mesmos enviamos, que voltam pelo webhook com o mesmo id.
 O evento na timeline grava `metadata.direction`, então é sempre possível saber
 de qual lado veio o gatilho.
 
+## Em atendimento e responsável (item 14)
+
+- **Em atendimento:** quando uma resposta da equipe **sai** pelo sistema
+  (`WhatsAppSendService`, depois do envio confirmado), um lead `NEW` e não
+  perdido passa a `IN_PROGRESS`, com `emAtendimentoAt` e o evento
+  `ATTENDANCE_STARTED`. Também dá para marcar à mão. Mensagem que falhou não
+  conta. A marcação nunca faz a fila reenviar a mensagem: um erro ali só vai
+  para o log.
+- **Responsável:** quem responde primeiro pela tela assume o lead que ainda
+  não tem dono (evento `OWNER_ASSIGNED`, `automatico: true`). A visita do
+  suporte da Timeless não assume. Troca à mão na ficha, só para alguém da
+  própria organização (`RESPONSAVEL_INVALIDO` para quem é de fora). Se a conta
+  da pessoa for apagada, o lead fica sem responsável.
+- **Valor potencial e próxima ação** (texto e dia) ficam no lead, na ficha e no
+  cartão do quadro; a próxima ação aparece atrasada, de hoje ou futura,
+  comparada como dia de Brasília.
+- **Filtro:** `GET /leads?responsavel=eu|nenhum|<id>`; `GET /leads/responsaveis`
+  lista quem pode ser responsável.
+- **Limitação:** respostas mandadas pelo celular não entram no sistema (ver
+  acima), então não marcam atendimento nem definem responsável.
+
 ## Desqualificação (Fase 11)
+
+Na tela, o nome é **Perdido**, com motivos prontos num toque (preço, sem
+interesse, não respondeu, comprou de outro, fora do perfil) e espaço para
+escrever outro. No banco e na API continua `disqualified*`.
 
 Desqualificar **não é um estágio do funil** — é uma saída lateral, gravada em
 `disqualifiedAt` / `disqualifiedReason`, não em `status`.

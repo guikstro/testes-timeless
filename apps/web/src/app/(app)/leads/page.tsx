@@ -8,6 +8,7 @@ import { ESTAGIOS } from "./estagios";
 import { LeadBoard } from "./lead-board";
 import { LeadCartao } from "./lead-card";
 import { LeadsFilters } from "./leads-filters";
+import type { Responsavel } from "@/lib/leads/acompanhamento";
 
 interface PaginatedResult<T> {
   items: T[];
@@ -30,27 +31,35 @@ const DESCRICAO_DA_REGRA = {
   TODOS: "Todas as conversas que chegaram pelo WhatsApp, com a origem quando ela existe.",
 } as const;
 
+/** O filtro de responsável que a API entende: eu, nenhum ou o id de alguém. */
+const RESPONSAVEL_VALIDO = /^(eu|nenhum|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; aguardando?: string }>;
+  searchParams: Promise<{ search?: string; aguardando?: string; responsavel?: string }>;
 }) {
   const params = await searchParams;
   const soAguardando = params.aguardando === "1";
+  // Um valor estranho na URL é ignorado, e não um 400 na tela.
+  const responsavel = params.responsavel && RESPONSAVEL_VALIDO.test(params.responsavel) ? params.responsavel : null;
 
-  // Quatro consultas em paralelo, uma por coluna. São independentes, então
-  // esperar uma pela outra só somaria latência.
-  const [colunas, conexao] = await Promise.all([
+  // Uma consulta por coluna, em paralelo. São independentes, então esperar
+  // uma pela outra só somaria latência.
+  const [colunas, conexao, pessoas] = await Promise.all([
     Promise.all(
       ESTAGIOS.map(async (estagio) => {
         const consulta = new URLSearchParams({ limit: String(POR_COLUNA), offset: "0", status: estagio });
         if (params.search) consulta.set("search", params.search);
+        if (responsavel) consulta.set("responsavel", responsavel);
 
         const { items, total } = await apiFetch<PaginatedResult<LeadCartao>>(`/leads?${consulta.toString()}`);
         return { estagio, itens: soAguardando ? items.filter((lead) => lead.awaitingReply) : items, total };
       }),
     ),
     conexaoDoWhatsApp(),
+    // Sem a lista, o filtro mostra só "meus" e "sem responsável".
+    apiFetch<Responsavel[]>("/leads/responsaveis").catch(() => [] as Responsavel[]),
   ]);
 
   // A regra muda o que "lead" quer dizer nesta tela, então ela é dita aqui.
@@ -61,7 +70,7 @@ export default async function LeadsPage({
 
   const totalGeral = colunas.reduce((soma, coluna) => soma + coluna.total, 0);
   const mostrados = colunas.reduce((soma, coluna) => soma + coluna.itens.length, 0);
-  const filtrando = Boolean(params.search || soAguardando);
+  const filtrando = Boolean(params.search || soAguardando || responsavel);
   // Com filtro, zero é resposta ao filtro e não diz nada sobre a conexão.
   const medicao = filtrando ? "medido" : medicaoDeLeads({ conexao, ate: hojeEmBrasilia(), leads: totalGeral });
 
@@ -77,7 +86,7 @@ export default async function LeadsPage({
 
       <AvisoDeMedicao medicao={medicao} desde={conexao ? inicioDaMedicao(conexao) : null} />
 
-      <LeadsFilters total={totalGeral} />
+      <LeadsFilters total={totalGeral} pessoas={pessoas} />
 
       {mostrados === 0 ? (
         <div className="surface">

@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Select } from "@/components/ui/input";
+import type { Responsavel } from "@/lib/leads/acompanhamento";
 
 /**
  * Busca e filtros da lista.
@@ -10,7 +12,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
  * compartilhado por link, sobrevive ao recarregar e volta certo no botão
  * "voltar" do navegador.
  */
-export function LeadsFilters({ total }: { total: number }) {
+export function LeadsFilters({ total, pessoas = [] }: { total: number; pessoas?: Responsavel[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -47,6 +49,15 @@ export function LeadsFilters({ total }: { total: number }) {
     const novos = new URLSearchParams(params.toString());
     if (soAguardando) novos.delete("aguardando");
     else novos.set("aguardando", "1");
+    iniciar(() => router.replace(`${pathname}?${novos.toString()}`));
+  }
+
+  const responsavel = params.get("responsavel") ?? "";
+
+  function escolherResponsavel(valor: string) {
+    const novos = new URLSearchParams(params.toString());
+    if (valor) novos.set("responsavel", valor);
+    else novos.delete("responsavel");
     iniciar(() => router.replace(`${pathname}?${novos.toString()}`));
   }
 
@@ -102,6 +113,23 @@ export function LeadsFilters({ total }: { total: number }) {
           </span>
           Aguardando você
         </button>
+
+        <Select
+          aria-label="Responsável"
+          value={responsavel}
+          onChange={(evento) => escolherResponsavel(evento.target.value)}
+          envolucro="inline-block"
+          className="h-9 w-auto"
+        >
+          <option value="">Todos os responsáveis</option>
+          <option value="eu">Meus leads</option>
+          <option value="nenhum">Sem responsável</option>
+          {pessoas.map((pessoa) => (
+            <option key={pessoa.id} value={pessoa.id}>
+              {pessoa.name}
+            </option>
+          ))}
+        </Select>
 
         <span className="ml-auto text-corpo tabular-nums text-ink-mute">
           {total} {total === 1 ? "lead" : "leads"}

@@ -4,6 +4,9 @@ import Link from "next/link";
 import { tempoRelativo } from "@/lib/relative-time";
 import { formatCentsAsBRL } from "@/lib/currency";
 import { attributionSourceLabel, AttributionSummary } from "@/lib/attribution";
+import { hojeEmBrasilia } from "@/lib/medicao-de-leads";
+import { Responsavel, situacaoDaProximaAcao } from "@/lib/leads/acompanhamento";
+import { formataDia } from "@/lib/periodo";
 import { Estagio } from "./estagios";
 import { QuickActions } from "./quick-actions";
 
@@ -11,14 +14,20 @@ export interface LeadCartao {
   id: string;
   name: string | null;
   normalizedPhone: string;
-  status: "NEW" | "QUALIFIED" | "MEETING_SCHEDULED" | "WON";
+  status: Estagio;
   disqualifiedAt: string | null;
   lastContactAt: string;
   attribution: AttributionSummary | null;
   sale: { amountCents: number | null } | null;
   lastMessage: { text: string | null; direction: "INBOUND" | "OUTBOUND"; timestamp: string } | null;
   awaitingReply: boolean;
+  responsavel: Responsavel | null;
+  valorPotencialCentavos: number | null;
+  proximaAcao: string | null;
+  proximaAcaoEm: string | null;
 }
+
+const COR_DA_PROXIMA_ACAO = { atrasada: "text-danger", hoje: "text-warning", futura: "text-ink-mute" } as const;
 
 /**
  * Cor derivada do nome, estável entre recarregamentos.
@@ -57,6 +66,7 @@ export function LeadCard({
 }) {
   const nome = lead.name?.trim() || "Sem nome";
   const inicial = nome.charAt(0).toUpperCase();
+  const situacao = situacaoDaProximaAcao(lead.proximaAcaoEm, hojeEmBrasilia());
 
   return (
     <li
@@ -96,6 +106,11 @@ export function LeadCard({
             <span className="shrink-0 text-apoio font-semibold tabular-nums text-ink">
               {formatCentsAsBRL(lead.sale.amountCents)}
             </span>
+          ) : lead.valorPotencialCentavos ? (
+            // Mais apagado que a venda: é o que o lead pode valer, não o que pagou.
+            <span className="shrink-0 text-apoio tabular-nums text-ink-mute" title="Valor potencial">
+              {formatCentsAsBRL(lead.valorPotencialCentavos)}
+            </span>
           ) : null}
         </div>
 
@@ -105,6 +120,14 @@ export function LeadCard({
               <span className="text-ink-mute">Você: </span>
             ) : null}
             {lead.lastMessage.text}
+          </p>
+        ) : null}
+
+        {lead.proximaAcao || situacao ? (
+          <p className={`relative mt-2 truncate text-rotulo font-medium ${situacao ? COR_DA_PROXIMA_ACAO[situacao] : "text-ink-mute"}`}>
+            {situacao === "atrasada" ? "Atrasada: " : situacao === "hoje" ? "Hoje: " : "Próxima: "}
+            {lead.proximaAcao ?? "próxima ação"}
+            {situacao === "futura" && lead.proximaAcaoEm ? ` · ${formataDia(lead.proximaAcaoEm.slice(0, 10))}` : ""}
           </p>
         ) : null}
 
@@ -126,12 +149,22 @@ export function LeadCard({
           )}
 
           {lead.disqualifiedAt ? (
-            <span className="rounded-full bg-panel-soft px-2 py-0.5 text-rotulo text-ink-mute">Descartado</span>
+            <span className="rounded-full bg-panel-soft px-2 py-0.5 text-rotulo text-ink-mute">Perdido</span>
           ) : null}
 
           <span className="ml-auto truncate text-rotulo text-ink-mute">
             {attributionSourceLabel(lead.attribution)}
           </span>
+
+          {lead.responsavel ? (
+            <span
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-panel-soft text-[10px] font-semibold text-ink-soft ring-1 ring-line"
+              title={`Responsável: ${lead.responsavel.name}`}
+            >
+              <span aria-hidden>{lead.responsavel.name.trim().charAt(0).toUpperCase()}</span>
+              <span className="sr-only">Responsável: {lead.responsavel.name}</span>
+            </span>
+          ) : null}
         </div>
 
         {/*

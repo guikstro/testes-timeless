@@ -75,7 +75,7 @@ export function LeadBoard({ colunas }: { colunas: ColunaDoQuadro[] }) {
         </p>
       ) : null}
 
-      <div className={`grid grid-cols-1 gap-4 transition-opacity duration-300 sm:grid-cols-2 xl:grid-cols-4 ${pendente ? "opacity-60" : ""}`}>
+      <div className={`grid grid-cols-1 gap-4 transition-opacity duration-300 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 ${pendente ? "opacity-60" : ""}`}>
         {colunas.map((coluna) => {
           const { titulo, cor } = APARENCIA[coluna.estagio];
           const daColuna = coluna.itens;
