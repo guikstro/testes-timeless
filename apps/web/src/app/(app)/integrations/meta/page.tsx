@@ -1,5 +1,7 @@
+import { unstable_rethrow } from "next/navigation";
 import { apiFetch } from "@/lib/api-client";
 import { formatCentsAsBRL } from "@/lib/currency";
+import { Alert } from "@/components/ui/alert";
 import { ConnectMetaForm } from "./connect-form";
 import { ConnectionActions } from "./connection-actions";
 import { ConnectMetaCapiForm } from "./capi-connect-form";
@@ -88,12 +90,34 @@ const STATUS_COLORS: Record<MetaConnection["status"], string> = {
   SYNC_FAILED: "text-danger",
 };
 
+/**
+ * Uma consulta que falha não derruba a tela.
+ *
+ * O formulário de conexão é justamente o que resolve a maioria das falhas da
+ * Meta (token vencido, conta trocada), e uma lista de campanhas que não
+ * carregou tirava da pessoa o único jeito de consertar. O redirecionamento
+ * de sessão encerrada continua passando (`unstable_rethrow`).
+ */
+async function busca<T>(caminho: string): Promise<{ ok: true; valor: T } | { ok: false }> {
+  try {
+    return { ok: true, valor: await apiFetch<T>(caminho) };
+  } catch (erro) {
+    unstable_rethrow(erro);
+    return { ok: false };
+  }
+}
+
 export default async function MetaIntegrationPage() {
-  const connection = await apiFetch<MetaConnection | null>("/integrations/meta");
-  const campaigns = connection ? await apiFetch<Campaign[]>("/campaigns") : [];
-  const conversionEvents = connection
-    ? await apiFetch<{ items: ConversionEvent[]; total: number }>("/integrations/meta/conversion-events?limit=20")
-    : { items: [], total: 0 };
+  const leitura = await busca<MetaConnection | null>("/integrations/meta");
+  const connection = leitura.ok ? leitura.valor : null;
+  const [listaDeCampanhas, listaDeEventos] = connection
+    ? await Promise.all([
+        busca<Campaign[]>("/campaigns"),
+        busca<{ items: ConversionEvent[]; total: number }>("/integrations/meta/conversion-events?limit=20"),
+      ])
+    : [null, null];
+  const campaigns = listaDeCampanhas?.ok ? listaDeCampanhas.valor : [];
+  const conversionEvents = listaDeEventos?.ok ? listaDeEventos.valor : { items: [], total: 0 };
   const desligada = connection?.status === "DISCONNECTED";
 
   return (
@@ -101,7 +125,12 @@ export default async function MetaIntegrationPage() {
       <h1 className="mb-6 font-display text-2xl font-semibold tracking-tight text-ink">Meta Ads</h1>
 
       <div className="mb-8 rounded-xl border border-line bg-panel p-6">
-        {connection ? (
+        {!leitura.ok ? (
+          <Alert tom="warning" titulo="Não foi possível ler a conexão com a Meta agora">
+            Tente de novo em alguns instantes. Se a conexão precisar ser refeita, o formulário abaixo continua
+            funcionando.
+          </Alert>
+        ) : connection ? (
           <div className="space-y-2 text-corpo text-ink-soft">
             <p>
               <span className="font-medium">Status:</span>{" "}
@@ -145,7 +174,11 @@ export default async function MetaIntegrationPage() {
       {connection ? (
         <div className="mt-8">
           <h2 className="mb-3 text-corpo font-semibold text-ink">Campanhas sincronizadas</h2>
-          {campaigns.length === 0 ? (
+          {listaDeCampanhas && !listaDeCampanhas.ok ? (
+            <Alert tom="warning" titulo="Não foi possível carregar as campanhas agora">
+              A conexão continua de pé. Tente de novo em alguns instantes.
+            </Alert>
+          ) : campaigns.length === 0 ? (
             <div className="rounded-xl border border-dashed border-line bg-panel p-8 text-center text-corpo text-ink-soft">
               {desligada
                 ? "Nenhuma campanha sincronizada ainda. Conecte a conta acima para buscar as campanhas."
@@ -200,7 +233,11 @@ export default async function MetaIntegrationPage() {
 
           <div className="mt-6">
             <h3 className="mb-3 text-corpo font-semibold text-ink">Eventos enviados</h3>
-            {conversionEvents.items.length === 0 ? (
+            {listaDeEventos && !listaDeEventos.ok ? (
+              <Alert tom="warning" titulo="Não foi possível carregar os eventos agora">
+                Os envios continuam acontecendo. Tente de novo em alguns instantes.
+              </Alert>
+            ) : conversionEvents.items.length === 0 ? (
               <div className="rounded-xl border border-dashed border-line bg-panel p-8 text-center text-corpo text-ink-soft">
                 Nenhum evento registrado ainda.
               </div>
