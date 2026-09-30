@@ -286,6 +286,8 @@ describe("Isolamento entre organizações (e2e)", () => {
       "/campaigns?platform=META",
       "/campaigns/investimento?days=30",
       "/analytics/overview?days=30",
+      "/analytics/funil?days=30",
+      "/analytics/funil?days=30&campanha=nenhuma&origem=unknown&responsavel=nenhum",
       "/analytics/campanhas",
       "/analytics/anuncios",
       "/presenca-local?days=30",

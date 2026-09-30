@@ -6,6 +6,7 @@ import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { AnalyticsService } from "./analytics.service";
 import { OverviewQueryDto } from "./dto/overview-query.dto";
 import { CampanhasQueryDto } from "./dto/campanhas-query.dto";
+import { FunilQueryDto } from "./dto/funil-query.dto";
 import { AppException } from "../common/exceptions/app-exception";
 
 @Controller("analytics")
@@ -17,6 +18,12 @@ export class AnalyticsController {
   @Get("overview")
   overview(@CurrentUser() user: AuthenticatedUser, @Query() query: OverviewQueryDto) {
     return this.analyticsService.overview(user.organizationId, query.days ?? 30);
+  }
+
+  /** O funil dos leads do período, com recorte por campanha, origem e responsável. */
+  @Get("funil")
+  funil(@CurrentUser() user: AuthenticatedUser, @Query() query: FunilQueryDto) {
+    return this.analyticsService.funil(user.organizationId, user.userId, query);
   }
 
   /** De quando é o último dado da Meta e do Google Ads: a tela diz se o número é de agora. */

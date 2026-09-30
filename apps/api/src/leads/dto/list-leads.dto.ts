@@ -2,6 +2,13 @@ import { IsIn, IsOptional, IsString, Matches, MaxLength } from "class-validator"
 import { PaginationQueryDto } from "../../common/dto/pagination.dto";
 
 /**
+ * De quem é o lead: `eu` (quem pergunta), `nenhum` (sem responsável) ou o id
+ * de alguém da organização. A lista de leads e o funil recortam pela mesma
+ * regra.
+ */
+export const FILTRO_DE_RESPONSAVEL = /^(eu|nenhum|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
+/**
  * DTO próprio, e não `@Query` solto: o pipe global roda com
  * `forbidNonWhitelisted`, então qualquer parâmetro não declarado devolveria
  * 400 na cara de quem só quis filtrar uma lista.
@@ -22,13 +29,8 @@ export class ListLeadsDto extends PaginationQueryDto {
   @IsIn(["NEW", "IN_PROGRESS", "QUALIFIED", "MEETING_SCHEDULED", "WON", "DISQUALIFIED", "AWAITING"])
   status?: "NEW" | "IN_PROGRESS" | "QUALIFIED" | "MEETING_SCHEDULED" | "WON" | "DISQUALIFIED" | "AWAITING";
 
-  /**
-   * De quem é o lead: `eu` (quem pergunta), `nenhum` (sem responsável) ou o
-   * id de alguém da organização.
-   */
+  /** Ver `FILTRO_DE_RESPONSAVEL`. */
   @IsOptional()
-  @Matches(/^(eu|nenhum|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i, {
-    message: "responsavel deve ser eu, nenhum ou o id de uma pessoa.",
-  })
+  @Matches(FILTRO_DE_RESPONSAVEL, { message: "responsavel deve ser eu, nenhum ou o id de uma pessoa." })
   responsavel?: string;
 }

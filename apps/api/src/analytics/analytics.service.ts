@@ -6,6 +6,7 @@ import {
   aggregateDaily,
   aggregateTotals,
   AggregationLead,
+  classifyOrigin,
   ComparacaoTotais,
   comparaTotais,
   CelulaDeChegada,
@@ -23,11 +24,23 @@ import {
   GastoDoAnuncio,
   LeadDoAnuncio,
 } from "./desempenho-por-anuncio";
-import { fimDoDia, inicioDoDia, diaCivilLocal, FUSO } from "../common/tempo";
+import { fimDoDia, inicioDoDia, diaCivilLocal, FUSO, hojeLocal } from "../common/tempo";
 import { gastoPorDia, medidoAte } from "./gasto-por-dia";
 import { identificacaoDosLeads, LeadIdentificado, MetodoDeIdentificacao } from "./identificacao-dos-leads";
 import { completaIdsDoAnuncio, HierarquiaDoAnuncio } from "./vinculo-do-anuncio";
 import { frescorDaMeta, frescorDoGoogle } from "./frescor";
+import {
+  aplicaFiltros,
+  FiltrosDoFunil,
+  FunilMontado,
+  LeadRecortavel,
+  montaFunil,
+  OpcaoDeFiltro,
+  opcoesDosFiltros,
+  SEM_CAMPANHA,
+} from "./funil";
+import { FunilQueryDto } from "./dto/funil-query.dto";
+import { janelas } from "../presenca-local/calculo";
 import {
   agregaDesempenhoPorCampanha,
   CampanhaComparada,
@@ -53,6 +66,19 @@ export interface Overview {
   setup: { whatsappConnected: boolean; metaConnected: boolean; trackingLinkCount: number };
 }
 
+export interface FunilDoPeriodo {
+  periodo: { de: string; ate: string; dias: number };
+  /** Os recortes como chegaram, com "eu" ainda como "eu": é o que a tela precisa marcar na lista. */
+  filtros: { campanha: string | null; origem: string | null; responsavel: string | null };
+  /** Leads do período antes dos recortes, para a tela dizer "12 dos 40". */
+  totalNoPeriodo: number;
+  funil: FunilMontado;
+  opcoes: {
+    campanhas: OpcaoDeFiltro[];
+    origens: OpcaoDeFiltro[];
+    responsaveis: { id: string; name: string }[];
+  };
+}
 
 export interface Janela {
   /** Dia civil no formato YYYY-MM-DD, inclusive nas duas pontas. */
@@ -214,6 +240,121 @@ export class AnalyticsService {
         whatsappConnected: whatsapp?.status === "CONNECTED",
         metaConnected: meta?.status === "CONNECTED",
         trackingLinkCount,
+      },
+    };
+  }
+
+  /**
+   * O funil dos leads que chegaram no período, com recorte por campanha,
+   * origem e responsável.
+   *
+   * Os recortes são aplicados aqui, sobre a lista já carregada, e não no
+   * `where`: as opções de cada filtro saem do período inteiro, e a campanha
+   * de um lead de Click-to-WhatsApp só é conhecida depois de subir do anúncio
+   * para a campanha, o que o banco não sabe fazer num filtro.
+   */
+  async funil(organizationId: string, userId: string, query: FunilQueryDto): Promise<FunilDoPeriodo> {
+    const dias = query.days ?? 30;
+    // Dias civis de Brasília: um lead das 22h é de hoje, não de amanhã.
+    const { de, ate } = janelas(hojeLocal(), dias).atual;
+
+    const [leads, membros] = await Promise.all([
+      this.prisma.lead.findMany({
+        where: { organizationId, firstContactAt: { gte: inicioDoDia(de), lte: fimDoDia(ate) } },
+        select: {
+          id: true,
+          status: true,
+          emAtendimentoAt: true,
+          disqualifiedAt: true,
+          disqualifiedReason: true,
+          responsavelId: true,
+          attribution: {
+            select: {
+              method: true,
+              evidence: true,
+              trackingClick: {
+                select: {
+                  utmSource: true,
+                  campaignId: true,
+                  adsetId: true,
+                  adId: true,
+                  trackingLink: { select: { name: true } },
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.membership.findMany({
+        where: { organizationId, user: { deletedAt: null } },
+        select: { user: { select: { id: true, name: true } } },
+      }),
+    ]);
+
+    // A mesma subida do anúncio para a campanha do desempenho por campanha:
+    // um lead não pode estar numa campanha lá e em nenhuma aqui.
+    const idsBrutos = leads.map((lead) => extractAdIds(lead.attribution));
+    const hierarquia = await this.hierarquiaDosAnuncios(
+      organizationId,
+      [...new Set(idsBrutos.map((ids) => ids.adId).filter((id): id is string => id !== null))],
+    );
+    const campanhaDe = idsBrutos.map((ids) => completaIdsDoAnuncio(ids, hierarquia).campaignId);
+
+    // A resposta da equipe só decide alguma coisa para quem continua em Novo
+    // sem nunca ter entrado em atendimento; os outros já provam o contato
+    // pelo estágio, e a consulta não precisa olhar as mensagens deles.
+    const semSinalDeContato = leads
+      .filter((lead) => lead.status === "NEW" && lead.emAtendimentoAt === null)
+      .map((lead) => lead.id);
+    const atendimento = await atendimentoPorLead(this.prisma, semSinalDeContato);
+
+    const recortaveis: LeadRecortavel[] = leads.map((lead, i) => ({
+      status: lead.status,
+      emAtendimentoAt: lead.emAtendimentoAt,
+      respondido: Boolean(atendimento.get(lead.id)?.primeiraResposta),
+      disqualifiedAt: lead.disqualifiedAt,
+      disqualifiedReason: lead.disqualifiedReason,
+      campanhaId: campanhaDe[i],
+      origem: classifyOrigin(lead),
+      responsavelId: lead.responsavelId,
+    }));
+
+    const escolhidos = {
+      campanha: query.campanha?.trim() || null,
+      origem: query.origem?.trim() || null,
+      responsavel: query.responsavel?.toLowerCase() || null,
+    };
+    const filtros: FiltrosDoFunil = {
+      ...escolhidos,
+      responsavel: escolhidos.responsavel === "eu" ? userId : escolhidos.responsavel,
+    };
+
+    // Os nomes vêm só de campanhas desta organização: um id de outra conta
+    // aparece cru, nunca com o nome que ela deu.
+    const idsDeCampanha = new Set(campanhaDe.filter((id): id is string => id !== null));
+    if (filtros.campanha !== null && filtros.campanha !== SEM_CAMPANHA) idsDeCampanha.add(filtros.campanha);
+    const campanhas =
+      idsDeCampanha.size > 0
+        ? await this.prisma.campaign.findMany({
+            where: { organizationId, externalId: { in: [...idsDeCampanha] } },
+            select: { externalId: true, name: true },
+          })
+        : [];
+
+    return {
+      periodo: { de, ate, dias },
+      filtros: escolhidos,
+      totalNoPeriodo: recortaveis.length,
+      funil: montaFunil(aplicaFiltros(recortaveis, filtros)),
+      opcoes: {
+        ...opcoesDosFiltros(
+          recortaveis,
+          new Map(campanhas.map((campanha) => [campanha.externalId, campanha.name])),
+          filtros,
+        ),
+        responsaveis: membros
+          .map((membro) => membro.user)
+          .sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
       },
     };
   }

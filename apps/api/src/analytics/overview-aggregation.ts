@@ -58,6 +58,7 @@ export interface OverviewTotals {
 
 const UNKNOWN_ORIGIN = { key: "unknown", label: "Sem origem identificada" };
 const CTWA_ORIGIN = { key: "meta_ctwa", label: "Anúncio Meta (Click-to-WhatsApp)" };
+const LINK_SEM_NOME = { key: "link:sem-nome", label: "Link rastreável sem nome" };
 
 /**
  * A que origem um lead pertence.
@@ -70,15 +71,29 @@ const CTWA_ORIGIN = { key: "meta_ctwa", label: "Anúncio Meta (Click-to-WhatsApp
  * ele pensa na origem; o `utm_source` entra só como segunda opção, para links
  * criados fora da tela de links.
  */
-export function classifyOrigin(lead: AggregationLead): { key: string; label: string } {
+export function classifyOrigin(lead: Pick<AggregationLead, "attribution">): { key: string; label: string } {
   const attribution = lead.attribution;
   if (!attribution || attribution.method === "UNKNOWN") return UNKNOWN_ORIGIN;
   if (attribution.method === "CTWA_REFERRAL") return CTWA_ORIGIN;
 
   const click = attribution.trackingClick;
   const name = click?.trackingLink?.name?.trim() || click?.utmSource?.trim();
-  if (!name) return { key: "link:sem-nome", label: "Link rastreável sem nome" };
+  if (!name) return { key: LINK_SEM_NOME.key, label: LINK_SEM_NOME.label };
   return { key: `link:${name.toLowerCase()}`, label: name };
+}
+
+/**
+ * O rótulo de uma chave de origem, sem o lead na mão.
+ *
+ * Serve ao filtro que chega pela URL e não tem lead no período para dizer o
+ * nome. A chave do link guarda o nome em minúsculas, e é ele que aparece: a
+ * grafia original só existe no lead.
+ */
+export function rotuloDaOrigem(chave: string): string {
+  if (chave === UNKNOWN_ORIGIN.key) return UNKNOWN_ORIGIN.label;
+  if (chave === CTWA_ORIGIN.key) return CTWA_ORIGIN.label;
+  if (chave === LINK_SEM_NOME.key) return LINK_SEM_NOME.label;
+  return chave.startsWith("link:") ? chave.slice("link:".length) : chave;
 }
 
 export function aggregateTotals(leads: AggregationLead[]): OverviewTotals {
