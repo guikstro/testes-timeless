@@ -4,9 +4,10 @@ import {
   concluiOrigem,
   concluiVisaoGeral,
   duracaoCurta,
+  maiorPerda,
 } from "./conclusao";
 import { formatCentsAsBRL } from "@/lib/currency";
-import type { Overview, OriginBucket } from "./tipos";
+import type { ChaveDaEtapa, EtapaMedida, FunilDoPeriodo, Overview, OriginBucket } from "./tipos";
 
 /*
   O real formatado carrega espaço não separável entre "R$" e o número, porque
@@ -87,28 +88,77 @@ describe("concluiVisaoGeral", () => {
   });
 });
 
+const CHAVES: ChaveDaEtapa[] = ["leads", "contatados", "qualificados", "reuniao", "vendas"];
+
+function etapas(quantidades: number[]): EtapaMedida[] {
+  return quantidades.map((quantidade, i) => ({
+    chave: CHAVES[i],
+    quantidade,
+    conversao: i === 0 || quantidades[i - 1] === 0 ? null : quantidade / quantidades[i - 1],
+    perdidos: 0,
+    abertos: 0,
+  }));
+}
+
+function funil(quantidades: number[], totalNoPeriodo = quantidades[0]): FunilDoPeriodo {
+  return {
+    periodo: { de: "2026-09-01", ate: "2026-09-30", dias: 30 },
+    filtros: { campanha: null, origem: null, responsavel: null },
+    totalNoPeriodo,
+    funil: { etapas: etapas(quantidades), conversaoTotal: null, perdidos: 0, abertos: 0, motivosDePerda: [] },
+    opcoes: { campanhas: [], origens: [], responsaveis: [] },
+  };
+}
+
 describe("concluiFunil", () => {
   /*
-    "48 leads, 20 qualificados, 9 reuniões, 4 vendas" é a tabela lida em voz
-    alta: quem lê ainda precisa fazer as subtrações. A queda maior é a resposta.
+    "48 leads, 40 contatados, 20 qualificados, 9 reuniões, 4 vendas" é a
+    tabela lida em voz alta: quem lê ainda precisa fazer as subtrações. A
+    queda maior é a resposta.
   */
   it("aponta a maior perda, e não repete cada etapa", () => {
     // 48→40 perde 8, 40→20 perde 20, 20→9 perde 11, 9→4 perde 5.
-    expect(concluiFunil(overview())).toBe(
-      "48 leads viraram 4 clientes. A maior perda é de aproveitável para qualificado: 20.",
+    expect(concluiFunil(funil([48, 40, 20, 9, 4]))).toBe(
+      "48 leads viraram 4 clientes. A maior perda é de contatado para qualificado: 20.",
     );
   });
 
   it("diz quando nada fechou", () => {
-    const o = overview({ totals: { ...overview().totals, won: 0 } });
-    expect(concluiFunil(o)).toContain("nenhuma venda fechada");
+    expect(concluiFunil(funil([10, 6, 2, 1, 0]))).toContain("nenhuma venda fechada");
   });
 
   it("não inventa perda quando o funil não perdeu ninguém", () => {
-    const o = overview({
-      totals: { ...overview().totals, leads: 3, disqualified: 0, workable: 3, qualified: 3, meetings: 3, won: 3 },
+    expect(concluiFunil(funil([3, 3, 3, 3, 3]))).toBe("3 leads viraram 3 clientes.");
+  });
+
+  it("separa período vazio de recorte vazio", () => {
+    expect(concluiFunil(funil([0, 0, 0, 0, 0], 0))).toBe("Nenhum lead entrou neste período.");
+    expect(concluiFunil(funil([0, 0, 0, 0, 0], 12))).toBe("Nenhum lead do período tem esta combinação de filtros.");
+  });
+});
+
+describe("maiorPerda", () => {
+  /*
+    De uma reunião para nenhuma venda a perda é de 100%. Apontar essa
+    passagem como o problema esconderia os trinta que nunca foram respondidos.
+  */
+  it("mede em pessoas, e não em proporção", () => {
+    expect(maiorPerda(etapas([40, 10, 2, 1, 0]))).toEqual({
+      de: "leads",
+      para: "contatados",
+      perdeu: 30,
+      proporcao: 30 / 40,
     });
-    expect(concluiFunil(o)).toBe("3 leads viraram 3 clientes.");
+  });
+
+  it("no empate, fica com a etapa de cima", () => {
+    // 20→10 e 10→0 perdem dez cada.
+    expect(maiorPerda(etapas([20, 10, 0, 0, 0]))?.de).toBe("leads");
+  });
+
+  it("não aponta nada quando ninguém saiu", () => {
+    expect(maiorPerda(etapas([4, 4, 4, 4, 4]))).toBeNull();
+    expect(maiorPerda(etapas([0, 0, 0, 0, 0]))).toBeNull();
   });
 });
 

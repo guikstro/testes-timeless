@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { unstable_rethrow } from "next/navigation";
 import { AtualizaAoVivo } from "@/components/notifications/atualiza-ao-vivo";
 import { GrupoDePilulas } from "@/components/ui/pill-group";
 import { apiFetch } from "@/lib/api-client";
@@ -14,12 +15,13 @@ import { AbaOrigem } from "./aba-origem";
 import { AbaAtendimento } from "./aba-atendimento";
 import { Procedencia } from "./procedencia";
 import { concluiAtendimento, concluiFunil, concluiOrigem, concluiVisaoGeral } from "./conclusao";
-import { Overview } from "./tipos";
+import { FunilDoPeriodo, Overview } from "./tipos";
 import { Alert } from "@/components/ui/alert";
 import { Frescor, FrescorDosDados } from "@/components/ui/frescor";
 import { sessaoAtual } from "@/lib/sessao";
 import { temPresencaLocal } from "@/lib/foco";
 import { concluiPresencaLocal, PainelPresencaLocal, PresencaLocal } from "./painel-presenca-local";
+import { FILTRO_DE_RESPONSAVEL } from "@/lib/leads/acompanhamento";
 
 const PERIODOS = [7, 30, 90];
 
@@ -33,7 +35,9 @@ const PERIODOS = [7, 30, 90];
  */
 const ABAS_DE_LEADS = [
   { chave: "geral", rotulo: "Visão geral", conclui: concluiVisaoGeral },
-  { chave: "funil", rotulo: "Funil", conclui: concluiFunil },
+  // A frase do funil sai do próprio funil, que já vem com os recortes: ver
+  // `subtitulo` abaixo.
+  { chave: "funil", rotulo: "Funil", conclui: () => "" },
   { chave: "origem", rotulo: "Origem", conclui: concluiOrigem },
   { chave: "atendimento", rotulo: "Atendimento", conclui: concluiAtendimento },
 ] as const;
@@ -46,7 +50,7 @@ type Aba = (typeof ABAS_DE_LEADS)[number]["chave"] | "local";
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ days?: string; aba?: string }>;
+  searchParams: Promise<{ days?: string; aba?: string; campanha?: string; origem?: string; responsavel?: string }>;
 }) {
   const params = await searchParams;
   const days = PERIODOS.includes(Number(params.days)) ? Number(params.days) : 30;
@@ -59,10 +63,14 @@ export default async function DashboardPage({
   const aba: Aba = ABAS.some((opcao) => opcao.chave === params.aba) ? (params.aba as Aba) : "geral";
   const local = aba === "local" ? await apiFetch<PresencaLocal>(`/presenca-local?days=${days}`) : null;
 
-  const [overview, conexao, frescor] = await Promise.all([
+  // Os recortes do funil só existem na aba dele; nas outras, a URL nem os leva.
+  const recortes = aba === "funil" ? recortesDoFunil(params) : null;
+
+  const [overview, conexao, frescor, funil] = await Promise.all([
     apiFetch<Overview>(`/analytics/overview?days=${days}`),
     conexaoDoWhatsApp(),
     buscaFrescor(),
+    recortes ? buscaFunil(days, recortes) : Promise.resolve(null),
   ]);
   const { totals, setup } = overview;
 
@@ -86,6 +94,19 @@ export default async function DashboardPage({
 
   const escolhida = ABAS.find((opcao) => opcao.chave === aba)!;
   const paraAba = (destino: string) => `/dashboard?aba=${destino}&days=${days}`;
+  // Trocar de período dentro do funil mantém os recortes: é a mesma pergunta
+  // feita sobre outra janela, e refazer os filtros seria trabalho à toa.
+  const comRecortes = recortes ? new URLSearchParams(recortes).toString() : "";
+
+  const subtitulo = local
+    ? concluiPresencaLocal(local)
+    : medicao !== "medido"
+      ? "Sem WhatsApp recebendo, não há lead para medir neste período."
+      : aba === "funil"
+        ? funil
+          ? concluiFunil(funil)
+          : "O funil não carregou agora."
+        : escolhida.conclui(overview);
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -112,13 +133,7 @@ export default async function DashboardPage({
               inteira para chegar a uma resposta que já cabia na primeira
               linha. O título diz o assunto; esta linha diz o que aconteceu.
             */}
-            <p className="mt-0.5 text-corpo text-ink-mute">
-              {local
-                ? concluiPresencaLocal(local)
-                : medicao === "medido"
-                  ? escolhida.conclui(overview)
-                  : "Sem WhatsApp recebendo, não há lead para medir neste período."}
-            </p>
+            <p className="mt-0.5 text-corpo text-ink-mute">{subtitulo}</p>
             <FrescorDosDados
               frescor={frescor}
               fontes={local ? ["google"] : ["meta", "google"]}
@@ -132,7 +147,7 @@ export default async function DashboardPage({
             opcoes={PERIODOS.map((opcao) => ({
               chave: String(opcao),
               rotulo: `${opcao} dias`,
-              href: `/dashboard?aba=${aba}&days=${opcao}`,
+              href: `/dashboard?aba=${aba}&days=${opcao}${comRecortes ? `&${comRecortes}` : ""}`,
             }))}
           />
         </div>
@@ -172,7 +187,15 @@ export default async function DashboardPage({
       ) : null}
 
       {medicao === "medido" && aba === "geral" ? <AbaVisaoGeral overview={overview} /> : null}
-      {medicao === "medido" && aba === "funil" ? <AbaFunil overview={overview} /> : null}
+      {medicao === "medido" && aba === "funil" ? (
+        funil ? (
+          <AbaFunil dados={funil} />
+        ) : (
+          <Alert tom="warning" titulo="Não foi possível carregar o funil agora">
+            As outras abas continuam funcionando. Tente de novo em alguns instantes.
+          </Alert>
+        )
+      ) : null}
       {medicao === "medido" && aba === "origem" ? <AbaOrigem overview={overview} /> : null}
       {medicao === "medido" && aba === "atendimento" ? <AbaAtendimento overview={overview} /> : null}
 
@@ -321,6 +344,40 @@ async function DashboardDePresencaLocal({ days }: { days: number }) {
       <PainelPresencaLocal dados={dados} />
     </div>
   );
+}
+
+/**
+ * Os recortes do funil que vieram pela URL, conferidos.
+ *
+ * Texto de fora, que não merece confiança: um valor que a API recusaria vira
+ * ausência de recorte aqui, em vez de derrubar a aba por causa de um link
+ * mal copiado.
+ */
+function recortesDoFunil(params: { campanha?: string; origem?: string; responsavel?: string }): Record<string, string> {
+  const recortes: Record<string, string> = {};
+  const campanha = params.campanha?.trim();
+  const origem = params.origem?.trim();
+  if (campanha && campanha.length <= 200) recortes.campanha = campanha;
+  if (origem && origem.length <= 300) recortes.origem = origem;
+  if (params.responsavel && FILTRO_DE_RESPONSAVEL.test(params.responsavel)) recortes.responsavel = params.responsavel;
+  return recortes;
+}
+
+/**
+ * O funil com os recortes, ou null quando a consulta falha.
+ *
+ * Só esta aba depende dele, então uma falha aqui vira um aviso dentro dela e
+ * o resto do painel continua. O redirecionamento de sessão encerrada passa
+ * adiante (`unstable_rethrow`), ou a pessoa ficaria presa numa tela sem dados.
+ */
+async function buscaFunil(days: number, recortes: Record<string, string>): Promise<FunilDoPeriodo | null> {
+  const consulta = new URLSearchParams({ days: String(days), ...recortes });
+  try {
+    return await apiFetch<FunilDoPeriodo>(`/analytics/funil?${consulta.toString()}`);
+  } catch (erro) {
+    unstable_rethrow(erro);
+    return null;
+  }
 }
 
 /** De quando é o dado. Opcional: sem ele a tela continua, só sem a linha. */

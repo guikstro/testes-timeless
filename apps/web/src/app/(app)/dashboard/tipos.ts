@@ -53,6 +53,48 @@ export interface Overview {
   setup: { whatsappConnected: boolean; metaConnected: boolean; trackingLinkCount: number };
 }
 
+/** As etapas da aba Funil, na ordem em que o lead anda. */
+export type ChaveDaEtapa = "leads" | "contatados" | "qualificados" | "reuniao" | "vendas";
+
+export interface EtapaMedida {
+  chave: ChaveDaEtapa;
+  /** Quem chegou nesta etapa ou foi além dela. */
+  quantidade: number;
+  /** Fração da etapa anterior que chegou aqui. Null na primeira, e quando a anterior está vazia. */
+  conversao: number | null;
+  /** Pararam aqui e foram marcados como perdidos. */
+  perdidos: number;
+  /** Pararam aqui e continuam abertos. */
+  abertos: number;
+}
+
+export interface OpcaoDeFiltro {
+  valor: string;
+  rotulo: string;
+  /** Leads do período com este valor, antes de qualquer recorte. */
+  leads: number;
+}
+
+/** O que a rota do funil devolve. */
+export interface FunilDoPeriodo {
+  periodo: { de: string; ate: string; dias: number };
+  filtros: { campanha: string | null; origem: string | null; responsavel: string | null };
+  /** Leads do período antes dos recortes. */
+  totalNoPeriodo: number;
+  funil: {
+    etapas: EtapaMedida[];
+    conversaoTotal: number | null;
+    perdidos: number;
+    abertos: number;
+    motivosDePerda: { motivo: string | null; quantidade: number }[];
+  };
+  opcoes: {
+    campanhas: OpcaoDeFiltro[];
+    origens: OpcaoDeFiltro[];
+    responsaveis: { id: string; name: string }[];
+  };
+}
+
 /** Null é "não houve base para calcular"; 0% afirmaria que ninguém converteu. */
 export function formatRate(rate: number | null): string {
   if (rate === null) return "Sem base";

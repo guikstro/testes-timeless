@@ -30,6 +30,8 @@ const MARCA_DE_ERRO = "Esta tela não carregou";
 
 const TELAS = [
   "/dashboard",
+  // Com os recortes, que chegam pela URL e vão conferidos para a API.
+  "/dashboard?aba=funil&campanha=nenhuma&responsavel=eu",
   "/leads",
   "/campanhas",
   "/verba",

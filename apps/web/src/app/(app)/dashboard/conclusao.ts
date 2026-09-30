@@ -1,5 +1,5 @@
 import { formatCentsAsBRL } from "@/lib/currency";
-import type { Overview } from "./tipos";
+import type { ChaveDaEtapa, EtapaMedida, FunilDoPeriodo, Overview } from "./tipos";
 
 /**
  * A primeira linha de cada aba, escrita a partir dos números.
@@ -45,10 +45,52 @@ export function concluiVisaoGeral(overview: Overview): string {
   return `${leads(totals.leads)}${comparacao(comp.leads.delta)}${receita}.`;
 }
 
-export function concluiFunil(overview: Overview): string {
-  const { totals } = overview;
+/** Cada etapa no singular, para "de contatado para qualificado". */
+const NA_FRASE: Record<ChaveDaEtapa, string> = {
+  leads: "lead",
+  contatados: "contatado",
+  qualificados: "qualificado",
+  reuniao: "reunião",
+  vendas: "venda",
+};
 
-  if (totals.leads === 0) return "Nenhum lead entrou neste período.";
+export interface MaiorPerda {
+  de: ChaveDaEtapa;
+  para: ChaveDaEtapa;
+  /** Quantas pessoas não passaram. */
+  perdeu: number;
+  /** A mesma perda como fração da etapa de onde elas saíram. */
+  proporcao: number;
+}
+
+/**
+ * Onde o funil perde mais gente, em número de pessoas.
+ *
+ * Em pessoas, e não em proporção: de uma reunião para nenhuma venda a perda
+ * é de 100%, e apontar essa passagem como o problema do mês esconderia os
+ * trinta leads que nunca foram respondidos. Empate fica com a etapa de cima,
+ * que é onde agir alcança mais gente.
+ *
+ * Uma função só para o subtítulo e para a frase dentro da aba: com duas
+ * contas, a mesma tela chegou a apontar duas passagens diferentes.
+ */
+export function maiorPerda(etapas: EtapaMedida[]): MaiorPerda | null {
+  let pior: MaiorPerda | null = null;
+  for (let i = 0; i < etapas.length - 1; i += 1) {
+    const perdeu = etapas[i].quantidade - etapas[i + 1].quantidade;
+    if (perdeu <= 0 || (pior && perdeu <= pior.perdeu)) continue;
+    pior = { de: etapas[i].chave, para: etapas[i + 1].chave, perdeu, proporcao: perdeu / etapas[i].quantidade };
+  }
+  return pior;
+}
+
+export function concluiFunil(dados: FunilDoPeriodo): string {
+  const { etapas } = dados.funil;
+  const entraram = etapas[0]?.quantidade ?? 0;
+  const vendas = etapas[etapas.length - 1]?.quantidade ?? 0;
+
+  if (dados.totalNoPeriodo === 0) return "Nenhum lead entrou neste período.";
+  if (entraram === 0) return "Nenhum lead do período tem esta combinação de filtros.";
 
   /*
     A maior queda do funil, e não o total de cada etapa.
@@ -57,22 +99,14 @@ export function concluiFunil(overview: Overview): string {
     alta: quem lê ainda precisa fazer as subtrações para descobrir onde agir.
     A queda maior é a resposta da pergunta da aba.
   */
-  const etapas = [
-    { de: "contato", para: "aproveitável", perdeu: totals.leads - totals.workable },
-    { de: "aproveitável", para: "qualificado", perdeu: totals.workable - totals.qualified },
-    { de: "qualificado", para: "reunião", perdeu: totals.qualified - totals.meetings },
-    { de: "reunião", para: "venda", perdeu: totals.meetings - totals.won },
-  ].filter((etapa) => etapa.perdeu > 0);
-
   const clientes =
-    totals.won === 0
-      ? `${leads(totals.leads)} e nenhuma venda fechada`
-      : `${leads(totals.leads)} viraram ${totals.won} ${totals.won === 1 ? "cliente" : "clientes"}`;
+    vendas === 0
+      ? `${leads(entraram)} e nenhuma venda fechada`
+      : `${leads(entraram)} viraram ${vendas} ${vendas === 1 ? "cliente" : "clientes"}`;
 
-  if (etapas.length === 0) return `${clientes}.`;
-
-  const maior = etapas.reduce((a, b) => (b.perdeu > a.perdeu ? b : a));
-  return `${clientes}. A maior perda é de ${maior.de} para ${maior.para}: ${maior.perdeu}.`;
+  const pior = maiorPerda(etapas);
+  if (!pior) return `${clientes}.`;
+  return `${clientes}. A maior perda é de ${NA_FRASE[pior.de]} para ${NA_FRASE[pior.para]}: ${pior.perdeu}.`;
 }
 
 export function concluiOrigem(overview: Overview): string {

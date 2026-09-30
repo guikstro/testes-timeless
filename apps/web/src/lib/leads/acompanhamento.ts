@@ -9,6 +9,13 @@ export interface Responsavel {
 }
 
 /**
+ * O recorte por responsável que a URL pode pedir: `eu`, `nenhum` ou o id de
+ * uma pessoa. Conferido antes de ir para a API, que recusaria o resto com
+ * erro e derrubaria a tela inteira por causa de um link mal copiado.
+ */
+export const FILTRO_DE_RESPONSAVEL = /^(eu|nenhum|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
+/**
  * Valor em reais escrito por gente, em centavos.
  *
  * Aceita "1.500", "1.500,00", "1500", "1500,5" e "R$ 1.500": no Brasil o

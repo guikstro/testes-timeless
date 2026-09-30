@@ -8,7 +8,7 @@ import { ESTAGIOS } from "./estagios";
 import { LeadBoard } from "./lead-board";
 import { LeadCartao } from "./lead-card";
 import { LeadsFilters } from "./leads-filters";
-import type { Responsavel } from "@/lib/leads/acompanhamento";
+import { FILTRO_DE_RESPONSAVEL, type Responsavel } from "@/lib/leads/acompanhamento";
 
 interface PaginatedResult<T> {
   items: T[];
@@ -31,9 +31,6 @@ const DESCRICAO_DA_REGRA = {
   TODOS: "Todas as conversas que chegaram pelo WhatsApp, com a origem quando ela existe.",
 } as const;
 
-/** O filtro de responsável que a API entende: eu, nenhum ou o id de alguém. */
-const RESPONSAVEL_VALIDO = /^(eu|nenhum|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
-
 export default async function LeadsPage({
   searchParams,
 }: {
@@ -42,7 +39,7 @@ export default async function LeadsPage({
   const params = await searchParams;
   const soAguardando = params.aguardando === "1";
   // Um valor estranho na URL é ignorado, e não um 400 na tela.
-  const responsavel = params.responsavel && RESPONSAVEL_VALIDO.test(params.responsavel) ? params.responsavel : null;
+  const responsavel = params.responsavel && FILTRO_DE_RESPONSAVEL.test(params.responsavel) ? params.responsavel : null;
 
   // Uma consulta por coluna, em paralelo. São independentes, então esperar
   // uma pela outra só somaria latência.
