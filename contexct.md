@@ -208,3 +208,11 @@ Decisões do usuário: convite por link, um cliente por pessoa, cadastro públic
 - `auth.service.ts` (`register`): `platformRole: "ADMIN"` para toda conta. O teste do cadastro confere isso.
 - `register/page.tsx`: depois do cadastro vai para `/`, igual ao login. Assim o ADMIN cai em `/clientes`, e não no `/dashboard` do cliente.
 - Depois, o ADMIN adiciona clientes e pessoas pelos convites (Configurações → Equipe).
+
+### Cadastro nunca vira operador; a equipe é avisada de toda conta nova (2026-09-29)
+- Decisão do usuário: operador da plataforma só por convite de quem já é administrador. O cadastro continua aberto, mas cria conta comum, com a própria organização.
+- `auth.service.ts` (`register`): `platformRole: null` sempre, nem a primeira conta. Substitui a regra de 2026-09-28 acima, que deixava qualquer pessoa que chegasse à página de cadastro virar operadora e, ligando o próprio segundo fator, ver todos os clientes.
+- Toda conta nova avisa a equipe: notificação `conta.nova` na organização cujo dono é administrador da plataforma, e e-mail ao dono (`novaContaCadastrada` em `common/email/mensagens.ts`). O aviso nunca impede o cadastro.
+- O e-mail só sai com SMTP configurado na API (`EMAIL_TRANSPORTE=smtp` e as variáveis `SMTP_*`, `EMAIL_REMETENTE`).
+- De quebra: o filtro "Sistema" da tela de notificações pedia `sistema.erro`, que a API recusava; a lista de tipos aceitos agora tem `sistema.erro` e `conta.nova`.
+- Testes: `auth.service.spec.ts` (nunca operador, aviso no sino e por e-mail, aviso que falha não impede o cadastro) e `admin.e2e-spec.ts` (conta nova barrada na administração; a equipe recebe o aviso e o cliente não).

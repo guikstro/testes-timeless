@@ -1,3 +1,4 @@
+import { NotificationsService } from "../notifications/notifications.service";
 import { HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
@@ -19,7 +20,13 @@ import { ChangePasswordDto } from "./dto/change-password.dto";
 import { ChangeEmailDto } from "./dto/change-email.dto";
 import { enderecoDaAplicacao } from "../common/configuracao/ambiente";
 import { EmailService } from "../common/email/email.service";
-import { confirmacaoDeEmail, emailAlterado, recuperacaoDeSenha, senhaAlterada } from "../common/email/mensagens";
+import {
+  confirmacaoDeEmail,
+  emailAlterado,
+  novaContaCadastrada,
+  recuperacaoDeSenha,
+  senhaAlterada,
+} from "../common/email/mensagens";
 import { AuditoriaService } from "../auditoria/auditoria.service";
 import { AuthenticatedUser, JwtPayload } from "./jwt-payload.interface";
 import { capacidadesDe } from "../common/permissoes/capacidades";
@@ -81,13 +88,15 @@ export class AuthService {
     private readonly email: EmailService,
     private readonly mfa: MfaService,
     private readonly auditoria: AuditoriaService,
+    private readonly notificacoes: NotificationsService,
   ) {}
 
   async register(dto: RegisterDto, contexto?: ContextoDoCliente): Promise<TokenPair> {
-    // Toda conta cadastrada nasce operadora da plataforma (ADMIN): quem se
-    // cadastra é da equipe, e depois convida clientes e colegas. O que segura
-    // o acesso aos clientes é a verificação em duas etapas, que o
-    // PlatformAdminGuard exige.
+    // Cadastro aberto: quem chega cria a própria conta e a própria organização,
+    // e é dono dela. Nunca vira operador da plataforma, nem a primeira conta:
+    // `platformRole` abre todos os clientes, e o segundo fator não segura isso,
+    // porque quem liga é a própria pessoa. Operador só entra por convite de
+    // outro administrador (Configurações → Equipe, acesso "Equipe Timeless").
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) {
       throw new AppException("EMAIL_ALREADY_IN_USE", "Este e-mail já está em uso.", HttpStatus.CONFLICT);
@@ -107,7 +116,7 @@ export class AuthService {
         });
 
         const user = await tx.user.create({
-          data: { name: dto.name, email: dto.email, passwordHash, platformRole: "ADMIN" },
+          data: { name: dto.name, email: dto.email, passwordHash, platformRole: null },
         });
 
         const membership = await tx.membership.create({
@@ -123,9 +132,57 @@ export class AuthService {
       throw error;
     }
 
+    await this.avisaAEquipe({
+      nome: dto.name,
+      email: dto.email,
+      organizacao: dto.organizationName,
+      organizationId: result.membership.organizationId,
+    });
+
     return this.issueTokenPair(result.user.id, result.membership.organizationId, result.membership.role, undefined, {
       contexto,
     });
+  }
+
+  /**
+   * Toda conta nova avisa a equipe Timeless, no sino e por e-mail: é uma
+   * organização a mais na plataforma, e quem administra precisa saber quem
+   * entrou sem convite.
+   *
+   * A equipe é a organização cujo dono é administrador da plataforma: é para
+   * ela que o convite de equipe leva as pessoas. O aviso vai para a
+   * organização (todos da equipe veem no sino) e o e-mail, para o dono.
+   *
+   * Nunca impede o cadastro: falhar ao avisar é um incômodo, falhar ao
+   * cadastrar é perder quem chegou.
+   */
+  private async avisaAEquipe(nova: { nome: string; email: string; organizacao: string; organizationId: string }): Promise<void> {
+    try {
+      const donos = await this.prisma.membership.findMany({
+        where: {
+          role: "OWNER",
+          organizationId: { not: nova.organizationId },
+          organization: { deletedAt: null },
+          user: { platformRole: "ADMIN", deletedAt: null },
+        },
+        select: { organizationId: true, user: { select: { email: true, name: true } } },
+      });
+
+      const endereco = `${enderecoDaAplicacao()}/clientes/${nova.organizationId}`;
+      for (const organizationId of new Set(donos.map((dono) => dono.organizationId))) {
+        await this.notificacoes.notificar({
+          type: "conta.nova",
+          organizationId,
+          title: `Nova conta cadastrada: ${nova.organizacao}`,
+          body: `${nova.nome} (${nova.email}) criou a conta e a organização ${nova.organizacao}, sem convite.`,
+        });
+      }
+      for (const dono of donos) {
+        await this.email.enfileirar(novaContaCadastrada(dono.user.email, dono.user.name, nova, endereco));
+      }
+    } catch (erro) {
+      this.logger.error(JSON.stringify({ event: "aviso_de_conta_nova_falhou", error: String(erro) }));
+    }
   }
 
   async login(dto: LoginDto, contexto?: ContextoDoCliente): Promise<ResultadoDeLogin> {

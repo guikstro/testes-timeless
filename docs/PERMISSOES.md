@@ -22,6 +22,26 @@ Ninguém decide permissão comparando o papel de quem age (`role === "ADMIN"`)
 fora de `capacidades.ts`. Comparar o papel do alvo continua valendo, como em
 "esta pessoa é dona?", porque isso é dado e não permissão.
 
+## Operador da plataforma (equipe Timeless)
+
+`platformRole` (`ADMIN` ou `SUPPORT`) abre todos os clientes. Por isso:
+
+- **Só por convite.** Um administrador convida pela equipe (Configurações →
+  Equipe, acesso "Equipe Timeless"), e quem aceita entra na organização da
+  equipe como operador. Não existe outro caminho pela aplicação.
+- **Cadastro nunca vira operador**, nem a primeira conta. O cadastro continua
+  aberto: quem se cadastra cria a própria conta e a própria organização, e é
+  dono só dela.
+- **A equipe é avisada de toda conta nova:** notificação "Conta nova" no sino
+  da organização da equipe e e-mail para o dono dela, com nome, e-mail e a
+  organização criada. O e-mail só é entregue com o envio por SMTP configurado
+  na API (`EMAIL_TRANSPORTE=smtp`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`,
+  `SMTP_PASSWORD`, `EMAIL_REMETENTE`); sem isso, vai só para o log.
+- **A administração exige segundo fator** (`PlatformAdminGuard`), mas ele não
+  substitui o convite: quem liga o fator é a própria pessoa.
+- **Instalação nova:** o primeiro administrador é marcado direto no banco
+  (`platform_role = 'ADMIN'`), porque ainda não há quem convide.
+
 ## Áreas e capacidades
 
 A área é o que se marca ao convidar alguém para um cliente. Cada uma libera:

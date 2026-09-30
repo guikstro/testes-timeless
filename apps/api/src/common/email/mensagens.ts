@@ -105,3 +105,37 @@ export function emailAlterado(para: string, nome: string, novoEmail: string): Me
     ].join("\n"),
   };
 }
+
+/**
+ * Aviso à equipe Timeless de que alguém se cadastrou sozinho.
+ *
+ * Vai para o dono da conta da equipe. Quem se cadastra cria uma organização
+ * nova e vê só ela, sem acesso a nenhum cliente; o aviso existe para a equipe
+ * saber quem entrou sem convite e decidir o que fazer.
+ */
+export function novaContaCadastrada(
+  para: string,
+  nome: string,
+  nova: { nome: string; email: string; organizacao: string },
+  endereco: string,
+): MensagemDeEmail {
+  return {
+    para,
+    assunto: `Nova conta na plataforma: ${nova.organizacao}`,
+    texto: [
+      `Olá, ${nome}.`,
+      "",
+      "Uma conta nova foi cadastrada na plataforma, pelo cadastro aberto, sem convite:",
+      "",
+      `Pessoa: ${nova.nome}`,
+      `E-mail: ${nova.email}`,
+      `Organização: ${nova.organizacao}`,
+      "",
+      "É uma conta comum: vê só a própria organização e não tem acesso a nenhum cliente nem à administração.",
+      "",
+      `Para ver a organização: ${endereco}`,
+      "",
+      "Se não reconhece este cadastro, a organização pode ser excluída na página dela.",
+    ].join("\n"),
+  };
+}

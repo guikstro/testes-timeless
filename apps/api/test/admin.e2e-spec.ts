@@ -116,6 +116,37 @@ describe("Administração da plataforma (e2e)", () => {
       await daSegundoFator(prisma, encryption, adminUserId);
     });
 
+    it("cadastro novo nunca vira operador, e a equipe fica sabendo no sino", async () => {
+      const nova = await request(app.getHttpServer())
+        .post("/api/auth/register")
+        .send({ name: "Nova", email: "nova@admin-e2e.local", password: "password123", organizationName: "Admin E2E Nova Conta" })
+        .expect(201);
+
+      // Barrada por não ser operadora, e não por falta do segundo fator.
+      const recusa = await request(app.getHttpServer())
+        .get("/api/admin/organizations")
+        .set("Authorization", `Bearer ${nova.body.accessToken}`)
+        .expect(403);
+      expect(recusa.body.code).not.toBe("MFA_OBRIGATORIO");
+      expect((await prisma.user.findUniqueOrThrow({ where: { email: "nova@admin-e2e.local" } })).platformRole).toBeNull();
+
+      const avisos = await request(app.getHttpServer())
+        .get("/api/notifications?tipo=conta.nova")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .expect(200);
+      expect(JSON.stringify(avisos.body)).toContain("Nova conta cadastrada: Admin E2E Nova Conta");
+
+      // O cliente não recebe o aviso: ele não é da equipe.
+      const doCliente = await request(app.getHttpServer())
+        .get("/api/notifications?tipo=conta.nova")
+        .set("Authorization", `Bearer ${clientToken}`)
+        .expect(200);
+      expect(JSON.stringify(doCliente.body)).not.toContain("Admin E2E Nova Conta");
+
+      // Sai daqui para não aparecer nas listagens dos testes seguintes.
+      await prisma.organization.deleteMany({ where: { name: "Admin E2E Nova Conta" } });
+    });
+
     it("lista as organizações com as métricas do painel", async () => {
       const response = await request(app.getHttpServer())
         .get("/api/admin/organizations?search=Admin E2E Cliente")

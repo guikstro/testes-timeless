@@ -8,6 +8,7 @@ import { AuthenticatedUser } from "./jwt-payload.interface";
 import { AppException } from "../common/exceptions/app-exception";
 import { MfaService } from "./mfa/mfa.service";
 import { EmailService } from "../common/email/email.service";
+import { NotificationsService } from "../notifications/notifications.service";
 
 // bcrypt's native binding exports non-configurable properties, so
 // jest.spyOn(bcrypt, "compare") fails with "Cannot redefine property".
@@ -40,7 +41,7 @@ function buildPrismaMock(): MockPrisma {
   return {
     user: { findUnique: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
     organization: { findUnique: jest.fn() },
-    membership: { create: jest.fn(), findUnique: jest.fn() },
+    membership: { create: jest.fn(), findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     refreshToken: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     passwordResetToken: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     emailChangeToken: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn(), deleteMany: jest.fn() },
@@ -67,6 +68,7 @@ describe("AuthService", () => {
   let email: { enfileirar: jest.Mock };
   let mfa: { confereSegundoFator: jest.Mock; desativar: jest.Mock };
   let auditoria: { registra: jest.Mock; registraParaAPessoa: jest.Mock; registraSemEsperar: jest.Mock };
+  let notificacoes: { notificar: jest.Mock };
 
   beforeEach(() => {
     prisma = buildPrismaMock();
@@ -78,12 +80,14 @@ describe("AuthService", () => {
       registraParaAPessoa: jest.fn().mockResolvedValue(undefined),
       registraSemEsperar: jest.fn(),
     };
+    notificacoes = { notificar: jest.fn().mockResolvedValue(undefined) };
     service = new AuthService(
       prisma as unknown as PrismaService,
       jwt,
       email as unknown as EmailService,
       mfa as unknown as MfaService,
       auditoria as unknown as AuditoriaService,
+      notificacoes as unknown as NotificationsService,
     );
   });
 
@@ -116,8 +120,54 @@ describe("AuthService", () => {
       expect(result.accessToken).toEqual(expect.any(String));
       expect(result.refreshToken).toEqual(expect.any(String));
       expect(prisma.refreshToken.create).toHaveBeenCalledTimes(1);
-      // Toda conta cadastrada nasce operadora da plataforma, não só a primeira.
-      expect(criaUsuario).toHaveBeenCalledWith({ data: expect.objectContaining({ platformRole: "ADMIN" }) });
+      // Cadastro nunca vira operador da plataforma: só o convite da equipe faz isso.
+      expect(criaUsuario).toHaveBeenCalledWith({ data: expect.objectContaining({ platformRole: null }) });
+    });
+
+    /** Uma transação de cadastro que dá certo, para os testes do aviso. */
+    function cadastroDaCerto() {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.$transaction.mockImplementationOnce(async (callback: (tx: unknown) => unknown) =>
+        callback({
+          organization: {
+            findUnique: jest.fn().mockResolvedValue(null),
+            create: jest.fn().mockResolvedValue({ id: "org-nova", slug: "acme" }),
+          },
+          user: { create: jest.fn().mockResolvedValue({ id: "user-1" }) },
+          membership: {
+            create: jest.fn().mockResolvedValue({ organizationId: "org-nova", userId: "user-1", role: "OWNER" }),
+          },
+        }),
+      );
+    }
+
+    it("avisa a equipe no sino e o dono por e-mail", async () => {
+      cadastroDaCerto();
+      prisma.membership.findMany.mockResolvedValue([
+        { organizationId: "org-equipe", user: { email: "dono@timeless.test", name: "Dono" } },
+      ]);
+
+      await service.register({ name: "Ana", email: "ana@example.com", password: "password123", organizationName: "Acme" });
+
+      expect(notificacoes.notificar).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "conta.nova", organizationId: "org-equipe", title: "Nova conta cadastrada: Acme" }),
+      );
+      expect(email.enfileirar).toHaveBeenCalledWith(
+        expect.objectContaining({ para: "dono@timeless.test", assunto: "Nova conta na plataforma: Acme" }),
+      );
+      const mensagem = email.enfileirar.mock.calls[0][0] as { texto: string };
+      expect(mensagem.texto).toContain("ana@example.com");
+      expect(mensagem.texto).toContain("/clientes/org-nova");
+    });
+
+    it("se o aviso falhar, o cadastro acontece do mesmo jeito", async () => {
+      cadastroDaCerto();
+      prisma.membership.findMany.mockRejectedValue(new Error("banco fora"));
+
+      const result = await service.register({ name: "Ana", email: "ana@example.com", password: "password123", organizationName: "Acme" });
+
+      expect(result.accessToken).toEqual(expect.any(String));
+      expect(notificacoes.notificar).not.toHaveBeenCalled();
     });
 
     it("rejects registration when the e-mail is already in use", async () => {

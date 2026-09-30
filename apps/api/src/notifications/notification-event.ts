@@ -15,7 +15,9 @@ export type TipoDeNotificacao =
   | "message.received"
   | "message.failed"
   /** Algo que a operação precisa resolver: integração caída, sincronia falhando. */
-  | "sistema.erro";
+  | "sistema.erro"
+  /** Alguém se cadastrou e criou uma organização: a equipe Timeless fica sabendo. */
+  | "conta.nova";
 
 export interface NotificationEvent {
   type: TipoDeNotificacao;

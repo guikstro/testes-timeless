@@ -10,11 +10,13 @@ import { SessoesController } from "./sessoes/sessoes.controller";
 import { SessoesService } from "./sessoes/sessoes.service";
 import { ConvitesService } from "./convites/convites.service";
 import { ConvitesController } from "./convites/convites.controller";
+import { NotificationsModule } from "../notifications/notifications.module";
 
 @Module({
   imports: [
     forwardRef(() => MfaModule),
     forwardRef(() => AdminModule),
+    NotificationsModule,
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET,

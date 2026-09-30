@@ -8,6 +8,9 @@ const TIPOS = [
   "lead.stage_changed",
   "message.received",
   "message.failed",
+  // Faltava: o filtro "Sistema" da tela pedia este tipo e recebia 400.
+  "sistema.erro",
+  "conta.nova",
 ] as const;
 
 export class ListarNotificacoesDto {
