@@ -68,13 +68,15 @@ upsert em MetaConnection (status=CONNECTED) + enfileira job "sync" imediato
 ## Como a sincronização funciona
 
 ```
-MetaConnectionsService.connect()
+MetaConnectionsService.connect()        ao conectar a conta
+MetaConnectionsService.triggerSync()    POST /sync, botão "Sincronizar agora"
+AgendaDeSincronia.enfileirarTodas()     sozinha, a cada 60 min por padrão
   |
   v
-enfileira job em "meta-sync" (BullMQ) — attempts: 5, backoff exponencial (5s)
+enfileira job "sync" em "meta-sync" (BullMQ), um por organização
   |
   v
-(processo worker separado)
+(worker dentro do processo da API: WorkerModule, importado pelo AppModule)
 MetaSyncProcessor -> MetaSyncService.sync(organizationId)
   |
   v
@@ -91,6 +93,17 @@ busca insights dos últimos 7 dias -> upsert AdSpend por (campaignId, date)
 status = CONNECTED, lastSyncedAt = agora, lastSyncError = null
 ```
 
+- **O worker roda dentro do processo da API**: o `WorkerModule` é importado
+  pelo `AppModule`, e não existe mais processo worker separado (saíram o
+  `worker/main.ts` e o `start:worker`; ver "Backend num processo só" em
+  `contexct.md`). O motivo é o WhatsApp por QR Code: a conexão fica em
+  memória, e um worker à parte abriria uma segunda conexão para o mesmo
+  número. A fila continua no meio mesmo assim: quem conecta ou clica em
+  "Sincronizar agora" só enfileira e já recebe a resposta, e a retentativa
+  fica por conta do BullMQ.
+- **A retentativa depende de quem enfileirou**: `connect()` e `POST /sync`
+  usam `attempts: 5` com backoff exponencial a partir de 5s; a agenda usa
+  `attempts: 3` a partir de 30s.
 - **Hierarquia sempre completa a cada sync**: campanhas/ad sets/ads são
   poucos por organização na prática, então cada sincronização busca e faz
   upsert do conjunto inteiro — não há sincronização incremental de
@@ -105,6 +118,88 @@ status = CONNECTED, lastSyncedAt = agora, lastSyncError = null
   sincronização, a linha é pulada silenciosamente em vez de criar um
   relacionamento incorreto ou falhar a sincronização inteira.
 
+### Agenda automática
+
+Antes da agenda, nada disparava a sincronização sozinho: o gasto só era
+buscado ao conectar a conta ou ao clicar em "Sincronizar agora". Quem
+conectava e não clicava em mais nada seguia vendo o custo por lead da época
+em que conectou, sem nenhuma marca de que o número estava velho, o que é pior
+do que não ter número nenhum.
+
+`AgendaDeSincronia` (`apps/api/src/worker/agenda-de-sincronia.ts`) registra
+no Redis, pelo BullMQ, um job repetido com id fixo `meta-sync-periodica` na
+fila `meta-sync` (`META_SYNC_QUEUE`):
+
+```
+subida da API: AgendaDeSincronia.onApplicationBootstrap()
+  |
+  v  sem await
+registraAgenda()
+  -> upsertJobScheduler("meta-sync-periodica", { every: minutos * 60_000 })
+  |
+  v  a cada intervalo, o BullMQ cria o job
+job "sincronizar-todas" na fila "meta-sync" (sem organização, attempts: 1)
+  |
+  v
+MetaSyncProcessor -> AgendaDeSincronia.enfileirarTodas()
+  |
+  v
+um job "sync" por conexão em CONNECTED ou SYNC_FAILED
+(attempts: 3, backoff exponencial a partir de 30s)
+  |
+  v
+MetaSyncService.sync(organizationId), o mesmo caminho do diagrama acima
+```
+
+- **De quanto em quanto tempo**: a cada 60 minutos por padrão. Quando a
+  agenda ainda não existe no Redis, a primeira rodada sai na hora do
+  registro; as seguintes contam o intervalo a partir dali, e não da virada
+  do relógio.
+- **Como ajustar**: pela variável `META_SYNC_INTERVAL_MINUTES`, em minutos,
+  que já está no `.env.example` (no Render, nas variáveis de ambiente do
+  serviço da API). O mínimo é 5, porque abaixo disso não é sincronizar, é
+  martelar a API da Meta: um valor como `1` vira 5. Sem a variável, ou com
+  um valor vazio, zero, negativo ou que não seja número, vale o padrão de 60;
+  fração é truncada. A agenda é registrada com o valor lido na subida da
+  API, então a mudança vale a partir do próximo início. Como o id é sempre o
+  mesmo, a agenda nova substitui a antiga no Redis, e com o intervalo trocado
+  a primeira rodada no ritmo novo sai na hora.
+- **Por que a agenda vive no Redis, e não num `setInterval` do processo**:
+  para sobreviver a reinício (reiniciar a API mantém a próxima rodada no
+  mesmo horário, em vez de recomeçar a contagem) e não disparar em dobro
+  quando houver dois processos da API no ar, cada um com o seu worker.
+  Registrar de novo com o mesmo id substitui a agenda em vez de criar outra,
+  e o próprio BullMQ garante uma execução só por intervalo. A contrapartida
+  é que o registro só acontece na subida: se o Redis perder os dados com a
+  API no ar, a agenda só volta na próxima subida da API.
+- **Registro sem `await` na subida**: `onApplicationBootstrap()` chama
+  `registraAgenda()` com `void`, sem esperar. Com o Redis fora do ar, o
+  BullMQ não devolve erro: fica esperando a conexão para sempre. E o Nest só
+  abre a porta HTTP depois que os hooks de bootstrap terminam, então, com
+  `await`, a API ficava no ar sem porta e o Render derrubava o deploy. Se o
+  Redis responder com erro, a falha vai para o log
+  (`agenda_de_sincronia_falhou`) e a API continua de pé.
+- **Um job por organização, e não um que percorre todas**: o job repetido
+  não traz organização. Quando ele chega, o `MetaSyncProcessor` chama
+  `enfileirarTodas()`, que enfileira um job `sync` para cada conexão. Assim
+  a falha de um cliente não interrompe a sincronização dos outros, e cada um
+  tem a própria retentativa. O job repetido em si roda com `attempts: 1`:
+  repetir uma rodada que falhou não adianta, porque o próximo intervalo
+  refaz o mesmo trabalho.
+- **Quem entra na rodada**: conexões em `CONNECTED` e em `SYNC_FAILED`,
+  porque falha passageira é justamente o que uma nova tentativa resolve.
+  `TOKEN_EXPIRED` fica de fora de propósito: o acesso só volta quando alguém
+  reconecta com um token válido, e insistir a cada intervalo com um token
+  morto só rende chamada recusada. `DISCONNECTED` também fica de fora.
+- **Sem sincronização empilhada**: o id de cada job junta a organização e o
+  número do intervalo (`sync:<organizationId>:<intervalo>`). Enquanto o job
+  de uma organização ainda estiver na fila, outro do mesmo intervalo não
+  entra, e uma rodada atrasada não vira duas sincronizações empilhadas.
+- **Como conferir**: na subida, a API escreve
+  `agenda_de_sincronia_registrada` no log, com o intervalo em minutos, e cada
+  rodada escreve `sincronia_periodica_enfileirada`, com quantas organizações
+  entraram.
+
 ## Tratamento de erro e mapeamento de status
 
 `MetaSyncService.handleSyncError` decide o status da conexão a partir do
@@ -117,9 +212,11 @@ tipo de erro devolvido pela Graph API:
 | Qualquer outro erro (rede, 5xx, etc.)  | `SYNC_FAILED`      | Sim |
 
 Em todos os casos o erro é relançado após atualizar o status, para que o
-BullMQ aplique o retry configurado (`attempts: 5`, backoff exponencial a
-partir de 5s). A UI (`/integrations/meta`) mostra `lastSyncError` e um aviso
-específico para pedir reconexão quando o status é `TOKEN_EXPIRED`.
+BullMQ aplique o retry configurado no job: `attempts: 5` com backoff
+exponencial a partir de 5s quando ele vem de `connect()` ou `POST /sync`, e
+`attempts: 3` a partir de 30s quando vem da agenda automática. A UI
+(`/integrations/meta`) mostra `lastSyncError` e um aviso específico para
+pedir reconexão quando o status é `TOKEN_EXPIRED`.
 
 ### Correção de bug: job atrasado podia "ressuscitar" uma conexão desconectada
 
@@ -173,11 +270,10 @@ Campaign
 - **Sincronização de metadados sempre completa, nunca incremental** (só o
   gasto usa janela de datas) — aceitável para os volumes esperados de
   campanhas/ad sets/ads por organização.
-- **Sem sincronização automática periódica (cron).** Hoje a sincronização só
-  ocorre ao conectar ou por acionamento manual (`POST /sync`). Uma
-  sincronização periódica (ex.: a cada N horas via `@nestjs/schedule` ou um
-  repeatable job do BullMQ) é uma extensão natural, não implementada nesta
-  fase por não estar no escopo mínimo do dashboard.
+- **A agenda automática não tenta token expirado.** Conexão em
+  `TOKEN_EXPIRED` só volta a sincronizar depois que alguém reconecta com um
+  token válido; até lá, o gasto fica parado na última sincronização que
+  funcionou (ver "Agenda automática").
 
 ## Credenciais necessárias para homologação real
 

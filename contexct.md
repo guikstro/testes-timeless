@@ -224,3 +224,6 @@ Decisões do usuário: convite por link, um cliente por pessoa, cadastro públic
 - "Negociação" aparece como Reunião marcada, o nome que ficou no item 14.
 - Se a consulta do funil falhar, só a aba mostra o aviso; o resto do painel continua.
 - Testes: `funil.spec.ts` (API, 22 casos), `funil.e2e-spec.ts` (banco de verdade: campanha pelo anúncio, resposta da equipe como contato, recortes e validação), o isolamento entre contas passou a ler o funil, e `conclusao.spec.ts` no site.
+
+### `docs/META_ADS.md` em dia com a agenda automática (2026-09-30)
+- A seção de sincronização da Meta passou a descrever a agenda automática (`AgendaDeSincronia`, a cada 60 min, ajustável por `META_SYNC_INTERVAL_MINUTES`) e o worker dentro do processo da API. Só documentação, nenhum código mudou.
