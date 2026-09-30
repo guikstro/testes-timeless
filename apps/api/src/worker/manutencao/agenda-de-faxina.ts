@@ -19,7 +19,12 @@ export class AgendaDeFaxina implements OnApplicationBootstrap {
 
   constructor(@InjectQueue(MANUTENCAO_QUEUE) private readonly fila: Queue) {}
 
-  async onApplicationBootstrap(): Promise<void> {
+  /** Sem `await`, pelo mesmo motivo da `AgendaDeSincronia`: Redis fora não pode segurar a porta. */
+  onApplicationBootstrap(): void {
+    void this.registraAgenda();
+  }
+
+  async registraAgenda(): Promise<void> {
     try {
       await this.fila.upsertJobScheduler(
         ID_DA_AGENDA,

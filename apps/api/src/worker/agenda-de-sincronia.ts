@@ -34,7 +34,16 @@ export class AgendaDeSincronia implements OnApplicationBootstrap {
     @InjectQueue(META_SYNC_QUEUE) private readonly fila: Queue<MetaSyncJob | Record<string, never>>,
   ) {}
 
-  async onApplicationBootstrap(): Promise<void> {
+  /**
+   * Sem `await`: com o Redis fora, o BullMQ espera a conexão para sempre (sem
+   * erro), e o Nest só abre a porta depois deste hook. A API ficava no ar sem
+   * porta e o Render derrubava o deploy.
+   */
+  onApplicationBootstrap(): void {
+    void this.registraAgenda();
+  }
+
+  async registraAgenda(): Promise<void> {
     const minutos = this.intervaloEmMinutos();
 
     try {

@@ -18,7 +18,7 @@ describe("AgendaDeSincronia", () => {
     it("registra a repetição de hora em hora por padrão", async () => {
       const { agenda, fila } = montar();
 
-      await agenda.onApplicationBootstrap();
+      await agenda.registraAgenda();
 
       expect(fila.upsertJobScheduler).toHaveBeenCalledWith(
         "meta-sync-periodica",
@@ -31,7 +31,7 @@ describe("AgendaDeSincronia", () => {
       process.env.META_SYNC_INTERVAL_MINUTES = "30";
       const { agenda, fila } = montar();
 
-      await agenda.onApplicationBootstrap();
+      await agenda.registraAgenda();
 
       expect(fila.upsertJobScheduler).toHaveBeenCalledWith(
         "meta-sync-periodica",
@@ -44,7 +44,7 @@ describe("AgendaDeSincronia", () => {
       process.env.META_SYNC_INTERVAL_MINUTES = "1";
       const { agenda, fila } = montar();
 
-      await agenda.onApplicationBootstrap();
+      await agenda.registraAgenda();
 
       expect(fila.upsertJobScheduler).toHaveBeenCalledWith(
         "meta-sync-periodica",
@@ -57,7 +57,7 @@ describe("AgendaDeSincronia", () => {
       process.env.META_SYNC_INTERVAL_MINUTES = "toda hora";
       const { agenda, fila } = montar();
 
-      await agenda.onApplicationBootstrap();
+      await agenda.registraAgenda();
 
       expect(fila.upsertJobScheduler).toHaveBeenCalledWith(
         "meta-sync-periodica",
@@ -72,7 +72,17 @@ describe("AgendaDeSincronia", () => {
 
       // O worker continua processando o que já está na fila; um Redis fora do
       // ar já é visível por si só e não precisa de um processo morrendo junto.
-      await expect(agenda.onApplicationBootstrap()).resolves.toBeUndefined();
+      await expect(agenda.registraAgenda()).resolves.toBeUndefined();
+    });
+
+    it("não segura a subida quando o Redis não responde", () => {
+      const { agenda, fila } = montar();
+      // O BullMQ, com o Redis fora, não recusa: espera para sempre.
+      fila.upsertJobScheduler.mockReturnValue(new Promise(() => {}));
+
+      // Se o hook devolvesse essa promessa, o Nest nunca abriria a porta.
+      expect(agenda.onApplicationBootstrap()).toBeUndefined();
+      expect(fila.upsertJobScheduler).toHaveBeenCalled();
     });
   });
 

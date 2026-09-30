@@ -84,12 +84,10 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto, contexto?: ContextoDoCliente): Promise<TokenPair> {
-    // Cadastro aberto: quem chega cria a própria organização e é dono dela.
-    // Só a primeira conta da instalação nasce operadora da plataforma, porque
-    // `platformRole` abre todos os clientes; as demais só por convite ou pela
-    // administração.
-    const primeiraConta = (await this.prisma.user.count()) === 0;
-
+    // Toda conta cadastrada nasce operadora da plataforma (ADMIN): quem se
+    // cadastra é da equipe, e depois convida clientes e colegas. O que segura
+    // o acesso aos clientes é a verificação em duas etapas, que o
+    // PlatformAdminGuard exige.
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) {
       throw new AppException("EMAIL_ALREADY_IN_USE", "Este e-mail já está em uso.", HttpStatus.CONFLICT);
@@ -109,7 +107,7 @@ export class AuthService {
         });
 
         const user = await tx.user.create({
-          data: { name: dto.name, email: dto.email, passwordHash, platformRole: primeiraConta ? "ADMIN" : null },
+          data: { name: dto.name, email: dto.email, passwordHash, platformRole: "ADMIN" },
         });
 
         const membership = await tx.membership.create({

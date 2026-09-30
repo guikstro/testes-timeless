@@ -202,3 +202,9 @@ Decisões do usuário: convite por link, um cliente por pessoa, cadastro públic
 - Não deixa excluir a conta da própria equipe.
 - Teste: `admin/exclui-cliente.spec.ts` (4 casos).
 - Site: bloco "Zona de perigo" (`excluir-cliente.tsx`) na página do cliente. O botão só libera quando a frase bate e o código tem 6 dígitos. Depois de excluir, volta para `/clientes`.
+
+### Toda conta cadastrada nasce ADMIN, de novo (2026-09-28)
+- O commit `cb963e5` tinha deixado só a primeira conta da instalação como operadora. As outras nasciam como cliente comum.
+- `auth.service.ts` (`register`): `platformRole: "ADMIN"` para toda conta. O teste do cadastro confere isso.
+- `register/page.tsx`: depois do cadastro vai para `/`, igual ao login. Assim o ADMIN cai em `/clientes`, e não no `/dashboard` do cliente.
+- Depois, o ADMIN adiciona clientes e pessoas pelos convites (Configurações → Equipe).

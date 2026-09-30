@@ -38,7 +38,7 @@ function buildPrismaMock(): MockPrisma {
   };
 
   return {
-    user: { findUnique: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn(), count: jest.fn().mockResolvedValue(1) },
+    user: { findUnique: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
     organization: { findUnique: jest.fn() },
     membership: { create: jest.fn(), findUnique: jest.fn() },
     refreshToken: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
@@ -116,8 +116,8 @@ describe("AuthService", () => {
       expect(result.accessToken).toEqual(expect.any(String));
       expect(result.refreshToken).toEqual(expect.any(String));
       expect(prisma.refreshToken.create).toHaveBeenCalledTimes(1);
-      // Cadastro aberto: quem se cadastra não vira operador da plataforma.
-      expect(criaUsuario).toHaveBeenCalledWith({ data: expect.objectContaining({ platformRole: null }) });
+      // Toda conta cadastrada nasce operadora da plataforma, não só a primeira.
+      expect(criaUsuario).toHaveBeenCalledWith({ data: expect.objectContaining({ platformRole: "ADMIN" }) });
     });
 
     it("rejects registration when the e-mail is already in use", async () => {
@@ -153,29 +153,6 @@ describe("AuthService", () => {
           organizationName: "Acme",
         }),
       ).rejects.toMatchObject({ response: { code: "EMAIL_ALREADY_IN_USE" } });
-    });
-
-    it("só a primeira conta da instalação nasce operadora da plataforma", async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
-      prisma.user.count.mockResolvedValue(0);
-      const criaUsuario = jest.fn().mockResolvedValue({ id: "user-1" });
-
-      prisma.$transaction.mockImplementationOnce(async (callback: (tx: unknown) => unknown) =>
-        callback({
-          organization: {
-            findUnique: jest.fn().mockResolvedValue(null),
-            create: jest.fn().mockResolvedValue({ id: "org-1", slug: "acme" }),
-          },
-          user: { create: criaUsuario },
-          membership: {
-            create: jest.fn().mockResolvedValue({ organizationId: "org-1", userId: "user-1", role: "OWNER" }),
-          },
-        }),
-      );
-
-      await service.register({ name: "Ana", email: "ana@example.com", password: "password123", organizationName: "Acme" });
-
-      expect(criaUsuario).toHaveBeenCalledWith({ data: expect.objectContaining({ platformRole: "ADMIN" }) });
     });
   });
 
