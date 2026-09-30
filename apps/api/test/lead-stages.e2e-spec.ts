@@ -158,4 +158,85 @@ describe("Estágio de reunião e desqualificação (e2e)", () => {
     // A taxa é sobre os aproveitáveis, nunca sobre o total.
     expect(totals.qualificationRate).toBeCloseTo(totals.qualified / totals.workable);
   });
+
+  describe("acompanhamento: em atendimento, responsável, valor e próxima ação", () => {
+    const eu = () => JSON.parse(Buffer.from(token.split(".")[1], "base64").toString("utf8")).sub as string;
+
+    async function totais() {
+      const resposta = await request(app.getHttpServer())
+        .get("/api/analytics/overview?days=30")
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+      return resposta.body.totals as { leads: number; qualified: number };
+    }
+
+    it("marca em atendimento à mão, e isso não conta como qualificado", async () => {
+      const antes = await totais();
+      const lead = await createLead();
+
+      await patch(lead.id, { status: "IN_PROGRESS" }).expect(200);
+
+      const salvo = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
+      expect(salvo.status).toBe("IN_PROGRESS");
+      expect(salvo.emAtendimentoAt).toBeInstanceOf(Date);
+      const depois = await totais();
+      expect(depois.leads).toBe(antes.leads + 1);
+      expect(depois.qualified).toBe(antes.qualified);
+
+      // Dali, qualifica; e não volta.
+      await patch(lead.id, { status: "QUALIFIED" }).expect(200);
+      await patch(lead.id, { status: "IN_PROGRESS" }).expect(400);
+    });
+
+    it("o responsável só pode ser alguém da conta", async () => {
+      const lead = await createLead();
+      const deFora = await request(app.getHttpServer())
+        .post("/api/auth/register")
+        .send({ name: "De Fora", email: "fora@lead-stages-e2e.local", password: "password123", organizationName: "Lead Stages E2E Outra" })
+        .expect(201);
+      const idDeFora = JSON.parse(Buffer.from(deFora.body.accessToken.split(".")[1], "base64").toString("utf8")).sub;
+
+      const recusa = await patch(lead.id, { responsavelId: idDeFora }).expect(400);
+      expect(recusa.body.code).toBe("RESPONSAVEL_INVALIDO");
+
+      await patch(lead.id, { responsavelId: eu() }).expect(200);
+      const ficha = await request(app.getHttpServer()).get(`/api/leads/${lead.id}`).set("Authorization", `Bearer ${token}`).expect(200);
+      expect(ficha.body.responsavel).toEqual({ id: eu(), name: "User" });
+      expect(ficha.body.events.map((e: { type: string }) => e.type)).toContain("OWNER_ASSIGNED");
+    });
+
+    it("filtra por responsável e lista só as pessoas da conta", async () => {
+      const meu = await createLead();
+      await patch(meu.id, { responsavelId: eu() }).expect(200);
+      const semDono = await createLead();
+
+      const meus = await request(app.getHttpServer()).get("/api/leads?responsavel=eu&limit=100").set("Authorization", `Bearer ${token}`).expect(200);
+      const ids = meus.body.items.map((l: { id: string }) => l.id);
+      expect(ids).toContain(meu.id);
+      expect(ids).not.toContain(semDono.id);
+
+      const nenhum = await request(app.getHttpServer()).get("/api/leads?responsavel=nenhum&limit=100").set("Authorization", `Bearer ${token}`).expect(200);
+      expect(nenhum.body.items.map((l: { id: string }) => l.id)).toContain(semDono.id);
+
+      await request(app.getHttpServer()).get("/api/leads?responsavel=qualquer").set("Authorization", `Bearer ${token}`).expect(400);
+
+      const pessoas = await request(app.getHttpServer()).get("/api/leads/responsaveis").set("Authorization", `Bearer ${token}`).expect(200);
+      expect(pessoas.body).toEqual([{ id: eu(), name: "User" }]);
+    });
+
+    it("guarda valor potencial e próxima ação, e limpa com null", async () => {
+      const lead = await createLead();
+
+      await patch(lead.id, { valorPotencialCentavos: 250000, proximaAcao: "Mandar proposta", proximaAcaoEm: "2026-10-05" }).expect(200);
+      let salvo = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
+      expect(salvo).toMatchObject({ valorPotencialCentavos: 250000, proximaAcao: "Mandar proposta" });
+      expect(salvo.proximaAcaoEm?.toISOString().slice(0, 10)).toBe("2026-10-05");
+
+      await patch(lead.id, { proximaAcao: null, proximaAcaoEm: null }).expect(200);
+      salvo = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
+      expect(salvo).toMatchObject({ proximaAcao: null, proximaAcaoEm: null, valorPotencialCentavos: 250000 });
+
+      await patch(lead.id, { valorPotencialCentavos: -1 }).expect(400);
+    });
+  });
 });

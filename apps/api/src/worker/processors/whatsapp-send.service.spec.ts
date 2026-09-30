@@ -7,6 +7,8 @@ import { NotificationsService } from "../../notifications/notifications.service"
 describe("WhatsAppSendService", () => {
   function buildService() {
     const prisma = {
+      lead: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      leadEvent: { create: jest.fn().mockResolvedValue({}) },
       message: {
         findUnique: jest.fn(),
         // A marcação de falha relê o lead na mesma escrita, para poder
@@ -183,6 +185,54 @@ describe("WhatsAppSendService", () => {
   });
 
   describe("classificação da mensagem enviada (Fase 11)", () => {
+    describe("em atendimento", () => {
+      const novo = (extra: Record<string, unknown> = {}) =>
+        messageRow({
+          conversation: {
+            lead: { id: "lead-1", organizationId: "org-1", normalizedPhone: "+5585999999999", status: "NEW", disqualifiedAt: null, ...extra },
+            whatsappConnection: { status: "CONNECTED", provider: "EVOLUTION", instanceName: "org-123" },
+          },
+        });
+
+      it("coloca o lead novo em atendimento quando a resposta sai", async () => {
+        const { service, prisma, classifier } = buildService();
+        prisma.message.findUnique.mockResolvedValue(novo());
+
+        await service.send("msg-1", false);
+
+        expect(prisma.lead.updateMany).toHaveBeenCalledWith({
+          where: { id: "lead-1", status: "NEW", disqualifiedAt: null },
+          data: { status: "IN_PROGRESS", emAtendimentoAt: new Date("2026-01-10T10:00:00Z") },
+        });
+        expect(prisma.leadEvent.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({ type: "ATTENDANCE_STARTED", leadId: "lead-1" }),
+        });
+        expect(classifier.classify).toHaveBeenCalledWith(
+          expect.objectContaining({ lead: expect.objectContaining({ status: "IN_PROGRESS" }) }),
+        );
+      });
+
+      it("não mexe em lead perdido", async () => {
+        const { service, prisma } = buildService();
+        prisma.message.findUnique.mockResolvedValue(novo({ disqualifiedAt: new Date("2026-01-09T00:00:00Z") }));
+
+        await service.send("msg-1", false);
+
+        expect(prisma.lead.updateMany).not.toHaveBeenCalled();
+      });
+
+      it("se marcar falhar, a mensagem não é reenviada: o erro fica no log", async () => {
+        const { service, prisma, motor, classifier } = buildService();
+        prisma.message.findUnique.mockResolvedValue(novo());
+        prisma.lead.updateMany.mockRejectedValue(new Error("banco ocupado"));
+
+        await expect(service.send("msg-1", false)).resolves.toBeUndefined();
+
+        expect(motor.enviaTexto).toHaveBeenCalledTimes(1);
+        expect(classifier.classify).toHaveBeenCalledWith(expect.objectContaining({ lead: expect.objectContaining({ status: "NEW" }) }));
+      });
+    });
+
     it("classifica como OUTBOUND depois do envio confirmado", async () => {
       const { service, prisma, classifier } = buildService();
       prisma.message.findUnique.mockResolvedValue(messageRow({ text: "agendei para terça às 15h" }));

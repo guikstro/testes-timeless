@@ -8,7 +8,7 @@
  */
 import type { LinhaDaCaixa } from "./caixa-de-entrada";
 
-export type EstagioDoLead = "NEW" | "QUALIFIED" | "MEETING_SCHEDULED" | "WON";
+export type EstagioDoLead = "NEW" | "IN_PROGRESS" | "QUALIFIED" | "MEETING_SCHEDULED" | "WON";
 
 export interface ItemDaLista {
   id: string;

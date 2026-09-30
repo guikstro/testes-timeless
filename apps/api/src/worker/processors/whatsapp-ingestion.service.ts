@@ -222,8 +222,9 @@ export class WhatsAppIngestionService {
     });
     // `NEW` está fora porque o funil não anda para trás: se o estágio mudou e
     // ainda é NEW, alguma coisa está errada, e inventar um aviso seria pior
-    // que ficar calado.
-    if (!depois || depois.status === leadAntes.status || depois.status === "NEW") return;
+    // que ficar calado. Em atendimento também: quem responde é a própria
+    // equipe, e avisá-la de que ela respondeu seria ruído.
+    if (!depois || depois.status === leadAntes.status || depois.status === "NEW" || depois.status === "IN_PROGRESS") return;
 
     const anuncio = ANUNCIO_POR_ESTAGIO[depois.status];
     await this.notifications.notificar({

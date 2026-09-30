@@ -1,3 +1,4 @@
+import { ORDEM_DO_FUNIL } from "./ordem-do-funil";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { LeadStatus, Prisma } from "@prisma/client";
 import { InjectQueue } from "@nestjs/bullmq";
@@ -48,12 +49,7 @@ function comUltimaMensagem<T extends ComConversas>(lead: T) {
   };
 }
 
-const STATUS_ORDER: Record<LeadStatus, number> = {
-  NEW: 0,
-  QUALIFIED: 1,
-  MEETING_SCHEDULED: 2,
-  WON: 3,
-};
+const STATUS_ORDER = ORDEM_DO_FUNIL;
 
 @Injectable()
 export class LeadsService {
@@ -65,12 +61,16 @@ export class LeadsService {
     private readonly auditoria: AuditoriaService,
   ) {}
 
-  async list(organizationId: string, query: ListLeadsDto): Promise<PaginatedResult<unknown>> {
+  async list(organizationId: string, query: ListLeadsDto, userId?: string): Promise<PaginatedResult<unknown>> {
     const offset = query.offset ?? 0;
     const limit = query.limit ?? 20;
     const termo = query.search?.trim();
 
     const where: Prisma.LeadWhereInput = { organizationId };
+
+    if (query.responsavel === "eu") where.responsavelId = userId ?? "";
+    else if (query.responsavel === "nenhum") where.responsavelId = null;
+    else if (query.responsavel) where.responsavelId = query.responsavel;
 
     if (termo) {
       // Telefone é buscado só pelos dígitos: quem digita "85 99999" espera
@@ -102,6 +102,7 @@ export class LeadsService {
         include: {
           attribution: true,
           sale: true,
+          responsavel: { select: { id: true, name: true } },
           conversations: { select: { messages: { orderBy: { timestamp: "desc" }, take: 1 } } },
         },
         orderBy: { lastContactAt: "desc" },
@@ -125,6 +126,7 @@ export class LeadsService {
         include: {
           attribution: true,
           sale: true,
+          responsavel: { select: { id: true, name: true } },
           // A última mensagem de cada conversa. É o que faz decidir se vale
           // abrir o lead, e sem ela a lista obriga a entrar em cada um para
           // descobrir do que se trata.
@@ -148,6 +150,7 @@ export class LeadsService {
       include: {
         attribution: { include: { trackingClick: { include: { trackingLink: true } } } },
         sale: true,
+        responsavel: { select: { id: true, name: true } },
         // O sinal que voltou para a Meta faz parte da ficha do lead: sem ele
         // não há como saber se a conversão chegou ao algoritmo que o cliente
         // está pagando para otimizar.
@@ -283,7 +286,15 @@ export class LeadsService {
     let becameWon = false;
     let scheduledMeeting = false;
 
-    if (dto.status === "QUALIFIED" && lead.status === "NEW") {
+    // Em atendimento, à mão: só a partir de Novo, como tudo no funil.
+    let comecouAtendimento = false;
+    if (dto.status === "IN_PROGRESS" && lead.status === "NEW") {
+      data.status = "IN_PROGRESS";
+      data.emAtendimentoAt = lead.emAtendimentoAt ?? now;
+      comecouAtendimento = true;
+    }
+
+    if (dto.status === "QUALIFIED" && STATUS_ORDER[lead.status] < STATUS_ORDER.QUALIFIED) {
       data.status = "QUALIFIED";
       data.qualifiedAt = lead.qualifiedAt ?? now;
       becameQualified = true;
@@ -332,8 +343,41 @@ export class LeadsService {
       data.disqualifiedReason = null;
     }
 
+    // Acompanhamento. `undefined` mantém, `null` limpa.
+    let novoResponsavel: { id: string; name: string } | null | undefined;
+    if (dto.responsavelId !== undefined && dto.responsavelId !== lead.responsavelId) {
+      novoResponsavel = dto.responsavelId === null ? null : await this.pessoaDaOrganizacao(organizationId, dto.responsavelId);
+      data.responsavel = novoResponsavel ? { connect: { id: novoResponsavel.id } } : { disconnect: true };
+    }
+    if (dto.valorPotencialCentavos !== undefined) data.valorPotencialCentavos = dto.valorPotencialCentavos;
+    if (dto.proximaAcao !== undefined) data.proximaAcao = dto.proximaAcao?.trim() || null;
+    if (dto.proximaAcaoEm !== undefined) data.proximaAcaoEm = dto.proximaAcaoEm ? new Date(dto.proximaAcaoEm) : null;
+
     if (Object.keys(data).length > 0) {
       await this.prisma.lead.update({ where: { id }, data });
+    }
+
+    if (comecouAtendimento) {
+      await this.prisma.leadEvent.create({
+        data: { organizationId, leadId: id, type: "ATTENDANCE_STARTED", occurredAt: now, metadata: { userId, manual: true } },
+      });
+    }
+
+    if (novoResponsavel !== undefined) {
+      await this.prisma.leadEvent.create({
+        data: {
+          organizationId,
+          leadId: id,
+          type: "OWNER_ASSIGNED",
+          occurredAt: now,
+          metadata: {
+            userId,
+            responsavelId: novoResponsavel?.id ?? null,
+            responsavelNome: novoResponsavel?.name ?? null,
+            automatico: false,
+          },
+        },
+      });
     }
 
     if (scheduledMeeting) {
@@ -466,10 +510,11 @@ export class LeadsService {
 
       // O mesmo aviso que a mudança automática produz. Para quem está com o
       // quadro aberto do outro lado, um cartão movido pelo colega e um movido
-      // por uma regra são o mesmo fato: o lead andou.
+      // por uma regra são o mesmo fato: o lead andou. Em atendimento não
+      // avisa: é a própria equipe trabalhando, e o aviso seria ruído.
       const anuncio = ANUNCIO_POR_ESTAGIO[data.status as "QUALIFIED" | "MEETING_SCHEDULED" | "WON"];
       const nome = lead.name ?? lead.rawPhone;
-      await this.notifications.notificar({
+      if (anuncio) await this.notifications.notificar({
         type: anuncio.tipo,
         organizationId,
         leadId: id,
@@ -492,7 +537,7 @@ export class LeadsService {
    * falhar, existe uma linha concreta para marcar como FAILED e mostrar o
    * motivo — em vez de a mensagem simplesmente sumir.
    */
-  async sendMessage(organizationId: string, leadId: string, dto: SendMessageDto) {
+  async sendMessage(organizationId: string, leadId: string, dto: SendMessageDto, userId?: string, impersonating = false) {
     const lead = await this.prisma.lead.findFirst({ where: { id: leadId, organizationId } });
     if (!lead) {
       throw new AppException("NOT_FOUND", "Lead não encontrado.", HttpStatus.NOT_FOUND);
@@ -538,6 +583,10 @@ export class LeadsService {
       data: { lastMessageAt: now },
     });
 
+    if (userId && !impersonating && !lead.responsavelId) {
+      await this.assumeSeForOPrimeiro(organizationId, leadId, userId, now);
+    }
+
     await this.sendQueue.add(
       "send",
       { messageId: message.id },
@@ -551,6 +600,59 @@ export class LeadsService {
     );
 
     return message;
+  }
+
+  /** As pessoas da organização que podem ser responsáveis por um lead. */
+  async responsaveis(organizationId: string): Promise<{ id: string; name: string }[]> {
+    const membros = await this.prisma.membership.findMany({
+      where: { organizationId, user: { deletedAt: null } },
+      select: { user: { select: { id: true, name: true } } },
+    });
+    return membros.map((membro) => membro.user).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  }
+
+  /**
+   * Quem responde primeiro vira o responsável, se o lead ainda não tem um.
+   *
+   * A visita do suporte não conta (quem chama já filtra): quem entra pela
+   * equipe Timeless não é da conta do cliente. A condição no `updateMany`
+   * torna isto atômico: duas respostas ao mesmo tempo não disputam o lead, e
+   * só a que ganhou registra o evento.
+   */
+  private async assumeSeForOPrimeiro(organizationId: string, leadId: string, userId: string, quando: Date): Promise<void> {
+    const membro = await this.prisma.membership.findFirst({
+      where: { organizationId, userId },
+      select: { user: { select: { name: true } } },
+    });
+    if (!membro) return;
+
+    const { count } = await this.prisma.lead.updateMany({
+      where: { id: leadId, organizationId, responsavelId: null },
+      data: { responsavelId: userId },
+    });
+    if (count !== 1) return;
+
+    await this.prisma.leadEvent.create({
+      data: {
+        organizationId,
+        leadId,
+        type: "OWNER_ASSIGNED",
+        occurredAt: quando,
+        metadata: { userId, responsavelId: userId, responsavelNome: membro.user.name, automatico: true },
+      },
+    });
+  }
+
+  /** O responsável precisa ser da organização: ninguém de fora cuida de um lead daqui. */
+  private async pessoaDaOrganizacao(organizationId: string, userId: string): Promise<{ id: string; name: string }> {
+    const membro = await this.prisma.membership.findFirst({
+      where: { organizationId, userId, user: { deletedAt: null } },
+      select: { user: { select: { id: true, name: true } } },
+    });
+    if (!membro) {
+      throw new AppException("RESPONSAVEL_INVALIDO", "Esta pessoa não faz parte da conta.", HttpStatus.BAD_REQUEST);
+    }
+    return membro.user;
   }
 
   private assertForwardTransition(current: LeadStatus, target: LeadStatus): void {

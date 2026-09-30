@@ -1,3 +1,4 @@
+import { ESTAGIOS_QUALIFICADOS } from "../leads/ordem-do-funil";
 import { AttributionMethod, LeadStatus } from "@prisma/client";
 
 /**
@@ -82,7 +83,7 @@ export function classifyOrigin(lead: AggregationLead): { key: string; label: str
 
 export function aggregateTotals(leads: AggregationLead[]): OverviewTotals {
   const disqualified = leads.filter((lead) => lead.disqualifiedAt !== null).length;
-  const qualified = leads.filter((lead) => lead.status !== "NEW").length;
+  const qualified = leads.filter((lead) => ESTAGIOS_QUALIFICADOS.has(lead.status)).length;
   const meetings = leads.filter((lead) => lead.meetingScheduledAt !== null).length;
   const won = leads.filter((lead) => lead.status === "WON").length;
   const revenueCents = leads.reduce((sum, lead) => sum + (lead.sale?.amountCents ?? 0), 0);
@@ -122,9 +123,9 @@ export function aggregateByOrigin(leads: AggregationLead[]): OriginBucket[] {
     };
 
     bucket.leads += 1;
-    // Qualquer estágio além de NEW conta como qualificado: quem comprou ou
-    // marcou reunião passou por lá, mesmo que o status tenha pulado direto.
-    if (lead.status !== "NEW") bucket.qualified += 1;
+    // Quem comprou ou marcou reunião passou pela qualificação, mesmo que o
+    // status tenha pulado direto. Em atendimento não conta.
+    if (ESTAGIOS_QUALIFICADOS.has(lead.status)) bucket.qualified += 1;
     if (lead.meetingScheduledAt !== null) bucket.meetings += 1;
     if (lead.status === "WON") bucket.won += 1;
     if (lead.disqualifiedAt !== null) bucket.disqualified += 1;

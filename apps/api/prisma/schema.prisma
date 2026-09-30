@@ -207,6 +207,7 @@ model User {
   refreshTokens       RefreshToken[]
   auditLogs           AuditLog[]
   notifications       Notification[]
+  leadsResponsavel    Lead[]               @relation("ResponsavelDoLead")
   mudancasNoAnuncio   MudancaNoAnuncio[]
   mfa                 UserMfa?
   mfaRecoveryCodes    MfaRecoveryCode[]
@@ -534,6 +535,11 @@ model SessaoWhatsApp {
 
 enum LeadStatus {
   NEW
+  /**
+   * Em atendimento: a equipe respondeu pelo sistema e a mensagem saiu. Fica
+   * entre Novo e Qualificado, e não conta como qualificado.
+   */
+  IN_PROGRESS
   QUALIFIED
   /**
    * Entre qualificar e vender: existe horário combinado com o lead (Fase 11).
@@ -564,10 +570,23 @@ model Lead {
    */
   disqualifiedAt     DateTime? @map("disqualified_at")
   disqualifiedReason String?   @map("disqualified_reason")
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  /**
+   * Acompanhamento: quem cuida do lead e o que vem a seguir. O responsável é
+   * alguém da organização; nasce com quem responde primeiro pelo sistema e
+   * pode ser trocado à mão. Sai sozinho se a conta da pessoa for apagada.
+   */
+  responsavelId          String?   @map("responsavel_id")
+  emAtendimentoAt        DateTime? @map("em_atendimento_at")
+  valorPotencialCentavos Int?      @map("valor_potencial_centavos")
+  proximaAcao            String?   @map("proxima_acao")
+  proximaAcaoEm          DateTime? @map("proxima_acao_em")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  responsavel      User?             @relation("ResponsavelDoLead", fields: [responsavelId], references: [id], onDelete: SetNull)
   conversations    Conversation[]
   events           LeadEvent[]
   attribution      Attribution?
@@ -577,6 +596,7 @@ model Lead {
 
   @@unique([organizationId, normalizedPhone])
   @@index([organizationId, lastContactAt])
+  @@index([organizationId, responsavelId])
   @@map("leads")
 }
 
@@ -672,6 +692,14 @@ enum LeadEventType {
    * Um lead desqualificado voltou a andar no funil (Fase 11).
    */
   REACTIVATED
+  /**
+   * A equipe respondeu pela primeira vez e o lead entrou em atendimento.
+   */
+  ATTENDANCE_STARTED
+  /**
+   * O lead ganhou (ou trocou de) responsável.
+   */
+  OWNER_ASSIGNED
 }
 
 model LeadEvent {

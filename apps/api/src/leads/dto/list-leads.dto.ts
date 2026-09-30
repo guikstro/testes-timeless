@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, MaxLength } from "class-validator";
+import { IsIn, IsOptional, IsString, Matches, MaxLength } from "class-validator";
 import { PaginationQueryDto } from "../../common/dto/pagination.dto";
 
 /**
@@ -19,6 +19,16 @@ export class ListLeadsDto extends PaginationQueryDto {
    * é uma categoria como qualquer outra.
    */
   @IsOptional()
-  @IsIn(["NEW", "QUALIFIED", "MEETING_SCHEDULED", "WON", "DISQUALIFIED", "AWAITING"])
-  status?: "NEW" | "QUALIFIED" | "MEETING_SCHEDULED" | "WON" | "DISQUALIFIED" | "AWAITING";
+  @IsIn(["NEW", "IN_PROGRESS", "QUALIFIED", "MEETING_SCHEDULED", "WON", "DISQUALIFIED", "AWAITING"])
+  status?: "NEW" | "IN_PROGRESS" | "QUALIFIED" | "MEETING_SCHEDULED" | "WON" | "DISQUALIFIED" | "AWAITING";
+
+  /**
+   * De quem é o lead: `eu` (quem pergunta), `nenhum` (sem responsável) ou o
+   * id de alguém da organização.
+   */
+  @IsOptional()
+  @Matches(/^(eu|nenhum|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i, {
+    message: "responsavel deve ser eu, nenhum ou o id de uma pessoa.",
+  })
+  responsavel?: string;
 }

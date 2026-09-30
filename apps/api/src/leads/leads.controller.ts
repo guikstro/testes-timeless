@@ -16,7 +16,20 @@ export class LeadsController {
   @Requer("lead.read")
   @Get()
   list(@CurrentUser() user: AuthenticatedUser, @Query() query: ListLeadsDto) {
-    return this.leadsService.list(user.organizationId, query);
+    return this.leadsService.list(user.organizationId, query, user.userId);
+  }
+
+  /**
+   * Quem pode ser responsável por um lead: as pessoas da organização. Rota
+   * própria porque a lista da equipe pede outra permissão, e quem vende
+   * precisa escolher de quem é o lead sem poder ver a gestão da equipe.
+   *
+   * Antes de `:id`, senão "responsaveis" seria lido como um id.
+   */
+  @Requer("lead.read")
+  @Get("responsaveis")
+  responsaveis(@CurrentUser() user: AuthenticatedUser) {
+    return this.leadsService.responsaveis(user.organizationId);
   }
 
   @Requer("lead.read")
@@ -42,6 +55,6 @@ export class LeadsController {
     @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: SendMessageDto,
   ) {
-    return this.leadsService.sendMessage(user.organizationId, id, dto);
+    return this.leadsService.sendMessage(user.organizationId, id, dto, user.userId, user.impersonating);
   }
 }

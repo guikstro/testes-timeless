@@ -92,6 +92,27 @@ describe("ConversationClassifierService", () => {
     expect(conversionEvents.recordQualifiedLead).toHaveBeenCalledWith("org-1", "lead-1", new Date("2026-01-01T00:00:00Z"));
   });
 
+  it("qualifica um lead em atendimento: a resposta da equipe não impede a qualificação", async () => {
+    const { service, prisma } = buildService();
+    prisma.classificationRule.findMany.mockResolvedValue([
+      { id: "rule-1", targetStatus: "QUALIFIED", phrase: "quero agendar" },
+    ]);
+
+    await service.classify({
+      organizationId: "org-1",
+      lead: buildLead({ status: "IN_PROGRESS" }),
+      messageId: "msg-1",
+      messageText: "quero agendar para semana que vem",
+      direction: "INBOUND",
+      occurredAt: new Date("2026-01-01T00:00:00Z"),
+    });
+
+    expect(prisma.lead.update).toHaveBeenCalledWith({
+      where: { id: "lead-1" },
+      data: { status: "QUALIFIED", qualifiedAt: new Date("2026-01-01T00:00:00Z") },
+    });
+  });
+
   it("does not qualify a lead that is already QUALIFIED or WON (no re-firing)", async () => {
     const { service, prisma } = buildService();
     prisma.classificationRule.findMany.mockResolvedValue([

@@ -1,3 +1,4 @@
+import { LeadStatus } from "@prisma/client";
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { MotorWhatsApp } from "../../integrations/whatsapp/motor-whatsapp";
@@ -70,9 +71,11 @@ export class WhatsAppSendService {
       //
       // Só o alvo "reunião" reage a uma mensagem nossa — o classificador
       // recusa venda e qualificação vindas de OUTBOUND.
+      const lead = { ...message.conversation.lead, status: await this.entraEmAtendimento(message) };
+
       await this.classifier.classify({
-        organizationId: message.conversation.lead.organizationId,
-        lead: message.conversation.lead,
+        organizationId: lead.organizationId,
+        lead,
         messageId: message.id,
         messageText: message.text ?? undefined,
         occurredAt: message.timestamp,
@@ -87,6 +90,45 @@ export class WhatsAppSendService {
       }
       this.logger.error(JSON.stringify({ event: "whatsapp_send_failed", messageId, reason }));
       throw error; // deixa o BullMQ aplicar o retry/backoff configurado
+    }
+  }
+
+  /**
+   * A resposta saiu: o lead entra em atendimento. Só a partir de Novo e fora
+   * de perdido; responder a quem foi dado como perdido não o traz de volta
+   * sozinho.
+   *
+   * Nunca lança. Isto roda depois de a mensagem já ter saído, e um erro aqui
+   * faria a fila tentar de novo e mandar a mesma mensagem duas vezes para o
+   * lead. A condição no `updateMany` evita dois eventos quando duas respostas
+   * saem juntas.
+   */
+  private async entraEmAtendimento(message: {
+    id: string;
+    timestamp: Date;
+    conversation: { lead: { id: string; organizationId: string; status: LeadStatus; disqualifiedAt: Date | null } };
+  }): Promise<LeadStatus> {
+    const lead = message.conversation.lead;
+    if (lead.status !== "NEW" || lead.disqualifiedAt) return lead.status;
+    try {
+      const { count } = await this.prisma.lead.updateMany({
+        where: { id: lead.id, status: "NEW", disqualifiedAt: null },
+        data: { status: "IN_PROGRESS", emAtendimentoAt: message.timestamp },
+      });
+      if (count !== 1) return lead.status;
+      await this.prisma.leadEvent.create({
+        data: {
+          organizationId: lead.organizationId,
+          leadId: lead.id,
+          type: "ATTENDANCE_STARTED",
+          occurredAt: message.timestamp,
+          metadata: { messageId: message.id },
+        },
+      });
+      return "IN_PROGRESS";
+    } catch (erro) {
+      this.logger.error(JSON.stringify({ event: "atendimento_nao_marcado", leadId: lead.id, error: String(erro) }));
+      return lead.status;
     }
   }
 

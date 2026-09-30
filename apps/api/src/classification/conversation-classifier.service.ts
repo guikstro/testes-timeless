@@ -1,5 +1,6 @@
+import { ORDEM_DO_FUNIL } from "../leads/ordem-do-funil";
 import { Injectable, Logger } from "@nestjs/common";
-import { Lead, LeadStatus, MessageDirection } from "@prisma/client";
+import { Lead, MessageDirection } from "@prisma/client";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { matchesTriggerPhrase } from "../common/utils/matches-trigger-phrase";
 import { extractRevenueCents } from "../common/utils/extract-revenue-cents";
@@ -15,13 +16,8 @@ export interface ClassifyInput {
   direction: MessageDirection;
 }
 
-/** Mesma ordem do funil usada pelo LeadsService — só avança. */
-const STATUS_ORDER: Record<LeadStatus, number> = {
-  NEW: 0,
-  QUALIFIED: 1,
-  MEETING_SCHEDULED: 2,
-  WON: 3,
-};
+/** A mesma ordem do funil do LeadsService: só avança. */
+const STATUS_ORDER = ORDEM_DO_FUNIL;
 
 /**
  * Deterministic, rule-based only (Section 62) — no probabilistic/AI
@@ -74,7 +70,8 @@ export class ConversationClassifierService {
       }
     }
 
-    if (!isOutbound && input.lead.status === "NEW") {
+    // Novo ou em atendimento: responder não qualifica, mas também não impede.
+    if (!isOutbound && STATUS_ORDER[input.lead.status] < STATUS_ORDER.QUALIFIED) {
       const qualifiedRule = match("QUALIFIED");
       if (qualifiedRule) {
         await this.markQualified(input, qualifiedRule.id, qualifiedRule.phrase);

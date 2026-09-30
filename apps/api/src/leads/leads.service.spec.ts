@@ -7,7 +7,8 @@ import { ConversionEventsService } from "../integrations/meta/conversion-events.
 describe("LeadsService", () => {
   function buildService() {
     const prisma = {
-      lead: { findMany: jest.fn(), count: jest.fn(), findFirst: jest.fn(), update: jest.fn() },
+      lead: { findMany: jest.fn(), count: jest.fn(), findFirst: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+      membership: { findFirst: jest.fn(), findMany: jest.fn() },
       leadEvent: { findMany: jest.fn().mockResolvedValue([]), create: jest.fn() },
       message: { findMany: jest.fn().mockResolvedValue([]), create: jest.fn() },
       sale: { create: jest.fn(), update: jest.fn() },
@@ -86,6 +87,7 @@ describe("LeadsService", () => {
         include: {
           attribution: { include: { trackingClick: { include: { trackingLink: true } } } },
           sale: true,
+          responsavel: { select: { id: true, name: true } },
           conversionEvents: { orderBy: { occurredAt: "asc" } },
         },
       }),
@@ -568,6 +570,185 @@ describe("LeadsService", () => {
         // Sem nada novo para gravar, a data original é preservada.
         expect(prisma.lead.update).not.toHaveBeenCalled();
       });
+    });
+  });
+
+  describe("acompanhamento do lead (item 14)", () => {
+    function lead(overrides: Record<string, unknown> = {}) {
+      return {
+        id: "lead-1",
+        organizationId: "org-1",
+        name: "Carla",
+        rawPhone: "+5585999990000",
+        status: "NEW",
+        firstContactAt: new Date("2026-01-10T10:00:00Z"),
+        qualifiedAt: null,
+        meetingScheduledAt: null,
+        wonAt: null,
+        disqualifiedAt: null,
+        disqualifiedReason: null,
+        emAtendimentoAt: null,
+        responsavelId: null,
+        sale: null,
+        ...overrides,
+      };
+    }
+
+    function comLead(overrides: Record<string, unknown> = {}) {
+      const montado = buildService();
+      montado.prisma.lead.findFirst.mockResolvedValue(lead(overrides));
+      montado.prisma.lead.update.mockResolvedValue({});
+      return montado;
+    }
+
+    it("marca em atendimento à mão a partir de novo, sem avisar a equipe", async () => {
+      const { service, prisma, notifications } = comLead();
+
+      await service.update("org-1", "lead-1", "user-1", { status: "IN_PROGRESS" });
+
+      expect(prisma.lead.update).toHaveBeenCalledWith({
+        where: { id: "lead-1" },
+        data: { status: "IN_PROGRESS", emAtendimentoAt: expect.any(Date) },
+      });
+      expect(prisma.leadEvent.create.mock.calls.map((c) => c[0].data.type)).toEqual(["ATTENDANCE_STARTED"]);
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ action: "LEAD_STATUS_CHANGED", after: { status: "IN_PROGRESS" } }),
+      });
+      expect(notifications.notificar).not.toHaveBeenCalled();
+    });
+
+    it("qualifica a partir de em atendimento, e não volta para ele", async () => {
+      const { service, prisma } = comLead({ status: "IN_PROGRESS" });
+
+      await service.update("org-1", "lead-1", "user-1", { status: "QUALIFIED" });
+      expect(prisma.lead.update).toHaveBeenCalledWith({
+        where: { id: "lead-1" },
+        data: { status: "QUALIFIED", qualifiedAt: expect.any(Date) },
+      });
+
+      const outro = comLead({ status: "QUALIFIED" });
+      await expect(outro.service.update("org-1", "lead-1", "user-1", { status: "IN_PROGRESS" })).rejects.toMatchObject({
+        response: { code: "INVALID_STATUS_TRANSITION" },
+      });
+    });
+
+    it("recusa responsável que não é da organização", async () => {
+      const { service, prisma } = comLead();
+      prisma.membership.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.update("org-1", "lead-1", "user-1", { responsavelId: "8b1d9d8e-3f7a-4c2b-9d1e-0a6b5c4d3e2f" }),
+      ).rejects.toMatchObject({ response: { code: "RESPONSAVEL_INVALIDO" } });
+      expect(prisma.membership.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ organizationId: "org-1" }) }),
+      );
+      expect(prisma.lead.update).not.toHaveBeenCalled();
+    });
+
+    it("troca o responsável e conta na linha do tempo quem ficou com o lead", async () => {
+      const { service, prisma } = comLead({ responsavelId: "user-1" });
+      prisma.membership.findFirst.mockResolvedValue({ user: { id: "user-2", name: "Bia" } });
+
+      await service.update("org-1", "lead-1", "user-1", { responsavelId: "user-2" });
+
+      expect(prisma.lead.update).toHaveBeenCalledWith({
+        where: { id: "lead-1" },
+        data: { responsavel: { connect: { id: "user-2" } } },
+      });
+      expect(prisma.leadEvent.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          type: "OWNER_ASSIGNED",
+          metadata: expect.objectContaining({ responsavelId: "user-2", responsavelNome: "Bia", automatico: false }),
+        }),
+      });
+    });
+
+    it("limpa o responsável com null, e guarda valor e próxima ação", async () => {
+      const { service, prisma } = comLead({ responsavelId: "user-1" });
+
+      await service.update("org-1", "lead-1", "user-1", {
+        responsavelId: null,
+        valorPotencialCentavos: 150_000,
+        proximaAcao: "  Ligar para fechar  ",
+        proximaAcaoEm: "2026-10-02",
+      });
+
+      expect(prisma.lead.update).toHaveBeenCalledWith({
+        where: { id: "lead-1" },
+        data: {
+          responsavel: { disconnect: true },
+          valorPotencialCentavos: 150_000,
+          proximaAcao: "Ligar para fechar",
+          proximaAcaoEm: new Date("2026-10-02"),
+        },
+      });
+    });
+
+    describe("quem responde primeiro vira o responsável", () => {
+      function prontoParaEnviar(overrides: Record<string, unknown> = {}) {
+        const montado = comLead(overrides);
+        montado.prisma.whatsAppConnection.findUnique.mockResolvedValue({ id: "conn-1", status: "CONNECTED" });
+        montado.prisma.conversation.findFirst.mockResolvedValue({ id: "conv-1" });
+        montado.prisma.message.create.mockResolvedValue({ id: "msg-1" });
+        montado.prisma.membership.findFirst.mockResolvedValue({ user: { name: "Ana" } });
+        montado.prisma.lead.updateMany.mockResolvedValue({ count: 1 });
+        return montado;
+      }
+
+      it("assume o lead sem responsável, com evento automático", async () => {
+        const { service, prisma } = prontoParaEnviar();
+
+        await service.sendMessage("org-1", "lead-1", { text: "Oi, Carla!" }, "user-1");
+
+        expect(prisma.lead.updateMany).toHaveBeenCalledWith({
+          where: { id: "lead-1", organizationId: "org-1", responsavelId: null },
+          data: { responsavelId: "user-1" },
+        });
+        expect(prisma.leadEvent.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({ type: "OWNER_ASSIGNED", metadata: expect.objectContaining({ automatico: true }) }),
+        });
+      });
+
+      it("não troca quem já é responsável, e a visita do suporte não assume", async () => {
+        const comDono = prontoParaEnviar({ responsavelId: "user-9" });
+        await comDono.service.sendMessage("org-1", "lead-1", { text: "Oi" }, "user-1");
+        expect(comDono.prisma.lead.updateMany).not.toHaveBeenCalled();
+
+        const suporte = prontoParaEnviar();
+        await suporte.service.sendMessage("org-1", "lead-1", { text: "Oi" }, "operador-1", true);
+        expect(suporte.prisma.lead.updateMany).not.toHaveBeenCalled();
+      });
+
+      it("se outra resposta assumiu antes, não registra evento", async () => {
+        const { service, prisma } = prontoParaEnviar();
+        prisma.lead.updateMany.mockResolvedValue({ count: 0 });
+
+        await service.sendMessage("org-1", "lead-1", { text: "Oi" }, "user-1");
+
+        expect(prisma.leadEvent.create).not.toHaveBeenCalled();
+      });
+    });
+
+    it("filtra a lista por responsável: eu, ninguém ou uma pessoa", async () => {
+      const { service, prisma } = buildService();
+      prisma.lead.findMany.mockResolvedValue([]);
+      prisma.lead.count.mockResolvedValue(0);
+
+      await service.list("org-1", { responsavel: "eu" }, "user-1");
+      await service.list("org-1", { responsavel: "nenhum" }, "user-1");
+
+      const filtros = prisma.lead.findMany.mock.calls.map((c) => c[0].where.responsavelId);
+      expect(filtros).toEqual(["user-1", null]);
+    });
+
+    it("lista as pessoas da organização em ordem de nome", async () => {
+      const { service, prisma } = buildService();
+      prisma.membership.findMany.mockResolvedValue([{ user: { id: "2", name: "Bia" } }, { user: { id: "1", name: "Ana" } }]);
+
+      expect(await service.responsaveis("org-1")).toEqual([
+        { id: "1", name: "Ana" },
+        { id: "2", name: "Bia" },
+      ]);
     });
   });
 });

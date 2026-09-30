@@ -86,6 +86,12 @@ describe("agregação do dashboard", () => {
       expect(totals).toMatchObject({ leads: 4, qualified: 3, won: 2, revenueCents: 200000 });
     });
 
+    it("em atendimento não conta como qualificado: responder não qualifica ninguém", () => {
+      const totals = aggregateTotals([lead({ status: "IN_PROGRESS" }), lead({ status: "QUALIFIED" }), lead({ status: "NEW" })]);
+
+      expect(totals).toMatchObject({ leads: 3, qualified: 1 });
+    });
+
     it("calcula fechamento sobre os qualificados, não sobre o total", () => {
       const totals = aggregateTotals([lead({ status: "NEW" }), lead({ status: "QUALIFIED" }), lead({ status: "WON" })]);
 

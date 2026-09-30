@@ -276,6 +276,8 @@ describe("Isolamento entre organizações (e2e)", () => {
     const leituras = [
       "/leads",
       `/leads?search=${encodeURIComponent(MARCA)}`,
+      "/leads/responsaveis",
+      "/leads?responsavel=nenhum",
       "/conversations",
       "/tracking-links",
       "/verbas",
