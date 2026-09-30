@@ -235,3 +235,6 @@ Decisões do usuário: convite por link, um cliente por pessoa, cadastro públic
 
 ### `docs/META_ADS.md` em dia com a agenda automática (2026-09-30)
 - A seção de sincronização da Meta passou a descrever a agenda automática (`AgendaDeSincronia`, a cada 60 min, ajustável por `META_SYNC_INTERVAL_MINUTES`) e o worker dentro do processo da API. Só documentação, nenhum código mudou.
+
+### Documentação: worker e intervalo da Meta (2026-09-30)
+- `docs/WHATSAPP.md`: o diagrama do webhook passa a dizer que o worker roda dentro do processo da API. `.env.example`: `META_SYNC_INTERVAL_MINUTES` abaixo de 5 vira 5, e não é ignorado, como dizia o comentário. Só documentação.
