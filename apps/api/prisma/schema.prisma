@@ -997,6 +997,10 @@ model MetaConnection {
   status               MetaConnectionStatus @default(CONNECTED)
   lastSyncedAt         DateTime?            @map("last_synced_at")
   lastSyncError        String?              @map("last_sync_error")
+  /**
+   * Até quando a Meta bloqueou as chamadas desta conta por excesso de pedidos. Enquanto não passar, nenhuma sincronia chama a Meta: tentar dentro do bloqueio só renova o bloqueio e conta como erro.
+   */
+  limitadaAte          DateTime?            @map("limitada_ate")
   connectedAt          DateTime             @default(now()) @map("connected_at")
   disconnectedAt       DateTime?            @map("disconnected_at")
   createdAt            DateTime             @default(now()) @map("created_at")

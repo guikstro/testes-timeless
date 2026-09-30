@@ -12,6 +12,8 @@ interface MetaConnection {
   status: "CONNECTED" | "DISCONNECTED" | "TOKEN_EXPIRED" | "SYNC_FAILED";
   lastSyncedAt: string | null;
   lastSyncError: string | null;
+  /** Até quando a Meta bloqueou as chamadas por excesso de pedidos. */
+  limitadaAte: string | null;
   connectedAt: string;
   disconnectedAt: string | null;
   pixelId: string | null;
@@ -119,6 +121,9 @@ export default async function MetaIntegrationPage() {
   const campaigns = listaDeCampanhas?.ok ? listaDeCampanhas.valor : [];
   const conversionEvents = listaDeEventos?.ok ? listaDeEventos.valor : { items: [], total: 0 };
   const desligada = connection?.status === "DISCONNECTED";
+  // Só enquanto não passou: depois da hora, a frase afirmaria um bloqueio que acabou.
+  const bloqueadaAte =
+    connection?.limitadaAte && new Date(connection.limitadaAte).getTime() > Date.now() ? connection.limitadaAte : null;
 
   return (
     <div>
@@ -157,7 +162,17 @@ export default async function MetaIntegrationPage() {
                     <span className="font-medium">{connection.status === "CONNECTED" ? "Aviso:" : "Erro:"}</span>{" "}
                     {connection.lastSyncError}
                   </p>
-                ) : !connection.lastSyncedAt ? (
+                ) : null}
+                {/* A hora em que a Meta libera, e o que acontece nela: sem isso,
+                    a pessoa clica em sincronizar de novo, e cada clique dentro
+                    do bloqueio só o renovava. */}
+                {bloqueadaAte ? (
+                  <p className="text-corpo text-ink-soft">
+                    A Meta libera as chamadas por volta das{" "}
+                    <span className="font-medium text-ink">{horaDeBrasilia(bloqueadaAte)}</span>. A sincronização roda
+                    sozinha nessa hora; não precisa clicar de novo.
+                  </p>
+                ) : !connection.lastSyncError && !connection.lastSyncedAt ? (
                   <p className="text-corpo text-ink-mute">
                     A primeira sincronização busca as campanhas, os anúncios e o gasto dos últimos 7 dias, e pode levar alguns
                     minutos. Se passar de 10 minutos sem mudar, clique em Sincronizar agora.
@@ -283,4 +298,13 @@ export default async function MetaIntegrationPage() {
       ) : null}
     </div>
   );
+}
+
+/** Hora e minuto em Brasília: o servidor roda em outro fuso, e quem lê está aqui. */
+function horaDeBrasilia(instante: string): string {
+  return new Date(instante).toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/Sao_Paulo",
+  });
 }

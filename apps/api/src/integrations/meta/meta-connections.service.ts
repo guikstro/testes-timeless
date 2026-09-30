@@ -59,6 +59,14 @@ export class MetaConnectionsService {
   async connect(organizationId: string, dto: ConnectMetaDto) {
     const accessTokenEncrypted = this.encryption.encrypt(dto.accessToken);
 
+    // O bloqueio da Meta é da conta de anúncios, não do token: colar outro
+    // token na mesma conta não o desfaz, e trocar de conta começa sem ele.
+    const anterior = await this.prisma.metaConnection.findUnique({
+      where: { organizationId },
+      select: { adAccountId: true, limitadaAte: true },
+    });
+    const mesmaConta = anterior?.adAccountId === dto.adAccountId;
+
     try {
       const connection = await this.prisma.metaConnection.upsert({
         where: { organizationId },
@@ -70,14 +78,11 @@ export class MetaConnectionsService {
           connectedAt: new Date(),
           disconnectedAt: null,
           lastSyncError: null,
+          ...(mesmaConta ? {} : { limitadaAte: null }),
         },
       });
 
-      await this.syncQueue.add(
-        "sync",
-        { organizationId },
-        { attempts: 5, backoff: { type: "exponential", delay: 5000 }, removeOnComplete: true, removeOnFail: 20 },
-      );
+      await this.enfileiraSincronia(organizationId, mesmaConta ? (anterior?.limitadaAte ?? null) : null);
 
       return this.redact(connection);
     } catch (error) {
@@ -111,11 +116,30 @@ export class MetaConnectionsService {
       throw new AppException("NOT_CONNECTED", "Conecte a conta de anúncios antes de sincronizar.", HttpStatus.BAD_REQUEST);
     }
 
-    await this.syncQueue.add(
-      "sync",
-      { organizationId },
-      { attempts: 5, backoff: { type: "exponential", delay: 5000 }, removeOnComplete: true, removeOnFail: 20 },
-    );
+    await this.enfileiraSincronia(organizationId, connection.limitadaAte ?? null);
+  }
+
+  /**
+   * Pede uma sincronia agora, ou para quando o bloqueio da Meta acabar.
+   *
+   * Dentro do bloqueio a chamada seria recusada, contaria como erro e
+   * manteria o bloqueio de pé. O pedido não se perde: fica marcado para o fim
+   * dele, e vários cliques no mesmo bloqueio viram um pedido só.
+   */
+  private async enfileiraSincronia(organizationId: string, limitadaAte: Date | null): Promise<void> {
+    const opcoes = { attempts: 5, backoff: { type: "exponential", delay: 5000 }, removeOnComplete: true, removeOnFail: 20 };
+    const falta = limitadaAte ? limitadaAte.getTime() - Date.now() : 0;
+
+    if (limitadaAte && falta > 0) {
+      await this.syncQueue.add(
+        "sync",
+        { organizationId },
+        { ...opcoes, delay: falta, jobId: `sync-pedida:${organizationId}:${Math.floor(limitadaAte.getTime() / 60_000)}` },
+      );
+      return;
+    }
+
+    await this.syncQueue.add("sync", { organizationId }, opcoes);
   }
 
   /**

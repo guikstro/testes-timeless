@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { MetaApiError } from "./meta-api-error";
+import { segundosAteLiberar } from "./limite-da-meta";
 import {
   MetaAd,
   MetaAdSet,
@@ -249,6 +250,9 @@ export class MetaGraphClient {
       errorBody.error?.error_subcode,
       errorBody.error?.message ?? `Meta API request failed with status ${response.status}`,
       response.status,
+      // Só o bloqueio por excesso de pedidos traz estes cabeçalhos com espera;
+      // nos outros erros eles vêm sem ela, ou nem vêm.
+      segundosAteLiberar(response.headers),
     );
   }
 }

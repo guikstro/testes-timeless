@@ -106,7 +106,11 @@ describe("AgendaDeSincronia", () => {
       // Um token expirado só volta quando alguém reconecta na mão: insistir de
       // hora em hora com ele só rende chamada recusada.
       expect(prisma.metaConnection.findMany).toHaveBeenCalledWith({
-        where: { status: { in: ["CONNECTED", "SYNC_FAILED"] } },
+        where: {
+          status: { in: ["CONNECTED", "SYNC_FAILED"] },
+          // A bloqueada pela Meta já tem tentativa marcada para o fim do bloqueio.
+          OR: [{ limitadaAte: null }, { limitadaAte: { lte: expect.any(Date) } }],
+        },
         select: { organizationId: true },
       });
     });
@@ -121,6 +125,31 @@ describe("AgendaDeSincronia", () => {
       const ids = fila.add.mock.calls.map((chamada) => (chamada[2] as { jobId: string }).jobId);
       expect(ids[0]).toBe(ids[1]);
       expect(ids[0]).toMatch(/^sync:org-1:\d+$/);
+    });
+
+    it("marca uma tentativa para quando o bloqueio da Meta acabar", async () => {
+      const { agenda, fila } = montar();
+      const ate = new Date(Date.now() + 6 * 60_000);
+
+      await agenda.tentaDepoisDoLimite("org-1", ate);
+
+      const [nome, dado, opcoes] = fila.add.mock.calls[0] as [string, unknown, { delay: number; jobId: string }];
+      expect(nome).toBe("sincronia-apos-limite");
+      expect(dado).toEqual({ organizationId: "org-1" });
+      expect(opcoes.delay).toBeGreaterThan(5 * 60_000);
+      expect(opcoes.delay).toBeLessThanOrEqual(6 * 60_000);
+      expect(opcoes.jobId).toBe(`sincronia-apos-limite:org-1:${Math.floor(ate.getTime() / 60_000)}`);
+    });
+
+    it("dois bloqueios no mesmo minuto marcam uma tentativa só", async () => {
+      const { agenda, fila } = montar();
+      const ate = new Date(Date.now() + 6 * 60_000);
+
+      await agenda.tentaDepoisDoLimite("org-1", ate);
+      await agenda.tentaDepoisDoLimite("org-1", new Date(ate.getTime() + 10));
+
+      const ids = fila.add.mock.calls.map((chamada) => (chamada[2] as { jobId: string }).jobId);
+      expect(ids[0]).toBe(ids[1]);
     });
 
     it("não enfileira nada quando ninguém tem a Meta conectada", async () => {

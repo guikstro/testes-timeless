@@ -235,8 +235,36 @@ describe("MetaSyncService", () => {
 
     expect(prisma.metaConnection.update).toHaveBeenCalledWith({
       where: { organizationId: "org-1" },
-      data: { status: "CONNECTED", lastSyncedAt: expect.any(Date), lastSyncError: null },
+      data: { status: "CONNECTED", lastSyncedAt: expect.any(Date), lastSyncError: null, limitadaAte: null },
     });
+  });
+
+  /*
+    Dentro do bloqueio, a chamada seria recusada, contaria como erro e
+    manteria o bloqueio de pé. A Meta só libera o acesso completo para quem
+    erra menos de 15% das chamadas.
+  */
+  it("does not call Meta at all while its block lasts", async () => {
+    const { service, prisma, metaGraphClient } = buildService();
+    const ate = new Date(Date.now() + 5 * 60_000);
+    prisma.metaConnection.findUnique.mockResolvedValue(connectionRow({ limitadaAte: ate }));
+
+    await expect(service.sync("org-1")).resolves.toEqual({ limitadaAte: ate });
+
+    expect(metaGraphClient.getCampaigns).not.toHaveBeenCalled();
+    expect(prisma.metaConnection.update).not.toHaveBeenCalled();
+  });
+
+  it("calls Meta again once the block is over, and clears it when the sync works", async () => {
+    const { service, prisma, metaGraphClient } = buildService();
+    prisma.metaConnection.findUnique.mockResolvedValue(connectionRow({ limitadaAte: new Date(Date.now() - 60_000) }));
+
+    await expect(service.sync("org-1")).resolves.toEqual({ limitadaAte: null });
+
+    expect(metaGraphClient.getCampaigns).toHaveBeenCalled();
+    expect(prisma.metaConnection.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ limitadaAte: null, lastSyncError: null }) }),
+    );
   });
 
   it("marks the connection TOKEN_EXPIRED on a Meta 190 error, and re-throws so BullMQ still sees the failure", async () => {
@@ -258,19 +286,27 @@ describe("MetaSyncService", () => {
     limite ficava em "última sincronização: nunca" sem nada escrito, e quem
     colou o token concluía que tinha errado no passo a passo.
   */
-  it("on a rate-limit error, keeps the status for the retry but records why", async () => {
+  it("on a rate-limit error, keeps the status, records why and until when, and does not throw", async () => {
     const { service, prisma, metaGraphClient, notifications } = buildService();
     prisma.metaConnection.findUnique.mockResolvedValue(connectionRow());
-    metaGraphClient.getCampaigns.mockRejectedValue(new MetaApiError(17, undefined, "User request limit reached"));
+    // A Meta diz 4 minutos; o bloqueio padrão é de 5, e ele vale.
+    metaGraphClient.getCampaigns.mockRejectedValue(new MetaApiError(17, 2446079, "User request limit reached", 400, 240));
+    const antes = Date.now();
 
-    await expect(service.sync("org-1")).rejects.toThrow(MetaApiError);
+    // Sem lançar: a retentativa do BullMQ viria em segundos, dentro do
+    // bloqueio, e só somaria erro.
+    const { limitadaAte } = await service.sync("org-1");
 
+    expect(limitadaAte).toBeInstanceOf(Date);
+    const minutos = (limitadaAte!.getTime() - antes) / 60_000;
+    expect(minutos).toBeGreaterThanOrEqual(5.9);
+    expect(minutos).toBeLessThanOrEqual(6.1);
     expect(prisma.metaConnection.update).toHaveBeenCalledTimes(1);
     expect(prisma.metaConnection.update).toHaveBeenCalledWith({
       where: { organizationId: "org-1" },
-      data: { lastSyncError: expect.stringContaining("A Meta limitou as chamadas") },
+      data: { lastSyncError: expect.stringContaining("A Meta bloqueou as chamadas"), limitadaAte },
     });
-    // Passageiro não vai para o sino: a próxima hora costuma resolver.
+    // Passageiro não vai para o sino: o bloqueio acaba em minutos.
     expect(notifications.notificar).not.toHaveBeenCalled();
   });
 

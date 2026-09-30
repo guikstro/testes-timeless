@@ -1,7 +1,7 @@
 import { Processor, WorkerHost } from "@nestjs/bullmq";
 import { Logger } from "@nestjs/common";
 import { Job } from "bullmq";
-import { META_SYNC_QUEUE, SINCRONIA_PERIODICA } from "../../common/queue/queue.constants";
+import { META_SYNC_QUEUE, SINCRONIA_APOS_LIMITE, SINCRONIA_PERIODICA } from "../../common/queue/queue.constants";
 import { MetaSyncJob } from "../../common/queue/meta-sync.job";
 import { AgendaDeSincronia } from "../agenda-de-sincronia";
 import { MetaSyncService } from "./meta-sync.service";
@@ -28,7 +28,14 @@ export class MetaSyncProcessor extends WorkerHost {
     const { organizationId } = job.data as MetaSyncJob;
 
     try {
-      await this.metaSyncService.sync(organizationId);
+      const { limitadaAte } = await this.metaSyncService.sync(organizationId);
+
+      // A Meta bloqueou: uma tentativa para quando o bloqueio acabar. Se era
+      // essa a tentativa e ela também foi bloqueada, a de hora em hora
+      // assume, e o bloqueio não vira um laço de erros.
+      if (limitadaAte && job.name !== SINCRONIA_APOS_LIMITE) {
+        await this.agenda.tentaDepoisDoLimite(organizationId, limitadaAte);
+      }
     } catch (error) {
       this.logger.error(
         JSON.stringify({ event: "meta_sync_failed", jobId: job.id, error: (error as Error).message }),

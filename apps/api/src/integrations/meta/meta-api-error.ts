@@ -12,6 +12,8 @@ export class MetaApiError extends Error {
     public readonly subcode: number | undefined,
     message: string,
     public readonly httpStatus?: number,
+    /** Quanto a Meta diz faltar para liberar as chamadas, quando ela diz. Ver `limite-da-meta.ts`. */
+    public readonly segundosAteLiberar: number | null = null,
   ) {
     super(message);
     this.name = "MetaApiError";
@@ -49,9 +51,9 @@ export function explicaErroDaMeta(erro: MetaApiError, adAccountId?: string): str
     }
     if (erro.isRateLimited) {
       return (
-        "A Meta limitou as chamadas desta conta por excesso de pedidos. O sistema tenta de novo sozinho, de hora em hora. " +
-        "Se continuar, o app provavelmente ainda está em modo de desenvolvimento, que tem limite baixo: peça o acesso padrão " +
-        "da API de Marketing (Ads Management Standard Access) em developers.facebook.com, em Permissões e recursos."
+        "A Meta bloqueou as chamadas desta conta por alguns minutos, por excesso de pedidos. O sistema espera o bloqueio " +
+        "acabar e tenta de novo sozinho. Se acontecer sempre, o app ainda está no acesso limitado da API de Marketing: " +
+        "peça o acesso completo em developers.facebook.com, no recurso Marketing API Access Tier."
       );
     }
     if (erro.code === 2635 || /deprecated version/i.test(crua)) {

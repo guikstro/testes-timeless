@@ -20,6 +20,9 @@ import { HttpExceptionFilter } from "../src/common/filters/http-exception.filter
 /** O que o dublê recebeu em cada escrita, para os testes conferirem o corpo. */
 const escritasRecebidas: Array<{ id: string; corpo: Record<string, string> }> = [];
 
+/** Quantas vezes a conta bloqueada foi chamada: dentro do bloqueio, nenhuma a mais. */
+let chamadasNaContaBloqueada = 0;
+
 function startMockMetaServer(): Promise<{ server: http.Server; baseUrl: string }> {
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
@@ -33,8 +36,15 @@ function startMockMetaServer(): Promise<{ server: http.Server; baseUrl: string }
       }
 
       if (url.pathname.startsWith("/act_ratelimited/")) {
-        res.statusCode = 429;
-        res.end(JSON.stringify({ error: { message: "User request limit reached", code: 17 } }));
+        chamadasNaContaBloqueada += 1;
+        // Como a Meta responde no acesso limitado: o código do bloqueio e,
+        // no cabeçalho da conta, quantos segundos faltam para liberar.
+        res.statusCode = 400;
+        res.setHeader(
+          "x-ad-account-usage",
+          JSON.stringify({ acc_id_util_pct: 100, reset_time_duration: 240, ads_api_access_tier: "development_access" }),
+        );
+        res.end(JSON.stringify({ error: { message: "User request limit reached", code: 17, error_subcode: 2446079 } }));
         return;
       }
 
@@ -318,6 +328,58 @@ describe("Meta Ads sync (e2e, against a local Graph API double)", () => {
     expect(response.body.status).toBe("TOKEN_EXPIRED");
     expect(response.body.lastSyncError).toContain("access token");
   });
+
+  /*
+    O bloqueio por excesso de pedidos. A conta continua conectada, o motivo e
+    a hora de liberar ficam gravados, e nada chama a Meta dentro do bloqueio:
+    nem a retentativa do BullMQ, nem o botão de sincronizar. Cada chamada ali
+    seria recusada, contaria como erro e manteria o bloqueio de pé.
+  */
+  it("guarda o bloqueio da Meta e não chama a Meta de novo dentro dele", async () => {
+    const outra = await request(app.getHttpServer()).post("/api/auth/register").send({
+      name: "User L",
+      email: "user-l@meta-ads-e2e.local",
+      password: "password123",
+      organizationName: "Meta Ads E2E Org L",
+    });
+    const token = outra.body.accessToken;
+    const outraOrgId = decodeJwtOrganizationId(token);
+
+    await request(app.getHttpServer())
+      .post("/api/integrations/meta/connect")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ adAccountId: "act_ratelimited", accessToken: "any-token" })
+      .expect(201);
+
+    const conexao = await waitFor(async () => {
+      const lida = await prisma.metaConnection.findUnique({ where: { organizationId: outraOrgId } });
+      return lida?.limitadaAte ? lida : null;
+    });
+    expect(conexao.status).toBe("CONNECTED");
+    expect(conexao.lastSyncError).toContain("A Meta bloqueou as chamadas");
+    // A Meta disse 4 minutos; vale o bloqueio padrão de 5, com um de folga.
+    expect(conexao.limitadaAte!.getTime()).toBeGreaterThan(Date.now() + 5 * 60_000);
+
+    // A retentativa antiga vinha em 5 segundos. Passado esse tempo, e com o
+    // botão apertado duas vezes, a Meta não recebe nenhuma chamada a mais.
+    const antes = chamadasNaContaBloqueada;
+    await request(app.getHttpServer())
+      .post("/api/integrations/meta/sync")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(204);
+    await request(app.getHttpServer())
+      .post("/api/integrations/meta/sync")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(204);
+    await new Promise((resolve) => setTimeout(resolve, 7_000));
+    expect(chamadasNaContaBloqueada).toBe(antes);
+
+    const tela = await request(app.getHttpServer())
+      .get("/api/integrations/meta")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+    expect(new Date(tela.body.limitadaAte).getTime()).toBe(conexao.limitadaAte!.getTime());
+  }, 30_000);
 
   it("never lets one organization see another organization's Meta connection or campaigns", async () => {
     const otherOrg = await request(app.getHttpServer()).post("/api/auth/register").send({

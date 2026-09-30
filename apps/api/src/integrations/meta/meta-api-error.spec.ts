@@ -30,10 +30,10 @@ describe("explicaErroDaMeta", () => {
     sem nada escrito. O texto diz que é passageiro e qual é a saída quando
     não passa, que é o acesso padrão da API de Marketing.
   */
-  it("limite de uso diz que tenta de novo sozinho e como subir o limite", () => {
+  it("limite de uso diz que espera o bloqueio e como subir o limite", () => {
     const texto = explicaErroDaMeta(new MetaApiError(17, undefined, "(#17) User request limit reached"));
-    expect(texto).toContain("A Meta limitou as chamadas");
-    expect(texto).toContain("Ads Management Standard Access");
+    expect(texto).toContain("A Meta bloqueou as chamadas desta conta por alguns minutos");
+    expect(texto).toContain("Marketing API Access Tier");
     expect(texto).toContain("(Meta: (#17) User request limit reached)");
   });
 

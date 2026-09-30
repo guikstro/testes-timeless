@@ -6,8 +6,20 @@ import { MetaApiError, explicaErroDaMeta } from "../../integrations/meta/meta-ap
 import { normalizaRespostaDaConta } from "../../integrations/meta/saude-da-conta";
 import { conversasIniciadasDe, dataDaMeta } from "../../integrations/meta/conversas-iniciadas";
 import { NotificationsService } from "../../notifications/notifications.service";
+import { liberadaEm } from "../../integrations/meta/limite-da-meta";
 
 const INSIGHTS_LOOKBACK_DAYS = 7;
+
+/**
+ * O que a sincronia devolve a quem a chamou.
+ *
+ * `limitadaAte` preenchido quer dizer que a Meta bloqueou as chamadas e nada
+ * foi buscado: quem chamou decide se agenda uma nova tentativa para depois do
+ * bloqueio. Um erro de verdade continua sendo lançado.
+ */
+export interface ResultadoDaSincronia {
+  limitadaAte: Date | null;
+}
 
 /**
  * Fetches the current campaign/adset/ad hierarchy and recent daily spend
@@ -28,13 +40,22 @@ export class MetaSyncService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  async sync(organizationId: string): Promise<void> {
+  async sync(organizationId: string): Promise<ResultadoDaSincronia> {
     const connection = await this.prisma.metaConnection.findUnique({ where: { organizationId } });
     if (!connection || connection.status === "DISCONNECTED") {
       // Deleted, or disconnected between enqueue and processing (including a
       // pending retry that outlives a user's disconnect click) — a stale job
       // must never resurrect a connection the user explicitly turned off.
-      return;
+      return { limitadaAte: null };
+    }
+
+    // Dentro do bloqueio da Meta, nenhuma chamada: ela seria recusada,
+    // contaria como erro e manteria o bloqueio de pé.
+    if (connection.limitadaAte && connection.limitadaAte.getTime() > Date.now()) {
+      this.logger.log(
+        JSON.stringify({ event: "meta_sync_adiada", organizationId, ate: connection.limitadaAte.toISOString() }),
+      );
+      return { limitadaAte: connection.limitadaAte };
     }
 
     try {
@@ -191,10 +212,15 @@ export class MetaSyncService {
 
       await this.prisma.metaConnection.update({
         where: { organizationId },
-        data: { status: "CONNECTED", lastSyncedAt: now, lastSyncError: null, ...saude },
+        data: { status: "CONNECTED", lastSyncedAt: now, lastSyncError: null, limitadaAte: null, ...saude },
       });
+      return { limitadaAte: null };
     } catch (error) {
-      await this.handleSyncError(organizationId, error);
+      const limitadaAte = await this.handleSyncError(organizationId, error);
+      // Bloqueio da Meta não é relançado: a retentativa do BullMQ viria em
+      // segundos, dentro do bloqueio, e só somaria erro. Quem chamou agenda
+      // uma tentativa para depois dele.
+      if (limitadaAte) return { limitadaAte };
       throw error; // let BullMQ retry per the job's configured attempts/backoff
     }
   }
@@ -211,7 +237,8 @@ export class MetaSyncService {
     }
   }
 
-  private async handleSyncError(organizationId: string, error: unknown): Promise<void> {
+  /** Devolve até quando a Meta bloqueou, quando o erro é o bloqueio; null nos outros casos. */
+  private async handleSyncError(organizationId: string, error: unknown): Promise<Date | null> {
     // O estado anterior decide se alguém precisa ser avisado. A sincronia roda
     // de hora em hora: avisar a cada falha encheria o sino com o mesmo
     // problema, e um sino cheio de repetição é um sino que ninguém lê.
@@ -233,7 +260,7 @@ export class MetaSyncService {
           "O acesso expirou. Reconecte em Integrações para o gasto voltar a ser sincronizado.",
         );
       }
-      return;
+      return null;
     }
 
     if (error instanceof MetaApiError && error.isRateLimited) {
@@ -247,12 +274,15 @@ export class MetaSyncService {
         tinha errado no passo a passo. A próxima sincronia que der certo
         limpa o motivo.
       */
-      this.logger.warn(JSON.stringify({ event: "meta_sync_rate_limited", organizationId, code: error.code }));
+      const limitadaAte = liberadaEm(new Date(), error.segundosAteLiberar);
+      this.logger.warn(
+        JSON.stringify({ event: "meta_sync_rate_limited", organizationId, code: error.code, ate: limitadaAte.toISOString() }),
+      );
       await this.prisma.metaConnection.update({
         where: { organizationId },
-        data: { lastSyncError: explicaErroDaMeta(error) },
+        data: { lastSyncError: explicaErroDaMeta(error), limitadaAte },
       });
-      return;
+      return limitadaAte;
     }
 
     const message =
@@ -275,6 +305,7 @@ export class MetaSyncService {
         `O gasto das campanhas pode estar desatualizado. ${message}`,
       );
     }
+    return null;
   }
 
   /**

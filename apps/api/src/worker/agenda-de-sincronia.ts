@@ -2,7 +2,12 @@ import { InjectQueue } from "@nestjs/bullmq";
 import { Injectable, Logger, OnApplicationBootstrap } from "@nestjs/common";
 import { Queue } from "bullmq";
 import { PrismaService } from "../common/prisma/prisma.service";
-import { META_SYNC_QUEUE, SINCRONIA_DE_UMA, SINCRONIA_PERIODICA } from "../common/queue/queue.constants";
+import {
+  META_SYNC_QUEUE,
+  SINCRONIA_APOS_LIMITE,
+  SINCRONIA_DE_UMA,
+  SINCRONIA_PERIODICA,
+} from "../common/queue/queue.constants";
 import { MetaSyncJob } from "../common/queue/meta-sync.job";
 
 /** Identificador da agenda no Redis. Fixo: é ele que faz o upsert substituir em vez de duplicar. */
@@ -79,7 +84,13 @@ export class AgendaDeSincronia implements OnApplicationBootstrap {
       // alguém reconecta na mão, e insistir de hora em hora com um token
       // morto só rende chamada recusada. `SYNC_FAILED` entra, porque falha
       // passageira é justamente o que uma nova tentativa resolve.
-      where: { status: { in: ["CONNECTED", "SYNC_FAILED"] } },
+      //
+      // A conta ainda bloqueada pela Meta também fica de fora: a tentativa
+      // dela já está marcada para quando o bloqueio acabar.
+      where: {
+        status: { in: ["CONNECTED", "SYNC_FAILED"] },
+        OR: [{ limitadaAte: null }, { limitadaAte: { lte: new Date() } }],
+      },
       select: { organizationId: true },
     });
 
@@ -102,6 +113,31 @@ export class AgendaDeSincronia implements OnApplicationBootstrap {
 
     this.logger.log(JSON.stringify({ event: "sincronia_periodica_enfileirada", organizacoes: conexoes.length }));
     return conexoes.length;
+  }
+
+  /**
+   * Uma tentativa para depois do bloqueio da Meta.
+   *
+   * O id amarra a organização ao minuto em que o bloqueio acaba: dois jobs
+   * bloqueados ao mesmo tempo marcam uma tentativa só, e não duas chamando a
+   * Meta juntas assim que ela liberar.
+   */
+  async tentaDepoisDoLimite(organizationId: string, limitadaAte: Date): Promise<void> {
+    await this.fila.add(
+      SINCRONIA_APOS_LIMITE,
+      { organizationId },
+      {
+        delay: Math.max(0, limitadaAte.getTime() - Date.now()),
+        jobId: `${SINCRONIA_APOS_LIMITE}:${organizationId}:${Math.floor(limitadaAte.getTime() / 60_000)}`,
+        attempts: 3,
+        backoff: { type: "exponential", delay: 30_000 },
+        removeOnComplete: true,
+        removeOnFail: 20,
+      },
+    );
+    this.logger.log(
+      JSON.stringify({ event: "meta_sync_depois_do_limite", organizationId, em: limitadaAte.toISOString() }),
+    );
   }
 
   private intervaloEmMinutos(): number {

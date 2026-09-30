@@ -16,6 +16,12 @@ export const MANUTENCAO_QUEUE = "manutencao";
  */
 export const SINCRONIA_PERIODICA = "sincronizar-todas";
 export const SINCRONIA_DE_UMA = "sync";
+/**
+ * A tentativa única depois de um bloqueio da Meta. Nome próprio para não
+ * agendar outra se ela também for bloqueada: aí quem assume é a sincronia de
+ * hora em hora, e o erro não vira laço.
+ */
+export const SINCRONIA_APOS_LIMITE = "sincronia-apos-limite";
 
 /** O job diário de faxina. */
 export const FAXINA_PERIODICA = "faxina";

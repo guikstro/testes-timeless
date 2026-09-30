@@ -126,6 +126,60 @@ describe("MetaConnectionsService", () => {
     await service.triggerSync("org-1");
 
     expect(queue.add).toHaveBeenCalledWith("sync", { organizationId: "org-1" }, expect.any(Object));
+    expect(queue.add.mock.calls[0][2]).not.toHaveProperty("delay");
+  });
+
+  describe("bloqueio da Meta", () => {
+    const daqui = (minutos: number) => new Date(Date.now() + minutos * 60_000);
+
+    /*
+      Clicar dentro do bloqueio só o renovava. O pedido não se perde: fica
+      para o fim do bloqueio, e vários cliques viram um pedido só.
+    */
+    it("o pedido feito durante o bloqueio fica para quando ele acabar", async () => {
+      const { service, prisma, queue } = buildService();
+      const ate = daqui(4);
+      prisma.metaConnection.findUnique.mockResolvedValue({ organizationId: "org-1", status: "CONNECTED", limitadaAte: ate });
+
+      await service.triggerSync("org-1");
+      await service.triggerSync("org-1");
+
+      const opcoes = queue.add.mock.calls.map((chamada) => chamada[2] as { delay: number; jobId: string });
+      expect(opcoes[0].delay).toBeGreaterThan(3 * 60_000);
+      expect(opcoes[0].jobId).toBe(`sync-pedida:org-1:${Math.floor(ate.getTime() / 60_000)}`);
+      expect(opcoes[1].jobId).toBe(opcoes[0].jobId);
+    });
+
+    it("depois do bloqueio, o pedido roda na hora", async () => {
+      const { service, prisma, queue } = buildService();
+      prisma.metaConnection.findUnique.mockResolvedValue({ organizationId: "org-1", status: "CONNECTED", limitadaAte: daqui(-1) });
+
+      await service.triggerSync("org-1");
+
+      expect(queue.add.mock.calls[0][2]).not.toHaveProperty("delay");
+    });
+
+    it("colar outro token na mesma conta não desfaz o bloqueio", async () => {
+      const { service, prisma, queue } = buildService();
+      prisma.metaConnection.findUnique.mockResolvedValue({ adAccountId: "act_123", limitadaAte: daqui(4) });
+      prisma.metaConnection.upsert.mockResolvedValue({ id: "conn-1", organizationId: "org-1" });
+
+      await service.connect("org-1", { adAccountId: "act_123", accessToken: "outro-token" });
+
+      expect(prisma.metaConnection.upsert.mock.calls[0][0].update).not.toHaveProperty("limitadaAte");
+      expect(queue.add.mock.calls[0][2]).toHaveProperty("delay");
+    });
+
+    it("trocar de conta de anúncios começa sem o bloqueio da anterior", async () => {
+      const { service, prisma, queue } = buildService();
+      prisma.metaConnection.findUnique.mockResolvedValue({ adAccountId: "act_999", limitadaAte: daqui(4) });
+      prisma.metaConnection.upsert.mockResolvedValue({ id: "conn-1", organizationId: "org-1" });
+
+      await service.connect("org-1", { adAccountId: "act_123", accessToken: "token" });
+
+      expect(prisma.metaConnection.upsert.mock.calls[0][0].update).toMatchObject({ limitadaAte: null });
+      expect(queue.add.mock.calls[0][2]).not.toHaveProperty("delay");
+    });
   });
 
   describe("connectCapi (Fase 7)", () => {

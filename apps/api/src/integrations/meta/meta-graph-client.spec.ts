@@ -37,6 +37,22 @@ describe("MetaGraphClient", () => {
     que a Meta usa sem pedir, uma conta grande estourava o limite do app em
     modo de desenvolvimento antes de a primeira sincronia terminar.
   */
+  it("guarda no erro quanto a Meta diz faltar, quando bloqueia por excesso de pedidos", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 400,
+      headers: new Headers({ "x-ad-account-usage": JSON.stringify({ acc_id_util_pct: 100, reset_time_duration: 240 }) }),
+      json: () => Promise.resolve({ error: { code: 17, error_subcode: 2446079, message: "User request limit reached" } }),
+    } as unknown as Response);
+    const client = new MetaGraphClient();
+
+    const erro = await client.getCampaigns("act_123", "token-abc").catch((falha: unknown) => falha);
+
+    expect(erro).toBeInstanceOf(MetaApiError);
+    expect((erro as MetaApiError).isRateLimited).toBe(true);
+    expect((erro as MetaApiError).segundosAteLiberar).toBe(240);
+  });
+
   it("pede páginas grandes, para gastar menos chamadas do limite da Meta", async () => {
     fetchMock.mockImplementation(async () => jsonResponse({ data: [] }));
     const client = new MetaGraphClient();
