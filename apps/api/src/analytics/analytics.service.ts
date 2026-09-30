@@ -128,7 +128,10 @@ export class AnalyticsService {
   /** De quando é o último dado de cada fonte de gasto, para a tela dizer se o número é de agora. */
   async frescor(organizationId: string) {
     const [meta, google] = await Promise.all([
-      this.prisma.metaConnection.findUnique({ where: { organizationId }, select: { status: true, lastSyncedAt: true } }),
+      this.prisma.metaConnection.findUnique({
+        where: { organizationId },
+        select: { status: true, lastSyncedAt: true, lastSyncError: true },
+      }),
       this.prisma.googleAdsConexao.findUnique({ where: { organizationId }, select: { ultimoEnvioEm: true } }),
     ]);
     return { meta: frescorDaMeta(meta), google: frescorDoGoogle(google) };

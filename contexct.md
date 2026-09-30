@@ -225,5 +225,13 @@ Decisões do usuário: convite por link, um cliente por pessoa, cadastro públic
 - Se a consulta do funil falhar, só a aba mostra o aviso; o resto do painel continua.
 - Testes: `funil.spec.ts` (API, 22 casos), `funil.e2e-spec.ts` (banco de verdade: campanha pelo anúncio, resposta da equipe como contato, recortes e validação), o isolamento entre contas passou a ler o funil, e `conclusao.spec.ts` no site.
 
+### Meta: limite de uso deixa o motivo na tela (2026-09-30)
+- Sintoma: token da Ferrovia colado e aceito, mas "Meta ainda sem dado" e nenhuma campanha. A tela é a de uma conexão salva cuja primeira sincronia nunca terminou, sem erro gravado.
+- O único caminho que chegava nesse estado sem erro era o limite de uso da Meta (e a sincronia interrompida no meio). O limite deixava o status como estava e não gravava motivo nenhum.
+- Agora o limite grava o motivo em `lastSyncError` (status continua conectado, a retentativa segue, sem aviso no sino), e a tela de integração mostra como aviso. Os códigos 80000 a 80014 (limite por conta de anúncios da API de Marketing) passaram a contar como limite.
+- As listas da Meta pedem 500 itens por página e os números por anúncio, 100, em vez dos 25 padrão: menos chamadas contadas no limite.
+- A Saúde da plataforma lista a conta "limitada pela Meta" e a "primeira sincronia não terminou" (15 minutos depois de conectar), que antes apareciam como sincronizando.
+- Conta sem nenhuma sincronia ganhou uma instrução na tela de integração: pode levar alguns minutos; passando de 10, clicar em Sincronizar agora.
+
 ### `docs/META_ADS.md` em dia com a agenda automática (2026-09-30)
 - A seção de sincronização da Meta passou a descrever a agenda automática (`AgendaDeSincronia`, a cada 60 min, ajustável por `META_SYNC_INTERVAL_MINUTES`) e o worker dentro do processo da API. Só documentação, nenhum código mudou.

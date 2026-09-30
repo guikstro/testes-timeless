@@ -32,6 +32,24 @@ describe("MetaGraphClient", () => {
     expect(requestedUrl.searchParams.get("access_token")).toBe("token-abc");
   });
 
+  /*
+    Cada página é uma chamada contada no limite de uso. Com os 25 por página
+    que a Meta usa sem pedir, uma conta grande estourava o limite do app em
+    modo de desenvolvimento antes de a primeira sincronia terminar.
+  */
+  it("pede páginas grandes, para gastar menos chamadas do limite da Meta", async () => {
+    fetchMock.mockImplementation(async () => jsonResponse({ data: [] }));
+    const client = new MetaGraphClient();
+
+    await client.getCampaigns("act_123", "token-abc");
+    await client.getAdSets("act_123", "token-abc");
+    await client.getAds("act_123", "token-abc");
+    await client.getInsights("act_123", "token-abc", { since: "2026-08-01", until: "2026-08-07" });
+
+    const limites = fetchMock.mock.calls.map((chamada) => new URL(chamada[0] as string).searchParams.get("limit"));
+    expect(limites).toEqual(["500", "500", "500", "100"]);
+  });
+
   it("follows paging.next until the last page, concatenating every page's data", async () => {
     fetchMock
       .mockResolvedValueOnce(
