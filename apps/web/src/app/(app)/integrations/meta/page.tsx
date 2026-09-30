@@ -150,9 +150,17 @@ export default async function MetaIntegrationPage() {
               </p>
             ) : (
               <>
+                {/* Conectada e com motivo gravado é a Meta limitando as chamadas:
+                    passageiro, tenta de novo sozinho, então é aviso e não erro. */}
                 {connection.lastSyncError ? (
-                  <p className="text-danger">
-                    <span className="font-medium">Erro:</span> {connection.lastSyncError}
+                  <p className={connection.status === "CONNECTED" ? "text-warning" : "text-danger"}>
+                    <span className="font-medium">{connection.status === "CONNECTED" ? "Aviso:" : "Erro:"}</span>{" "}
+                    {connection.lastSyncError}
+                  </p>
+                ) : !connection.lastSyncedAt ? (
+                  <p className="text-corpo text-ink-mute">
+                    A primeira sincronização busca as campanhas, os anúncios e o gasto dos últimos 7 dias, e pode levar alguns
+                    minutos. Se passar de 10 minutos sem mudar, clique em Sincronizar agora.
                   </p>
                 ) : null}
                 {connection.status === "TOKEN_EXPIRED" ? (

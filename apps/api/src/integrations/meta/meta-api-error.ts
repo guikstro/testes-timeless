@@ -3,6 +3,8 @@
  * error_subcode, fbtrace_id } }`. Code 190 = expired/invalid token; codes
  * 4/17/32/613 (and HTTP 429) = rate limiting — see
  * https://developers.facebook.com/docs/graph-api/guides/error-handling.
+ * The 80000 range is the Marketing API's per-ad-account limit (Business Use
+ * Case), which is the one a sync actually hits.
  */
 export class MetaApiError extends Error {
   constructor(
@@ -20,7 +22,8 @@ export class MetaApiError extends Error {
   }
 
   get isRateLimited(): boolean {
-    return this.httpStatus === 429 || [4, 17, 32, 613].includes(this.code ?? -1);
+    const code = this.code ?? -1;
+    return this.httpStatus === 429 || [4, 17, 32, 613].includes(code) || (code >= 80000 && code <= 80014);
   }
 }
 
@@ -42,6 +45,13 @@ export function explicaErroDaMeta(erro: MetaApiError, adAccountId?: string): str
       return (
         "A Meta bloqueou o acesso do app à API. Isso é do lado da Meta: abra o app em developers.facebook.com e veja se há aviso de " +
         "restrição, se o produto API de Marketing está adicionado e se o portfólio empresarial está verificado. Depois gere um token novo."
+      );
+    }
+    if (erro.isRateLimited) {
+      return (
+        "A Meta limitou as chamadas desta conta por excesso de pedidos. O sistema tenta de novo sozinho, de hora em hora. " +
+        "Se continuar, o app provavelmente ainda está em modo de desenvolvimento, que tem limite baixo: peça o acesso padrão " +
+        "da API de Marketing (Ads Management Standard Access) em developers.facebook.com, em Permissões e recursos."
       );
     }
     if (erro.code === 2635 || /deprecated version/i.test(crua)) {

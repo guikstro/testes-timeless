@@ -252,14 +252,26 @@ describe("MetaSyncService", () => {
     });
   });
 
-  it("does not flip the connection to a failed state on a rate-limit error — leaves it for the retry", async () => {
-    const { service, prisma, metaGraphClient } = buildService();
+  /*
+    O limite é passageiro: o status continua conectado e a retentativa segue.
+    Mas o motivo fica gravado. Sem ele, a conta recém-conectada que batia no
+    limite ficava em "última sincronização: nunca" sem nada escrito, e quem
+    colou o token concluía que tinha errado no passo a passo.
+  */
+  it("on a rate-limit error, keeps the status for the retry but records why", async () => {
+    const { service, prisma, metaGraphClient, notifications } = buildService();
     prisma.metaConnection.findUnique.mockResolvedValue(connectionRow());
     metaGraphClient.getCampaigns.mockRejectedValue(new MetaApiError(17, undefined, "User request limit reached"));
 
     await expect(service.sync("org-1")).rejects.toThrow(MetaApiError);
 
-    expect(prisma.metaConnection.update).not.toHaveBeenCalled();
+    expect(prisma.metaConnection.update).toHaveBeenCalledTimes(1);
+    expect(prisma.metaConnection.update).toHaveBeenCalledWith({
+      where: { organizationId: "org-1" },
+      data: { lastSyncError: expect.stringContaining("A Meta limitou as chamadas") },
+    });
+    // Passageiro não vai para o sino: a próxima hora costuma resolver.
+    expect(notifications.notificar).not.toHaveBeenCalled();
   });
 
   it("marks the connection SYNC_FAILED on any other error", async () => {

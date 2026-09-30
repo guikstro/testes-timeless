@@ -14,6 +14,8 @@ import { MetricasDaApi } from "./metricas-da-api";
 
 /** O script do Google roda de hora em hora; três horas sem envio é sinal de que parou. */
 const GOOGLE_ATRASADO_MS = 3 * 60 * 60 * 1000;
+/** Tempo que uma primeira sincronia da Meta tem para terminar antes de virar problema. */
+const PRIMEIRA_SINCRONIA_MS = 15 * 60 * 1000;
 const DIA_MS = 24 * 60 * 60 * 1000;
 const INICIO_DO_PROCESSO = new Date();
 
@@ -69,7 +71,7 @@ export class SaudeDaPlataformaService {
       }),
       seguro(() => Promise.all(this.filas.map((fila) => this.fila(fila)))),
       seguro(() => this.whatsapp()),
-      seguro(() => this.meta()),
+      seguro(() => this.meta(agora)),
       seguro(() => this.google(agora)),
       seguro(() => this.capi(agora)),
       seguro(() => this.erros(agora)),
@@ -147,27 +149,58 @@ export class SaudeDaPlataformaService {
     };
   }
 
-  private async meta() {
+  private async meta(agora: Date) {
     const conexoes = await this.prisma.metaConnection.findMany({
       where: { organization: { deletedAt: null }, status: { not: "DISCONNECTED" } },
-      select: { status: true, lastSyncedAt: true, lastSyncError: true, organization: { select: { name: true } } },
+      select: {
+        status: true,
+        connectedAt: true,
+        lastSyncedAt: true,
+        lastSyncError: true,
+        organization: { select: { name: true } },
+      },
     });
     const ultima = conexoes.reduce<Date | null>(
       (maior, c) => (c.lastSyncedAt && (!maior || c.lastSyncedAt > maior) ? c.lastSyncedAt : maior),
       null,
     );
-    return {
-      total: conexoes.length,
-      sincronizando: conexoes.filter((c) => c.status === "CONNECTED").length,
-      ultimaSincroniaEm: ultima?.toISOString() ?? null,
-      problemas: conexoes
-        .filter((c) => c.status !== "CONNECTED")
-        .map((c) => ({
+
+    /*
+      Conectada não quer dizer sincronizando.
+
+      Só o status contava aqui, e uma conta recém-conectada que batia no limite
+      da Meta, ou cuja primeira sincronia nunca terminava, aparecia como "1 de 1
+      sincronizando" enquanto o cliente via a tela vazia. Os dois casos entram
+      como problema agora, com o motivo quando há um.
+    */
+    const situacaoDe = (c: (typeof conexoes)[number]): string | null => {
+      if (c.status === "TOKEN_EXPIRED") return "token expirado";
+      if (c.status !== "CONNECTED") return "falha na sincronização";
+      if (c.lastSyncError) return "limitada pela Meta";
+      if (!c.lastSyncedAt && agora.getTime() - c.connectedAt.getTime() > PRIMEIRA_SINCRONIA_MS) {
+        return "primeira sincronia não terminou";
+      }
+      return null;
+    };
+
+    const problemas = conexoes.flatMap((c) => {
+      const situacao = situacaoDe(c);
+      if (!situacao) return [];
+      return [
+        {
           cliente: c.organization.name,
-          situacao: c.status === "TOKEN_EXPIRED" ? "token expirado" : "falha na sincronização",
+          situacao,
           erro: c.lastSyncError?.slice(0, 300) ?? null,
           ultimaSincroniaEm: c.lastSyncedAt?.toISOString() ?? null,
-        })),
+        },
+      ];
+    });
+
+    return {
+      total: conexoes.length,
+      sincronizando: conexoes.length - problemas.length,
+      ultimaSincroniaEm: ultima?.toISOString() ?? null,
+      problemas,
     };
   }
 

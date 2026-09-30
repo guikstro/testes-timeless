@@ -31,6 +31,20 @@ export const VERSAO_DA_GRAPH_API = "v25.0";
 
 const DEFAULT_BASE_URL = `https://graph.facebook.com/${VERSAO_DA_GRAPH_API}`;
 
+/**
+ * Itens por página.
+ *
+ * Sem isto a Meta devolve 25 por vez, e cada página é uma chamada contada no
+ * limite de uso da conta: 300 anúncios eram 12 chamadas só para listá-los, e
+ * uma semana de números por anúncio passava de cem. O app em modo de
+ * desenvolvimento tem limite baixo, e a sincronia inteira parava ali, sem
+ * trazer nada. As listas levam só id, nome e status, então 500 por página é
+ * leve; os números vêm com as ações de cada anúncio, e ficam em 100, o
+ * tamanho que a própria Meta tolera sem pedir para reduzir a consulta.
+ */
+const ITENS_POR_PAGINA = "500";
+const LINHAS_DE_NUMEROS_POR_PAGINA = "100";
+
 export interface InsightsRange {
   since: string; // "YYYY-MM-DD"
   until: string; // "YYYY-MM-DD"
@@ -50,17 +64,26 @@ export class MetaGraphClient {
   private readonly baseUrl = process.env.META_GRAPH_API_BASE_URL ?? DEFAULT_BASE_URL;
 
   async getCampaigns(adAccountId: string, accessToken: string): Promise<MetaCampaign[]> {
-    const url = this.buildUrl(`/${adAccountId}/campaigns`, accessToken, { fields: "id,name,status,created_time" });
+    const url = this.buildUrl(`/${adAccountId}/campaigns`, accessToken, {
+      fields: "id,name,status,created_time",
+      limit: ITENS_POR_PAGINA,
+    });
     return this.fetchAllPages<MetaCampaign>(url);
   }
 
   async getAdSets(adAccountId: string, accessToken: string): Promise<MetaAdSet[]> {
-    const url = this.buildUrl(`/${adAccountId}/adsets`, accessToken, { fields: "id,name,status,campaign_id" });
+    const url = this.buildUrl(`/${adAccountId}/adsets`, accessToken, {
+      fields: "id,name,status,campaign_id",
+      limit: ITENS_POR_PAGINA,
+    });
     return this.fetchAllPages<MetaAdSet>(url);
   }
 
   async getAds(adAccountId: string, accessToken: string): Promise<MetaAd[]> {
-    const url = this.buildUrl(`/${adAccountId}/ads`, accessToken, { fields: "id,name,status,adset_id" });
+    const url = this.buildUrl(`/${adAccountId}/ads`, accessToken, {
+      fields: "id,name,status,adset_id",
+      limit: ITENS_POR_PAGINA,
+    });
     return this.fetchAllPages<MetaAd>(url);
   }
 
@@ -82,6 +105,7 @@ export class MetaGraphClient {
       fields: "campaign_id,adset_id,ad_id,spend,impressions,clicks,actions",
       time_increment: "1",
       time_range: JSON.stringify({ since: range.since, until: range.until }),
+      limit: LINHAS_DE_NUMEROS_POR_PAGINA,
     });
     return this.fetchAllPages<MetaInsight>(url);
   }

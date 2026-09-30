@@ -21,6 +21,8 @@ export interface FrescorDaFonte {
 interface ConexaoDaMeta {
   status: string;
   lastSyncedAt: Date | null;
+  /** O motivo da última sincronia que não terminou, em palavras de gente. */
+  lastSyncError?: string | null;
 }
 
 interface ConexaoDoGoogle {
@@ -38,8 +40,20 @@ export function frescorDaMeta(conexao: ConexaoDaMeta | null, agora = new Date())
   if (!conexao || conexao.status === "DISCONNECTED") return null;
   const atualizadoEm = conexao.lastSyncedAt?.toISOString() ?? null;
   if (conexao.status === "TOKEN_EXPIRED") return { estado: "falha", atualizadoEm, motivo: "O acesso à Meta venceu; reconecte em Integrações." };
-  if (conexao.status === "SYNC_FAILED") return { estado: "falha", atualizadoEm, motivo: "A última sincronia com a Meta falhou." };
-  if (!conexao.lastSyncedAt) return { estado: "atrasada", atualizadoEm, motivo: "A Meta ainda não sincronizou." };
+  if (conexao.status === "SYNC_FAILED") {
+    return { estado: "falha", atualizadoEm, motivo: conexao.lastSyncError ?? "A última sincronia com a Meta falhou." };
+  }
+  // Conectada, mas com motivo gravado: a Meta limitou as chamadas. É
+  // passageiro e tenta de novo sozinho, então é atraso, e não falha; mas a
+  // tela diz o porquê em vez de só "ainda sem dado".
+  if (conexao.lastSyncError) return { estado: "atrasada", atualizadoEm, motivo: conexao.lastSyncError };
+  if (!conexao.lastSyncedAt) {
+    return {
+      estado: "atrasada",
+      atualizadoEm,
+      motivo: "A primeira sincronia ainda não terminou. Se passar de alguns minutos, clique em Sincronizar agora, em Integrações, Meta Ads.",
+    };
+  }
   if (atrasado(conexao.lastSyncedAt, agora)) return { estado: "atrasada", atualizadoEm, motivo: "A Meta sincroniza de hora em hora e passou de 3 horas sem sincronizar." };
   return { estado: "em-dia", atualizadoEm, motivo: null };
 }

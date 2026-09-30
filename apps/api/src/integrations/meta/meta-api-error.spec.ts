@@ -25,6 +25,24 @@ describe("explicaErroDaMeta", () => {
     expect(explicaErroDaMeta(new MetaApiError(10, undefined, "Permission denied"))).toContain("ads_read");
   });
 
+  /*
+    O limite de uso deixava a conta parada em "última sincronização: nunca",
+    sem nada escrito. O texto diz que é passageiro e qual é a saída quando
+    não passa, que é o acesso padrão da API de Marketing.
+  */
+  it("limite de uso diz que tenta de novo sozinho e como subir o limite", () => {
+    const texto = explicaErroDaMeta(new MetaApiError(17, undefined, "(#17) User request limit reached"));
+    expect(texto).toContain("A Meta limitou as chamadas");
+    expect(texto).toContain("Ads Management Standard Access");
+    expect(texto).toContain("(Meta: (#17) User request limit reached)");
+  });
+
+  it("reconhece o limite por conta de anúncios da API de Marketing", () => {
+    expect(new MetaApiError(80004, undefined, "There have been too many calls to this ad-account.").isRateLimited).toBe(true);
+    expect(new MetaApiError(80000, undefined, "Too many calls").isRateLimited).toBe(true);
+    expect(new MetaApiError(100, 33, "does not exist").isRateLimited).toBe(false);
+  });
+
   it("erro que não conhece passa como veio", () => {
     expect(explicaErroDaMeta(new MetaApiError(1, undefined, "An unknown error occurred"))).toBe("An unknown error occurred");
   });

@@ -237,9 +237,21 @@ export class MetaSyncService {
     }
 
     if (error instanceof MetaApiError && error.isRateLimited) {
-      // Transient — leave the connection's status alone and let the retry
-      // (with backoff) resolve it rather than surfacing a false failure.
-      this.logger.warn(JSON.stringify({ event: "meta_sync_rate_limited", organizationId }));
+      /*
+        Passageiro: o status fica como está, a retentativa e a sincronia de
+        hora em hora continuam, e ninguém é avisado no sino.
+
+        Mas o motivo fica gravado. Sem ele, uma conta recém-conectada que
+        batia no limite ficava para sempre em "Conectado, última sincronização:
+        nunca", sem erro nenhum na tela, e quem colou o token concluía que
+        tinha errado no passo a passo. A próxima sincronia que der certo
+        limpa o motivo.
+      */
+      this.logger.warn(JSON.stringify({ event: "meta_sync_rate_limited", organizationId, code: error.code }));
+      await this.prisma.metaConnection.update({
+        where: { organizationId },
+        data: { lastSyncError: explicaErroDaMeta(error) },
+      });
       return;
     }
 

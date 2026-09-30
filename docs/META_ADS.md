@@ -113,13 +113,30 @@ tipo de erro devolvido pela Graph API:
 | Erro da Meta                          | Status da conexão | Job re-lançado? |
 |----------------------------------------|--------------------|-----------------|
 | Código 190 (token inválido/expirado)   | `TOKEN_EXPIRED`    | Sim (BullMQ tenta de novo, mas continuará falhando até reconectar com token válido) |
-| HTTP 429 ou código 4/17/32/613 (rate limit) | Status **não muda** | Sim (deixa o backoff resolver, sem marcar falha falsa) |
+| HTTP 429, código 4/17/32/613 ou 80000 a 80014 (limite de uso) | Status **não muda**; `lastSyncError` guarda o motivo, que a tela mostra como aviso | Sim (a retentativa e a sincronia de hora em hora continuam; a próxima que der certo limpa o motivo) |
 | Qualquer outro erro (rede, 5xx, etc.)  | `SYNC_FAILED`      | Sim |
 
 Em todos os casos o erro é relançado após atualizar o status, para que o
 BullMQ aplique o retry configurado (`attempts: 5`, backoff exponencial a
 partir de 5s). A UI (`/integrations/meta`) mostra `lastSyncError` e um aviso
 específico para pedir reconexão quando o status é `TOKEN_EXPIRED`.
+
+**Limite de uso.** Até 2026-09-30 o limite não gravava nada: uma conta
+recém-conectada que batia nele ficava em "Conectado, última sincronização:
+nunca", sem erro na tela, e parecia um erro no passo a passo do token. Agora:
+
+- O motivo fica em `lastSyncError`, em português, com a mensagem da Meta
+  entre parênteses. A tela de integração mostra como aviso, e a linha de
+  frescor das telas de números diz o motivo.
+- A Saúde da plataforma lista a conta como "limitada pela Meta", e também
+  como "primeira sincronia não terminou" quando passam 15 minutos da conexão
+  sem nenhuma sincronia completa.
+- Para gastar menos do limite, as listas pedem 500 itens por página e os
+  números por anúncio, 100. Sem `limit`, a Meta devolve 25, e cada página é
+  uma chamada contada.
+- O app em modo de desenvolvimento tem limite baixo. A saída definitiva é o
+  acesso padrão da API de Marketing (Ads Management Standard Access), pedido
+  em developers.facebook.com, em Permissões e recursos.
 
 ### Correção de bug: job atrasado podia "ressuscitar" uma conexão desconectada
 

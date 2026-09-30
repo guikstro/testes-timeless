@@ -33,4 +33,27 @@ describe("frescor dos dados", () => {
     expect(frescorDaMeta({ status: "TOKEN_EXPIRED", lastSyncedAt: ha(0.5) }, agora)?.estado).toBe("falha");
     expect(frescorDaMeta({ status: "SYNC_FAILED", lastSyncedAt: ha(0.5) }, agora)?.estado).toBe("falha");
   });
+
+  it("a falha diz o motivo gravado, quando há um", () => {
+    expect(
+      frescorDaMeta({ status: "SYNC_FAILED", lastSyncedAt: null, lastSyncError: "A Meta não encontrou act_1." }, agora),
+    ).toMatchObject({ estado: "falha", motivo: "A Meta não encontrou act_1." });
+  });
+
+  /*
+    Conectada e com motivo gravado é a Meta limitando as chamadas. Tenta de
+    novo sozinho, então é atraso e não falha, mas a tela diz o porquê.
+  */
+  it("conectada com motivo gravado é atraso com o motivo, e não só 'sem dado'", () => {
+    const motivo = "A Meta limitou as chamadas desta conta.";
+    expect(frescorDaMeta({ status: "CONNECTED", lastSyncedAt: null, lastSyncError: motivo }, agora)).toEqual({
+      estado: "atrasada",
+      atualizadoEm: null,
+      motivo,
+    });
+  });
+
+  it("a primeira sincronia que não terminou diz onde tentar de novo", () => {
+    expect(frescorDaMeta({ status: "CONNECTED", lastSyncedAt: null }, agora)?.motivo).toContain("Sincronizar agora");
+  });
 });
