@@ -83,7 +83,7 @@ export function AbaFunil({ dados }: { dados: FunilDoPeriodo }) {
         ) : recortado ? (
           <EmptyState
             title="Nenhum lead com estes filtros"
-            description="Nenhum lead do período tem essa combinação. Troque ou limpe os filtros acima."
+            description="Troque ou limpe os filtros acima para ver os outros leads do período."
           />
         ) : (
           <EmptyState

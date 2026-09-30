@@ -216,3 +216,11 @@ Decisões do usuário: convite por link, um cliente por pessoa, cadastro públic
 - O e-mail só sai com SMTP configurado na API (`EMAIL_TRANSPORTE=smtp` e as variáveis `SMTP_*`, `EMAIL_REMETENTE`).
 - De quebra: o filtro "Sistema" da tela de notificações pedia `sistema.erro`, que a API recusava; a lista de tipos aceitos agora tem `sistema.erro` e `conta.nova`.
 - Testes: `auth.service.spec.ts` (nunca operador, aviso no sino e por e-mail, aviso que falha não impede o cadastro) e `admin.e2e-spec.ts` (conta nova barrada na administração; a equipe recebe o aviso e o cliente não).
+
+### Funil com recortes (item 13) (2026-09-30)
+- A aba Funil do dashboard mostra leads, contatados, qualificados, reunião marcada e vendas, com a conversão de cada passagem, a conversão total, quem ficou em cada etapa (em aberto e perdidos) e os motivos de perda.
+- Recortes por campanha, origem e responsável, na URL. O período continua no seletor do cabeçalho, e trocar de período mantém os recortes.
+- API: `GET /analytics/funil` (`analytics/funil.ts` e `AnalyticsService.funil`). Regra completa em `docs/QUALIFICATION.md`, "Funil do dashboard".
+- "Negociação" aparece como Reunião marcada, o nome que ficou no item 14.
+- Se a consulta do funil falhar, só a aba mostra o aviso; o resto do painel continua.
+- Testes: `funil.spec.ts` (API, 22 casos), `funil.e2e-spec.ts` (banco de verdade: campanha pelo anúncio, resposta da equipe como contato, recortes e validação), o isolamento entre contas passou a ler o funil, e `conclusao.spec.ts` no site.

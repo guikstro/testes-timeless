@@ -118,6 +118,36 @@ de qual lado veio o gatilho.
 - **Limitação:** respostas mandadas pelo celular não entram no sistema (ver
   acima), então não marcam atendimento nem definem responsável.
 
+## Funil do dashboard (item 13)
+
+A aba Funil lê `GET /analytics/funil?days=&campanha=&origem=&responsavel=`
+(`analytics/funil.ts`, conta pura, e `AnalyticsService.funil`).
+
+- **Quem entra:** os leads que chegaram no período (`firstContactAt`, em dias
+  de Brasília), como na visão geral.
+- **Etapas acumuladas:** leads, contatados, qualificados, reunião marcada e
+  vendas. Cada uma conta quem chegou nela **ou além**, então uma venda aparece
+  em todas as de cima e o funil nunca cresce de uma etapa para a seguinte.
+  "Negociação", da lista original, é o estágio Reunião marcada.
+- **Contatado:** estágio `IN_PROGRESS` ou além, `emAtendimentoAt` preenchido,
+  ou resposta da equipe no WhatsApp (a mesma primeira resposta do tempo de
+  atendimento). A última regra cobre os leads de antes do estágio "Em
+  atendimento", que continuam em Novo mesmo respondidos.
+- **Quem parou:** em cada etapa, separado entre **perdidos** (`disqualifiedAt`)
+  e **em aberto**. Os motivos de perda vêm agrupados, sem diferenciar
+  maiúscula e espaço.
+- **Conversão:** de cada etapa sobre a anterior, e total (vendas sobre leads).
+  Sem base, é nula, e a tela escreve "Sem base" em vez de 0%.
+- **Recortes:** campanha (o id na plataforma, ou `nenhuma`; o lead de
+  Click-to-WhatsApp sobe do anúncio para a campanha, como no desempenho por
+  campanha), origem (a chave da tabela de origens) e responsável (`eu`,
+  `nenhum` ou o id). As opções saem do período inteiro, com a contagem de cada
+  uma. O nome da campanha só vem da própria organização; um id sem campanha
+  sincronizada aparece como "Campanha <id>".
+- **Maior perda:** a passagem que perde mais **pessoas**, e não a maior
+  proporção: de uma reunião para nenhuma venda a perda é de 100%, e apontar
+  isso esconderia os leads que nunca foram respondidos.
+
 ## Desqualificação (Fase 11)
 
 Na tela, o nome é **Perdido**, com motivos prontos num toque (preço, sem
