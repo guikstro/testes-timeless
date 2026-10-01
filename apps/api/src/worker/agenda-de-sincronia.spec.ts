@@ -1,17 +1,70 @@
 import { Queue } from "bullmq";
 import { AgendaDeSincronia } from "./agenda-de-sincronia";
+import { INTERVALO_DA_VIGIA_MS } from "./vigia-de-agenda";
 import { PrismaService } from "../common/prisma/prisma.service";
 
 describe("AgendaDeSincronia", () => {
+  const montadas: AgendaDeSincronia[] = [];
+
   function montar(conexoes: { organizationId: string }[] = []) {
     const prisma = { metaConnection: { findMany: jest.fn().mockResolvedValue(conexoes) } };
-    const fila = { upsertJobScheduler: jest.fn().mockResolvedValue(undefined), add: jest.fn().mockResolvedValue(undefined) };
+    const fila = {
+      upsertJobScheduler: jest.fn().mockResolvedValue(undefined),
+      add: jest.fn().mockResolvedValue(undefined),
+      getJobScheduler: jest.fn().mockResolvedValue({ key: "meta-sync-periodica" }),
+    };
     const agenda = new AgendaDeSincronia(prisma as unknown as PrismaService, fila as unknown as Queue);
+    montadas.push(agenda);
     return { agenda, prisma, fila };
   }
 
   afterEach(() => {
     delete process.env.META_SYNC_INTERVAL_MINUTES;
+    montadas.splice(0).forEach((agenda) => agenda.onApplicationShutdown());
+    jest.useRealTimers();
+  });
+
+  describe("vigia", () => {
+    it("registra de novo, com o mesmo id e o mesmo intervalo, quando a agenda some do Redis", async () => {
+      jest.useFakeTimers();
+      const { agenda, fila } = montar();
+      // O Redis gratuito do Render volta vazio quando reinicia.
+      fila.getJobScheduler.mockResolvedValue(undefined);
+
+      agenda.onApplicationBootstrap();
+      await jest.advanceTimersByTimeAsync(INTERVALO_DA_VIGIA_MS);
+
+      expect(fila.getJobScheduler).toHaveBeenCalledWith("meta-sync-periodica");
+      expect(fila.upsertJobScheduler).toHaveBeenCalledTimes(2);
+      expect(fila.upsertJobScheduler).toHaveBeenLastCalledWith(
+        "meta-sync-periodica",
+        { every: 60 * 60_000 },
+        expect.objectContaining({ name: "sincronizar-todas" }),
+      );
+    });
+
+    it("deixa em paz a agenda que continua no Redis", async () => {
+      jest.useFakeTimers();
+      const { agenda, fila } = montar();
+
+      agenda.onApplicationBootstrap();
+      await jest.advanceTimersByTimeAsync(INTERVALO_DA_VIGIA_MS * 3);
+
+      expect(fila.getJobScheduler).toHaveBeenCalledTimes(3);
+      expect(fila.upsertJobScheduler).toHaveBeenCalledTimes(1);
+    });
+
+    it("desliga junto com a API", async () => {
+      jest.useFakeTimers();
+      const { agenda, fila } = montar();
+
+      agenda.onApplicationBootstrap();
+      await jest.advanceTimersByTimeAsync(0);
+      agenda.onApplicationShutdown();
+      await jest.advanceTimersByTimeAsync(INTERVALO_DA_VIGIA_MS * 2);
+
+      expect(fila.getJobScheduler).not.toHaveBeenCalled();
+    });
   });
 
   describe("registro da agenda", () => {

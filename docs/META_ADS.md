@@ -207,8 +207,7 @@ MetaSyncService.sync(organizationId), o mesmo caminho do diagrama acima
   quando houver dois processos da API no ar, cada um com o seu worker.
   Registrar de novo com o mesmo id substitui a agenda em vez de criar outra,
   e o próprio BullMQ garante uma execução só por intervalo. A contrapartida
-  é que o registro só acontece na subida: se o Redis perder os dados com a
-  API no ar, a agenda só volta na próxima subida da API.
+  é depender do Redis para guardar a agenda (ver "Vigia", abaixo).
 - **Registro sem `await` na subida**: `onApplicationBootstrap()` chama
   `registraAgenda()` com `void`, sem esperar. Com o Redis fora do ar, o
   BullMQ não devolve erro: fica esperando a conexão para sempre. E o Nest só
@@ -216,6 +215,18 @@ MetaSyncService.sync(organizationId), o mesmo caminho do diagrama acima
   `await`, a API ficava no ar sem porta e o Render derrubava o deploy. Se o
   Redis responder com erro, a falha vai para o log
   (`agenda_de_sincronia_falhou`) e a API continua de pé.
+- **Vigia**: o Redis de produção é o Key Value gratuito do Render, que não
+  guarda nada em disco, e a Render pode reiniciá-lo a qualquer momento: ele
+  volta vazio, e a agenda some junto, sem erro nenhum. Antes da vigia, ela
+  só voltava na próxima subida da API, e até lá nada sincronizava sozinho.
+  Agora, depois do registro da subida, `mantemAgenda`
+  (`apps/api/src/worker/vigia-de-agenda.ts`) confere a cada 5 minutos se a
+  agenda continua no Redis e a registra de novo quando ela some
+  (`agenda_sumiu_do_redis` no log). Agenda recém-criada roda na hora, então
+  a volta já cobre o intervalo perdido. A vigia só lê uma agenda viva, nunca
+  registra por cima dela, e o relógio dela não sincroniza nada. Também é ela
+  que refaz um registro que falhou na subida. A faxina diária usa a mesma
+  vigia.
 - **Um job por organização, e não um que percorre todas**: o job repetido
   não traz organização. Quando ele chega, o `MetaSyncProcessor` chama
   `enfileirarTodas()`, que enfileira um job `sync` para cada conexão. Assim

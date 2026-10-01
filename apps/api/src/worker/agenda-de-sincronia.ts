@@ -1,9 +1,10 @@
 import { InjectQueue } from "@nestjs/bullmq";
-import { Injectable, Logger, OnApplicationBootstrap } from "@nestjs/common";
+import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from "@nestjs/common";
 import { Queue } from "bullmq";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { META_SYNC_QUEUE, SINCRONIA_DE_UMA, SINCRONIA_PERIODICA } from "../common/queue/queue.constants";
 import { MetaSyncJob } from "../common/queue/meta-sync.job";
+import { mantemAgenda } from "./vigia-de-agenda";
 
 /** Identificador da agenda no Redis. Fixo: é ele que faz o upsert substituir em vez de duplicar. */
 const ID_DA_AGENDA = "meta-sync-periodica";
@@ -24,10 +25,14 @@ const INTERVALO_MINIMO_MINUTOS = 5;
  * A agenda vive no Redis, e não num `setInterval` deste processo: assim ela
  * sobrevive a reinício, não dispara duas vezes quando houver dois workers, e
  * o próprio BullMQ garante que só uma execução acontece por intervalo.
+ *
+ * O relógio da vigia (`mantemAgenda`) não sincroniza nada: só confere se a
+ * agenda continua no Redis e a registra de novo quando ela some.
  */
 @Injectable()
-export class AgendaDeSincronia implements OnApplicationBootstrap {
+export class AgendaDeSincronia implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(AgendaDeSincronia.name);
+  private vigia?: { para(): void };
 
   constructor(
     private readonly prisma: PrismaService,
@@ -40,7 +45,16 @@ export class AgendaDeSincronia implements OnApplicationBootstrap {
    * porta e o Render derrubava o deploy.
    */
   onApplicationBootstrap(): void {
-    void this.registraAgenda();
+    this.vigia = mantemAgenda({
+      fila: this.fila,
+      id: ID_DA_AGENDA,
+      registra: () => this.registraAgenda(),
+      logger: this.logger,
+    });
+  }
+
+  onApplicationShutdown(): void {
+    this.vigia?.para();
   }
 
   async registraAgenda(): Promise<void> {
