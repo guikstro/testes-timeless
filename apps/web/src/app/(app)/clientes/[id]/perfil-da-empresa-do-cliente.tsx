@@ -122,7 +122,9 @@ export function PerfilDaEmpresaDoCliente({
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-corpo text-ink">
             <span className={`inline-block h-2.5 w-2.5 rounded-full ${situacao.conta.erro ? "bg-amber-500" : "bg-emerald-500"}`} aria-hidden />
             Conta da equipe: {situacao.conta.email ?? "conectada"}
-            <span className="text-ink-mute">· desde {formataDia(situacao.conta.conectadaEm.slice(0, 10))}</span>
+            <span className="text-ink-mute">
+              · desde {new Date(situacao.conta.conectadaEm).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
+            </span>
             <button
               type="button"
               onClick={desconecta}

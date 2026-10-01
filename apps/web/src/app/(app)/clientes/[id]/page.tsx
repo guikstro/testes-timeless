@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch, ApiRequestError } from "@/lib/api-client";
 import { WhatsAppDoCliente, WhatsAppDoClienteDados } from "./whatsapp-do-cliente";
 import { CorDoCliente } from "../cor-do-cliente";
 import { PessoaDoCliente, PessoasDoCliente } from "./pessoas-do-cliente";
@@ -22,8 +22,8 @@ export default async function ClientePage({
     apiFetch<WhatsAppDoClienteDados>(`/admin/organizations/${id}/whatsapp`),
     apiFetch<PessoaDoCliente[]>(`/admin/organizations/${id}/pessoas`),
     // Opcionais: sem eles a página continua, só sem o cartão do perfil.
-    apiFetch<SituacaoDoPerfil>("/admin/perfil-da-empresa").catch(() => null),
-    apiFetch<PerfilDoCliente>(`/admin/organizations/${id}/perfil-da-empresa`).catch(() => null),
+    apiFetch<SituacaoDoPerfil>("/admin/perfil-da-empresa").catch(semCartao),
+    apiFetch<PerfilDoCliente>(`/admin/organizations/${id}/perfil-da-empresa`).catch(semCartao),
   ]);
 
   return (
@@ -54,3 +54,12 @@ export default async function ClientePage({
 
 /** Parâmetro repetido na URL vira lista; aqui só vale texto. */
 const texto = (valor: unknown) => (typeof valor === "string" ? valor : undefined);
+
+/**
+ * Erro da API vira página sem o cartão. Qualquer outro segue: é por ele que
+ * passa o redirecionamento ao login quando a sessão acabou.
+ */
+function semCartao(erro: unknown): null {
+  if (erro instanceof ApiRequestError) return null;
+  throw erro;
+}

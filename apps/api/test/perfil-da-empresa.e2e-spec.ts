@@ -219,6 +219,10 @@ describe("Perfil da Empresa no Google (e2e)", () => {
   const decodifica = (token: string) => JSON.parse(Buffer.from(token.split(".")[1], "base64").toString("utf8"));
   const comoEquipe = (r: request.Test) => r.set("Authorization", `Bearer ${tokenDaEquipe}`);
 
+  // O ambiente é do processo inteiro, e as suítes rodam em fila no mesmo processo.
+  const variaveis = ["GOOGLE_API_BASE_URL", "GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "WEB_APP_URL"] as const;
+  const anteriores = Object.fromEntries(variaveis.map((nome) => [nome, process.env[nome]]));
+
   beforeAll(async () => {
     const subido = await sobeDublê();
     dublê = subido.server;
@@ -261,7 +265,10 @@ describe("Perfil da Empresa no Google (e2e)", () => {
     await prisma.contaGoogleDaEquipe.deleteMany();
     await app.close();
     await new Promise((r) => dublê.close(r));
-    delete process.env.GOOGLE_API_BASE_URL;
+    for (const nome of variaveis) {
+      if (anteriores[nome] === undefined) delete process.env[nome];
+      else process.env[nome] = anteriores[nome];
+    }
   });
 
   it("é só da equipe: um cliente não chega a nenhuma rota", async () => {
