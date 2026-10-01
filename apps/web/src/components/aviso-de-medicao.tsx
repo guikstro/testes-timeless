@@ -1,4 +1,8 @@
+import { cookies } from "next/headers";
 import { Alert } from "@/components/ui/alert";
+import { AvisoDispensavel } from "@/components/aviso-dispensavel";
+import { chaveDoAviso, COOKIE_DOS_AVISOS, leDispensados } from "@/lib/avisos-dispensados";
+import { sessaoAtual } from "@/lib/sessao";
 import { ButtonLink } from "@/components/ui/button";
 import { formataDia } from "@/lib/periodo";
 import { Medicao } from "@/lib/medicao-de-leads";
@@ -12,27 +16,43 @@ import { SePuderAbrir } from "@/components/acesso";
  * Não aparece quando o número é medida, que é o caso normal e não merece
  * faixa nenhuma.
  */
-export function AvisoDeMedicao({
+export async function AvisoDeMedicao({
   medicao,
   desde,
   conversasNaPlataforma,
+  dispensavel = true,
 }: {
   medicao: Medicao;
   /** Dia em que o WhatsApp foi configurado, para o caso "antes do WhatsApp". */
   desde?: string | null;
   /** O que a Meta diz ter iniciado no período. Null ou ausente quando não se sabe. */
   conversasNaPlataforma?: number | null;
+  /**
+   * Com X para fechar. Falso no relatório: ele vai para o cliente, e lá o
+   * aviso é o que impede "nenhum lead" de ser lido como fato.
+   */
+  dispensavel?: boolean;
 }) {
   if (medicao === "medido") return null;
+
+  // Fechado nesta conta e nesta situação: nem desenha, para não piscar.
+  let chave: string | null = null;
+  if (dispensavel) {
+    const { organization } = await sessaoAtual();
+    chave = chaveDoAviso(organization.id, medicao);
+    const dispensados = leDispensados((await cookies()).get(COOKIE_DOS_AVISOS)?.value);
+    if (dispensados.includes(chave)) return null;
+  }
 
   const texto = TEXTOS[medicao];
   const conversas = conversasNaPlataforma ?? 0;
 
-  return (
+  const aviso = (
     <Alert
       tom="warning"
       titulo={texto.titulo}
-      className="mb-6"
+      // Espaço à direita para o X não cobrir o título nem o botão.
+      className={chave ? "mb-6 pr-12" : "mb-6"}
       acao={
         texto.acao ? (
           <SePuderAbrir
@@ -61,6 +81,8 @@ export function AvisoDeMedicao({
       ) : null}
     </Alert>
   );
+
+  return chave ? <AvisoDispensavel chave={chave}>{aviso}</AvisoDispensavel> : aviso;
 }
 
 const TEXTOS: Record<Exclude<Medicao, "medido">, { titulo: string; corpo: string; acao: string | null }> = {

@@ -171,6 +171,7 @@ export default async function RelatorioPage({
         <AvisoDeMedicao
           medicao={medicao}
           desde={conexao ? inicioDaMedicao(conexao) : null}
+          dispensavel={false}
         />
       }
     />
