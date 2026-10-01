@@ -2,7 +2,10 @@ import {
   agregaDesempenhoPorCampanha,
   CampanhaComGasto,
   comparaDesempenho,
+  completaEntregaPelosAnuncios,
+  entregaDaCampanha,
   LeadAtribuido,
+  LinhaDeGasto,
 } from "./campaign-performance";
 
 function campanha(over: Partial<CampanhaComGasto> = {}): CampanhaComGasto {
@@ -245,5 +248,138 @@ describe("comparaDesempenho", () => {
     );
 
     expect(comparaDesempenho(julho, marco()).campanhas[0].nome).toBe("Institucional 2026");
+  });
+});
+
+describe("entregaDaCampanha", () => {
+  const linha = (over: Partial<LinhaDeGasto>): LinhaDeGasto => ({
+    date: dia("2026-09-01"),
+    spendCents: 10_000,
+    conversasIniciadas: null,
+    impressoes: null,
+    cliques: null,
+    ...over,
+  });
+
+  it("soma impressões e cliques e tira deles CTR, CPM e CPC", () => {
+    const entrega = entregaDaCampanha([
+      linha({ spendCents: 10_000, impressoes: 4_000, cliques: 80 }),
+      linha({ date: dia("2026-09-02"), spendCents: 5_000, impressoes: 1_000, cliques: 20 }),
+    ]);
+
+    expect(entrega).toMatchObject({ impressoes: 5_000, cliques: 100, completa: true });
+    expect(entrega.ctr).toBeCloseTo(0.02);
+    // R$ 150 por 5 mil impressões: R$ 30 a cada mil.
+    expect(entrega.cpmCentavos).toBe(3_000);
+    // R$ 150 por 100 cliques: R$ 1,50 cada.
+    expect(entrega.cpcCentavos).toBe(150);
+  });
+
+  /*
+    Dividir o gasto do mês inteiro pelas impressões de metade dele dobraria o
+    CPM, e a tela mostraria uma piora que não aconteceu.
+  */
+  it("divide cada custo só pelo gasto dos dias que trouxeram o número", () => {
+    const entrega = entregaDaCampanha([
+      linha({ spendCents: 10_000, impressoes: 5_000, cliques: 50 }),
+      linha({ date: dia("2026-09-02"), spendCents: 10_000 }),
+    ]);
+
+    expect(entrega.cpmCentavos).toBe(2_000);
+    expect(entrega.cpcCentavos).toBe(200);
+    // Metade dos dias sem o número: é um piso, e a tela diz isso.
+    expect(entrega.completa).toBe(false);
+  });
+
+  it("sem nenhum dia com entrega, não inventa número", () => {
+    expect(entregaDaCampanha([linha({})])).toEqual({
+      impressoes: null,
+      cliques: null,
+      completa: false,
+      ctr: null,
+      cpmCentavos: null,
+      cpcCentavos: null,
+      custoPorConversaCentavos: null,
+    });
+  });
+
+  it("zero impressão é medida, mas não dá CTR nem CPM", () => {
+    const entrega = entregaDaCampanha([linha({ spendCents: 0, impressoes: 0, cliques: 0 })]);
+    expect(entrega).toMatchObject({ impressoes: 0, cliques: 0, ctr: null, cpmCentavos: null, cpcCentavos: null });
+  });
+
+  it("dá o custo por conversa sobre os dias que trouxeram a contagem", () => {
+    const entrega = entregaDaCampanha([
+      linha({ spendCents: 9_000, conversasIniciadas: 3 }),
+      linha({ date: dia("2026-09-02"), spendCents: 5_000 }),
+    ]);
+    expect(entrega.custoPorConversaCentavos).toBe(3_000);
+  });
+});
+
+describe("completaEntregaPelosAnuncios", () => {
+  /*
+    A Meta passou a gravar a entrega no gasto da campanha só agora. Para os
+    dias antigos, a soma dos anúncios da campanha é o mesmo número.
+  */
+  it("preenche o dia sem entrega com a soma dos anúncios, e não toca no dia que já tem", () => {
+    const [completa] = completaEntregaPelosAnuncios(
+      [
+        campanha({
+          id: "c1",
+          spend: [
+            { date: dia("2026-09-01"), spendCents: 100, conversasIniciadas: null, impressoes: null, cliques: null },
+            { date: dia("2026-09-02"), spendCents: 100, conversasIniciadas: null, impressoes: 900, cliques: 9 },
+          ],
+        }),
+      ],
+      new Map([
+        ["c1|2026-09-01", { impressoes: 500, cliques: 5 }],
+        ["c1|2026-09-02", { impressoes: 1, cliques: 1 }],
+      ]),
+    );
+
+    expect(completa.spend.map((linha) => [linha.impressoes, linha.cliques])).toEqual([
+      [500, 5],
+      [900, 9],
+    ]);
+  });
+
+  it("deixa sem número o dia que nem os anúncios têm", () => {
+    const [completa] = completaEntregaPelosAnuncios(
+      [campanha({ id: "c1", spend: [{ date: dia("2026-09-01"), spendCents: 100, conversasIniciadas: null, impressoes: null }] })],
+      new Map(),
+    );
+    expect(completa.spend[0].impressoes).toBeNull();
+  });
+});
+
+describe("totais de entrega", () => {
+  it("somam os dias de todas as campanhas, e não a média dos custos de cada uma", () => {
+    const { entrega } = agregaDesempenhoPorCampanha(
+      [
+        campanha({
+          id: "a",
+          externalId: "a",
+          spend: [{ date: dia("2026-09-01"), spendCents: 1_000, conversasIniciadas: null, impressoes: 1_000, cliques: 10 }],
+        }),
+        campanha({
+          id: "b",
+          externalId: "b",
+          spend: [{ date: dia("2026-09-01"), spendCents: 99_000, conversasIniciadas: null, impressoes: 9_000, cliques: 90 }],
+        }),
+      ],
+      [],
+    );
+
+    // R$ 1.000 por 10 mil impressões: R$ 100 por mil. A média dos dois CPMs
+    // (R$ 10 e R$ 110) daria R$ 60.
+    expect(entrega.cpmCentavos).toBe(10_000);
+    expect(entrega.ctr).toBeCloseTo(0.01);
+  });
+
+  it("levam o objetivo da campanha para a tela", () => {
+    const { campanhas } = agregaDesempenhoPorCampanha([campanha({ objetivo: "OUTCOME_TRAFFIC" })], []);
+    expect(campanhas[0].objetivo).toBe("OUTCOME_TRAFFIC");
   });
 });

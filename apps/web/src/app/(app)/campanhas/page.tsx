@@ -9,6 +9,7 @@ import { Frescor } from "@/components/ui/frescor";
 import { CampanhasView } from "./campanhas-view";
 import { CampanhasDePresencaLocal, CampanhasLocaisView } from "./campanhas-locais";
 import { DesempenhoDeCampanhas } from "./tipos";
+import { leMetricas, metricasDoConjunto, sugereConjunto } from "@/lib/campanhas/metricas";
 
 interface Busca {
   de?: string;
@@ -16,6 +17,8 @@ interface Busca {
   compararDe?: string;
   compararAte?: string;
   aba?: string;
+  /** As colunas da tabela, separadas por vírgula. Sem elas, vale a sugestão pelo objetivo. */
+  metricas?: string;
 }
 
 export default async function CampanhasPage({ searchParams }: { searchParams: Promise<Busca> }) {
@@ -66,6 +69,15 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
     leads: dados.totais.leads + dados.semCampanha.atual,
   });
 
+  // A sugestão sai das campanhas do período escolhido, pesadas pelo que
+  // cada uma investiu: é o objetivo de onde o dinheiro está.
+  const sugestao = sugereConjunto(
+    dados.campanhas.flatMap((linha) =>
+      linha.atual ? [{ objetivo: linha.objetivo, gastoCentavos: linha.atual.gastoCentavos }] : [],
+    ),
+  );
+  const escolhidas = leMetricas(params.metricas);
+
   return (
     <CampanhasView
       dados={dados}
@@ -73,6 +85,10 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
       desdeDoWhatsApp={conexao ? inicioDaMedicao(conexao) : null}
       abas={abas}
       frescor={fontes}
+      metricas={escolhidas ?? metricasDoConjunto(sugestao.conjunto)}
+      escolhaManual={escolhidas !== null}
+      sugestao={sugestao}
+      busca={query.toString()}
     />
   );
 }

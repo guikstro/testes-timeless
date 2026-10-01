@@ -6,6 +6,8 @@ export interface MetaCampaign {
   status: string;
   /** "2026-09-24T12:48:04+0000": com o fuso sem os dois pontos. */
   created_time?: string;
+  /** OUTCOME_TRAFFIC, OUTCOME_LEADS, OUTCOME_ENGAGEMENT; nas campanhas antigas, LINK_CLICKS, MESSAGES. */
+  objective?: string;
 }
 
 export interface MetaAdSet {

@@ -124,8 +124,15 @@ describe("MetaSyncService", () => {
 
     expect(prisma.adSpend.upsert).toHaveBeenCalledWith({
       where: { campaignId_date: { campaignId: "internal-campaign-1", date: new Date("2026-08-01") } },
-      create: { campaignId: "internal-campaign-1", date: new Date("2026-08-01"), spendCents: 12345, conversasIniciadas: 0 },
-      update: { spendCents: 12345, conversasIniciadas: 0 },
+      create: {
+        campaignId: "internal-campaign-1",
+        date: new Date("2026-08-01"),
+        spendCents: 12345,
+        conversasIniciadas: 0,
+        impressoes: 0,
+        cliques: 0,
+      },
+      update: { spendCents: 12345, conversasIniciadas: 0, impressoes: 0, cliques: 0 },
     });
   });
 
@@ -171,7 +178,45 @@ describe("MetaSyncService", () => {
 
       expect(prisma.adSpend.upsert).toHaveBeenCalledTimes(1);
       expect(prisma.adSpend.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({ update: { spendCents: 15050, conversasIniciadas: 0 } }),
+        expect.objectContaining({ update: { spendCents: 15050, conversasIniciadas: 0, impressoes: 0, cliques: 0 } }),
+      );
+    });
+
+    /*
+      O CTR, o CPM e o CPC da tela de campanhas saem daqui. Somados da resposta
+      inteira, como o gasto, inclusive de anúncio que já não existe mais.
+    */
+    it("soma impressões e cliques no total da campanha, junto com o gasto", async () => {
+      const { service, prisma, metaGraphClient } = buildService();
+      prisma.metaConnection.findUnique.mockResolvedValue(connectionRow());
+      prisma.campaign.findMany.mockResolvedValue([{ id: "interna-1", externalId: "c1" }]);
+      prisma.ad.findMany.mockResolvedValue([{ id: "anuncio-a", externalId: "ad1" }]);
+      metaGraphClient.getInsights.mockResolvedValue([
+        { campaign_id: "c1", ad_id: "ad1", spend: "10.00", impressions: "1000", clicks: "20", date_start: "2026-08-01" },
+        { campaign_id: "c1", ad_id: "apagado", spend: "5.00", impressions: "500", clicks: "5", date_start: "2026-08-01" },
+      ]);
+
+      await service.sync("org-1");
+
+      expect(prisma.adSpend.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ update: { spendCents: 1500, conversasIniciadas: 0, impressoes: 1500, cliques: 25 } }),
+      );
+    });
+
+    it("guarda o objetivo de cada campanha", async () => {
+      const { service, prisma, metaGraphClient } = buildService();
+      prisma.metaConnection.findUnique.mockResolvedValue(connectionRow());
+      metaGraphClient.getCampaigns.mockResolvedValue([
+        { id: "c1", name: "Tráfego site", status: "ACTIVE", objective: "OUTCOME_TRAFFIC" },
+      ]);
+
+      await service.sync("org-1");
+
+      expect(prisma.campaign.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({ objetivo: "OUTCOME_TRAFFIC" }),
+          update: expect.objectContaining({ objetivo: "OUTCOME_TRAFFIC" }),
+        }),
       );
     });
 
@@ -207,7 +252,7 @@ describe("MetaSyncService", () => {
 
       // Somar só o que conseguimos casar encolheria o total em silêncio.
       expect(prisma.adSpend.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({ update: { spendCents: 8000, conversasIniciadas: 0 } }),
+        expect.objectContaining({ update: { spendCents: 8000, conversasIniciadas: 0, impressoes: 0, cliques: 0 } }),
       );
       expect(prisma.adInsight.upsert).not.toHaveBeenCalled();
     });

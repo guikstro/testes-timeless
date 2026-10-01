@@ -231,6 +231,14 @@ describe("AnalyticsService.desempenhoPorCampanha", () => {
       vendas: 1,
       receitaCentavos: 90000,
       conversasNaPlataforma: null,
+      // Gasto lançado sem entrega (CSV): sem número, e nunca zero.
+      impressoes: null,
+      cliques: null,
+      entregaCompleta: false,
+      ctr: null,
+      cpmCentavos: null,
+      cpcCentavos: null,
+      custoPorConversaCentavos: null,
     });
   });
 

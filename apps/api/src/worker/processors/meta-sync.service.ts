@@ -91,6 +91,7 @@ export class MetaSyncService {
             status: campaign.status,
             platform: "META",
             criadaNaPlataformaEm: dataDaMeta(campaign.created_time),
+            objetivo: campaign.objective ?? null,
             lastSyncedAt: now,
           },
           // `platform` também no update: uma campanha lançada à mão que depois
@@ -102,6 +103,7 @@ export class MetaSyncService {
             platform: "META",
             manual: false,
             criadaNaPlataformaEm: dataDaMeta(campaign.created_time),
+            objetivo: campaign.objective ?? null,
             lastSyncedAt: now,
           },
         });
@@ -155,7 +157,15 @@ export class MetaSyncService {
         conta pode devolver gasto de anúncio que já não existe mais: somar só o
         reconhecido encolheria o total sem ninguém perceber.
       */
-      const totalPorCampanhaEDia = new Map<string, { spendCents: number; conversasIniciadas: number }>();
+      /*
+        Impressões e cliques entram no total da campanha pelo mesmo motivo do
+        gasto: somados da resposta inteira, inclusive de anúncio que já não
+        existe. É deles que saem o CTR, o CPM e o CPC da tela de campanhas.
+      */
+      const totalPorCampanhaEDia = new Map<
+        string,
+        { spendCents: number; conversasIniciadas: number; impressoes: number; cliques: number }
+      >();
 
       for (const insight of insights) {
         const dia = insight.date_start;
@@ -163,11 +173,20 @@ export class MetaSyncService {
         if (!Number.isFinite(centavos)) continue;
 
         const conversas = conversasIniciadasDe(insight.actions);
+        const impressoes = Number(insight.impressions ?? 0) || 0;
+        const cliques = Number(insight.clicks ?? 0) || 0;
         const chave = `${insight.campaign_id}|${dia}`;
-        const acumulado = totalPorCampanhaEDia.get(chave) ?? { spendCents: 0, conversasIniciadas: 0 };
+        const acumulado = totalPorCampanhaEDia.get(chave) ?? {
+          spendCents: 0,
+          conversasIniciadas: 0,
+          impressoes: 0,
+          cliques: 0,
+        };
         totalPorCampanhaEDia.set(chave, {
           spendCents: acumulado.spendCents + centavos,
           conversasIniciadas: acumulado.conversasIniciadas + conversas,
+          impressoes: acumulado.impressoes + impressoes,
+          cliques: acumulado.cliques + cliques,
         });
 
         // O detalhe por anúncio só existe para anúncio que conhecemos. Um id
@@ -177,8 +196,8 @@ export class MetaSyncService {
 
         const dados = {
           spendCents: centavos,
-          impressions: Number(insight.impressions ?? 0) || 0,
-          clicks: Number(insight.clicks ?? 0) || 0,
+          impressions: impressoes,
+          clicks: cliques,
           conversasIniciadas: conversas,
         };
         await this.prisma.adInsight.upsert({

@@ -16,6 +16,18 @@ import {
   mesDoIntervalo,
   rotuloDoIntervalo,
 } from "@/lib/periodo";
+import {
+  alterna,
+  Conjunto,
+  CONJUNTOS,
+  conjuntoDe,
+  DEFINICAO,
+  formataTaxa,
+  Metrica,
+  METRICAS,
+  metricasDoConjunto,
+  rotuloDoObjetivo,
+} from "@/lib/campanhas/metricas";
 import { CampanhaComparada, DesempenhoDeCampanha, DesempenhoDeCampanhas } from "./tipos";
 
 /**
@@ -33,6 +45,10 @@ export function CampanhasView({
   desdeDoWhatsApp,
   abas,
   frescor = null,
+  metricas = metricasDoConjunto("vendas"),
+  escolhaManual = false,
+  sugestao = { conjunto: "vendas", objetivo: null },
+  busca = "",
 }: {
   dados: DesempenhoDeCampanhas;
   medicao: Medicao;
@@ -41,6 +57,13 @@ export function CampanhasView({
   abas?: ReactNode;
   /** De quando é o gasto que chegou da Meta e do Google. */
   frescor?: Frescor | null;
+  /** As colunas da tabela, na ordem do catálogo. */
+  metricas?: Metrica[];
+  /** Falso quando as métricas vieram da sugestão pelo objetivo, e não de uma escolha. */
+  escolhaManual?: boolean;
+  sugestao?: { conjunto: Conjunto; objetivo: string | null };
+  /** O período da URL, sem as métricas, para os links da escolha não o perderem. */
+  busca?: string;
 }) {
   const { periodo, comparacao, campanhas, semCampanha, totais } = dados;
   const medido = medicao === "medido";
@@ -48,16 +71,7 @@ export function CampanhasView({
   // Os totais do período de comparação saem das próprias linhas: a API já
   // devolve os dois lados de cada campanha, e somá-los aqui evita uma segunda
   // rota que diria a mesma coisa.
-  const anteriores = comparacao
-    ? campanhas.reduce(
-        (soma, linha) => ({
-          gastoCentavos: soma.gastoCentavos + (linha.anterior?.gastoCentavos ?? 0),
-          leads: soma.leads + (linha.anterior?.leads ?? 0),
-          vendas: soma.vendas + (linha.anterior?.vendas ?? 0),
-        }),
-        { gastoCentavos: 0, leads: 0, vendas: 0 },
-      )
-    : null;
+  const anteriores = comparacao ? somaAnteriores(campanhas) : null;
 
   /*
     Campanha criada à mão sem o id real da plataforma nunca casa com lead
@@ -73,6 +87,9 @@ export function CampanhasView({
       linha.atual.leads === 0,
   ).length;
 
+  // O investimento abre sempre; os outros quatro cartões seguem a escolha.
+  const cartoes = metricas.slice(0, 4);
+
   return (
     <div className="mx-auto max-w-6xl">
       {abas}
@@ -80,15 +97,20 @@ export function CampanhasView({
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Campanhas</h1>
           <p className="mt-1 max-w-2xl text-corpo text-ink-mute">
-            Quanto cada campanha custou, quantas conversas a Meta diz que ela abriu, e quantas viraram lead e venda
-            aqui.
+            Quanto cada campanha custou e o que trouxe: da impressão e do clique na Meta até o lead e a venda aqui.
           </p>
           <FrescorDosDados frescor={frescor} className="mt-2" />
         </div>
-        <SeletorDePeriodo periodo={periodo} comparacao={comparacao} />
+        <SeletorDePeriodo
+          periodo={periodo}
+          comparacao={comparacao}
+          metricas={escolhaManual ? metricas.join(",") : undefined}
+        />
       </header>
 
       <AvisoDeMedicao medicao={medicao} desde={desdeDoWhatsApp} conversasNaPlataforma={totais.conversasNaPlataforma} />
+
+      <SeletorDeMetricas metricas={metricas} escolhaManual={escolhaManual} sugestao={sugestao} busca={busca} />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Resumo
@@ -97,31 +119,9 @@ export function CampanhasView({
           atual={totais.gastoCentavos}
           anterior={anteriores?.gastoCentavos}
         />
-        <Resumo
-          titulo="Conversas na Meta"
-          valor={totais.conversasNaPlataforma === null ? "Sem dado" : String(totais.conversasNaPlataforma)}
-          nota="O que o Gerenciador de Anúncios conta"
-        />
-        <Resumo
-          titulo="Leads aqui"
-          valor={medido ? String(totais.leads) : "Sem medida"}
-          atual={medido ? totais.leads : undefined}
-          anterior={medido ? anteriores?.leads : undefined}
-          apagado={!medido}
-        />
-        <Resumo
-          titulo="Vendas"
-          valor={medido ? String(totais.vendas) : "Sem medida"}
-          atual={medido ? totais.vendas : undefined}
-          anterior={medido ? anteriores?.vendas : undefined}
-          apagado={!medido}
-        />
-        <Resumo
-          titulo="Retorno"
-          valor={medido ? retorno(totais.receitaCentavos, totais.gastoCentavos, totais.vendas) : "Sem medida"}
-          nota={medido && totais.gastoCentavos > 0 ? "Receita dividida pelo investimento" : undefined}
-          apagado={!medido}
-        />
+        {cartoes.map((metrica) => (
+          <Resumo key={metrica} {...resumoDaMetrica(metrica, totais, anteriores, medido)} />
+        ))}
       </div>
 
       {campanhas.length === 0 ? (
@@ -134,6 +134,7 @@ export function CampanhasView({
       ) : (
         <Tabela
           campanhas={campanhas}
+          metricas={metricas}
           medido={medido}
           rotuloDaComparacao={comparacao ? rotuloDoIntervalo(comparacao) : null}
         />
@@ -142,24 +143,15 @@ export function CampanhasView({
       {/*
         As definições ficam ao pé da tabela, uma vez só, em vez de repetidas em
         cada cabeçalho: é a primeira coisa que alguém procura quando dois
-        números parecidos não batem.
+        números parecidos não batem. Só as das colunas à vista.
       */}
       <dl className="mt-5 grid gap-x-8 gap-y-3 text-apoio leading-relaxed text-ink-mute md:grid-cols-3">
-        <div>
-          <dt className="font-semibold text-ink-soft">Conversas na Meta</dt>
-          <dd>Quantas pessoas a Meta diz que começaram uma conversa no WhatsApp a partir do anúncio.</dd>
-        </div>
-        <div>
-          <dt className="font-semibold text-ink-soft">Leads aqui</dt>
-          <dd>
-            Quem mandou mensagem no WhatsApp conectado e foi ligado a esta campanha. Fica abaixo da Meta quando a
-            conversa não chegou ao número conectado.
-          </dd>
-        </div>
-        <div>
-          <dt className="font-semibold text-ink-soft">Retorno</dt>
-          <dd>Receita das vendas dividida pelo investimento. 2,00x quer dizer que cada real voltou dobrado.</dd>
-        </div>
+        {metricas.map((metrica) => (
+          <div key={metrica}>
+            <dt className="font-semibold text-ink-soft">{DEFINICAO[metrica].rotulo}</dt>
+            <dd>{DEFINICAO[metrica].definicao}</dd>
+          </div>
+        ))}
       </dl>
 
       {/*
@@ -187,6 +179,218 @@ export function CampanhasView({
   );
 }
 
+interface Anteriores {
+  gastoCentavos: number;
+  leads: number;
+  vendas: number;
+  /** Undefined quando nenhuma campanha do período de comparação trouxe o número. */
+  impressoes?: number;
+  cliques?: number;
+}
+
+function somaAnteriores(campanhas: CampanhaComparada[]): Anteriores {
+  const soma = (valor: (linha: DesempenhoDeCampanha) => number | null) => {
+    const conhecidos = campanhas
+      .map((linha) => (linha.anterior ? valor(linha.anterior) : null))
+      .filter((numero): numero is number => numero !== null);
+    return conhecidos.length > 0 ? conhecidos.reduce((total, numero) => total + numero, 0) : undefined;
+  };
+  return {
+    gastoCentavos: soma((linha) => linha.gastoCentavos) ?? 0,
+    leads: soma((linha) => linha.leads) ?? 0,
+    vendas: soma((linha) => linha.vendas) ?? 0,
+    impressoes: soma((linha) => linha.impressoes),
+    cliques: soma((linha) => linha.cliques),
+  };
+}
+
+const SEM_DADO = "Sem dado";
+const SEM_MEDIDA = "Sem medida";
+
+/** O cartão do total de uma métrica. */
+function resumoDaMetrica(
+  metrica: Metrica,
+  totais: DesempenhoDeCampanhas["totais"],
+  anteriores: Anteriores | null,
+  medido: boolean,
+): { titulo: string; valor: string; atual?: number; anterior?: number; nota?: string; apagado?: boolean; invertido?: boolean } {
+  const titulo = DEFINICAO[metrica].rotulo;
+  const dinheiro = (centavos: number | null) => (centavos === null ? SEM_DADO : formatCentsAsBRL(centavos));
+  const piso = !totais.entregaCompleta && totais.impressoes !== null ? "No mínimo: falta dado de alguns dias" : undefined;
+
+  switch (metrica) {
+    case "impressoes":
+      return {
+        titulo,
+        valor: totais.impressoes === null ? SEM_DADO : totais.impressoes.toLocaleString("pt-BR"),
+        atual: totais.impressoes ?? undefined,
+        anterior: totais.impressoes === null ? undefined : anteriores?.impressoes,
+        apagado: totais.impressoes === null,
+        nota: piso,
+      };
+    case "cliques":
+      return {
+        titulo,
+        valor: totais.cliques === null ? SEM_DADO : totais.cliques.toLocaleString("pt-BR"),
+        atual: totais.cliques ?? undefined,
+        anterior: totais.cliques === null ? undefined : anteriores?.cliques,
+        apagado: totais.cliques === null,
+        nota: piso,
+      };
+    case "cpm":
+      return { titulo, valor: dinheiro(totais.cpmCentavos), apagado: totais.cpmCentavos === null, nota: "A cada mil impressões" };
+    case "ctr":
+      return {
+        titulo,
+        valor: totais.ctr === null ? SEM_DADO : formataTaxa(totais.ctr),
+        apagado: totais.ctr === null,
+        nota: "Cliques por impressão",
+      };
+    case "cpc":
+      return { titulo, valor: dinheiro(totais.cpcCentavos), apagado: totais.cpcCentavos === null, nota: "Por clique" };
+    case "conversas":
+      return {
+        titulo,
+        valor: totais.conversasNaPlataforma === null ? SEM_DADO : String(totais.conversasNaPlataforma),
+        apagado: totais.conversasNaPlataforma === null,
+        nota: "O que o Gerenciador de Anúncios conta",
+      };
+    case "custoPorConversa":
+      return {
+        titulo,
+        valor: dinheiro(totais.custoPorConversaCentavos),
+        apagado: totais.custoPorConversaCentavos === null,
+      };
+    case "leads":
+      return {
+        titulo,
+        valor: medido ? String(totais.leads) : SEM_MEDIDA,
+        atual: medido ? totais.leads : undefined,
+        anterior: medido ? anteriores?.leads : undefined,
+        apagado: !medido,
+      };
+    case "custoPorLead":
+      return {
+        titulo,
+        valor: !medido
+          ? SEM_MEDIDA
+          : totais.gastoCentavos <= 0
+            ? "Sem gasto"
+            : totais.leads === 0
+              ? "Nenhum lead"
+              : formatCentsAsBRL(Math.round(totais.gastoCentavos / totais.leads)),
+        apagado: !medido || totais.gastoCentavos <= 0 || totais.leads === 0,
+      };
+    case "vendas":
+      return {
+        titulo,
+        valor: medido ? String(totais.vendas) : SEM_MEDIDA,
+        atual: medido ? totais.vendas : undefined,
+        anterior: medido ? anteriores?.vendas : undefined,
+        apagado: !medido,
+      };
+    case "receita":
+      return { titulo, valor: medido ? formatCentsAsBRL(totais.receitaCentavos) : SEM_MEDIDA, apagado: !medido };
+    case "retorno":
+      return {
+        titulo,
+        valor: medido ? retorno(totais.receitaCentavos, totais.gastoCentavos, totais.vendas) : SEM_MEDIDA,
+        nota: medido && totais.gastoCentavos > 0 ? "Receita dividida pelo investimento" : undefined,
+        apagado: !medido,
+      };
+  }
+}
+
+/**
+ * A escolha das colunas.
+ *
+ * Em links, e não em estado do navegador: a escolha vai junto quando o
+ * endereço é compartilhado, e a tela continua desenhada no servidor. Os
+ * conjuntos prontos resolvem o caso comum num clique; as métricas soltas, o
+ * resto.
+ */
+function SeletorDeMetricas({
+  metricas,
+  escolhaManual,
+  sugestao,
+  busca,
+}: {
+  metricas: Metrica[];
+  escolhaManual: boolean;
+  sugestao: { conjunto: Conjunto; objetivo: string | null };
+  busca: string;
+}) {
+  const href = (lista: Metrica[] | null) => {
+    const params = new URLSearchParams(busca);
+    if (lista) params.set("metricas", lista.join(","));
+    else params.delete("metricas");
+    return `/campanhas?${params.toString()}`;
+  };
+
+  const conjuntos: Conjunto[] = ["entrega", "conversas", "vendas", "todas"];
+  const ativo = escolhaManual ? conjuntoDe(metricas) : "sugeridas";
+
+  return (
+    <section aria-label="Métricas da tabela" className="mb-5 space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">Métricas</p>
+        <GrupoDePilulas
+          ativo={ativo}
+          opcoes={[
+            {
+              chave: "sugeridas",
+              rotulo: sugestao.objetivo ? `Pelo objetivo: ${sugestao.objetivo}` : "Sugeridas",
+              href: href(null),
+              titulo: sugestao.objetivo
+                ? `A maior parte do investimento está em campanhas de ${sugestao.objetivo.toLowerCase()}.`
+                : "Sem objetivo informado pela plataforma, ficam as métricas de resultado.",
+            },
+            ...conjuntos.map((conjunto) => ({
+              chave: conjunto,
+              rotulo: CONJUNTOS[conjunto].rotulo,
+              href: href(metricasDoConjunto(conjunto)),
+            })),
+          ]}
+        />
+      </div>
+
+      <ul className="flex flex-wrap gap-1.5" aria-label="Escolher as métricas uma a uma">
+        {METRICAS.map((metrica) => {
+          const ligada = metricas.includes(metrica.chave);
+          return (
+            <li key={metrica.chave}>
+              <Link
+                href={href(alterna(metricas, metrica.chave))}
+                scroll={false}
+                className={`focus-ring inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-apoio transition-all duration-200 ease-soft active:scale-95 ${
+                  ligada
+                    ? "bg-accent/12 font-medium text-ink ring-1 ring-inset ring-accent/40"
+                    : "border border-line bg-panel text-ink-mute hover:border-ink/20 hover:text-ink"
+                }`}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-3.5 w-3.5 shrink-0"
+                  aria-hidden
+                >
+                  {ligada ? <path d="M5 12.5l4.5 4.5L19 7.5" /> : <path d="M12 5v14M5 12h14" />}
+                </svg>
+                {metrica.rotulo}
+                <span className="sr-only">{ligada ? ", mostrando" : ", escondida"}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 /**
  * Retorno escrito, e não só a conta.
  *
@@ -211,11 +415,14 @@ export function SeletorDePeriodo({
   periodo,
   comparacao,
   aba,
+  metricas,
 }: {
   periodo: Intervalo;
   comparacao: Intervalo | null;
   /** A aba da tela, que a troca de mês não pode perder. */
   aba?: string;
+  /** As métricas escolhidas, que a troca de mês também não pode perder. */
+  metricas?: string;
 }) {
   const mes = mesDoIntervalo(periodo) ?? {
     ano: Number(periodo.de.slice(0, 4)),
@@ -230,6 +437,7 @@ export function SeletorDePeriodo({
   function url(p: Intervalo, c: Intervalo | null) {
     const params = new URLSearchParams({ de: p.de, ate: p.ate });
     if (aba) params.set("aba", aba);
+    if (metricas) params.set("metricas", metricas);
     if (c) {
       params.set("compararDe", c.de);
       params.set("compararAte", c.ate);
@@ -354,12 +562,21 @@ export const STATUS: Record<string, { rotulo: string; tom: "success" | "neutral"
   DELETED: { rotulo: "Excluída", tom: "neutral" },
 };
 
+/** Largura mínima pelo número de colunas: quem rola é a tabela, nunca a página. */
+function larguraMinima(colunas: number): string {
+  if (colunas <= 4) return "min-w-[40rem]";
+  if (colunas <= 7) return "min-w-[60rem]";
+  return "min-w-[80rem]";
+}
+
 function Tabela({
   campanhas,
+  metricas,
   medido,
   rotuloDaComparacao,
 }: {
   campanhas: CampanhaComparada[];
+  metricas: Metrica[];
   medido: boolean;
   /** Null quando nenhum período de comparação foi escolhido. */
   rotuloDaComparacao: string | null;
@@ -368,22 +585,27 @@ function Tabela({
     <div className="surface overflow-hidden">
       {/* A tabela é larga de propósito; quem rola é ela, nunca a página. */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[60rem] text-corpo">
+        <table className={`w-full ${larguraMinima(metricas.length)} text-corpo`}>
           <thead>
             <tr className="border-b border-line text-left text-rotulo font-semibold uppercase tracking-[0.09em] text-ink-mute">
               <th className="px-4 py-3 font-semibold">Campanha</th>
               <th className="px-4 py-3 text-right font-semibold">Investimento</th>
-              <th className="px-4 py-3 text-right font-semibold">Conversas na Meta</th>
-              <th className="px-4 py-3 text-right font-semibold">Leads aqui</th>
-              <th className="px-4 py-3 text-right font-semibold">Vendas</th>
-              <th className="px-4 py-3 text-right font-semibold">Receita</th>
-              <th className="px-4 py-3 text-right font-semibold">Custo por lead</th>
-              <th className="px-4 py-3 text-right font-semibold">Retorno</th>
+              {metricas.map((metrica) => (
+                <th key={metrica} className="px-4 py-3 text-right font-semibold">
+                  {DEFINICAO[metrica].rotulo}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {campanhas.map((linha) => (
-              <Linha key={linha.externalId} linha={linha} medido={medido} rotuloDaComparacao={rotuloDaComparacao} />
+              <Linha
+                key={linha.externalId}
+                linha={linha}
+                metricas={metricas}
+                medido={medido}
+                rotuloDaComparacao={rotuloDaComparacao}
+              />
             ))}
           </tbody>
         </table>
@@ -394,10 +616,12 @@ function Tabela({
 
 function Linha({
   linha,
+  metricas,
   medido,
   rotuloDaComparacao,
 }: {
   linha: CampanhaComparada;
+  metricas: Metrica[];
   medido: boolean;
   rotuloDaComparacao: string | null;
 }) {
@@ -407,6 +631,12 @@ function Linha({
   const dados = linha.atual ?? linha.anterior!;
   const temComparacao = rotuloDaComparacao !== null;
   const status = STATUS[linha.status];
+  const objetivo = rotuloDoObjetivo(linha.objetivo);
+
+  // As colunas que dependem do WhatsApp vêm juntas no fim (é a ordem do
+  // catálogo), então sem medida elas viram uma célula só.
+  const daPlataforma = metricas.filter((metrica) => DEFINICAO[metrica].daPlataforma);
+  const doWhatsApp = metricas.filter((metrica) => !DEFINICAO[metrica].daPlataforma);
 
   return (
     <tr className={`border-b border-line/60 last:border-0 ${ausente ? "opacity-55" : ""}`}>
@@ -424,6 +654,8 @@ function Linha({
             </Badge>
           ) : null}
           <span>{PLATAFORMAS[linha.plataforma] ?? linha.plataforma}</span>
+          {/* O objetivo diz por qual número a campanha deve ser julgada. */}
+          {objetivo ? <span>· {objetivo}</span> : null}
           {linha.criadaNaPlataformaEm ? <span>· criada em {formataDia(linha.criadaNaPlataformaEm)}</span> : null}
         </div>
         {dados.ativo && (
@@ -449,83 +681,184 @@ function Linha({
         valor={formatCentsAsBRL(dados.gastoCentavos)}
         variacao={temComparacao ? linha.variacao?.gastoCentavos : undefined}
       />
-      <Numero
-        valor={dados.conversasNaPlataforma === null ? "Sem dado" : String(dados.conversasNaPlataforma)}
-        apagado={dados.conversasNaPlataforma === null}
-        nota={
-          dados.conversasNaPlataforma !== null && !dados.conversasCompletas
-            ? "no mínimo, falta dado de alguns dias"
-            : undefined
-        }
-      />
-      {medido ? <ColunasMedidas dados={dados} linha={linha} temComparacao={temComparacao} /> : <ColunasSemMedida />}
+      {daPlataforma.map((metrica) => (
+        <CelulaDaMetrica key={metrica} metrica={metrica} dados={dados} linha={linha} temComparacao={temComparacao} />
+      ))}
+      {doWhatsApp.length === 0 ? null : medido ? (
+        doWhatsApp.map((metrica) => (
+          <CelulaDaMetrica key={metrica} metrica={metrica} dados={dados} linha={linha} temComparacao={temComparacao} />
+        ))
+      ) : (
+        <ColunasSemMedida colunas={doWhatsApp.length} />
+      )}
     </tr>
   );
 }
 
-function ColunasMedidas({
+/**
+ * A variação de um número entre os dois períodos, quando os dois têm o número.
+ *
+ * Sem um dos lados não há variação: comparar com "não sabemos" inventaria uma
+ * subida ou uma queda.
+ */
+function variacaoEntre(linha: CampanhaComparada, valor: (dados: DesempenhoDeCampanha) => number | null) {
+  if (!linha.atual || !linha.anterior) return undefined;
+  const atual = valor(linha.atual);
+  const anterior = valor(linha.anterior);
+  if (atual === null || anterior === null) return undefined;
+  return { delta: anterior === 0 ? null : (atual - anterior) / anterior, anterior };
+}
+
+function CelulaDaMetrica({
+  metrica,
   dados,
   linha,
   temComparacao,
 }: {
+  metrica: Metrica;
   dados: DesempenhoDeCampanha;
   linha: CampanhaComparada;
   temComparacao: boolean;
 }) {
-  return (
-    <>
-      <Numero
-        valor={String(dados.leads)}
-        variacao={temComparacao ? linha.variacao?.leads : undefined}
-        nota={
-          dados.qualificados > 0
-            ? `${dados.qualificados} ${dados.qualificados === 1 ? "qualificado" : "qualificados"}`
-            : undefined
-        }
-      />
-      <Numero
-        valor={String(dados.vendas)}
-        variacao={temComparacao ? linha.variacao?.vendas : undefined}
-        nota={dados.custoPorVendaCentavos !== null ? `${formatCentsAsBRL(dados.custoPorVendaCentavos)} cada` : undefined}
-      />
-      <Numero
-        valor={formatCentsAsBRL(dados.receitaCentavos)}
-        variacao={temComparacao ? linha.variacao?.receitaCentavos : undefined}
-        nota={
-          dados.vendasSemValor > 0
-            ? `${dados.vendasSemValor} ${dados.vendasSemValor === 1 ? "venda" : "vendas"} sem valor registrado`
-            : undefined
-        }
-      />
-      <Numero
-        valor={
-          dados.custoPorLeadCentavos !== null
-            ? formatCentsAsBRL(dados.custoPorLeadCentavos)
-            : dados.gastoCentavos > 0
-              ? "Nenhum lead"
-              : "Sem gasto"
-        }
-        apagado={dados.custoPorLeadCentavos === null}
-      />
-      <Numero
-        valor={retorno(dados.receitaCentavos, dados.gastoCentavos, dados.vendas)}
-        apagado={dados.gastoCentavos <= 0 || dados.vendas === 0}
-      />
-    </>
-  );
+  const variacao = (valor: (d: DesempenhoDeCampanha) => number | null) =>
+    temComparacao ? variacaoEntre(linha, valor) : undefined;
+  const piso =
+    !dados.entregaCompleta && dados.impressoes !== null ? "no mínimo, falta dado de alguns dias" : undefined;
+  const inteiro = (numero: number | null) => (numero === null ? SEM_DADO : numero.toLocaleString("pt-BR"));
+  const dinheiro = (centavos: number | null, semBase: string) =>
+    centavos !== null ? formatCentsAsBRL(centavos) : semBase;
+
+  switch (metrica) {
+    case "impressoes":
+      return (
+        <Numero
+          valor={inteiro(dados.impressoes)}
+          apagado={dados.impressoes === null}
+          variacao={variacao((d) => d.impressoes)}
+          nota={piso}
+        />
+      );
+    case "cliques":
+      return (
+        <Numero
+          valor={inteiro(dados.cliques)}
+          apagado={dados.cliques === null}
+          variacao={variacao((d) => d.cliques)}
+          nota={piso}
+        />
+      );
+    case "cpm":
+      return (
+        <Numero
+          valor={dinheiro(dados.cpmCentavos, dados.impressoes === null ? SEM_DADO : "Sem impressão")}
+          apagado={dados.cpmCentavos === null}
+          variacao={variacao((d) => d.cpmCentavos)}
+          invertido
+        />
+      );
+    case "ctr":
+      return (
+        <Numero
+          valor={dados.ctr === null ? (dados.impressoes === null ? SEM_DADO : "Sem impressão") : formataTaxa(dados.ctr)}
+          apagado={dados.ctr === null}
+          variacao={variacao((d) => d.ctr)}
+        />
+      );
+    case "cpc":
+      return (
+        <Numero
+          valor={dinheiro(dados.cpcCentavos, dados.cliques === null ? SEM_DADO : "Nenhum clique")}
+          apagado={dados.cpcCentavos === null}
+          variacao={variacao((d) => d.cpcCentavos)}
+          invertido
+        />
+      );
+    case "conversas":
+      return (
+        <Numero
+          valor={dados.conversasNaPlataforma === null ? SEM_DADO : String(dados.conversasNaPlataforma)}
+          apagado={dados.conversasNaPlataforma === null}
+          variacao={variacao((d) => d.conversasNaPlataforma)}
+          nota={
+            dados.conversasNaPlataforma !== null && !dados.conversasCompletas
+              ? "no mínimo, falta dado de alguns dias"
+              : undefined
+          }
+        />
+      );
+    case "custoPorConversa":
+      return (
+        <Numero
+          valor={dinheiro(
+            dados.custoPorConversaCentavos,
+            dados.conversasNaPlataforma === null ? SEM_DADO : dados.gastoCentavos > 0 ? "Nenhuma conversa" : "Sem gasto",
+          )}
+          apagado={dados.custoPorConversaCentavos === null}
+          variacao={variacao((d) => d.custoPorConversaCentavos)}
+          invertido
+        />
+      );
+    case "leads":
+      return (
+        <Numero
+          valor={String(dados.leads)}
+          variacao={temComparacao ? linha.variacao?.leads : undefined}
+          nota={
+            dados.qualificados > 0
+              ? `${dados.qualificados} ${dados.qualificados === 1 ? "qualificado" : "qualificados"}`
+              : undefined
+          }
+        />
+      );
+    case "custoPorLead":
+      return (
+        <Numero
+          valor={dinheiro(dados.custoPorLeadCentavos, dados.gastoCentavos > 0 ? "Nenhum lead" : "Sem gasto")}
+          apagado={dados.custoPorLeadCentavos === null}
+          variacao={variacao((d) => d.custoPorLeadCentavos)}
+          invertido
+        />
+      );
+    case "vendas":
+      return (
+        <Numero
+          valor={String(dados.vendas)}
+          variacao={temComparacao ? linha.variacao?.vendas : undefined}
+          nota={dados.custoPorVendaCentavos !== null ? `${formatCentsAsBRL(dados.custoPorVendaCentavos)} cada` : undefined}
+        />
+      );
+    case "receita":
+      return (
+        <Numero
+          valor={formatCentsAsBRL(dados.receitaCentavos)}
+          variacao={temComparacao ? linha.variacao?.receitaCentavos : undefined}
+          nota={
+            dados.vendasSemValor > 0
+              ? `${dados.vendasSemValor} ${dados.vendasSemValor === 1 ? "venda" : "vendas"} sem valor registrado`
+              : undefined
+          }
+        />
+      );
+    case "retorno":
+      return (
+        <Numero
+          valor={retorno(dados.receitaCentavos, dados.gastoCentavos, dados.vendas)}
+          apagado={dados.gastoCentavos <= 0 || dados.vendas === 0}
+        />
+      );
+  }
 }
 
 /**
- * As cinco colunas que dependem do WhatsApp, quando não há medida.
+ * As colunas que dependem do WhatsApp, quando não há medida.
  *
- * Uma célula só, atravessando as cinco: repetir "sem medida" cinco vezes por
- * linha enchia a tabela de ruído, e o que precisa ser dito é uma frase, uma
- * vez. Escrita por extenso, e não com traço, porque um hífen numa célula é
- * lido como zero.
+ * Uma célula só, atravessando todas: repetir "sem medida" em cada uma enchia a
+ * tabela de ruído, e o que precisa ser dito é uma frase, uma vez. Escrita por
+ * extenso, e não com traço, porque um hífen numa célula é lido como zero.
  */
-function ColunasSemMedida() {
+function ColunasSemMedida({ colunas }: { colunas: number }) {
   return (
-    <td colSpan={5} className="px-4 py-3.5 text-center align-top text-apoio text-ink-mute">
+    <td colSpan={colunas} className="px-4 py-3.5 text-center align-top text-apoio text-ink-mute">
       Sem medida até o WhatsApp estar recebendo
     </td>
   );

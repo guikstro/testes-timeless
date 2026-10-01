@@ -23,6 +23,13 @@ export interface LinhaDeGasto {
   spendCents: number;
   /** Null quando o dia não trouxe a contagem da Meta (CSV, ou sincronizado antes dela). */
   conversasIniciadas: number | null;
+  /**
+   * Entrega do dia, como a plataforma conta. Null quando o dia não trouxe o
+   * número (CSV, ou sincronizado antes de a Meta passar a gravá-lo aqui), que
+   * é "não sabemos", e não zero.
+   */
+  impressoes?: number | null;
+  cliques?: number | null;
 }
 
 export interface CampanhaComGasto {
@@ -32,6 +39,8 @@ export interface CampanhaComGasto {
   platform: string;
   status: string;
   criadaNaPlataformaEm: Date | null;
+  /** O objetivo da campanha na plataforma, como ela escreve: OUTCOME_TRAFFIC, OUTCOME_LEADS. */
+  objetivo?: string | null;
   spend: LinhaDeGasto[];
 }
 
@@ -68,6 +77,8 @@ export interface DesempenhoDeCampanha {
   status: string;
   /** Dia civil em que ela foi criada na plataforma, quando se sabe. */
   criadaNaPlataformaEm: string | null;
+  /** O objetivo na plataforma, quando ela informa. A tela sugere as métricas a partir dele. */
+  objetivo: string | null;
   /**
    * Conversas que a própria plataforma diz ter iniciado na janela. Null quando
    * nenhum dia trouxe essa contagem, que é "não sabemos", e não zero.
@@ -81,6 +92,22 @@ export interface DesempenhoDeCampanha {
   /** Null quando não há nenhum gasto lançado para a campanha dentro da janela. */
   ativo: PeriodoAtivo | null;
   gastoCentavos: number;
+  /**
+   * Entrega na plataforma: quantas vezes o anúncio apareceu e quantos cliques
+   * levou. Null quando nenhum dia trouxe o número.
+   */
+  impressoes: number | null;
+  cliques: number | null;
+  /** Falso quando parte dos dias com gasto não trouxe a entrega: os números são um piso. */
+  entregaCompleta: boolean;
+  /** Cliques sobre impressões, de 0 a 1. */
+  ctr: number | null;
+  /** Custo por mil impressões, em centavos, sobre o gasto dos dias que trouxeram a entrega. */
+  cpmCentavos: number | null;
+  /** Custo por clique, em centavos, sobre o gasto dos dias que trouxeram os cliques. */
+  cpcCentavos: number | null;
+  /** Custo por conversa iniciada, em centavos, sobre o gasto dos dias que trouxeram a contagem. */
+  custoPorConversaCentavos: number | null;
   leads: number;
   qualificados: number;
   vendas: number;
@@ -106,6 +133,8 @@ export interface DesempenhoPorCampanha {
    * as campanhas respondem por tudo.
    */
   semCampanha: number;
+  /** A entrega de todas as campanhas da janela juntas, para os totais da tela. */
+  entrega: ReturnType<typeof entregaDaCampanha>;
 }
 
 /** Dia civil de uma data gravada na meia-noite UTC, que é como o gasto é guardado. */
@@ -137,6 +166,76 @@ function conversasDaPlataforma(gastos: LinhaDeGasto[]): { total: number | null; 
 }
 
 /**
+ * A entrega de uma campanha na janela, e os custos que saem dela.
+ *
+ * Cada custo é dividido só pelo gasto dos dias que trouxeram o número que
+ * vai embaixo. Dividir o gasto do mês inteiro pelas impressões de metade dele
+ * dobraria o CPM, e o número pareceria uma piora que não aconteceu.
+ */
+export function entregaDaCampanha(gastos: LinhaDeGasto[]): {
+  impressoes: number | null;
+  cliques: number | null;
+  completa: boolean;
+  ctr: number | null;
+  cpmCentavos: number | null;
+  cpcCentavos: number | null;
+  custoPorConversaCentavos: number | null;
+} {
+  const comImpressoes = gastos.filter((linha) => typeof linha.impressoes === "number");
+  const comCliques = gastos.filter((linha) => typeof linha.cliques === "number");
+  const comConversas = gastos.filter((linha) => typeof linha.conversasIniciadas === "number");
+  const soma = (linhas: LinhaDeGasto[], valor: (linha: LinhaDeGasto) => number) =>
+    linhas.reduce((total, linha) => total + valor(linha), 0);
+
+  const impressoes = comImpressoes.length > 0 ? soma(comImpressoes, (linha) => linha.impressoes ?? 0) : null;
+  const cliques = comCliques.length > 0 ? soma(comCliques, (linha) => linha.cliques ?? 0) : null;
+  const conversas = comConversas.length > 0 ? soma(comConversas, (linha) => linha.conversasIniciadas ?? 0) : null;
+
+  // O CTR só vale com os dois números dos mesmos dias; senão compara cliques
+  // de uma semana com impressões de outra.
+  const comOsDois = gastos.filter((linha) => typeof linha.impressoes === "number" && typeof linha.cliques === "number");
+  const impressoesDosDois = soma(comOsDois, (linha) => linha.impressoes ?? 0);
+  const cliquesDosDois = soma(comOsDois, (linha) => linha.cliques ?? 0);
+
+  const custo = (gasto: number, por: number | null, escala = 1) =>
+    por !== null && por > 0 && gasto > 0 ? Math.round((gasto / por) * escala) : null;
+
+  return {
+    impressoes,
+    cliques,
+    completa: gastos.length > 0 && comImpressoes.length === gastos.length && comCliques.length === gastos.length,
+    ctr: impressoesDosDois > 0 ? cliquesDosDois / impressoesDosDois : null,
+    cpmCentavos: custo(soma(comImpressoes, (linha) => linha.spendCents), impressoes, 1000),
+    cpcCentavos: custo(soma(comCliques, (linha) => linha.spendCents), cliques),
+    custoPorConversaCentavos: custo(soma(comConversas, (linha) => linha.spendCents), conversas),
+  };
+}
+
+/**
+ * Completa a entrega dos dias que não a trouxeram, somando os anúncios.
+ *
+ * A Meta passou a gravar impressões e cliques no gasto da campanha só agora;
+ * antes, eles ficavam apenas nos números por anúncio. Para os dias antigos, a
+ * soma dos anúncios da campanha é o mesmo número, contado de outro lado. Um
+ * dia que já tem o próprio número não é tocado.
+ *
+ * A chave do mapa é `<id interno da campanha>|<AAAA-MM-DD>`.
+ */
+export function completaEntregaPelosAnuncios<T extends { id: string; spend: LinhaDeGasto[] }>(
+  campanhas: T[],
+  porCampanhaEDia: Map<string, { impressoes: number; cliques: number }>,
+): T[] {
+  return campanhas.map((campanha) => ({
+    ...campanha,
+    spend: campanha.spend.map((linha) => {
+      if (typeof linha.impressoes === "number") return linha;
+      const dosAnuncios = porCampanhaEDia.get(`${campanha.id}|${diaCivil(linha.date)}`);
+      return dosAnuncios ? { ...linha, impressoes: dosAnuncios.impressoes, cliques: dosAnuncios.cliques } : linha;
+    }),
+  }));
+}
+
+/**
  * Divisão que devolve null em vez de zero ou infinito quando não dá para
  * dividir. Um custo por lead de R$ 0,00 numa campanha sem leads afirmaria que
  * ela foi eficiente, quando o caso é que ela não produziu nada.
@@ -154,6 +253,7 @@ export function agregaDesempenhoPorCampanha(
 
   for (const campanha of campanhas) {
     const conversas = conversasDaPlataforma(campanha.spend);
+    const entrega = entregaDaCampanha(campanha.spend);
     porExternalId.set(campanha.externalId, {
       id: campanha.id,
       externalId: campanha.externalId,
@@ -161,10 +261,18 @@ export function agregaDesempenhoPorCampanha(
       plataforma: campanha.platform,
       status: campanha.status,
       criadaNaPlataformaEm: campanha.criadaNaPlataformaEm ? diaCivil(campanha.criadaNaPlataformaEm) : null,
+      objetivo: campanha.objetivo ?? null,
       conversasNaPlataforma: conversas.total,
       conversasCompletas: conversas.completas,
       ativo: periodoAtivo(campanha.spend),
       gastoCentavos: campanha.spend.reduce((soma, linha) => soma + linha.spendCents, 0),
+      impressoes: entrega.impressoes,
+      cliques: entrega.cliques,
+      entregaCompleta: entrega.completa,
+      ctr: entrega.ctr,
+      cpmCentavos: entrega.cpmCentavos,
+      cpcCentavos: entrega.cpcCentavos,
+      custoPorConversaCentavos: entrega.custoPorConversaCentavos,
       leads: 0,
       qualificados: 0,
       vendas: 0,
@@ -215,7 +323,12 @@ export function agregaDesempenhoPorCampanha(
   // de cortar ou reforçar tem mais efeito. Empate desce para o volume de leads.
   linhas.sort((a, b) => b.gastoCentavos - a.gastoCentavos || b.leads - a.leads);
 
-  return { campanhas: linhas, semCampanha };
+  // Os custos do total saem dos dias de todas as campanhas juntos, e não da
+  // média dos custos de cada uma: a média daria o mesmo peso a uma campanha
+  // de R$ 10 e a outra de R$ 10 mil.
+  const entrega = entregaDaCampanha(campanhas.flatMap((campanha) => campanha.spend));
+
+  return { campanhas: linhas, semCampanha, entrega };
 }
 
 /**
@@ -233,6 +346,7 @@ export interface CampanhaComparada {
   plataforma: string;
   status: string;
   criadaNaPlataformaEm: string | null;
+  objetivo: string | null;
   atual: DesempenhoDeCampanha | null;
   anterior: DesempenhoDeCampanha | null;
   /** Preenchida só quando a campanha teve atividade nos dois períodos. */
@@ -271,6 +385,7 @@ export function comparaDesempenho(
       plataforma: referencia.plataforma,
       status: referencia.status,
       criadaNaPlataformaEm: referencia.criadaNaPlataformaEm,
+      objetivo: referencia.objetivo,
       atual: agora,
       anterior: antes,
       variacao:

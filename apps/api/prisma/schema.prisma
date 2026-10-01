@@ -1173,6 +1173,11 @@ model Campaign {
   criadaNaPlataformaEm DateTime? @map("criada_na_plataforma_em")
 
   /**
+   * O objetivo da campanha na plataforma, como ela escreve (OUTCOME_TRAFFIC, OUTCOME_LEADS). A tela de campanhas sugere as métricas a partir dele: tráfego se mede por clique, reconhecimento por impressão, mensagens por conversa.
+   */
+  objetivo String? @map("objetivo")
+
+  /**
    * Orçamento diário na plataforma, quando ela informa.
    */
   orcamentoDiarioCentavos Int? @map("orcamento_diario_centavos")

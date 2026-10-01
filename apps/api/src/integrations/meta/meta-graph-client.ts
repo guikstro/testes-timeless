@@ -66,7 +66,8 @@ export class MetaGraphClient {
 
   async getCampaigns(adAccountId: string, accessToken: string): Promise<MetaCampaign[]> {
     const url = this.buildUrl(`/${adAccountId}/campaigns`, accessToken, {
-      fields: "id,name,status,created_time",
+      // O objetivo vem na mesma chamada: nenhuma página a mais no limite da Meta.
+      fields: "id,name,status,created_time,objective",
       limit: ITENS_POR_PAGINA,
     });
     return this.fetchAllPages<MetaCampaign>(url);

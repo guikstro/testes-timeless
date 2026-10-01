@@ -71,12 +71,14 @@ function startMockMetaServer(): Promise<{ server: http.Server; baseUrl: string }
 
       if (url.pathname === "/act_123/campaigns") {
         if (url.searchParams.get("after") === "page2") {
-          res.end(JSON.stringify({ data: [{ id: "c2", name: "Campanha Instagram", status: "ACTIVE" }] }));
+          res.end(
+            JSON.stringify({ data: [{ id: "c2", name: "Campanha Instagram", status: "ACTIVE", objective: "OUTCOME_TRAFFIC" }] }),
+          );
           return;
         }
         res.end(
           JSON.stringify({
-            data: [{ id: "c1", name: "Direito Trabalhista", status: "ACTIVE" }],
+            data: [{ id: "c1", name: "Direito Trabalhista", status: "ACTIVE", objective: "OUTCOME_ENGAGEMENT" }],
             paging: { next: `http://localhost:${(server.address() as AddressInfo).port}/act_123/campaigns?after=page2` },
           }),
         );
@@ -114,7 +116,7 @@ function startMockMetaServer(): Promise<{ server: http.Server; baseUrl: string }
           JSON.stringify({
             data: [
               { campaign_id: "c1", adset_id: "as1", ad_id: "ad1", spend: "500.00", impressions: "9000", clicks: "310", date_start: "2026-08-20" },
-              { campaign_id: "c1", adset_id: "as1", ad_id: "ad-apagado", spend: "250.00", date_start: "2026-08-20" },
+              { campaign_id: "c1", adset_id: "as1", ad_id: "ad-apagado", spend: "250.00", impressions: "1000", clicks: "40", date_start: "2026-08-20" },
               { campaign_id: "c2", spend: "250.50", date_start: "2026-08-20" },
             ],
           }),
@@ -466,6 +468,29 @@ describe("Meta Ads sync (e2e, against a local Graph API double)", () => {
       coberturaPorCento: 100,
     });
     expect(porAnuncio.body.identificacao.porMetodo.CTWA_REFERRAL).toBe(1);
+  });
+
+  /*
+    As métricas de entrega chegam à tela de campanhas somadas da resposta
+    inteira da Meta, inclusive do anúncio que já não existe, como o gasto. É
+    delas que saem o CTR, o CPM e o CPC que a tela deixa escolher.
+  */
+  it("mostra impressões, cliques, CTR, CPM e CPC por campanha, com o objetivo dela", async () => {
+    const resposta = await request(app.getHttpServer())
+      .get("/api/analytics/campanhas?de=2026-08-01&ate=2026-08-31")
+      .set("Authorization", `Bearer ${orgToken}`)
+      .expect(200);
+
+    const c1 = resposta.body.campanhas.find((c: { externalId: string }) => c.externalId === "c1");
+    expect(c1.objetivo).toBe("OUTCOME_ENGAGEMENT");
+    // 9.000 + 1.000 impressões e 310 + 40 cliques, sobre R$ 750.
+    expect(c1.atual).toMatchObject({ impressoes: 10_000, cliques: 350, entregaCompleta: true, cpmCentavos: 7_500, cpcCentavos: 214 });
+    expect(c1.atual.ctr).toBeCloseTo(0.035);
+
+    const c2 = resposta.body.campanhas.find((c: { externalId: string }) => c.externalId === "c2");
+    expect(c2.objetivo).toBe("OUTCOME_TRAFFIC");
+
+    expect(resposta.body.totais).toMatchObject({ impressoes: 10_000, cliques: 350 });
   });
 
   it("monta o extrato com um dia por dia do período, sem inventar zero no futuro", async () => {

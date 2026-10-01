@@ -45,7 +45,9 @@ import {
   agregaDesempenhoPorCampanha,
   CampanhaComparada,
   comparaDesempenho,
+  completaEntregaPelosAnuncios,
   DesempenhoPorCampanha,
+  entregaDaCampanha,
   LeadAtribuido,
 } from "./campaign-performance";
 
@@ -98,6 +100,14 @@ export interface DesempenhoDeCampanhas {
     receitaCentavos: number;
     /** Null quando nenhuma campanha do período trouxe a contagem da plataforma. */
     conversasNaPlataforma: number | null;
+    /** Entrega somada: null quando nenhuma campanha trouxe o número. */
+    impressoes: number | null;
+    cliques: number | null;
+    entregaCompleta: boolean;
+    ctr: number | null;
+    cpmCentavos: number | null;
+    cpcCentavos: number | null;
+    custoPorConversaCentavos: number | null;
   };
 }
 
@@ -412,7 +422,7 @@ export class AnalyticsService {
       this.desempenhoNaJanela(organizationId, periodo),
       comparacao
         ? this.desempenhoNaJanela(organizationId, comparacao)
-        : Promise.resolve<DesempenhoPorCampanha>({ campanhas: [], semCampanha: 0 }),
+        : Promise.resolve<DesempenhoPorCampanha>({ campanhas: [], semCampanha: 0, entrega: entregaDaCampanha([]) }),
     ]);
 
     const juncao = comparaDesempenho(atual, anterior);
@@ -422,21 +432,36 @@ export class AnalyticsService {
       comparacao,
       campanhas: juncao.campanhas,
       semCampanha: juncao.semCampanha,
-      totais: atual.campanhas.reduce<DesempenhoDeCampanhas["totais"]>(
-        (soma, linha) => ({
-          gastoCentavos: soma.gastoCentavos + linha.gastoCentavos,
-          leads: soma.leads + linha.leads,
-          vendas: soma.vendas + linha.vendas,
-          receitaCentavos: soma.receitaCentavos + linha.receitaCentavos,
-          // Só soma quem tem o número: uma campanha de CSV não conta conversa
-          // nenhuma, e isso não pode apagar a contagem das que contam.
-          conversasNaPlataforma:
-            linha.conversasNaPlataforma === null
-              ? soma.conversasNaPlataforma
-              : (soma.conversasNaPlataforma ?? 0) + linha.conversasNaPlataforma,
-        }),
-        { gastoCentavos: 0, leads: 0, vendas: 0, receitaCentavos: 0, conversasNaPlataforma: null },
-      ),
+      totais: {
+        ...atual.campanhas.reduce(
+          (soma, linha) => ({
+            gastoCentavos: soma.gastoCentavos + linha.gastoCentavos,
+            leads: soma.leads + linha.leads,
+            vendas: soma.vendas + linha.vendas,
+            receitaCentavos: soma.receitaCentavos + linha.receitaCentavos,
+            // Só soma quem tem o número: uma campanha de CSV não conta conversa
+            // nenhuma, e isso não pode apagar a contagem das que contam.
+            conversasNaPlataforma:
+              linha.conversasNaPlataforma === null
+                ? soma.conversasNaPlataforma
+                : (soma.conversasNaPlataforma ?? 0) + linha.conversasNaPlataforma,
+          }),
+          {
+            gastoCentavos: 0,
+            leads: 0,
+            vendas: 0,
+            receitaCentavos: 0,
+            conversasNaPlataforma: null as number | null,
+          },
+        ),
+        impressoes: atual.entrega.impressoes,
+        cliques: atual.entrega.cliques,
+        entregaCompleta: atual.entrega.completa,
+        ctr: atual.entrega.ctr,
+        cpmCentavos: atual.entrega.cpmCentavos,
+        cpcCentavos: atual.entrega.cpcCentavos,
+        custoPorConversaCentavos: atual.entrega.custoPorConversaCentavos,
+      },
     };
   }
 
@@ -467,9 +492,10 @@ export class AnalyticsService {
           platform: true,
           status: true,
           criadaNaPlataformaEm: true,
+          objetivo: true,
           spend: {
             where: { date: { gte: deDia, lte: ateDia } },
-            select: { date: true, spendCents: true, conversasIniciadas: true },
+            select: { date: true, spendCents: true, conversasIniciadas: true, impressoes: true, cliques: true },
           },
         },
       }),
@@ -512,12 +538,50 @@ export class AnalyticsService {
 
     const comAtividade = new Set(atribuidos.map((lead) => lead.campaignExternalId));
 
+    // Os dias anteriores a a Meta gravar a entrega no gasto da campanha: a
+    // soma dos anúncios da campanha naquele dia é o mesmo número.
+    const entregaDosAnuncios = campanhas.some((campanha) => campanha.spend.some((linha) => linha.impressoes === null))
+      ? await this.entregaPorCampanhaEDia(organizationId, deDia, ateDia)
+      : new Map<string, { impressoes: number; cliques: number }>();
+
     return agregaDesempenhoPorCampanha(
       // Campanha sem gasto e sem lead na janela fica de fora: listá-la diria
       // que ela rodou sem resultado, quando o caso é que ela não rodou.
-      campanhas.filter((campanha) => campanha.spend.length > 0 || comAtividade.has(campanha.externalId)),
+      completaEntregaPelosAnuncios(
+        campanhas.filter((campanha) => campanha.spend.length > 0 || comAtividade.has(campanha.externalId)),
+        entregaDosAnuncios,
+      ),
       atribuidos,
     );
+  }
+
+  /**
+   * Impressões e cliques dos anúncios, somados por campanha e dia.
+   *
+   * O escopo desce pela campanha, como em todo número por anúncio: anúncio e
+   * conjunto não carregam organização, e filtrar aqui é o que impede alcançar
+   * a conta alheia.
+   */
+  private async entregaPorCampanhaEDia(
+    organizationId: string,
+    deDia: Date,
+    ateDia: Date,
+  ): Promise<Map<string, { impressoes: number; cliques: number }>> {
+    const linhas = await this.prisma.adInsight.findMany({
+      where: { date: { gte: deDia, lte: ateDia }, ad: { adSet: { campaign: { organizationId } } } },
+      select: { date: true, impressions: true, clicks: true, ad: { select: { adSet: { select: { campaignId: true } } } } },
+    });
+
+    const porCampanhaEDia = new Map<string, { impressoes: number; cliques: number }>();
+    for (const linha of linhas) {
+      const chave = `${linha.ad.adSet.campaignId}|${linha.date.toISOString().slice(0, 10)}`;
+      const acumulado = porCampanhaEDia.get(chave) ?? { impressoes: 0, cliques: 0 };
+      porCampanhaEDia.set(chave, {
+        impressoes: acumulado.impressoes + linha.impressions,
+        cliques: acumulado.cliques + linha.clicks,
+      });
+    }
+    return porCampanhaEDia;
   }
 
   /**
