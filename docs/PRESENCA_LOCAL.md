@@ -20,7 +20,7 @@ para a tela inicial. A regra está em `apps/web/src/lib/foco.ts`.
 
 ## De onde vêm os números
 
-Do script do Google Ads (versão 2), o mesmo que já manda o gasto. Além do gasto
+Do script do Google Ads (versão 2 em diante), o mesmo que já manda o gasto. Além do gasto
 por campanha, ele manda por dia e por campanha:
 
 | Métrica | O que é | Parte do script |
@@ -35,6 +35,37 @@ Cada parte é uma consulta separada no script. Se o Google recusar uma, o
 envio diz qual falhou (`partes`), o resto continua chegando, e os números já
 guardados daquela parte não são apagados. Ficam na tabela `metricas_locais`.
 
+## Histórico e comparação
+
+A rodada de hora em hora manda os últimos 35 dias. Até a versão 2, era só
+isso: uma conta que começou a mandar no fim de setembro tinha agosto com
+cinco dias, e "setembro contra o mês anterior" mostrava altas de 300% que não
+aconteceram.
+
+Da versão 3 em diante:
+
+- Cada envio diz o período que consultou (`periodo: { de, ate }`), inclusive
+  nos dias em que nenhuma campanha rodou. O primeiro dia coberto fica em
+  `google_ads_conexoes.coberto_desde`, e só anda para trás. Na primeira vez,
+  o gasto que um script antigo já tinha mandado também conta.
+- Enquanto a resposta disser `historicoPendente: true`, a mesma rodada manda
+  os 13 meses anteriores (396 dias contando hoje), em blocos de 60 dias com
+  `historico: true`. O último bloco vai com `historicoFim: true`, que grava
+  `historico_completo_em` e encerra o pedido. Os blocos não trocam a versão
+  nem as partes da conexão: as que valem são as da rodada de hora em hora.
+- O gasto é gravado em lote (`INSERT ... ON CONFLICT`), 500 dias por comando.
+  Mandar o mesmo bloco de novo substitui, e não soma.
+- Os dias são contados em UTC a partir do "hoje" no fuso da conta: com o
+  horário de verão de uma conta de fora, somar 24 horas pulava um dia.
+
+As telas de comparação (Campanhas, o painel de presença local e os anúncios
+da visão geral) recebem `cobertura` e `parcial`. Quando o período escolhido
+ou o de comparação começa antes do primeiro dia com número, a porcentagem
+fica de fora e um aviso diz desde quando há dado. Com Meta e Google juntos,
+vale a fonte que começa por último; a Meta conta a partir da conexão, com os
+sete dias que a sincronia busca para trás. Se quem limita é o Google sem
+histórico, o aviso manda gerar o script de novo.
+
 ## Medida e ausência
 
 Zero é medida; ausência é "Sem medida". O painel diz em que situação está:
@@ -42,6 +73,8 @@ Zero é medida; ausência é "Sem medida". O painel diz em que situação está:
 - **Sem Google Ads:** nenhum envio do script ainda.
 - **Script desatualizado:** o script colado é o antigo (versão 1), que só manda
   gasto. Gere o script de novo em Integrações → Google Ads e cole no lugar.
+  Um script na versão 2 continua medindo; a tela de Integrações só oferece a
+  versão 3 por causa do histórico.
 - **Parcial:** uma parte do script falhou; a tela diz qual.
 - **Medido:** tudo chegando.
 

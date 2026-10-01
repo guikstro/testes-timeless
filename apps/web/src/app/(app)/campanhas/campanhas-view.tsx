@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import Link from "next/link";
 import { AvisoDeMedicao } from "@/components/aviso-de-medicao";
+import { AvisoDeCobertura, comparavel } from "@/components/aviso-de-cobertura";
 import { Badge } from "@/components/ui/badge";
 import { Delta } from "@/components/ui/delta";
 import { Frescor, FrescorDosDados } from "@/components/ui/frescor";
@@ -67,10 +68,14 @@ export function CampanhasView({
   const { periodo, comparacao, campanhas, semCampanha, totais } = dados;
   const medido = medicao === "medido";
 
+  // Com um dos períodos começando antes do primeiro dia com número, a
+  // porcentagem compararia um mês com alguns dias: fica de fora, e o aviso diz.
+  const comVariacao = comparacao !== null && comparavel(dados.parcial);
+
   // Os totais do período de comparação saem das próprias linhas: a API já
   // devolve os dois lados de cada campanha, e somá-los aqui evita uma segunda
   // rota que diria a mesma coisa.
-  const anteriores = comparacao ? somaAnteriores(campanhas) : null;
+  const anteriores = comVariacao ? somaAnteriores(campanhas) : null;
 
   /*
     Campanha criada à mão sem o id real da plataforma nunca casa com lead
@@ -109,6 +114,14 @@ export function CampanhasView({
 
       <AvisoDeMedicao medicao={medicao} desde={desdeDoWhatsApp} conversasNaPlataforma={totais.conversasNaPlataforma} />
 
+      <AvisoDeCobertura
+        cobertura={dados.cobertura}
+        parcial={dados.parcial}
+        periodo={periodo}
+        comparacao={comparacao}
+        className="mb-5"
+      />
+
       <SeletorDeMetricas
         metricas={metricas}
         escolhaManual={escolhaManual}
@@ -146,6 +159,7 @@ export function CampanhasView({
           metricas={metricas}
           medido={medido}
           rotuloDaComparacao={comparacao ? rotuloDoIntervalo(comparacao) : null}
+          comVariacao={comVariacao}
         />
       )}
 
@@ -317,12 +331,15 @@ function Tabela({
   metricas,
   medido,
   rotuloDaComparacao,
+  comVariacao,
 }: {
   campanhas: CampanhaComparada[];
   metricas: Metrica[];
   medido: boolean;
   /** Null quando nenhum período de comparação foi escolhido. */
   rotuloDaComparacao: string | null;
+  /** Falso também quando a comparação tem dias sem número: a linha ainda diz de onde vem, sem porcentagem. */
+  comVariacao: boolean;
 }) {
   return (
     <div className="surface overflow-hidden">
@@ -348,6 +365,7 @@ function Tabela({
                 metricas={metricas}
                 medido={medido}
                 rotuloDaComparacao={rotuloDaComparacao}
+                comVariacao={comVariacao}
               />
             ))}
           </tbody>
@@ -362,17 +380,18 @@ function Linha({
   metricas,
   medido,
   rotuloDaComparacao,
+  comVariacao,
 }: {
   linha: CampanhaComparada;
   metricas: Metrica[];
   medido: boolean;
   rotuloDaComparacao: string | null;
+  comVariacao: boolean;
 }) {
   // Uma campanha ausente do período escolhido continua na tabela: "não rodou"
   // é metade da explicação de uma queda, e some-la esconderia justamente isso.
   const ausente = linha.atual === null;
   const dados = linha.atual ?? linha.anterior!;
-  const temComparacao = rotuloDaComparacao !== null;
   const status = STATUS[linha.status];
   const objetivo = rotuloDoObjetivo(linha.objetivo);
 
@@ -422,14 +441,14 @@ function Linha({
 
       <Numero
         valor={formatCentsAsBRL(dados.gastoCentavos)}
-        variacao={temComparacao ? linha.variacao?.gastoCentavos : undefined}
+        variacao={comVariacao ? linha.variacao?.gastoCentavos : undefined}
       />
       {daPlataforma.map((metrica) => (
-        <CelulaDaMetrica key={metrica} metrica={metrica} dados={dados} linha={linha} temComparacao={temComparacao} />
+        <CelulaDaMetrica key={metrica} metrica={metrica} dados={dados} linha={linha} temComparacao={comVariacao} />
       ))}
       {doWhatsApp.length === 0 ? null : medido ? (
         doWhatsApp.map((metrica) => (
-          <CelulaDaMetrica key={metrica} metrica={metrica} dados={dados} linha={linha} temComparacao={temComparacao} />
+          <CelulaDaMetrica key={metrica} metrica={metrica} dados={dados} linha={linha} temComparacao={comVariacao} />
         ))
       ) : (
         <ColunasSemMedida colunas={doWhatsApp.length} />

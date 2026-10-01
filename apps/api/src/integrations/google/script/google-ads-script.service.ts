@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { PrismaService } from "../../../common/prisma/prisma.service";
 import { AppException } from "../../../common/exceptions/app-exception";
 import { hashToken } from "../../../common/utils/hash-token";
@@ -7,11 +7,19 @@ import { enderecoPublico } from "../../../common/configuracao/ambiente";
 import { AuditoriaService, Autor } from "../../../auditoria/auditoria.service";
 import { contaLegivel, converteCampanha, converteMetricasLocais, metricasMedidas } from "./converte-envio";
 import { Prisma } from "@prisma/client";
-import { scriptDoGoogleAds, VERSAO_DO_SCRIPT } from "./script-do-google-ads";
+import { scriptDoGoogleAds, VERSAO_DAS_ACOES_LOCAIS, VERSAO_DO_SCRIPT } from "./script-do-google-ads";
 import { EnvioDoScriptDto } from "./envio.dto";
 
 /** Sem envio há mais que isto, a tela avisa que o script parou. */
 const ENVIO_ATRASADO_EM_HORAS = 3;
+
+/** O teto de dias de um envio: o mesmo que cabe por campanha no corpo. */
+const DIAS_POR_ENVIO = 62;
+
+/** Linhas de gasto por comando de escrita. */
+const LOTE = 500;
+
+const diaUtc = (dia: string) => new Date(`${dia}T00:00:00.000Z`);
 
 @Injectable()
 export class GoogleAdsScriptService {
@@ -128,7 +136,11 @@ export class GoogleAdsScriptService {
             ultimoEnvioEm: conexao.ultimoEnvioEm?.toISOString() ?? null,
             atrasado,
             // Script colado antes das ligações e rotas: manda gasto, e só.
-            scriptDesatualizado: conexao.ultimoEnvioEm !== null && (conexao.versaoDoScript ?? 1) < VERSAO_DO_SCRIPT,
+            scriptDesatualizado: conexao.ultimoEnvioEm !== null && (conexao.versaoDoScript ?? 1) < VERSAO_DAS_ACOES_LOCAIS,
+            // Script anterior ao histórico: só os últimos 35 dias de cada rodada.
+            semHistorico: conexao.ultimoEnvioEm !== null && !conexao.historicoCompletoEm && (conexao.versaoDoScript ?? 1) < VERSAO_DO_SCRIPT,
+            historicoCompleto: Boolean(conexao.historicoCompletoEm),
+            cobertoDesde: conexao.cobertoDesde?.toISOString().slice(0, 10) ?? null,
             partes: (conexao.partesDoScript as Record<string, string> | null) ?? null,
           }
         : null,
@@ -157,16 +169,48 @@ export class GoogleAdsScriptService {
       );
     }
 
+    // O período declarado, da versão 3 em diante. Fora de ordem ou maior que
+    // o teto é script mexido à mão: recusado, em vez de gravado pela metade.
+    const periodo = envio.periodo ? { de: diaUtc(envio.periodo.de), ate: diaUtc(envio.periodo.ate) } : null;
+    if (
+      periodo &&
+      (Number.isNaN(periodo.de.getTime()) ||
+        Number.isNaN(periodo.ate.getTime()) ||
+        periodo.de > periodo.ate ||
+        periodo.ate.getTime() - periodo.de.getTime() > (DIAS_POR_ENVIO - 1) * 86_400_000)
+    ) {
+      throw new AppException(
+        "PERIODO_INVALIDO",
+        `O período do envio precisa ter a data inicial antes da final e no máximo ${DIAS_POR_ENVIO} dias.`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     const organizationId = conexao.organizationId;
     const agora = new Date();
+
+    // Até onde a conta tem dado aqui, que só anda para trás. Na primeira vez
+    // com período declarado, o que um script antigo já mandou também conta.
+    let cobertoDesde = conexao.cobertoDesde;
+    if (periodo && !cobertoDesde) {
+      const primeiro = await this.prisma.adSpend.aggregate({
+        where: { campaign: { organizationId, platform: "GOOGLE" } },
+        _min: { date: true },
+      });
+      cobertoDesde = primeiro._min.date;
+    }
+    if (periodo && (!cobertoDesde || periodo.de < cobertoDesde)) cobertoDesde = periodo.de;
     const campanhas = envio.campanhas.map(converteCampanha);
     const medidas = metricasMedidas(envio.partes);
     const locais = converteMetricasLocais(envio.locais, medidas);
-    // A janela do envio: o que estiver nela e não vier de novo virou zero.
+    // A janela do envio: o que estiver nela e não vier de novo virou zero. Com
+    // o período declarado ela é exata, inclusive nos dias sem linha nenhuma.
     const datas = [...campanhas.flatMap((c) => c.dias.map((d) => d.data)), ...locais.map((l) => l.dia)];
-    const janela = datas.length
-      ? { gte: new Date(Math.min(...datas.map((d) => d.getTime()))), lte: new Date(Math.max(...datas.map((d) => d.getTime()))) }
-      : null;
+    const janela = periodo
+      ? { gte: periodo.de, lte: periodo.ate }
+      : datas.length
+        ? { gte: new Date(Math.min(...datas.map((d) => d.getTime()))), lte: new Date(Math.max(...datas.map((d) => d.getTime()))) }
+        : null;
     let dias = 0;
 
     await this.prisma.$transaction(
@@ -196,14 +240,27 @@ export class GoogleAdsScriptService {
             },
           });
 
-          for (const dia of campanha.dias) {
-            const { data, ...numeros } = dia;
-            await tx.adSpend.upsert({
-              where: { campaignId_date: { campaignId: linha.id, date: data } },
-              create: { campaignId: linha.id, date: data, ...numeros },
-              update: numeros,
-            });
-            dias += 1;
+          // Em lote: o histórico manda milhares de dias, e uma ida ao banco
+          // por dia estourava o tempo da transação.
+          for (let inicio = 0; inicio < campanha.dias.length; inicio += LOTE) {
+            const lote = campanha.dias.slice(inicio, inicio + LOTE);
+            await tx.$executeRaw`
+              INSERT INTO "ad_spend" ("id", "campaign_id", "date", "spend_cents", "impressoes", "cliques", "conversoes_na_plataforma", "valor_conversoes_centavos", "updated_at")
+              VALUES ${Prisma.join(
+                lote.map(
+                  (dia) =>
+                    Prisma.sql`(${randomUUID()}, ${linha.id}, ${dia.data.toISOString().slice(0, 10)}::date, ${dia.spendCents}, ${dia.impressoes}, ${dia.cliques}, ${dia.conversoesNaPlataforma}, ${dia.valorConversoesCentavos}, now())`,
+                ),
+              )}
+              ON CONFLICT ("campaign_id", "date") DO UPDATE SET
+                "spend_cents" = EXCLUDED."spend_cents",
+                "impressoes" = EXCLUDED."impressoes",
+                "cliques" = EXCLUDED."cliques",
+                "conversoes_na_plataforma" = EXCLUDED."conversoes_na_plataforma",
+                "valor_conversoes_centavos" = EXCLUDED."valor_conversoes_centavos",
+                "updated_at" = now()
+            `;
+            dias += lote.length;
           }
         }
 
@@ -227,8 +284,16 @@ export class GoogleAdsScriptService {
             nomeDaConta: envio.conta.nome.slice(0, 255),
             moeda: envio.conta.moeda,
             ultimoEnvioEm: agora,
-            versaoDoScript: envio.versao ?? 1,
-            partesDoScript: (envio.partes ?? Prisma.JsonNull) as Prisma.InputJsonValue | typeof Prisma.JsonNull,
+            // Os blocos do histórico vêm da mesma rodada: a versão e as
+            // partes que valem são as da rodada de hora em hora.
+            ...(envio.historico
+              ? {}
+              : {
+                  versaoDoScript: envio.versao ?? 1,
+                  partesDoScript: (envio.partes ?? Prisma.JsonNull) as Prisma.InputJsonValue | typeof Prisma.JsonNull,
+                }),
+            ...(periodo ? { cobertoDesde } : {}),
+            ...(envio.historicoFim ? { historicoCompletoEm: agora } : {}),
           },
         });
       },
@@ -249,7 +314,15 @@ export class GoogleAdsScriptService {
       );
     }
 
-    return { recebido: true, campanhas: campanhas.length, dias, metricasLocais: locais.length };
+    return {
+      recebido: true,
+      campanhas: campanhas.length,
+      dias,
+      metricasLocais: locais.length,
+      // O script da versão 3 lê isto: enquanto for verdade, manda também os
+      // 13 meses anteriores na mesma rodada.
+      historicoPendente: !conexao.historicoCompletoEm && !envio.historicoFim,
+    };
   }
 }
 

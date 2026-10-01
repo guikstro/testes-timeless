@@ -2,8 +2,9 @@ import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { hojeLocal } from "../common/tempo";
 import { METRICAS_DA_PARTE } from "../integrations/google/script/converte-envio";
-import { VERSAO_DO_SCRIPT } from "../integrations/google/script/script-do-google-ads";
+import { VERSAO_DAS_ACOES_LOCAIS } from "../integrations/google/script/script-do-google-ads";
 import { custoPor, diasDa, Janela, janelas } from "./calculo";
+import { Cobertura, comecaAntes } from "../common/cobertura";
 
 /** As métricas que o painel mostra, e de qual parte do script cada uma vem. */
 const METRICAS = ["LIGACOES_DOS_ANUNCIOS", "LIGACOES_CONVERSAO", "ROTAS", "VISITAS_A_LOJA", "EXIBICOES_DO_TELEFONE"] as const;
@@ -37,7 +38,14 @@ interface Medicao {
   ultimoEnvioEm: string | null;
   temGoogle: boolean;
   medida: (metrica: Metrica) => boolean;
+  /**
+   * Desde quando a conta tem dado do Google aqui, e se o histórico de 13
+   * meses já chegou. Antes de `desde`, um período não tem número nenhum, e
+   * compará-lo com um período inteiro mostraria altas que não aconteceram.
+   */
+  cobertura: Cobertura;
 }
+
 
 const dataDe = (dia: string) => new Date(`${dia}T00:00:00.000Z`);
 const arredonda = (valor: number) => Math.round(valor * 100) / 100;
@@ -85,6 +93,8 @@ export class PresencaLocalService {
       situacao: medicao.situacao,
       partes: medicao.partes,
       ultimoEnvioEm: medicao.ultimoEnvioEm,
+      cobertura: medicao.cobertura,
+      parcial: { atual: comecaAntes(atual, medicao.cobertura.desde), comparacao: comecaAntes(anterior, medicao.cobertura.desde) },
       totais,
       investimento,
       custo: {
@@ -139,6 +149,8 @@ export class PresencaLocalService {
       situacao: medicao.situacao,
       partes: medicao.partes,
       ultimoEnvioEm: medicao.ultimoEnvioEm,
+      cobertura: medicao.cobertura,
+      parcial: { atual: comecaAntes(periodo, medicao.cobertura.desde), comparacao: comecaAntes(comparacao, medicao.cobertura.desde) },
       totais: {
         gastoCentavos: par("gastoCentavos"),
         cliques: par("cliques"),
@@ -156,15 +168,26 @@ export class PresencaLocalService {
   private async medicao(organizationId: string): Promise<Medicao> {
     const conexao = await this.prisma.googleAdsConexao.findUnique({
       where: { organizationId },
-      select: { ultimoEnvioEm: true, versaoDoScript: true, partesDoScript: true },
+      select: { ultimoEnvioEm: true, versaoDoScript: true, partesDoScript: true, cobertoDesde: true, historicoCompletoEm: true },
     });
+
+    // O script da versão 3 diz o período que cobriu. Os anteriores não
+    // diziam, e o primeiro dia com gasto é a melhor pista que sobra.
+    let desde = conexao?.cobertoDesde?.toISOString().slice(0, 10) ?? null;
+    if (!desde && conexao?.ultimoEnvioEm) {
+      const primeiro = await this.prisma.adSpend.aggregate({
+        where: { campaign: { organizationId, platform: "GOOGLE" } },
+        _min: { date: true },
+      });
+      desde = primeiro._min.date?.toISOString().slice(0, 10) ?? null;
+    }
 
     const partes = (conexao?.partesDoScript as Record<string, string> | null) ?? {};
     const versao = conexao?.versaoDoScript ?? 1;
-    const medida = (metrica: Metrica) => versao >= VERSAO_DO_SCRIPT && partes[PARTE_DA_METRICA[metrica]] === "ok";
+    const medida = (metrica: Metrica) => versao >= VERSAO_DAS_ACOES_LOCAIS && partes[PARTE_DA_METRICA[metrica]] === "ok";
     const situacao = !conexao?.ultimoEnvioEm
       ? "sem-google-ads"
-      : versao < VERSAO_DO_SCRIPT
+      : versao < VERSAO_DAS_ACOES_LOCAIS
         ? "script-desatualizado"
         : METRICAS.every(medida)
           ? "medido"
@@ -176,6 +199,11 @@ export class PresencaLocalService {
       ultimoEnvioEm: conexao?.ultimoEnvioEm?.toISOString() ?? null,
       temGoogle: Boolean(conexao?.ultimoEnvioEm),
       medida,
+      cobertura: {
+        desde,
+        limitadaPor: desde ? "GOOGLE" : null,
+        googleSemHistorico: Boolean(conexao?.ultimoEnvioEm && !conexao.historicoCompletoEm),
+      },
     };
   }
 

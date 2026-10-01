@@ -1,5 +1,7 @@
 /** O que a rota `GET /analytics/campanhas` devolve. */
 
+import type { Cobertura, Parcial } from "@/components/aviso-de-cobertura";
+
 export interface Variacao {
   /** Fração: 0.15 é quinze por cento acima. Null quando o período anterior era zero. */
   delta: number | null;
@@ -71,6 +73,10 @@ export interface CampanhaComparada {
 export interface DesempenhoDeCampanhas {
   periodo: { de: string; ate: string };
   comparacao: { de: string; ate: string } | null;
+  /** Desde quando há número de anúncio aqui. Ausente na API anterior. */
+  cobertura?: Cobertura;
+  /** O período e a comparação começam antes disso: a porcentagem entre eles não vale. */
+  parcial?: Parcial;
   campanhas: CampanhaComparada[];
   semCampanha: { atual: number; anterior: number };
   totais: {

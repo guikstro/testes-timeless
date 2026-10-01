@@ -1358,6 +1358,14 @@ model GoogleAdsConexao {
    * "zero ligações" de "não deu para medir ligações".
    */
   partesDoScript Json?     @map("partes_do_script")
+  /**
+   * O primeiro dia que o script já cobriu: antes dele, a conta não tem dado do Google aqui. É o que impede comparar um mês inteiro com um mês que só tem os últimos dias.
+   */
+  cobertoDesde   DateTime? @map("coberto_desde") @db.Date
+  /**
+   * Quando o script terminou de mandar o histórico (13 meses). Nulo: ainda não chegou; o script da versão 3 manda na próxima rodada.
+   */
+  historicoCompletoEm DateTime? @map("historico_completo_em")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 

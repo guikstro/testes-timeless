@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { BotaoCopiar } from "@/components/ui/copy-button";
 import { formatCentsAsBRL } from "@/lib/currency";
 import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
+import { formataDia } from "@/lib/periodo";
 import { desligaScriptDoGoogleAds, geraScriptDoGoogleAds } from "./script-actions";
 import { Alert } from "@/components/ui/alert";
 import { Foco, temPresencaLocal } from "@/lib/foco";
@@ -19,6 +20,11 @@ export interface SituacaoDoGoogleAds {
     atrasado: boolean;
     /** O script colado é anterior às ligações e rotas. */
     scriptDesatualizado?: boolean;
+    /** O script colado é anterior ao histórico: só os últimos 35 dias de cada rodada. */
+    semHistorico?: boolean;
+    historicoCompleto?: boolean;
+    /** O primeiro dia que o script declarou ter mandado. */
+    cobertoDesde?: string | null;
     /** O que cada parte nova conseguiu ler no último envio. */
     partes?: Record<string, string> | null;
   } | null;
@@ -88,6 +94,9 @@ export function ConexaoGoogleAds({
               Conta <span className="font-medium text-ink">{conexao!.conta}</span>
               {conexao!.nomeDaConta ? ` (${conexao!.nomeDaConta})` : ""}. Último envio{" "}
               <span title={dataCompleta(conexao!.ultimoEnvioEm!)}>{tempoRelativo(conexao!.ultimoEnvioEm!)}</span>.
+              {conexao!.historicoCompleto && conexao!.cobertoDesde
+                ? ` Números desde ${formataDia(conexao!.cobertoDesde)}.`
+                : null}
             </p>
           ) : conexao ? (
             <p className="mt-1 text-corpo text-ink-soft">
@@ -137,6 +146,19 @@ export function ConexaoGoogleAds({
         </Alert>
       ) : null}
 
+      {/*
+        Para todo cliente, de leads ou de presença local: sem os meses
+        anteriores, a comparação com o mês passado sai pela metade. Quem tem o
+        aviso do script antigo já vai gerar o novo, que traz o histórico junto.
+      */}
+      {conexao?.semHistorico && !(medeLigacoes && conexao.scriptDesatualizado) && !script ? (
+        <Alert tom="info" className="mt-3" titulo="Os meses anteriores ainda não chegaram">
+          O script colado manda só os últimos 35 dias, e por isso o mês passado aparece pela metade nas comparações.
+          Gere o script de novo aqui em cima e cole no lugar do atual: na primeira rodada ele traz os 13 meses
+          anteriores, uma vez só.
+        </Alert>
+      ) : null}
+
       {medeLigacoes && conexao && !conexao.scriptDesatualizado && conexao.partes
         ? Object.entries(conexao.partes)
             .filter(([, estado]) => estado !== "ok")
@@ -166,7 +188,10 @@ function PassoAPasso({ script }: { script: string }) {
         <li>Vá em Ferramentas → Ações em massa → Scripts e clique no botão de adicionar (+), em Novo script.</li>
         <li>Apague o que vier escrito, cole o script abaixo e dê um nome, como “Timeless”.</li>
         <li>Clique em Autorizar e aceite com a sua conta do Google.</li>
-        <li>Clique em Visualizar para testar: no registro deve aparecer “Timeless respondeu 200”.</li>
+        <li>
+          Clique em Visualizar para testar: no registro deve aparecer “Timeless respondeu 200”. Na primeira vez ele
+          manda também os 13 meses anteriores, em várias linhas, e demora alguns minutos a mais.
+        </li>
         <li>Salve, e em Frequência escolha “A cada hora”.</li>
       </ol>
       <div className="relative mt-3">

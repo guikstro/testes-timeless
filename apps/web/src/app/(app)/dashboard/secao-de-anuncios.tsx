@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AvisoDeCobertura, comparavel } from "@/components/aviso-de-cobertura";
 import { formatCentsAsBRL } from "@/lib/currency";
 import { Conjunto, Metrica } from "@/lib/campanhas/metricas";
 import { Resumo, resumoDaMetrica, SeletorDeMetricas, somaAnteriores } from "../campanhas/metricas-ui";
@@ -33,7 +34,8 @@ export function SecaoDeAnuncios({
   porCampanha: string;
 }) {
   const { totais, campanhas, comparacao } = dados;
-  const anteriores = comparacao ? somaAnteriores(campanhas) : null;
+  // O período anterior começando antes do primeiro dia com número: sem porcentagem.
+  const anteriores = comparacao && comparavel(dados.parcial) ? somaAnteriores(campanhas) : null;
 
   return (
     <section className="surface p-6">
@@ -55,6 +57,15 @@ export function SecaoDeAnuncios({
       <div className="mt-4">
         <SeletorDeMetricas metricas={metricas} escolhaManual={escolhaManual} sugestao={sugestao} href={href} />
       </div>
+
+      <AvisoDeCobertura
+        cobertura={dados.cobertura}
+        parcial={dados.parcial}
+        periodo={dados.periodo}
+        comparacao={comparacao}
+        rotuloDaComparacao="o período anterior"
+        className="mb-4"
+      />
 
       {campanhas.length === 0 ? (
         <p className="text-corpo text-ink-mute">

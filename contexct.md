@@ -272,3 +272,10 @@ Decisões do usuário: convite por link, um cliente por pessoa, cadastro públic
 - Sem WhatsApp, a mesma seção aparece no lugar dos três números de antes: as métricas da plataforma não dependem de lead.
 - A escolha é a mesma da tela de Campanhas (`metricas` na URL), mantida ao trocar de período e de aba. As peças ficaram num lugar só (`campanhas/metricas-ui.tsx`), para os dois lugares não mostrarem o mesmo número de jeitos diferentes.
 
+
+### Comparação sem mês pela metade e histórico do Google (2026-10-01)
+- Pergunta do usuário: como a tela de Campanhas da Doca calculava "setembro contra o mês anterior" (investimento +340%, rotas +254%). Resposta: o script do Google mandava só os últimos 35 dias, e agosto tinha uns cinco dias de dado.
+- As telas de comparação recebem `cobertura` (desde quando há número, qual fonte limita, se falta o histórico do Google) e `parcial`. Com um dos períodos começando antes do primeiro dia, a porcentagem sai e um aviso explica (`components/aviso-de-cobertura.tsx`). Vale para Campanhas (leads e presença local), o painel de presença local e os anúncios da visão geral.
+- Script do Google na versão 3: cada envio declara o período; enquanto a API responder `historicoPendente`, a rodada manda os 13 meses anteriores em blocos de 60 dias, uma vez só. Colunas `coberto_desde` e `historico_completo_em` em `google_ads_conexoes` (migration só acrescenta). Gasto gravado em lote.
+- Quem está na versão 2 continua medindo ligações e rotas; a tela de Integrações oferece o script novo por causa do histórico.
+- Regra completa em `docs/PRESENCA_LOCAL.md`, "Histórico e comparação".

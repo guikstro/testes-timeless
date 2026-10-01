@@ -1,5 +1,6 @@
 import { Type } from "class-transformer";
 import {
+  IsBoolean,
   ArrayMaxSize,
   IsArray,
   IsIn,
@@ -13,6 +14,7 @@ import {
   Min,
   ValidateNested,
 } from "class-validator";
+import { DiaCivil } from "../../../common/validation/dia-civil";
 
 /*
   O corpo vem de fora, de um script que qualquer um com a chave pode editar.
@@ -20,7 +22,7 @@ import {
 */
 
 export class DiaDoEnvioDto {
-  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @DiaCivil()
   data!: string;
 
   @IsInt()
@@ -85,7 +87,7 @@ export class MetricaLocalDoEnvioDto {
   @Matches(/^\d{1,20}$/)
   campanha!: string;
 
-  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @DiaCivil()
   data!: string;
 
   @IsIn(["LIGACOES_DOS_ANUNCIOS", "EXIBICOES_DO_TELEFONE", "ROTAS", "LIGACOES_CONVERSAO", "VISITAS_A_LOJA"])
@@ -110,7 +112,35 @@ export class PartesDoEnvioDto {
   acoesLocais?: string;
 }
 
+/**
+ * O período que o script consultou, dia a dia. Vem da versão 3 em diante: é o
+ * que diz até onde a conta tem dado aqui, mesmo nos dias em que nenhuma
+ * campanha rodou e por isso nenhuma linha veio.
+ */
+export class PeriodoDoEnvioDto {
+  @DiaCivil()
+  de!: string;
+
+  @DiaCivil()
+  ate!: string;
+}
+
 export class EnvioDoScriptDto {
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PeriodoDoEnvioDto)
+  periodo?: PeriodoDoEnvioDto;
+
+  /** Um bloco do histórico de 13 meses, e não a rodada de hora em hora. */
+  @IsOptional()
+  @IsBoolean()
+  historico?: boolean;
+
+  /** O último bloco do histórico: depois dele, o script volta aos 35 dias. */
+  @IsOptional()
+  @IsBoolean()
+  historicoFim?: boolean;
+
   /** Ausente no script da primeira versão, que só mandava gasto. */
   @IsOptional()
   @IsInt()

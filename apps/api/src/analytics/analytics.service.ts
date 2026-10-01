@@ -41,6 +41,7 @@ import {
 } from "./funil";
 import { FunilQueryDto } from "./dto/funil-query.dto";
 import { diasDa, janelas } from "../presenca-local/calculo";
+import { Cobertura, coberturaDeTodas, comecaAntes, diasAntes } from "../common/cobertura";
 import {
   LinhaGuardada,
   porDiaDaPagina,
@@ -112,6 +113,10 @@ export interface Janela {
 export interface DesempenhoDeCampanhas {
   periodo: Janela;
   comparacao: Janela | null;
+  /** Desde quando os anúncios da conta têm dado aqui. */
+  cobertura: Cobertura;
+  /** O período e a comparação começam antes da cobertura: têm dias sem dado. */
+  parcial: { atual: boolean; comparacao: boolean };
   campanhas: CampanhaComparada[];
   semCampanha: { atual: number; anterior: number };
   totais: {
@@ -501,11 +506,12 @@ export class AnalyticsService {
     periodo: Janela,
     comparacao: Janela | null,
   ): Promise<DesempenhoDeCampanhas> {
-    const [atual, anterior] = await Promise.all([
+    const [atual, anterior, cobertura] = await Promise.all([
       this.desempenhoNaJanela(organizationId, periodo),
       comparacao
         ? this.desempenhoNaJanela(organizationId, comparacao)
         : Promise.resolve<DesempenhoPorCampanha>({ campanhas: [], semCampanha: 0, entrega: entregaDaCampanha([]) }),
+      this.coberturaDosAnuncios(organizationId),
     ]);
 
     const juncao = comparaDesempenho(atual, anterior);
@@ -513,6 +519,8 @@ export class AnalyticsService {
     return {
       periodo,
       comparacao,
+      cobertura,
+      parcial: { atual: comecaAntes(periodo, cobertura.desde), comparacao: comecaAntes(comparacao, cobertura.desde) },
       campanhas: juncao.campanhas,
       semCampanha: juncao.semCampanha,
       totais: {
@@ -545,6 +553,40 @@ export class AnalyticsService {
         cpcCentavos: atual.entrega.cpcCentavos,
         custoPorConversaCentavos: atual.entrega.custoPorConversaCentavos,
       },
+    };
+  }
+
+  /**
+   * Desde quando os anúncios da conta têm dado aqui.
+   *
+   * A Meta é buscada a partir da conexão, com 7 dias para trás; o Google, a
+   * partir do período que o script declarou (ou, nos scripts antigos, do
+   * primeiro dia com gasto). Com as duas, vale a mais recente: antes dela, o
+   * total de um período não está inteiro. O gasto já guardado de antes (de
+   * uma conexão anterior, ou lançado à mão) também conta como coberto.
+   */
+  private async coberturaDosAnuncios(organizationId: string): Promise<Cobertura> {
+    const [meta, google, primeiroDaMeta, primeiroDoGoogle] = await Promise.all([
+      this.prisma.metaConnection.findUnique({ where: { organizationId }, select: { status: true, connectedAt: true } }),
+      this.prisma.googleAdsConexao.findUnique({
+        where: { organizationId },
+        select: { ultimoEnvioEm: true, cobertoDesde: true, historicoCompletoEm: true },
+      }),
+      this.prisma.adSpend.aggregate({ where: { campaign: { organizationId, platform: "META" } }, _min: { date: true } }),
+      this.prisma.adSpend.aggregate({ where: { campaign: { organizationId, platform: "GOOGLE" } }, _min: { date: true } }),
+    ]);
+    const dia = (data: Date | null | undefined) => data?.toISOString().slice(0, 10) ?? null;
+
+    const daMeta =
+      meta && meta.status !== "DISCONNECTED"
+        ? coberturaMaisAntiga(diasAntes(diaCivilLocal(meta.connectedAt, FUSO), INSIGHTS_LOOKBACK_DAYS), dia(primeiroDaMeta._min.date))
+        : null;
+    const doGoogle = google?.ultimoEnvioEm ? (dia(google.cobertoDesde) ?? dia(primeiroDoGoogle._min.date)) : null;
+    const desde = coberturaDeTodas([daMeta, doGoogle]);
+    return {
+      desde,
+      limitadaPor: desde === null ? null : desde === doGoogle ? "GOOGLE" : "META",
+      googleSemHistorico: Boolean(google?.ultimoEnvioEm && !google.historicoCompletoEm),
     };
   }
 
@@ -827,3 +869,14 @@ export class AnalyticsService {
     };
   }
 }
+
+/** Os dias que a sincronia da Meta busca para trás na conexão. Ver `MetaSyncService`. */
+const INSIGHTS_LOOKBACK_DAYS = 7;
+
+/** A mais antiga de duas datas conhecidas: dado guardado de antes também é cobertura. */
+function coberturaMaisAntiga(a: string | null, b: string | null): string | null {
+  if (!a) return b;
+  if (!b) return a;
+  return a < b ? a : b;
+}
+

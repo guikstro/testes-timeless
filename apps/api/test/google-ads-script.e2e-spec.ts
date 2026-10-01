@@ -262,6 +262,127 @@ describe("Google Ads por script (e2e)", () => {
     });
   });
 
+  describe("versão 3: o período declarado e o histórico", () => {
+    const dia = (atras: number) => new Date(Date.parse(`${hoje}T00:00:00Z`) - atras * 864e5).toISOString().slice(0, 10);
+    const conexao = async () =>
+      (await request(app.getHttpServer()).get("/api/integrations/google/script").set("Authorization", `Bearer ${tokenA}`).expect(200))
+        .body.conexao;
+    const campanhas = async (busca: string) =>
+      (await request(app.getHttpServer()).get(`/api/presenca-local/campanhas?${busca}`).set("Authorization", `Bearer ${tokenA}`).expect(200))
+        .body;
+    const rodada = () => ({
+      ...envio(),
+      versao: 3,
+      periodo: { de: dia(34), ate: hoje },
+      partes: { ligacoes: "ok", acoesLocais: "ok" },
+      locais: [],
+    });
+    // Um bloco do histórico com uma campanha antiga rodando todos os dias dele.
+    const bloco = (de: number, ate: number, extras: object) => ({
+      versao: 3,
+      conta: { id: "1234567890", nome: "Clínica Sorriso", moeda: "BRL" },
+      periodo: { de: dia(de), ate: dia(ate) },
+      partes: { ligacoes: "falhou: só neste bloco", acoesLocais: "ok" },
+      locais: [{ campanha: "20003", data: dia(de), metrica: "ROTAS", valor: 2 }],
+      campanhas: [
+        {
+          id: "20003",
+          nome: "Local | Antiga",
+          status: "REMOVED",
+          orcamentoMicros: null,
+          dias: Array.from({ length: de - ate + 1 }, (_, i) => ({
+            data: dia(ate + i),
+            custoMicros: 1_000_000,
+            impressoes: 10,
+            cliques: 1,
+            conversoes: 0,
+            valorConversoes: 0,
+          })),
+        },
+      ],
+      historico: true,
+      ...extras,
+    });
+
+    it("script anterior: sem cobertura declarada, a tela usa o primeiro dia com gasto e oferece o histórico", async () => {
+      expect(await conexao()).toMatchObject({ semHistorico: true, historicoCompleto: false, cobertoDesde: null });
+
+      // O gasto mais antigo de A é o da campanha pausada, 40 dias atrás.
+      const r = await campanhas(`de=${dia(10)}&ate=${hoje}&compararDe=${dia(45)}&compararAte=${dia(11)}`);
+      expect(r.cobertura).toEqual({ desde: dia(40), limitadaPor: "GOOGLE", googleSemHistorico: true });
+      expect(r.parcial).toEqual({ atual: false, comparacao: true });
+    });
+
+    it("a rodada da versão 3 declara o período, guarda a cobertura e pede o histórico", async () => {
+      const resposta = await manda(chaveA, rodada()).expect(200);
+      expect(resposta.body.historicoPendente).toBe(true);
+
+      // O que o script antigo já tinha mandado continua contando como coberto.
+      expect(await conexao()).toMatchObject({ semHistorico: false, historicoCompleto: false, cobertoDesde: dia(40) });
+    });
+
+    it("os blocos do histórico gravam em lote, não trocam a versão nem as partes, e o último fecha o histórico", async () => {
+      const primeiro = await manda(chaveA, bloco(94, 35, { historicoFim: false })).expect(200);
+      expect(primeiro.body).toMatchObject({ dias: 60, historicoPendente: true });
+
+      const ultimo = await manda(chaveA, bloco(154, 95, { historicoFim: true })).expect(200);
+      expect(ultimo.body.historicoPendente).toBe(false);
+
+      const depois = await conexao();
+      expect(depois).toMatchObject({ semHistorico: false, historicoCompleto: true, cobertoDesde: dia(154) });
+      // As partes que valem são as da rodada de hora em hora, e não as do bloco.
+      expect(depois.partes).toEqual({ ligacoes: "ok", acoesLocais: "ok" });
+
+      const antiga = await prisma.campaign.findFirstOrThrow({ where: { externalId: "20003", organization: { name: "Org GAds A" } } });
+      expect(await prisma.adSpend.count({ where: { campaignId: antiga.id } })).toBe(120);
+      expect(antiga.status).toBe("ARCHIVED");
+
+      // Mandar o mesmo bloco de novo substitui, e não duplica.
+      await manda(chaveA, bloco(94, 35, { historicoFim: false })).expect(200);
+      expect(await prisma.adSpend.count({ where: { campaignId: antiga.id } })).toBe(120);
+
+      // A próxima rodada já não pede histórico.
+      expect((await manda(chaveA, rodada()).expect(200)).body.historicoPendente).toBe(false);
+    });
+
+    it("com o histórico, a comparação com um mês coberto deixa de ser parcial", async () => {
+      const r = await campanhas(`de=${dia(10)}&ate=${hoje}&compararDe=${dia(45)}&compararAte=${dia(11)}`);
+      expect(r.cobertura).toEqual({ desde: dia(154), limitadaPor: "GOOGLE", googleSemHistorico: false });
+      expect(r.parcial).toEqual({ atual: false, comparacao: false });
+      expect(r.totais.rotas.anterior).toBe(0);
+
+      // Antes da cobertura, continua parcial.
+      const longe = await campanhas(`de=${dia(10)}&ate=${hoje}&compararDe=${dia(200)}&compararAte=${dia(150)}`);
+      expect(longe.parcial.comparacao).toBe(true);
+      expect(longe.totais.rotas.anterior).toBe(2);
+    });
+
+    it("a tela de campanhas de leads também diz desde quando há dado", async () => {
+      const r = await request(app.getHttpServer())
+        .get(`/api/analytics/campanhas?de=${dia(10)}&ate=${hoje}&compararDe=${dia(200)}&compararAte=${dia(150)}`)
+        .set("Authorization", `Bearer ${tokenA}`)
+        .expect(200);
+      expect(r.body.cobertura).toEqual({ desde: dia(154), limitadaPor: "GOOGLE", googleSemHistorico: false });
+      expect(r.body.parcial).toEqual({ atual: false, comparacao: true });
+    });
+
+    it("recusa período ao contrário, maior que o teto ou com dia que não existe, sem gravar nada", async () => {
+      const antes = await prisma.adSpend.count();
+      for (const periodo of [
+        { de: hoje, ate: dia(1) },
+        { de: dia(80), ate: hoje },
+      ]) {
+        expect((await manda(chaveA, { ...rodada(), periodo }).expect(400)).body.code).toBe("PERIODO_INVALIDO");
+      }
+      // 30 de fevereiro viraria 2 de março sem aviso.
+      await manda(chaveA, { ...rodada(), periodo: { de: "2026-02-30", ate: "2026-03-05" } }).expect(400);
+      const comDiaImpossivel = rodada();
+      comDiaImpossivel.campanhas[0].dias[0].data = "2026-02-30";
+      await manda(chaveA, { ...comDiaImpossivel, periodo: undefined }).expect(400);
+      expect(await prisma.adSpend.count()).toBe(antes);
+    });
+  });
+
   it("recusa envio sem chave ou com chave errada, e não grava nada", async () => {
     const antes = await prisma.adSpend.count();
     await manda(null, envio()).expect(401);

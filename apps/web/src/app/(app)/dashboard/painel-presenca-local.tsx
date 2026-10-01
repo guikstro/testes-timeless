@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { Alert } from "@/components/ui/alert";
+import { AvisoDeCobertura, Cobertura, comparavel, Parcial } from "@/components/aviso-de-cobertura";
 import { ButtonLink } from "@/components/ui/button";
 import { SePuderAbrir } from "@/components/acesso";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -20,6 +21,11 @@ export interface MedicaoLocal {
 
 export interface PresencaLocal extends MedicaoLocal {
   periodo: { de: string; ate: string };
+  /** O período anterior do mesmo tamanho, o das porcentagens. */
+  periodoAnterior?: { de: string; ate: string };
+  /** Desde quando o Google tem número aqui. Ausente na API anterior. */
+  cobertura?: Cobertura;
+  parcial?: Parcial;
   totais: Record<"LIGACOES_DOS_ANUNCIOS" | "LIGACOES_CONVERSAO" | "ROTAS" | "VISITAS_A_LOJA" | "EXIBICOES_DO_TELEFONE", Par>;
   investimento: Par;
   custo: { porLigacao: Par; porRota: Par };
@@ -52,20 +58,31 @@ const PARTE: Record<string, string> = { ligacoes: "as ligações dos anúncios",
 export function PainelPresencaLocal({ dados }: { dados: PresencaLocal }) {
   const { totais, investimento, custo } = dados;
   const serieDe = (campo: "ligacoes" | "rotas") => dados.serie.map((d) => d[campo] ?? 0);
+  // O período anterior começando antes do primeiro dia com número: sem porcentagem.
+  const comparar = comparavel(dados.parcial);
 
   return (
     <div className="space-y-6">
       <SituacaoDaMedicao medicao={dados} />
 
+      <AvisoDeCobertura
+        cobertura={dados.cobertura}
+        parcial={dados.parcial}
+        periodo={dados.periodo}
+        comparacao={dados.periodoAnterior ?? null}
+        rotuloDaComparacao="o período anterior"
+      />
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Numero rotulo="Ligações pelos anúncios" par={totais.LIGACOES_DOS_ANUNCIOS} serie={serieDe("ligacoes")} />
-        <Numero rotulo="Pedidos de rota" par={totais.ROTAS} serie={serieDe("rotas")} />
-        <Numero rotulo="Investido no Google Ads" par={investimento} moeda nota="no período" />
+        <Numero rotulo="Ligações pelos anúncios" par={totais.LIGACOES_DOS_ANUNCIOS} serie={serieDe("ligacoes")} comparar={comparar} />
+        <Numero rotulo="Pedidos de rota" par={totais.ROTAS} serie={serieDe("rotas")} comparar={comparar} />
+        <Numero rotulo="Investido no Google Ads" par={investimento} moeda nota="no período" comparar={comparar} />
         <Numero
           rotulo="Custo por ligação"
           par={custo.porLigacao}
           moeda
           invertido
+          comparar={comparar}
           // Medido e sem ligação: o custo não existe, mas não é falta de medida.
           semValor={totais.LIGACOES_DOS_ANUNCIOS.atual === null ? undefined : "Sem ligação"}
           nota={custo.porRota.atual !== null ? `Por rota: ${formatCentsAsBRL(custo.porRota.atual)}` : undefined}
@@ -73,9 +90,14 @@ export function PainelPresencaLocal({ dados }: { dados: PresencaLocal }) {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Numero rotulo="Ligações contadas como conversão" par={totais.LIGACOES_CONVERSAO} nota="Inclui cliques para ligar no site" />
-        <Numero rotulo="Visitas à loja" par={totais.VISITAS_A_LOJA} nota="Estimadas pelo Google" />
-        <Numero rotulo="Vezes que o telefone apareceu" par={totais.EXIBICOES_DO_TELEFONE} />
+        <Numero
+          rotulo="Ligações contadas como conversão"
+          par={totais.LIGACOES_CONVERSAO}
+          nota="Inclui cliques para ligar no site"
+          comparar={comparar}
+        />
+        <Numero rotulo="Visitas à loja" par={totais.VISITAS_A_LOJA} nota="Estimadas pelo Google" comparar={comparar} />
+        <Numero rotulo="Vezes que o telefone apareceu" par={totais.EXIBICOES_DO_TELEFONE} comparar={comparar} />
       </div>
 
       {/*
@@ -183,6 +205,7 @@ function Numero({
   serie,
   nota,
   semValor,
+  comparar,
 }: {
   rotulo: string;
   par: Par;
@@ -192,6 +215,8 @@ function Numero({
   nota?: string;
   /** Quando o valor não existe por falta de base, e não de medida. */
   semValor?: string;
+  /** Falso quando o período anterior tem dias sem número: sem porcentagem. */
+  comparar: boolean;
 }) {
   if (par.atual === null) {
     return semValor ? (
@@ -205,8 +230,8 @@ function Numero({
       rotulo={rotulo}
       numero={moeda ? par.atual / 100 : par.atual}
       formato={moeda ? "moeda" : "inteiro"}
-      delta={variacao(par)}
-      anterior={par.anterior === null ? undefined : moeda ? par.anterior / 100 : par.anterior}
+      delta={comparar ? variacao(par) : undefined}
+      anterior={!comparar || par.anterior === null ? undefined : moeda ? par.anterior / 100 : par.anterior}
       serie={serie}
       nota={nota}
       invertido={invertido}

@@ -12,8 +12,18 @@
  * ligações contadas como conversão, visitas à loja). Cada parte nova roda
  * numa consulta separada e protegida: se o Google recusar numa conta, o gasto
  * continua chegando, e o envio diz o que faltou.
+ *
+ * Versão 3: o histórico. Com só os 35 dias, uma conta que começava a mandar
+ * no fim de setembro tinha agosto com cinco dias, e a comparação de setembro
+ * com agosto mostrava altas de 300% que não aconteceram. Agora cada envio diz
+ * o período que consultou, e enquanto a Timeless responder que falta
+ * histórico, a rodada manda também os 13 meses anteriores, em blocos de 60
+ * dias (o teto por campanha num envio é 62).
  */
-export const VERSAO_DO_SCRIPT = 2;
+export const VERSAO_DO_SCRIPT = 3;
+
+/** Ligações e rotas chegam desde a versão 2: um script na 2 continua medindo. */
+export const VERSAO_DAS_ACOES_LOCAIS = 2;
 
 export function scriptDoGoogleAds(endereco: string, chave: string): string {
   return `/**
@@ -24,16 +34,36 @@ export function scriptDoGoogleAds(endereco: string, chave: string): string {
 var ENDERECO = ${JSON.stringify(endereco)};
 var CHAVE = ${JSON.stringify(chave)};
 var DIAS = 35;
+var DIAS_DE_HISTORICO = 396;
+var DIAS_POR_BLOCO = 60;
 var VERSAO = ${VERSAO_DO_SCRIPT};
+var DIA = 24 * 60 * 60 * 1000;
 
 function main() {
   var conta = AdsApp.currentAccount();
-  var fuso = conta.getTimeZone();
-  var hoje = new Date();
-  var inicio = new Date(hoje.getTime() - (DIAS - 1) * 24 * 60 * 60 * 1000);
-  var de = Utilities.formatDate(inicio, fuso, "yyyy-MM-dd");
-  var ate = Utilities.formatDate(hoje, fuso, "yyyy-MM-dd");
+  // O dia de hoje no fuso da conta. A conta dos dias para trás é feita em UTC,
+  // que não tem horário de verão: um dia é sempre 24 horas.
+  var hoje = new Date(Utilities.formatDate(new Date(), conta.getTimeZone(), "yyyy-MM-dd") + "T12:00:00Z");
+  var formata = function (data) { return Utilities.formatDate(data, "UTC", "yyyy-MM-dd"); };
 
+  // A rodada de hora em hora: os últimos 35 dias.
+  var inicio = new Date(hoje.getTime() - (DIAS - 1) * DIA);
+  var resposta = envia(conta, leia(formata(inicio), formata(hoje)), {});
+
+  // Enquanto a Timeless disser que falta histórico: os 13 meses anteriores, em blocos.
+  if (resposta.historicoPendente) {
+    var limite = new Date(hoje.getTime() - (DIAS_DE_HISTORICO - 1) * DIA);
+    var fim = new Date(inicio.getTime() - DIA);
+    while (fim.getTime() >= limite.getTime()) {
+      var comeco = new Date(Math.max(fim.getTime() - (DIAS_POR_BLOCO - 1) * DIA, limite.getTime()));
+      var ultimo = comeco.getTime() <= limite.getTime();
+      envia(conta, leia(formata(comeco), formata(fim)), { historico: true, historicoFim: ultimo });
+      fim = new Date(comeco.getTime() - DIA);
+    }
+  }
+}
+
+function leia(de, ate) {
   var linhas = AdsApp.search(
     "SELECT campaign.id, campaign.name, campaign.status, campaign_budget.amount_micros, " +
     "segments.date, metrics.cost_micros, metrics.impressions, metrics.clicks, " +
@@ -102,13 +132,24 @@ function main() {
     partes.acoesLocais = "falhou: " + String(e).slice(0, 200);
   }
 
-  var corpo = {
-    versao: VERSAO,
+  return {
+    periodo: { de: de, ate: ate },
     partes: partes,
     locais: locais,
-    conta: { id: String(conta.getCustomerId()).replace(/-/g, ""), nome: conta.getName(), moeda: conta.getCurrencyCode() },
     campanhas: Object.keys(campanhas).map(function (k) { return campanhas[k]; })
   };
+}
+
+function envia(conta, lido, extras) {
+  var corpo = {
+    versao: VERSAO,
+    periodo: lido.periodo,
+    partes: lido.partes,
+    locais: lido.locais,
+    conta: { id: String(conta.getCustomerId()).replace(/-/g, ""), nome: conta.getName(), moeda: conta.getCurrencyCode() },
+    campanhas: lido.campanhas
+  };
+  for (var chave in extras) corpo[chave] = extras[chave];
 
   var resposta = UrlFetchApp.fetch(ENDERECO, {
     method: "post",
@@ -117,9 +158,14 @@ function main() {
     payload: JSON.stringify(corpo),
     muteHttpExceptions: true
   });
-  Logger.log("Timeless respondeu " + resposta.getResponseCode() + ": " + resposta.getContentText());
+  Logger.log("Timeless respondeu " + resposta.getResponseCode() + " (" + lido.periodo.de + " a " + lido.periodo.ate + "): " + resposta.getContentText());
   if (resposta.getResponseCode() >= 300) {
     throw new Error("A Timeless recusou o envio: " + resposta.getContentText());
+  }
+  try {
+    return JSON.parse(resposta.getContentText());
+  } catch (e) {
+    return {};
   }
 }
 `;

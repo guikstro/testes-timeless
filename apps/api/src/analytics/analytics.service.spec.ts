@@ -154,9 +154,44 @@ describe("AnalyticsService.desempenhoPorCampanha", () => {
     const prisma = {
       campaign: { findMany: jest.fn().mockResolvedValue(campanhas) },
       lead: { findMany: jest.fn().mockResolvedValue(leads) },
+      // A cobertura: sem conexão nenhuma, ela não restringe nada.
+      metaConnection: { findUnique: jest.fn().mockResolvedValue(null) },
+      googleAdsConexao: { findUnique: jest.fn().mockResolvedValue(null) },
+      adSpend: { aggregate: jest.fn().mockResolvedValue({ _min: { date: null } }) },
     };
     return { service: new AnalyticsService(prisma as unknown as PrismaService), prisma };
   }
+
+  /*
+    A Meta conectada em 23/09 tem dado desde 16/09 (sete dias para trás).
+    Setembro contra agosto compararia um mês com quinze dias de nada.
+  */
+  it("marca como parcial a comparação que começa antes da Meta ter dado aqui", async () => {
+    const { service, prisma } = buildService();
+    prisma.metaConnection.findUnique.mockResolvedValue({ status: "CONNECTED", connectedAt: new Date("2026-09-23T15:00:00.000Z") });
+
+    const resultado = await service.desempenhoPorCampanha(
+      "org-1",
+      { de: "2026-09-01", ate: "2026-09-30" },
+      { de: "2026-08-01", ate: "2026-08-31" },
+    );
+
+    expect(resultado.cobertura).toEqual({ desde: "2026-09-16", limitadaPor: "META", googleSemHistorico: false });
+    expect(resultado.parcial).toEqual({ atual: true, comparacao: true });
+  });
+
+  it("o gasto guardado de antes, de outra conexão, também conta como coberto", async () => {
+    const { service, prisma } = buildService();
+    prisma.metaConnection.findUnique.mockResolvedValue({ status: "CONNECTED", connectedAt: new Date("2026-09-23T15:00:00.000Z") });
+    prisma.adSpend.aggregate.mockImplementation(async (args: { where: { campaign: { platform: string } } }) => ({
+      _min: { date: args.where.campaign.platform === "META" ? new Date("2026-05-01T00:00:00.000Z") : null },
+    }));
+
+    const resultado = await service.desempenhoPorCampanha("org-1", { de: "2026-09-01", ate: "2026-09-30" }, { de: "2026-08-01", ate: "2026-08-31" });
+
+    expect(resultado.cobertura.desde).toBe("2026-05-01");
+    expect(resultado.parcial).toEqual({ atual: false, comparacao: false });
+  });
 
   const marco = { de: "2026-03-01", ate: "2026-03-31" };
 

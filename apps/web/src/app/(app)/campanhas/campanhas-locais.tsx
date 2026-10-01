@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { AvisoDeCobertura, Cobertura, comparavel, Parcial } from "@/components/aviso-de-cobertura";
 import { Badge } from "@/components/ui/badge";
 import { Frescor, FrescorDosDados } from "@/components/ui/frescor";
 import { formatCentsAsBRL } from "@/lib/currency";
@@ -23,6 +24,9 @@ interface NumerosDaCampanha {
 export interface CampanhasDePresencaLocal extends MedicaoLocal {
   periodo: { de: string; ate: string };
   comparacao: { de: string; ate: string } | null;
+  /** Desde quando o Google tem número aqui. Ausente na API anterior. */
+  cobertura?: Cobertura;
+  parcial?: Parcial;
   totais: Record<"gastoCentavos" | "cliques" | "impressoes" | "ligacoes" | "rotas" | "custoPorLigacao" | "custoPorRota", Par>;
   campanhas: {
     externalId: string;
@@ -56,7 +60,9 @@ export function CampanhasLocaisView({
   frescor?: Frescor | null;
 }) {
   const { periodo, comparacao, totais } = dados;
-  const comparando = comparacao !== null;
+  // Com a comparação começando antes do primeiro dia com número, a
+  // porcentagem compararia o mês com alguns dias: fica de fora, e o aviso diz.
+  const comparando = comparacao !== null && comparavel(dados.parcial);
   const rotuloDaComparacao = comparacao ? rotuloDoIntervalo(comparacao) : null;
 
   const resumo = (par: Par, formata: (valor: number) => string, semValor = "Sem medida") => ({
@@ -88,6 +94,14 @@ export function CampanhasLocaisView({
           <SituacaoDaMedicao medicao={dados} />
         </div>
       ) : null}
+
+      <AvisoDeCobertura
+        cobertura={dados.cobertura}
+        parcial={dados.parcial}
+        periodo={periodo}
+        comparacao={comparacao}
+        className="mb-5"
+      />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Resumo titulo="Investimento" {...resumo(totais.gastoCentavos, formatCentsAsBRL)} />
