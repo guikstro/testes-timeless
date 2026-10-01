@@ -247,3 +247,10 @@ Decisões do usuário: convite por link, um cliente por pessoa, cadastro públic
 - `worker/vigia-de-agenda.ts` (novo): depois do registro da subida, confere a cada 5 minutos se a agenda continua no Redis e a registra de novo quando ela some. Nunca mexe numa agenda viva e para quando a API desliga. Usada pela `AgendaDeSincronia` e pela `AgendaDeFaxina`. Descrita em `docs/META_ADS.md`, "Vigia".
 - Testes: `vigia-de-agenda.spec.ts` (9 casos), `agenda-de-faxina.spec.ts` (novo, 2) e 3 casos novos em `agenda-de-sincronia.spec.ts`. Suíte da API: 912 de 919 passam; os 7 que falham são dos dois testes que precisam de um Redis de verdade (`redis-throttler.storage.spec.ts` e `notifications.integration.spec.ts`), que não havia no ambiente onde rodei.
 - Pendente (decisão do usuário): plano pago do Key Value, porque jobs na fila, links de conexão e convites guardados no Redis ainda se perdem quando ele reinicia; e conferir no Render se a política de memória está em `noeviction`.
+
+### Meta: espera o bloqueio acabar em vez de tentar dentro dele (2026-10-01)
+- Confirmado no caso da Ferrovia: a Meta devolvia "User request limit reached" (código 17), o bloqueio do acesso limitado da API de Marketing (60 pontos a cada 5 minutos, 5 minutos de bloqueio).
+- As retentativas em segundos e os cliques em "Sincronizar agora" caíam dentro do bloqueio, renovavam o bloqueio e contavam como erro contra os 15% que a Meta exige para liberar o acesso completo.
+- Coluna nova `meta_connections.limitada_ate` (migration só acrescenta). Enquanto não passa, nada chama a Meta; uma única tentativa fica marcada para o fim do bloqueio; a agenda de hora em hora pula a conta; pedidos manuais durante o bloqueio ficam para o fim dele. A tela de integração mostra a hora.
+- Regra completa em `docs/META_ADS.md`, "Limite de uso".
+- Testes: `limite-da-meta.spec.ts`, `meta-sync.processor.spec.ts`, agenda, conexões, sincronia e o e2e da Meta com o dublê devolvendo o bloqueio.

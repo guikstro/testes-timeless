@@ -256,10 +256,10 @@ tipo de erro devolvido pela Graph API:
 | Erro da Meta                          | Status da conexão | Job re-lançado? |
 |----------------------------------------|--------------------|-----------------|
 | Código 190 (token inválido/expirado)   | `TOKEN_EXPIRED`    | Sim (BullMQ tenta de novo, mas continuará falhando até reconectar com token válido) |
-| HTTP 429, código 4/17/32/613 ou 80000 a 80014 (limite de uso) | Status **não muda**; `lastSyncError` guarda o motivo, que a tela mostra como aviso | Sim (a retentativa e a sincronia de hora em hora continuam; a próxima que der certo limpa o motivo) |
+| HTTP 429, código 4/17/32/613 ou 80000 a 80014 (limite de uso) | Status **não muda**; `lastSyncError` guarda o motivo e `limitadaAte` guarda até quando dura o bloqueio | **Não**: nada chama a Meta até `limitadaAte`, e uma única tentativa fica marcada para essa hora (ver "Limite de uso") |
 | Qualquer outro erro (rede, 5xx, etc.)  | `SYNC_FAILED`      | Sim |
 
-Em todos os casos o erro é relançado após atualizar o status, para que o
+Nos outros casos o erro é relançado após atualizar o status, para que o
 BullMQ aplique o retry configurado no job: `attempts: 5` com backoff
 exponencial a partir de 5s quando ele vem de `connect()` ou `POST /sync`, e
 `attempts: 3` a partir de 30s quando vem da agenda automática. A UI
@@ -288,9 +288,34 @@ nunca", sem erro na tela, e parecia um erro no passo a passo do token. Agora:
 - Para gastar menos do limite, as listas pedem 500 itens por página e os
   números por anúncio, 100. Sem `limit`, a Meta devolve 25, e cada página é
   uma chamada contada.
-- O app em modo de desenvolvimento tem limite baixo. A saída definitiva é o
-  acesso padrão da API de Marketing (Ads Management Standard Access), pedido
-  em developers.facebook.com, em Permissões e recursos.
+- No acesso limitado da API de Marketing, o padrão de todo app novo, a conta
+  de anúncios tem teto de 60 pontos (cada leitura vale 1), o saldo se renova
+  em 5 minutos, e quem estoura fica 5 minutos bloqueado (código 17, subcódigo
+  2446079, "User request limit reached"). A saída definitiva é o acesso
+  completo, pedido em developers.facebook.com no recurso Marketing API Access
+  Tier ("+Upgrade"). A Meta exige pelo menos 500 chamadas bem-sucedidas nos
+  últimos 15 dias e menos de 15% de erro nas últimas 500.
+
+**Esperar o bloqueio, em vez de tentar dentro dele (2026-10-01).** Tentar
+dentro do bloqueio só o renovava e contava como erro contra os 15%. Agora:
+
+- O bloqueio grava `limitadaAte`: o que a Meta disser nos cabeçalhos
+  (`X-Business-Use-Case-Usage`, em minutos, e `X-Ad-Account-Usage`, em
+  segundos; vale o maior), nunca menos que os 5 minutos do bloqueio padrão,
+  mais 1 minuto de folga (`limite-da-meta.ts`). O erro não é relançado, então
+  o BullMQ não tenta de novo em segundos.
+- Enquanto `limitadaAte` não passa, `MetaSyncService.sync` não chama a Meta,
+  e a agenda de hora em hora pula a conta.
+- O processador marca uma única tentativa para o fim do bloqueio
+  (`sincronia-apos-limite`, com id pelo minuto, para dois bloqueios no mesmo
+  minuto não virarem duas). Se ela também for bloqueada, não marca outra: a
+  agenda de hora em hora assume, e o erro não vira laço.
+- `POST /sync`, e reconectar a mesma conta, durante o bloqueio enfileiram a
+  sincronia com atraso até `limitadaAte`; vários cliques viram um pedido só.
+  Trocar de conta de anúncios começa sem o bloqueio da anterior.
+- A tela de integração diz a que horas a Meta libera, e que não precisa
+  clicar de novo.
+- Uma sincronia completa limpa `limitadaAte` e `lastSyncError`.
 
 ### Correção de bug: job atrasado podia "ressuscitar" uma conexão desconectada
 
