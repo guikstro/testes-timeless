@@ -32,6 +32,7 @@ import { TelemetriaModule } from "./telemetria/telemetria.module";
 import { AuditoriaModule } from "./auditoria/auditoria.module";
 import { OrigemDaRequisicaoMiddleware } from "./auditoria/contexto-da-requisicao";
 import { GoogleConversionsModule } from "./integrations/google/google-conversions.module";
+import { PerfilDaEmpresaModule } from "./integrations/perfil-da-empresa/perfil-da-empresa.module";
 import { WorkerModule } from "./worker/worker.module";
 import { ObservabilidadeModule } from "./observabilidade/observabilidade.module";
 
@@ -71,6 +72,7 @@ import { ObservabilidadeModule } from "./observabilidade/observabilidade.module"
     NotificationsStreamModule,
     ConversationsModule,
     GoogleConversionsModule,
+    PerfilDaEmpresaModule,
     TelemetriaModule,
     WorkerModule,
     ObservabilidadeModule,

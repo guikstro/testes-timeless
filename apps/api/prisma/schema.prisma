@@ -180,6 +180,7 @@ model Organization {
   leadEvents           LeadEvent[]
   metricasLocais       MetricaLocal[]
   metricasDaPagina     MetricaDaPagina[]
+  locaisDoPerfil       LocalDoPerfil[]
 
   @@map("organizations")
 }
@@ -1608,4 +1609,54 @@ model MetricaLocal {
 enum FonteDeMetricaLocal {
   GOOGLE_ADS
   PERFIL_DA_EMPRESA
+}
+
+/**
+ * A conta Google da equipe Timeless, que lê o Perfil da Empresa de todos os clientes. Uma linha só (id "equipe").
+ * Uma conta, e não uma por cliente: o Google guarda no máximo 100 tokens de uma conta num mesmo app, e o 101º invalida o mais antigo sem aviso. Os perfis dos clientes chegam a ela pelos convites de gerente, no Gerenciador de Perfis.
+ */
+model ContaGoogleDaEquipe {
+  id                    String   @id @default("equipe")
+  email                 String?
+  /**
+   * O token que renova o acesso, cifrado. O de acesso dura uma hora e não é guardado.
+   */
+  refreshTokenEncrypted String   @map("refresh_token_encrypted")
+  escopos               String
+  conectadaPorId        String?  @map("conectada_por_id")
+  conectadaEm           DateTime @default(now()) @map("conectada_em")
+  /**
+   * O Google recusou renovar (acesso revogado, senha trocada, app em teste há mais de 7 dias): a equipe precisa conectar de novo.
+   */
+  erro                  String?
+  atualizadaEm          DateTime @default(now()) @updatedAt @map("atualizada_em")
+
+  @@map("contas_google_da_equipe")
+}
+
+/**
+ * Um local do Perfil da Empresa no Google ligado a um cliente, escolhido pela equipe.
+ * Um local pertence a um cliente só: ligado em dois, os números de um apareceriam no painel do outro.
+ */
+model LocalDoPerfil {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  /**
+   * Como o Google escreve: "locations/123". É o `escopo` das linhas em `metricas_locais`.
+   */
+  localId        String    @unique @map("local_id")
+  nome           String
+  endereco       String?
+  /**
+   * Até que dia os números chegaram. O Google libera os do perfil com uns três dias de atraso.
+   */
+  numerosAte     DateTime? @map("numeros_ate") @db.Date
+  sincronizadoEm DateTime? @map("sincronizado_em")
+  erro           String?
+  criadoEm       DateTime  @default(now()) @map("criado_em")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("locais_do_perfil")
 }

@@ -27,3 +27,13 @@ export const SINCRONIA_DA_PAGINA = "sincronia-da-pagina";
 
 /** O job diário de faxina. */
 export const FAXINA_PERIODICA = "faxina";
+
+/**
+ * O Perfil da Empresa no Google, numa fila própria: uma recusa ou lentidão do
+ * Google não atrasa a sincronia da Meta, e vice-versa.
+ */
+export const PERFIL_DA_EMPRESA_QUEUE = "perfil-da-empresa";
+/** A rodada periódica: abre uma leitura por cliente com perfil escolhido. */
+export const LEITURA_DOS_PERFIS = "ler-todos-os-perfis";
+/** A leitura dos perfis de um cliente. */
+export const LEITURA_DO_PERFIL = "ler-perfil";

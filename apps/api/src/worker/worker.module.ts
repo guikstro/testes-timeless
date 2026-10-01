@@ -9,10 +9,12 @@ import {
   MANUTENCAO_QUEUE,
   EMAIL_QUEUE,
   META_SYNC_QUEUE,
+  PERFIL_DA_EMPRESA_QUEUE,
   WHATSAPP_EVENTS_QUEUE,
   WHATSAPP_SEND_QUEUE,
 } from "../common/queue/queue.constants";
 import { AgendaDeSincronia } from "./agenda-de-sincronia";
+import { AgendaDoPerfil } from "./agenda-do-perfil";
 import { EmailProcessor } from "./processors/email.processor";
 import { AgendaDeFaxina } from "./manutencao/agenda-de-faxina";
 import { FaxinaProcessor } from "./manutencao/faxina.processor";
@@ -32,6 +34,9 @@ import { WhatsAppSendProcessor } from "./processors/whatsapp-send.processor";
 import { WhatsAppSendService } from "./processors/whatsapp-send.service";
 import { MetaGraphClient } from "../integrations/meta/meta-graph-client";
 import { WhatsAppConnectionsModule } from "../integrations/whatsapp/whatsapp-connections.module";
+import { GoogleDoPerfilModule } from "../integrations/perfil-da-empresa/google-do-perfil.module";
+import { PerfilDaEmpresaProcessor } from "./processors/perfil-da-empresa.processor";
+import { PerfilDaEmpresaSyncService } from "./processors/perfil-da-empresa-sync.service";
 
 /**
  * Processadores das filas e agendas, rodando dentro do processo da API.
@@ -49,6 +54,7 @@ import { WhatsAppConnectionsModule } from "../integrations/whatsapp/whatsapp-con
     NotificationsModule,
     QueueModule,
     WhatsAppConnectionsModule,
+    GoogleDoPerfilModule,
     BullModule.registerQueue(
       { name: WHATSAPP_EVENTS_QUEUE },
       { name: WHATSAPP_SEND_QUEUE },
@@ -56,11 +62,15 @@ import { WhatsAppConnectionsModule } from "../integrations/whatsapp/whatsapp-con
       { name: META_CONVERSIONS_QUEUE },
       { name: MANUTENCAO_QUEUE },
       { name: EMAIL_QUEUE },
+      { name: PERFIL_DA_EMPRESA_QUEUE },
     ),
   ],
   providers: [
     AgendaDeSincronia,
     AgendaDeFaxina,
+    AgendaDoPerfil,
+    PerfilDaEmpresaProcessor,
+    PerfilDaEmpresaSyncService,
     FaxinaProcessor,
     FaxinaService,
     EmailProcessor,

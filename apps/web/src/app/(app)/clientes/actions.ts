@@ -102,3 +102,75 @@ export async function mudaFoco(organizationId: string, foco: string): Promise<{ 
   revalidatePath(`/clientes/${organizationId}`);
   return {};
 }
+
+// --- Perfil da Empresa no Google ------------------------------------------
+
+export interface SituacaoDoPerfil {
+  configurado: boolean;
+  enderecoDeRetorno: string;
+  conta: { email: string | null; conectadaEm: string; erro: string | null } | null;
+}
+
+export interface PerfilDoCliente {
+  locais: {
+    localId: string;
+    nome: string;
+    endereco: string | null;
+    numerosAte: string | null;
+    sincronizadoEm: string | null;
+    erro: string | null;
+  }[];
+}
+
+export interface LocalDoGoogle {
+  localId: string;
+  nome: string;
+  endereco: string | null;
+  cliente: { id: string; nome: string } | null;
+}
+
+/** O endereço do consentimento do Google. Quem navega é o botão, com a página inteira. */
+export async function iniciaPerfil(volta: string): Promise<{ url: string } | { error: string }> {
+  try {
+    return await apiFetch<{ url: string }>("/admin/perfil-da-empresa/inicio", { method: "POST", body: JSON.stringify({ volta }) });
+  } catch (error) {
+    return { error: mensagemDe(error, "Não foi possível começar a conexão com o Google.") };
+  }
+}
+
+export async function desconectaPerfil(organizationId: string): Promise<{ error?: string }> {
+  try {
+    await apiFetch("/admin/perfil-da-empresa", { method: "DELETE" });
+    revalidatePath(`/clientes/${organizationId}`);
+    return {};
+  } catch (error) {
+    return { error: mensagemDe(error, "Não foi possível desconectar a conta Google.") };
+  }
+}
+
+export async function locaisDoGoogle(): Promise<{ locais: LocalDoGoogle[]; contasRecusadas: number } | { error: string }> {
+  try {
+    return await apiFetch<{ locais: LocalDoGoogle[]; contasRecusadas: number }>("/admin/perfil-da-empresa/locais");
+  } catch (error) {
+    return { error: mensagemDe(error, "Não foi possível listar os perfis do Google.") };
+  }
+}
+
+export async function definePerfis(organizationId: string, locais: string[]): Promise<{ error?: string }> {
+  try {
+    await apiFetch(`/admin/organizations/${organizationId}/perfil-da-empresa`, { method: "PUT", body: JSON.stringify({ locais }) });
+    revalidatePath(`/clientes/${organizationId}`);
+    return {};
+  } catch (error) {
+    return { error: mensagemDe(error, "Não foi possível salvar os perfis.") };
+  }
+}
+
+export async function lePerfilAgora(organizationId: string): Promise<{ error?: string }> {
+  try {
+    await apiFetch(`/admin/organizations/${organizationId}/perfil-da-empresa/ler`, { method: "POST" });
+    return {};
+  } catch (error) {
+    return { error: mensagemDe(error, "Não foi possível pedir a leitura.") };
+  }
+}

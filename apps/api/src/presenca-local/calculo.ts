@@ -34,3 +34,17 @@ export function diasDa(janela: Janela): string[] {
   for (let dia = janela.de; dia <= janela.ate; dia = somaDias(dia, 1)) lista.push(dia);
   return lista;
 }
+
+/**
+ * As janelas do Perfil da Empresa, cortadas no último dia que o Google já
+ * contou (uns três dias de atraso), e a anterior com o mesmo número de dias,
+ * a partir do mesmo começo. Comparar 27 dias com 30 mostraria uma queda que
+ * não aconteceu. Null quando o período ainda não tem dia contado.
+ */
+export function janelasDoPerfil(atual: Janela, anterior: Janela, numerosAte: string | null): { atual: Janela; anterior: Janela } | null {
+  if (!numerosAte) return null;
+  const fim = numerosAte < atual.ate ? numerosAte : atual.ate;
+  if (fim < atual.de) return null;
+  const dias = diasDa({ de: atual.de, ate: fim }).length;
+  return { atual: { de: atual.de, ate: fim }, anterior: { de: anterior.de, ate: somaDias(anterior.de, dias - 1) } };
+}

@@ -3,7 +3,8 @@ import { PrismaService } from "../common/prisma/prisma.service";
 import { hojeLocal } from "../common/tempo";
 import { METRICAS_DA_PARTE } from "../integrations/google/script/converte-envio";
 import { VERSAO_DAS_ACOES_LOCAIS } from "../integrations/google/script/script-do-google-ads";
-import { custoPor, diasDa, Janela, janelas } from "./calculo";
+import { custoPor, diasDa, Janela, janelas, janelasDoPerfil } from "./calculo";
+import { VISUALIZACOES } from "../integrations/perfil-da-empresa/metricas-do-perfil";
 import { Cobertura, comecaAntes } from "../common/cobertura";
 
 /** As métricas que o painel mostra, e de qual parte do script cada uma vem. */
@@ -19,6 +20,22 @@ const PARTE_DA_METRICA: Record<Metrica, keyof typeof METRICAS_DA_PARTE> = {
 };
 
 type Par = { atual: number | null; anterior: number | null };
+
+/** O que a tela mostra do Perfil da Empresa. As visualizações são as quatro somadas. */
+const NUMEROS_DO_PERFIL = ["LIGACOES", "ROTAS", "CLIQUES_NO_SITE", "CONVERSAS", "RESERVAS", "VISUALIZACOES", "VISUALIZACOES_MAPS", "VISUALIZACOES_BUSCA"] as const;
+type NumeroDoPerfil = (typeof NUMEROS_DO_PERFIL)[number];
+
+/** De quais métricas guardadas cada número da tela sai. */
+const METRICAS_DO_NUMERO: Record<NumeroDoPerfil, string[]> = {
+  LIGACOES: ["LIGACOES"],
+  ROTAS: ["ROTAS"],
+  CLIQUES_NO_SITE: ["CLIQUES_NO_SITE"],
+  CONVERSAS: ["CONVERSAS"],
+  RESERVAS: ["RESERVAS"],
+  VISUALIZACOES: VISUALIZACOES,
+  VISUALIZACOES_MAPS: ["VISUALIZACOES_MAPS_CELULAR", "VISUALIZACOES_MAPS_COMPUTADOR"],
+  VISUALIZACOES_BUSCA: ["VISUALIZACOES_BUSCA_CELULAR", "VISUALIZACOES_BUSCA_COMPUTADOR"],
+};
 
 /** O que uma campanha fez numa janela. Ligação e rota são `null` quando não medidas. */
 interface LinhaDaCampanha {
@@ -67,12 +84,13 @@ export class PresencaLocalService {
     const { atual, anterior } = janelas(hoje, dias);
     const medicao = await this.medicao(organizationId);
 
-    const [metricasAtual, metricasAnterior, somaAtual, somaAnterior, campanhas] = await Promise.all([
+    const [metricasAtual, metricasAnterior, somaAtual, somaAnterior, campanhas, perfil] = await Promise.all([
       this.metricasPorDia(organizationId, atual),
       this.metricasPorDia(organizationId, anterior),
       this.somaDoGoogle(organizationId, atual),
       this.somaDoGoogle(organizationId, anterior),
       this.porCampanha(organizationId, atual, medicao),
+      this.doPerfil(organizationId, atual, anterior),
     ]);
 
     const total = (linhas: { metrica: string; valor: number }[], metrica: Metrica) =>
@@ -113,6 +131,88 @@ export class PresencaLocalService {
         return { dia, ligacoes: soma("LIGACOES_DOS_ANUNCIOS"), rotas: soma("ROTAS") };
       }),
       campanhas,
+      perfil,
+    };
+  }
+
+  /**
+   * O Perfil da Empresa no Google no período: o que o Google conta no perfil,
+   * na Busca e no Maps. Null quando a equipe não escolheu perfil para o
+   * cliente.
+   *
+   * O Google libera esses números com uns três dias de atraso: o período vai
+   * até onde ele já contou, e a comparação usa os mesmos dias do período
+   * anterior. Só conta local ligado agora: o número de um local tirado do
+   * cliente não aparece, nem enquanto a faxina não passa.
+   */
+  private async doPerfil(organizationId: string, atual: Janela, anterior: Janela) {
+    const locais = await this.prisma.localDoPerfil.findMany({
+      where: { organizationId },
+      select: { localId: true, nome: true, numerosAte: true, sincronizadoEm: true, erro: true },
+      orderBy: { nome: "asc" },
+    });
+    if (locais.length === 0) return null;
+
+    const ids = locais.map((local) => local.localId);
+    const dia = (data: Date | null) => data?.toISOString().slice(0, 10) ?? null;
+    // Com mais de um local, vale o que todos já contaram.
+    const contados = locais.map((local) => dia(local.numerosAte));
+    const numerosAte = contados.includes(null) ? null : contados.sort()[0];
+    const cabecalhoDoPerfil = {
+      locais: locais.map((local) => ({ nome: local.nome, numerosAte: dia(local.numerosAte) })),
+      numerosAte,
+      /** Algum local ainda não foi lido: o histórico está chegando. */
+      lendo: locais.some((local) => local.sincronizadoEm === null && local.erro === null),
+      /** O motivo fica na tela da equipe; o cliente só precisa saber que parou. */
+      comProblema: locais.some((local) => local.erro !== null),
+    };
+
+    const janelasCortadas = janelasDoPerfil(atual, anterior, numerosAte);
+    if (!janelasCortadas) return { ...cabecalhoDoPerfil, periodo: null, periodoAnterior: null, totais: null, serie: [] };
+
+    const [linhas, primeiro] = await Promise.all([
+      this.prisma.metricaLocal.findMany({
+        where: {
+          organizationId,
+          fonte: "PERFIL_DA_EMPRESA",
+          escopo: { in: ids },
+          dia: { gte: dataDe(janelasCortadas.anterior.de), lte: dataDe(janelasCortadas.atual.ate) },
+        },
+        select: { metrica: true, dia: true, valor: true },
+      }),
+      this.prisma.metricaLocal.aggregate({
+        where: { organizationId, fonte: "PERFIL_DA_EMPRESA", escopo: { in: ids } },
+        _min: { dia: true },
+      }),
+    ]);
+    const doDia = linhas.map((l) => ({ metrica: l.metrica, dia: l.dia.toISOString().slice(0, 10), valor: l.valor }));
+    const soma = (janela: Janela, numero: NumeroDoPerfil, de = janela.de, ate = janela.ate) =>
+      arredonda(
+        doDia
+          .filter((l) => l.dia >= de && l.dia <= ate && METRICAS_DO_NUMERO[numero].includes(l.metrica))
+          .reduce((total, l) => total + l.valor, 0),
+      );
+
+    // O período anterior começando antes do primeiro dia lido não tem com o que comparar.
+    const comparavel = !comecaAntes(janelasCortadas.anterior, dia(primeiro._min.dia));
+    const totais = Object.fromEntries(
+      NUMEROS_DO_PERFIL.map((numero) => [
+        numero,
+        { atual: soma(janelasCortadas.atual, numero), anterior: comparavel ? soma(janelasCortadas.anterior, numero) : null },
+      ]),
+    ) as Record<NumeroDoPerfil, Par>;
+
+    return {
+      ...cabecalhoDoPerfil,
+      periodo: janelasCortadas.atual,
+      periodoAnterior: comparavel ? janelasCortadas.anterior : null,
+      totais,
+      serie: diasDa(janelasCortadas.atual).map((d) => ({
+        dia: d,
+        ligacoes: soma(janelasCortadas.atual, "LIGACOES", d, d),
+        rotas: soma(janelasCortadas.atual, "ROTAS", d, d),
+        visualizacoes: soma(janelasCortadas.atual, "VISUALIZACOES", d, d),
+      })),
     };
   }
 

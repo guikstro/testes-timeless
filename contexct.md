@@ -279,3 +279,11 @@ Decisões do usuário: convite por link, um cliente por pessoa, cadastro públic
 - Script do Google na versão 3: cada envio declara o período; enquanto a API responder `historicoPendente`, a rodada manda o histórico desde o dia 1º do mês de 13 meses atrás, em blocos de 60 dias, uma vez só. Colunas `coberto_desde` e `historico_completo_em` em `google_ads_conexoes` (migration só acrescenta). Gasto gravado em lote.
 - Quem está na versão 2 continua medindo ligações e rotas; a tela de Integrações oferece o script novo por causa do histórico.
 - Regra completa em `docs/PRESENCA_LOCAL.md`, "Histórico e comparação".
+
+### Perfil da Empresa no Google na presença local (2026-10-01)
+- Pedido do usuário: adicionar o Google My Business (Perfil da Empresa) na seção de presença local.
+- Uma conta Google da equipe, conectada por OAuth na área da equipe (Clientes, um cliente, Perfil da Empresa no Google); em cada cliente a equipe escolhe o perfil. A lista de perfis só existe na área da equipe, e um perfil não pode ser de dois clientes.
+- Leitura numa fila própria (`perfil-da-empresa`): ano e meio de histórico ao escolher, depois a cada 6 horas as últimas duas semanas. Números em `metricas_locais` (fonte PERFIL_DA_EMPRESA), cortados no último dia que o Google já contou.
+- Painel de presença local ganhou a seção do perfil: ligações, rotas, cliques no site e visualizações (Maps e Busca), comparando os mesmos dias do período anterior.
+- Tabelas novas `contas_google_da_equipe` e `locais_do_perfil` (migration só acrescenta, com RLS).
+- Falta do lado do usuário: aprovação do Google para a API, cliente OAuth no Google Cloud e as variáveis `GOOGLE_OAUTH_CLIENT_ID` e `GOOGLE_OAUTH_CLIENT_SECRET` na API do Render. Passo a passo em `docs/PRESENCA_LOCAL.md`, "Perfil da Empresa no Google".

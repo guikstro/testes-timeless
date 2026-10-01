@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
 import { BullModule } from "@nestjs/bullmq";
 import { getRedisConnectionOptions } from "./redis-connection";
-import { META_SYNC_QUEUE, WHATSAPP_EVENTS_QUEUE } from "./queue.constants";
+import { META_SYNC_QUEUE, PERFIL_DA_EMPRESA_QUEUE, WHATSAPP_EVENTS_QUEUE } from "./queue.constants";
 
 /**
  * Producer-side registration: import this wherever a job needs to be
@@ -11,7 +11,7 @@ import { META_SYNC_QUEUE, WHATSAPP_EVENTS_QUEUE } from "./queue.constants";
 @Module({
   imports: [
     BullModule.forRoot({ connection: getRedisConnectionOptions() }),
-    BullModule.registerQueue({ name: WHATSAPP_EVENTS_QUEUE }, { name: META_SYNC_QUEUE }),
+    BullModule.registerQueue({ name: WHATSAPP_EVENTS_QUEUE }, { name: META_SYNC_QUEUE }, { name: PERFIL_DA_EMPRESA_QUEUE }),
   ],
   exports: [BullModule],
 })

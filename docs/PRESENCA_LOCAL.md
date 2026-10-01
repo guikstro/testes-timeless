@@ -81,24 +81,83 @@ Zero é medida; ausência é "Sem medida". O painel diz em que situação está:
 
 ## Rotas da API
 
-- `GET /api/presenca-local?days=7|30|90`: o painel, com o período anterior.
+- `GET /api/presenca-local?days=7|30|90`: o painel, com o período anterior e o Perfil da Empresa.
 - `GET /api/presenca-local/campanhas?de&ate[&compararDe&compararAte]`: cada
   campanha num mês livre, com comparação, para a tela de campanhas.
 - `PUT /api/admin/organizations/:id/foco`: a troca do foco, só a equipe.
 
-## Perfil da Empresa no Google (próxima fase)
+## Perfil da Empresa no Google
 
-As ligações e rotas que não vêm de anúncio, e as visualizações do perfil no
-Maps e na busca, vêm da API de desempenho do Perfil da Empresa. Antes de usar:
+As ligações, os pedidos de rota, os cliques no site e as visualizações do
+perfil na Busca e no Maps, com ou sem anúncio. Aparecem numa seção própria do
+painel de presença local, e não somados aos números dos anúncios: são duas
+contagens diferentes do Google, e uma ligação pode estar nas duas.
 
-- O Google exige que toda agência tenha uma conta de organização no Perfil da
-  Empresa (`business.google.com/agencysignup`, com e-mail do domínio da
-  agência) e aprove o projeto da equipe Timeless no Google Cloud
-  ("Application for Basic API Access"). Sem aprovação, a cota fica em 0 pedidos
-  por minuto; aprovado, 300.
-- O perfil de cada cliente é ligado à organização: a organização pede acesso
-  em Gerenciar convites, no Gerenciador de Perfis, e o dono do perfil aprova.
+### Como configurar (uma vez)
 
-Depois disso, a conexão será por "Entrar com Google" com a conta da equipe.
-Os números entram na mesma tabela, com a fonte `PERFIL_DA_EMPRESA`, e chegam
-com uns três dias de atraso, que é o tempo do próprio Google.
+1. **Organização da agência no Perfil da Empresa**
+   (`business.google.com/agencysignup`, com e-mail do domínio da agência). O
+   perfil de cada cliente é ligado a ela: a organização pede acesso de gerente
+   em Gerenciar convites, no Gerenciador de Perfis, e o dono do perfil aprova.
+2. **Projeto no Google Cloud**, com estas APIs ativadas: My Business Account
+   Management API, My Business Business Information API e Business Profile
+   Performance API. O Google precisa aprovar o projeto ("Application for Basic
+   API Access", no formulário de acesso à API do Perfil da Empresa). Antes da
+   aprovação a cota é 0 pedidos por minuto, e a tela mostra a recusa do Google
+   ("não liberou cota"); aprovado, 300.
+3. **Tela de consentimento OAuth.** Com Google Workspace, tipo **Interno**:
+   sem revisão do Google e sem prazo no acesso. Se for Externo, publique **Em
+   produção**: em "Teste", o Google derruba o acesso a cada 7 dias, e a leitura
+   para com "a conta perdeu o acesso".
+4. **Credencial OAuth**, tipo "Aplicativo da Web", com o URI de
+   redirecionamento autorizado
+   `https://timeless-crm.onrender.com/clientes/perfil-da-empresa/retorno`
+   (a primeira origem de `WEB_APP_URL` + `/clientes/perfil-da-empresa/retorno`;
+   a tela da equipe mostra o endereço exato).
+5. **No Render, serviço da API:** `GOOGLE_OAUTH_CLIENT_ID` e
+   `GOOGLE_OAUTH_CLIENT_SECRET`.
+6. **Na Timeless:** Clientes, um cliente, Perfil da Empresa no Google,
+   "Conectar conta Google", com a conta da equipe que gerencia a organização.
+   A conta é uma só para todos os clientes; só quem administra a plataforma
+   conecta e desconecta.
+7. Em cada cliente, "Escolher perfil". O mesmo perfil não pode ser de dois
+   clientes, e a lista (que tem os perfis de todos) só existe na área da
+   equipe.
+
+### Como roda
+
+- Uma conta Google da equipe, e não uma por cliente: o Google guarda no máximo
+  100 tokens de uma conta num mesmo app, e o 101º invalida o mais antigo sem
+  aviso. Fica em `contas_google_da_equipe`, com o token de renovação cifrado.
+  O token de acesso dura uma hora e fica só na memória.
+- O `state` do OAuth é assinado, vale 15 minutos e só conclui com o mesmo
+  operador que começou: um link de retorno com o código de outra conta Google
+  é recusado.
+- Ao escolher o perfil, a fila `perfil-da-empresa` lê um ano e meio de
+  histórico, em trechos de 180 dias do mais novo para o mais antigo; um trecho
+  antigo recusado encerra a volta no tempo sem perder o resto. Depois, a cada
+  6 horas, relê as últimas duas semanas, que o Google ainda acerta.
+- Os números ficam em `metricas_locais`, com a fonte `PERFIL_DA_EMPRESA` e o
+  local (`locations/123`) no `escopo`. O Google omite o valor quando ele é
+  zero, e o dia sem valor vira zero; mas os últimos dias também chegam sem
+  valor enquanto ele não conta (uns três dias de atraso), então o trecho mais
+  novo é cortado no último dia com número (`locais_do_perfil.numeros_ate`).
+- O painel corta o período nesse dia e compara com os mesmos dias do período
+  anterior: 27 dias contra 30 mostrariam uma queda que não aconteceu.
+- Tirar um perfil do cliente apaga os números dele deste cliente. A leitura
+  também só conta local ligado agora.
+- Recusa do Google (permissão, cota, perfil removido) fica escrita no local,
+  na tela da equipe, sem tentar de novo em segundos; o cliente vê só que a
+  leitura parou. Acesso revogado marca a conta, e a rodada para até alguém
+  conectar de novo. Erro de rede volta para a fila.
+
+### Rotas da API (todas da administração)
+
+- `GET /api/admin/perfil-da-empresa`: configuração, conta e endereço de retorno.
+- `POST /api/admin/perfil-da-empresa/inicio` e `.../conexao`: o OAuth (só ADMIN).
+- `DELETE /api/admin/perfil-da-empresa`: desconecta e revoga no Google (só ADMIN).
+- `GET /api/admin/perfil-da-empresa/locais`: os perfis que a conta enxerga.
+- `GET|PUT /api/admin/organizations/:id/perfil-da-empresa` e `POST .../ler`.
+
+O teste de ponta a ponta (`test/perfil-da-empresa.e2e-spec.ts`) roda contra um
+dublê que imita a documentação do Google, com `GOOGLE_API_BASE_URL`.

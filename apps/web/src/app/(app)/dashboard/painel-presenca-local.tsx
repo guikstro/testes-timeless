@@ -7,6 +7,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/table";
 import { formatCentsAsBRL } from "@/lib/currency";
 import { tempoRelativo } from "@/lib/relative-time";
+import { formataDia } from "@/lib/periodo";
 import { StatCard } from "./stat-card";
 import { LeadsAreaChart } from "./leads-area-chart";
 
@@ -30,6 +31,8 @@ export interface PresencaLocal extends MedicaoLocal {
   investimento: Par;
   custo: { porLigacao: Par; porRota: Par };
   serie: { dia: string; ligacoes: number | null; rotas: number | null }[];
+  /** O Perfil da Empresa no Google. Null sem perfil escolhido; ausente na API anterior. */
+  perfil?: PerfilNoPainel | null;
   /** Ligação e rota `null` quando a parte do script que as mede não está chegando. */
   campanhas: {
     externalId: string;
@@ -41,6 +44,24 @@ export interface PresencaLocal extends MedicaoLocal {
     ligacoes: number | null;
     rotas: number | null;
   }[];
+}
+
+/** O que o Google conta no perfil da empresa, cortado no último dia que ele já contou. */
+export interface PerfilNoPainel {
+  locais: { nome: string; numerosAte: string | null }[];
+  numerosAte: string | null;
+  /** O histórico ainda está chegando. */
+  lendo: boolean;
+  /** A leitura parou; o motivo está na tela da equipe. */
+  comProblema: boolean;
+  periodo: { de: string; ate: string } | null;
+  /** Null quando o período anterior começa antes do primeiro dia lido. */
+  periodoAnterior: { de: string; ate: string } | null;
+  totais: Record<
+    "LIGACOES" | "ROTAS" | "CLIQUES_NO_SITE" | "CONVERSAS" | "RESERVAS" | "VISUALIZACOES" | "VISUALIZACOES_MAPS" | "VISUALIZACOES_BUSCA",
+    Par
+  > | null;
+  serie: { dia: string; ligacoes: number; rotas: number; visualizacoes: number }[];
 }
 
 const variacao = ({ atual, anterior }: Par): number | null =>
@@ -152,13 +173,75 @@ export function PainelPresencaLocal({ dados }: { dados: PresencaLocal }) {
         />
       </Card>
 
-      <p className="text-apoio text-ink-mute">
-        Ligações e rotas que não vieram de anúncio, as do Perfil da Empresa no Google, entram aqui quando a
-        conexão com o Perfil da Empresa for liberada pelo Google.
-      </p>
+      {dados.perfil ? (
+        <SecaoDoPerfil perfil={dados.perfil} />
+      ) : (
+        <p className="text-apoio text-ink-mute">
+          As ligações, rotas e visualizações do Perfil da Empresa no Google aparecem aqui quando a equipe Timeless
+          ligar o perfil deste cliente.
+        </p>
+      )}
     </div>
   );
 }
+
+/**
+ * O Perfil da Empresa no Google: o que acontece no perfil, na Busca e no
+ * Maps, com ou sem anúncio.
+ *
+ * Seção própria, e não somada aos números dos anúncios: são duas contagens
+ * diferentes do Google, e uma ligação pode aparecer nas duas.
+ */
+function SecaoDoPerfil({ perfil }: { perfil: PerfilNoPainel }) {
+  const { totais } = perfil;
+  // Sem o período anterior inteiro lido, a porcentagem compararia com menos dias.
+  const comparar = perfil.periodoAnterior !== null;
+  const serieDe = (campo: "ligacoes" | "rotas" | "visualizacoes") => perfil.serie.map((d) => d[campo]);
+
+  return (
+    <section className="space-y-4" aria-labelledby="titulo-do-perfil">
+      <div>
+        <h2 id="titulo-do-perfil" className="font-display text-destaque font-semibold tracking-tight text-ink">
+          Perfil da Empresa no Google
+        </h2>
+        <p className="mt-0.5 text-apoio text-ink-mute">
+          {perfil.locais.map((local) => local.nome).join(", ")}. O que o Google conta no perfil, na Busca e no Maps
+          {perfil.numerosAte ? `, até ${formataDia(perfil.numerosAte)}: ele libera esses números com uns três dias de atraso` : ""}.
+          {comparar ? " A comparação usa os mesmos dias do período anterior." : ""}
+        </p>
+      </div>
+
+      {perfil.comProblema ? (
+        <Alert tom="warning" titulo="A leitura do perfil está parada">
+          Os números abaixo são os que já tinham chegado. Fale com a equipe Timeless.
+        </Alert>
+      ) : null}
+
+      {!totais ? (
+        <p className="text-corpo text-ink-soft">
+          {perfil.lendo
+            ? "Lendo o histórico do perfil. Os números aparecem em alguns minutos."
+            : "O Google ainda não contou nenhum dia deste período."}
+        </p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Numero rotulo="Ligações pelo perfil" par={totais.LIGACOES} serie={serieDe("ligacoes")} comparar={comparar} />
+          <Numero rotulo="Pedidos de rota pelo perfil" par={totais.ROTAS} serie={serieDe("rotas")} comparar={comparar} />
+          <Numero rotulo="Cliques no site" par={totais.CLIQUES_NO_SITE} comparar={comparar} />
+          <Numero
+            rotulo="Visualizações do perfil"
+            par={totais.VISUALIZACOES}
+            serie={serieDe("visualizacoes")}
+            comparar={comparar}
+            nota={`${inteiro(totais.VISUALIZACOES_MAPS.atual)} no Maps, ${inteiro(totais.VISUALIZACOES_BUSCA.atual)} na Busca`}
+          />
+        </div>
+      )}
+    </section>
+  );
+}
+
+const inteiro = (valor: number | null) => (valor ?? 0).toLocaleString("pt-BR");
 
 /** O aviso de quando ligação e rota não estão chegando, e o que fazer. */
 export function SituacaoDaMedicao({ medicao: dados }: { medicao: MedicaoLocal }) {
