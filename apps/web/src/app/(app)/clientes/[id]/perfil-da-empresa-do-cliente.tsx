@@ -120,8 +120,14 @@ export function PerfilDaEmpresaDoCliente({
       ) : (
         <div className="mt-4">
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-corpo text-ink">
-            <span className={`inline-block h-2.5 w-2.5 rounded-full ${situacao.conta.erro ? "bg-amber-500" : "bg-emerald-500"}`} aria-hidden />
-            Conta da equipe: {situacao.conta.email ?? "conectada"}
+            {/* O ponto e o texto juntos: no celular, o ponto ficava sozinho numa linha. */}
+            <span className="inline-flex min-w-0 items-center gap-2">
+              <span
+                className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${situacao.conta.erro ? "bg-amber-500" : "bg-emerald-500"}`}
+                aria-hidden
+              />
+              <span className="min-w-0 break-words">Conta da equipe: {situacao.conta.email ?? "conectada"}</span>
+            </span>
             <span className="text-ink-mute">
               · desde {new Date(situacao.conta.conectadaEm).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
             </span>
