@@ -5,6 +5,7 @@ import { Alert } from "@/components/ui/alert";
 import { ConnectMetaForm } from "./connect-form";
 import { ConnectionActions } from "./connection-actions";
 import { ConnectMetaCapiForm } from "./capi-connect-form";
+import { PaginaDaMetaForm } from "./pagina-form";
 
 interface MetaConnection {
   id: string;
@@ -14,6 +15,11 @@ interface MetaConnection {
   lastSyncError: string | null;
   /** Até quando a Meta bloqueou as chamadas por excesso de pedidos. */
   limitadaAte: string | null;
+  /** A Página do Facebook dos Insights. Opcionais: uma API anterior a eles não manda os campos. */
+  paginaId?: string | null;
+  paginaNome?: string | null;
+  paginaSincronizadaEm?: string | null;
+  paginaErro?: string | null;
   connectedAt: string;
   disconnectedAt: string | null;
   pixelId: string | null;
@@ -194,6 +200,8 @@ export default async function MetaIntegrationPage() {
 
       <ConnectMetaForm />
 
+      {connection && !desligada ? <SecaoDaPagina connection={connection} /> : null}
+
       {connection ? (
         <div className="mt-8">
           <h2 className="mb-3 text-corpo font-semibold text-ink">Campanhas sincronizadas</h2>
@@ -307,4 +315,62 @@ function horaDeBrasilia(instante: string): string {
     minute: "2-digit",
     timeZone: "America/Sao_Paulo",
   });
+}
+
+/**
+ * A Página do Facebook, para os números da tela de Insights da Meta.
+ *
+ * Fica aqui, ao lado da conta de anúncios, porque usa o mesmo token: o
+ * usuário do sistema só precisa ter a Página entre os ativos dele e as
+ * permissões de leitura. O passo a passo vai junto, porque é exatamente onde
+ * quem configura vai travar.
+ */
+function SecaoDaPagina({ connection }: { connection: MetaConnection }) {
+  const paginaId = connection.paginaId ?? null;
+  return (
+    <section className="mt-8 rounded-xl border border-line bg-panel p-6">
+      <h2 className="text-corpo font-semibold text-ink">Página do Facebook</h2>
+      <p className="mt-1 text-apoio leading-relaxed text-ink-mute">
+        Os números da tela de Insights da Página: visualizações, visitas, interações, seguidores e vídeos. Eles aparecem
+        no painel, na aba Página, e são lidos de hora em hora.
+      </p>
+
+      {paginaId ? (
+        <div className="mt-4 space-y-1.5 text-corpo text-ink-soft">
+          <p>
+            <span className="font-medium">Página:</span> {connection.paginaNome ?? paginaId}
+            {connection.paginaNome ? <span className="text-ink-mute"> ({paginaId})</span> : null}
+          </p>
+          <p>
+            <span className="font-medium">Última leitura:</span>{" "}
+            {connection.paginaSincronizadaEm ? new Date(connection.paginaSincronizadaEm).toLocaleString("pt-BR") : "Ainda não"}
+          </p>
+          {connection.paginaErro ? (
+            <p className="text-danger">
+              <span className="font-medium">Erro:</span> {connection.paginaErro}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="mt-4">
+        <PaginaDaMetaForm paginaId={paginaId} />
+      </div>
+
+      <details className="mt-4 text-apoio leading-relaxed text-ink-mute">
+        <summary className="cursor-pointer font-medium text-ink-soft">O que a Meta precisa para a leitura funcionar</summary>
+        <ol className="mt-2 list-decimal space-y-1.5 pl-5">
+          <li>
+            Em Configurações do negócio, Usuários do sistema, adicione a Página aos ativos do usuário do sistema, com
+            permissão de ver o desempenho.
+          </li>
+          <li>
+            Gere o token desse usuário com pages_show_list, pages_read_engagement e read_insights, além de ads_read, e
+            cole na conexão acima.
+          </li>
+          <li>O id da Página aparece no endereço do Business, depois de asset_id=, e em Configurações da Página.</li>
+        </ol>
+      </details>
+    </section>
+  );
 }

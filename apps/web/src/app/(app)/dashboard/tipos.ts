@@ -95,6 +95,33 @@ export interface FunilDoPeriodo {
   };
 }
 
+/** Os números da Página num período. Null em cada um quando nenhum dia trouxe a métrica. */
+export interface ResumoDaPagina {
+  visualizacoes: number | null;
+  visitas: number | null;
+  interacoes: number | null;
+  novosSeguidores: number | null;
+  deixaramDeSeguir: number | null;
+  seguidoresLiquidos: number | null;
+  /** Total de seguidores no último dia lido do período. */
+  seguidores: number | null;
+  videos: number | null;
+  tempoDeVideoSegundos: number | null;
+}
+
+/** O que a rota `GET /analytics/pagina` devolve. */
+export interface InsightsDaPagina {
+  periodo: { de: string; ate: string };
+  anterior: { de: string; ate: string };
+  /** Null quando nenhuma Página foi escolhida em Integrações. */
+  pagina: { id: string; nome: string | null; sincronizadaEm: string | null; erro: string | null } | null;
+  atual: ResumoDaPagina;
+  comparacao: ResumoDaPagina;
+  /** Pessoas únicas nos 7 e nos 28 dias até `ate`: a Meta não dá o total de um período qualquer. */
+  visualizadores: { semana: { valor: number; ate: string } | null; mes: { valor: number; ate: string } | null };
+  porDia: { dia: string; visualizacoes: number | null; visitas: number | null; interacoes: number | null; novosSeguidores: number | null }[];
+}
+
 /** Null é "não houve base para calcular"; 0% afirmaria que ninguém converteu. */
 export function formatRate(rate: number | null): string {
   if (rate === null) return "Sem base";

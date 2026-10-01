@@ -1,5 +1,5 @@
 import { formatCentsAsBRL } from "@/lib/currency";
-import type { ChaveDaEtapa, EtapaMedida, FunilDoPeriodo, Overview } from "./tipos";
+import type { ChaveDaEtapa, EtapaMedida, FunilDoPeriodo, InsightsDaPagina, Overview } from "./tipos";
 
 /**
  * A primeira linha de cada aba, escrita a partir dos números.
@@ -174,4 +174,26 @@ export function duracaoCurta(segundos: number): string {
 
   const dias = Math.round(horas / 24);
   return `${dias} ${dias === 1 ? "dia" : "dias"}`;
+}
+
+/**
+ * A primeira linha da aba Página: o alcance e o saldo de seguidores.
+ *
+ * As duas perguntas de quem abre os Insights: quanta gente viu, e a Página
+ * cresceu ou encolheu. O resto está nos cartões.
+ */
+export function concluiPagina(dados: InsightsDaPagina | null): string {
+  if (!dados) return "Os números da Página não carregaram agora.";
+  if (!dados.pagina) return "Escolha a Página do Facebook em Integrações para ver os números dela aqui.";
+
+  const { visualizacoes, seguidoresLiquidos } = dados.atual;
+  if (visualizacoes === null) return "A Página ainda não tem números lidos neste período.";
+
+  const vistas = `${visualizacoes.toLocaleString("pt-BR")} ${visualizacoes === 1 ? "visualização" : "visualizações"}`;
+  if (seguidoresLiquidos === null) return `${vistas} no período.`;
+  if (seguidoresLiquidos === 0) return `${vistas} e o mesmo número de seguidores do começo do período.`;
+
+  const quantos = Math.abs(seguidoresLiquidos).toLocaleString("pt-BR");
+  const palavra = Math.abs(seguidoresLiquidos) === 1 ? "seguidor" : "seguidores";
+  return `${vistas} e ${quantos} ${palavra} ${seguidoresLiquidos > 0 ? "a mais" : "a menos"}.`;
 }

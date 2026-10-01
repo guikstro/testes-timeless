@@ -72,3 +72,39 @@ export async function connectMetaCapi(
   revalidatePath("/integrations/meta");
   return {};
 }
+
+export interface PaginaDaMetaState {
+  error?: string;
+  ok?: boolean;
+}
+
+/**
+ * Escolhe ou troca a Página do Facebook dos Insights. A API lê o histórico
+ * logo em seguida, então a aba Página do painel já nasce com três meses.
+ */
+export async function definePaginaDaMeta(_prevState: PaginaDaMetaState, formData: FormData): Promise<PaginaDaMetaState> {
+  const paginaId = String(formData.get("paginaId") ?? "").replace(/\s/g, "");
+  if (!/^\d{5,25}$/.test(paginaId)) {
+    return { error: "Informe o id da Página, só os números. Ele aparece no endereço do Business, depois de asset_id=." };
+  }
+
+  try {
+    await apiFetch("/integrations/meta/pagina", { method: "PUT", body: JSON.stringify({ paginaId }) });
+  } catch (error) {
+    if (error instanceof ApiRequestError) return { error: error.body.message };
+    return { error: "Não foi possível salvar a Página." };
+  }
+
+  revalidatePath("/integrations/meta");
+  return { ok: true };
+}
+
+export async function tiraPaginaDaMeta(): Promise<void> {
+  await apiFetch("/integrations/meta/pagina", { method: "PUT", body: JSON.stringify({ paginaId: null }) });
+  revalidatePath("/integrations/meta");
+}
+
+export async function leiaPaginaDaMeta(): Promise<void> {
+  await apiFetch("/integrations/meta/pagina/sync", { method: "POST" });
+  revalidatePath("/integrations/meta");
+}

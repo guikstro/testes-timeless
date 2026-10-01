@@ -17,6 +17,8 @@ export interface FrescorDaFonte {
 export interface Frescor {
   meta: FrescorDaFonte | null;
   google: FrescorDaFonte | null;
+  /** A Página do Facebook dos Insights. Opcional: uma API anterior a ela não manda o campo. */
+  pagina?: FrescorDaFonte | null;
 }
 
 type Fonte = keyof Frescor;
@@ -24,6 +26,7 @@ type Fonte = keyof Frescor;
 const FONTES: Record<Fonte, { nome: string; atualizado: string }> = {
   meta: { nome: "Meta", atualizado: "atualizada" },
   google: { nome: "Google Ads", atualizado: "atualizado" },
+  pagina: { nome: "Página", atualizado: "lida" },
 };
 
 /*

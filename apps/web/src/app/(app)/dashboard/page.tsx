@@ -14,8 +14,9 @@ import { AbaFunil } from "./aba-funil";
 import { AbaOrigem } from "./aba-origem";
 import { AbaAtendimento } from "./aba-atendimento";
 import { Procedencia } from "./procedencia";
-import { concluiAtendimento, concluiFunil, concluiOrigem, concluiVisaoGeral } from "./conclusao";
-import { FunilDoPeriodo, Overview } from "./tipos";
+import { concluiAtendimento, concluiFunil, concluiOrigem, concluiPagina, concluiVisaoGeral } from "./conclusao";
+import { FunilDoPeriodo, InsightsDaPagina, Overview } from "./tipos";
+import { AbaPagina } from "./aba-pagina";
 import { Alert } from "@/components/ui/alert";
 import { Frescor, FrescorDosDados } from "@/components/ui/frescor";
 import { sessaoAtual } from "@/lib/sessao";
@@ -45,7 +46,10 @@ const ABAS_DE_LEADS = [
 /** Para quem tem os dois focos, a presença local vira mais uma aba. */
 const ABA_LOCAL = { chave: "local", rotulo: "Presença local", conclui: () => "" } as const;
 
-type Aba = (typeof ABAS_DE_LEADS)[number]["chave"] | "local";
+/** Com uma Página do Facebook escolhida em Integrações, os Insights dela viram mais uma aba. */
+const ABA_PAGINA = { chave: "pagina", rotulo: "Página", conclui: () => "" } as const;
+
+type Aba = (typeof ABAS_DE_LEADS)[number]["chave"] | "local" | "pagina";
 
 export default async function DashboardPage({
   searchParams,
@@ -59,19 +63,27 @@ export default async function DashboardPage({
   // Só presença local: o painel inteiro é o do Google, sem nada de lead.
   if (organization.foco === "PRESENCA_LOCAL") return <DashboardDePresencaLocal days={days} />;
 
-  const ABAS = temPresencaLocal(organization.foco) ? [...ABAS_DE_LEADS, ABA_LOCAL] : ABAS_DE_LEADS;
+  // O frescor diz se há Página escolhida, e por isso vem antes das abas.
+  const frescor = await buscaFrescor();
+  const ABAS = [
+    ...ABAS_DE_LEADS,
+    ...(temPresencaLocal(organization.foco) ? [ABA_LOCAL] : []),
+    ...(frescor?.pagina ? [ABA_PAGINA] : []),
+  ];
   const aba: Aba = ABAS.some((opcao) => opcao.chave === params.aba) ? (params.aba as Aba) : "geral";
   const local = aba === "local" ? await apiFetch<PresencaLocal>(`/presenca-local?days=${days}`) : null;
 
   // Os recortes do funil só existem na aba dele; nas outras, a URL nem os leva.
   const recortes = aba === "funil" ? recortesDoFunil(params) : null;
 
-  const [overview, conexao, frescor, funil] = await Promise.all([
+  const [overview, conexao, funil, pagina] = await Promise.all([
     apiFetch<Overview>(`/analytics/overview?days=${days}`),
     conexaoDoWhatsApp(),
-    buscaFrescor(),
     recortes ? buscaFunil(days, recortes) : Promise.resolve(null),
+    aba === "pagina" ? buscaPagina(days) : Promise.resolve(null),
   ]);
+  // Os números da Página não dependem do WhatsApp nem de lead nenhum.
+  const naPagina = aba === "pagina";
   const { totals, setup } = overview;
 
   const de = overview.period.from.slice(0, 10);
@@ -80,7 +92,10 @@ export default async function DashboardPage({
 
   // Sem o WhatsApp medindo, as abas de lead não têm o que mostrar; a de
   // presença local continua, porque quem mede ligação e rota é o Google.
-  const abasVisiveis = medicao === "medido" ? ABAS : ABAS.filter((opcao) => opcao.chave === "geral" || opcao.chave === "local");
+  const abasVisiveis =
+    medicao === "medido"
+      ? ABAS
+      : ABAS.filter((opcao) => opcao.chave === "geral" || opcao.chave === "local" || opcao.chave === "pagina");
 
   // Só quando não há medida: é o que se sabe do período sem o WhatsApp, e a
   // tela precisa ter algo verdadeiro para mostrar no lugar das abas.
@@ -100,7 +115,9 @@ export default async function DashboardPage({
 
   const subtitulo = local
     ? concluiPresencaLocal(local)
-    : medicao !== "medido"
+    : naPagina
+      ? concluiPagina(pagina)
+      : medicao !== "medido"
       ? "Sem WhatsApp recebendo, não há lead para medir neste período."
       : aba === "funil"
         ? funil
@@ -136,8 +153,8 @@ export default async function DashboardPage({
             <p className="mt-0.5 text-corpo text-ink-mute">{subtitulo}</p>
             <FrescorDosDados
               frescor={frescor}
-              fontes={local ? ["google"] : ["meta", "google"]}
-              aoVivo={!local && medicao === "medido"}
+              fontes={local ? ["google"] : naPagina ? ["pagina"] : ["meta", "google"]}
+              aoVivo={!local && !naPagina && medicao === "medido"}
               className="mt-2"
             />
           </div>
@@ -178,7 +195,17 @@ export default async function DashboardPage({
 
       {local ? <PainelPresencaLocal dados={local} /> : null}
 
-      {!local && medicao !== "medido" ? (
+      {naPagina ? (
+        pagina ? (
+          <AbaPagina dados={pagina} dias={days} />
+        ) : (
+          <Alert tom="warning" titulo="Não foi possível carregar os números da Página agora">
+            As outras abas continuam funcionando. Tente de novo em alguns instantes.
+          </Alert>
+        )
+      ) : null}
+
+      {!local && !naPagina && medicao !== "medido" ? (
         <SemMedicao
           medicao={medicao}
           desde={conexao ? inicioDaMedicao(conexao) : null}
@@ -208,7 +235,7 @@ export default async function DashboardPage({
         acrescenta o que fazer a respeito, que é outra coisa, e por isso ele
         continua condicionado.
       */}
-      {!local && medicao === "medido" && maioriaSemOrigem ? (
+      {!local && !naPagina && medicao === "medido" && maioriaSemOrigem ? (
         <Alert tom="warning" className="mt-6" titulo="A maior parte dos leads está sem origem identificada.">
           <p>
             A origem só é registrada quando a pessoa chega por um anúncio Click-to-WhatsApp ou por um link
@@ -238,7 +265,7 @@ export default async function DashboardPage({
         </Alert>
       ) : null}
 
-      {!local && medicao === "medido" ? <Procedencia overview={overview} /> : null}
+      {!local && !naPagina && medicao === "medido" ? <Procedencia overview={overview} /> : null}
     </div>
   );
 }
@@ -374,6 +401,20 @@ async function buscaFunil(days: number, recortes: Record<string, string>): Promi
   const consulta = new URLSearchParams({ days: String(days), ...recortes });
   try {
     return await apiFetch<FunilDoPeriodo>(`/analytics/funil?${consulta.toString()}`);
+  } catch (erro) {
+    unstable_rethrow(erro);
+    return null;
+  }
+}
+
+/**
+ * Os Insights da Página, ou null quando a consulta falha: só esta aba depende
+ * deles, e uma falha aqui vira um aviso dentro dela. A sessão encerrada passa
+ * adiante (`unstable_rethrow`).
+ */
+async function buscaPagina(days: number): Promise<InsightsDaPagina | null> {
+  try {
+    return await apiFetch<InsightsDaPagina>(`/analytics/pagina?days=${days}`);
   } catch (erro) {
     unstable_rethrow(erro);
     return null;

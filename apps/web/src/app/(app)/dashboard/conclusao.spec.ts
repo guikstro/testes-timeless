@@ -3,11 +3,12 @@ import {
   concluiFunil,
   concluiOrigem,
   concluiVisaoGeral,
+  concluiPagina,
   duracaoCurta,
   maiorPerda,
 } from "./conclusao";
 import { formatCentsAsBRL } from "@/lib/currency";
-import type { ChaveDaEtapa, EtapaMedida, FunilDoPeriodo, Overview, OriginBucket } from "./tipos";
+import type { ChaveDaEtapa, EtapaMedida, FunilDoPeriodo, InsightsDaPagina, Overview, OriginBucket } from "./tipos";
 
 /*
   O real formatado carrega espaço não separável entre "R$" e o número, porque
@@ -229,5 +230,41 @@ describe("duracaoCurta", () => {
     expect(duracaoCurta(60)).toBe("1 minuto");
     expect(duracaoCurta(3_600)).toBe("1 hora");
     expect(duracaoCurta(86_400)).toBe("1 dia");
+  });
+});
+
+describe("concluiPagina", () => {
+  function pagina(visualizacoes: number | null, seguidoresLiquidos: number | null): InsightsDaPagina {
+    const resumo = {
+      visualizacoes,
+      visitas: null,
+      interacoes: null,
+      novosSeguidores: null,
+      deixaramDeSeguir: null,
+      seguidoresLiquidos,
+      seguidores: null,
+      videos: null,
+      tempoDeVideoSegundos: null,
+    };
+    return {
+      periodo: { de: "2026-09-01", ate: "2026-09-30" },
+      anterior: { de: "2026-08-02", ate: "2026-08-31" },
+      pagina: { id: "1", nome: "Ótica", sincronizadaEm: null, erro: null },
+      atual: resumo,
+      comparacao: resumo,
+      visualizadores: { semana: null, mes: null },
+      porDia: [],
+    };
+  }
+
+  it("diz quanta gente viu e se a Página cresceu", () => {
+    expect(concluiPagina(pagina(327_300, 15))).toBe("327.300 visualizações e 15 seguidores a mais.");
+    expect(concluiPagina(pagina(10, -1))).toBe("10 visualizações e 1 seguidor a menos.");
+    expect(concluiPagina(pagina(1, 0))).toBe("1 visualização e o mesmo número de seguidores do começo do período.");
+  });
+
+  it("separa Página não escolhida de período sem leitura", () => {
+    expect(concluiPagina({ ...pagina(null, null), pagina: null })).toContain("Escolha a Página");
+    expect(concluiPagina(pagina(null, null))).toBe("A Página ainda não tem números lidos neste período.");
   });
 });

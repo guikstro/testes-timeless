@@ -254,3 +254,15 @@ Decisões do usuário: convite por link, um cliente por pessoa, cadastro públic
 - Coluna nova `meta_connections.limitada_ate` (migration só acrescenta). Enquanto não passa, nada chama a Meta; uma única tentativa fica marcada para o fim do bloqueio; a agenda de hora em hora pula a conta; pedidos manuais durante o bloqueio ficam para o fim dele. A tela de integração mostra a hora.
 - Regra completa em `docs/META_ADS.md`, "Limite de uso".
 - Testes: `limite-da-meta.spec.ts`, `meta-sync.processor.spec.ts`, agenda, conexões, sincronia e o e2e da Meta com o dublê devolvendo o bloqueio.
+
+### Métricas da Meta na tela de campanhas (2026-10-01)
+- Pedido do usuário: ver também as métricas da Meta, e não só as de lead, escolhendo de acordo com a campanha.
+- Impressões, cliques, CTR, CPM, CPC e custo por conversa por campanha, sem chamada a mais à Meta. Seletor de métricas com conjuntos prontos e sugestão pelo objetivo da campanha (`apps/web/src/lib/campanhas/metricas.ts`).
+- Publicado em f9b0edd. Regra em `docs/META_ADS.md`, "Métricas de entrega".
+
+### Insights da Página do Facebook (2026-10-01)
+- Pedido do usuário: trazer os números da tela de Insights da Página na Meta.
+- Seção Página do Facebook em Integrações, Meta Ads; aba Página no painel, que aparece com Página escolhida e não depende do WhatsApp.
+- Tabela `metricas_da_pagina` e colunas `pagina_*` na conexão da Meta (migration só acrescenta, com RLS). Leitura de hora em hora, separada do limite da conta de anúncios.
+- Regra completa e configuração na Meta em `docs/META_ADS.md`, "Insights da Página do Facebook".
+

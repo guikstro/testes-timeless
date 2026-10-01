@@ -336,6 +336,67 @@ segurança), agora também retorna cedo quando
 reverter uma desconexão explícita. Coberto por teste em
 `meta-sync.service.spec.ts`.
 
+## Métricas de entrega na tela de campanhas (2026-10-01)
+
+- A sincronia grava impressões e cliques no gasto da campanha
+  (`ad_spend.impressoes` e `.cliques`, as colunas que o Google já usava),
+  somados da resposta inteira, como o gasto. O objetivo de cada campanha
+  vem na mesma chamada das campanhas (`campaigns.objetivo`).
+- O desempenho por campanha devolve impressões, cliques, CTR, CPM, CPC e
+  custo por conversa. Cada custo divide só o gasto dos dias que trouxeram o
+  número de baixo. Os dias de antes desta mudança são completados pela soma
+  dos anúncios da campanha (`ad_insights`).
+- A tela deixa escolher as colunas (conjuntos prontos ou uma a uma, na URL)
+  e sugere um conjunto pelo objetivo de onde está o investimento.
+
+## Insights da Página do Facebook (2026-10-01)
+
+Os números da tela de Insights da Página na Meta, guardados por dia em
+`metricas_da_pagina` e mostrados no painel, na aba Página.
+
+**O que é lido** (`insights-da-pagina.ts`), com os nomes de depois de junho
+de 2026, quando a Meta aposentou boa parte das métricas antigas:
+visualizações (`page_media_view`), visitas (`page_views_total`), interações
+(`page_post_engagements`), seguidores novos e perdidos
+(`page_daily_follows_unique`, `page_daily_unfollows_unique`), total de
+seguidores (`page_follows`), vídeos de 3 segundos (`page_video_views`) e
+tempo assistido (`page_video_view_time`, em milissegundos).
+
+**Visualizadores únicos** não podem ser somados dia a dia, e a Meta não dá o
+total de um período qualquer. São lidos em 7 e 28 dias
+(`page_total_media_view_unique` com `period=week` e `days_28`) e a tela diz
+a data da janela.
+
+**Como configurar**
+
+1. Em Configurações do negócio, Usuários do sistema, a Página entra nos
+   ativos do usuário do sistema, com permissão de ver o desempenho.
+2. O token desse usuário é gerado com `pages_show_list`,
+   `pages_read_engagement` e `read_insights`, além de `ads_read`.
+3. Em Integrações, Meta Ads, o id da Página (o `asset_id` do endereço do
+   Business) vai na seção Página do Facebook.
+
+**Como roda**
+
+- `PUT /integrations/meta/pagina` escolhe, troca ou tira a Página e lê o
+  histórico que cabe numa chamada (89 dias; o teto da Meta é 90).
+  `POST /integrations/meta/pagina/sync` lê agora.
+- A leitura usa o token da própria Página, que a Meta devolve em
+  `GET /{pagina}?fields=access_token` quando o usuário do sistema tem a
+  Página entre os ativos.
+- A agenda de hora em hora lê os últimos três dias de cada Página
+  (`sincronia-da-pagina`), porque a Meta continua acertando os números
+  recentes. É outro limite de uso na Meta, então a leitura da Página não
+  olha o bloqueio da conta de anúncios.
+- Se a Meta recusar um nome de métrica, a leitura pede uma a uma e guarda as
+  que vierem. Erro da Meta fica em `pagina_erro`, sem retentativa em
+  segundos; erro de rede volta ao BullMQ.
+- O valor diário chega marcado com o fim do dia no fuso da Página; o dia
+  guardado é esse instante menos 12 horas (`diaDoValor`).
+
+**Fora, por enquanto:** a divisão entre seguidores e não seguidores (a Meta
+tem o recorte `is_from_followers`, ainda não lido) e o Instagram.
+
 ## Modelo de dados desta fase
 
 ```
