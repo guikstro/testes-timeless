@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Hero } from "./hero";
 import { LeadsAreaChart } from "./leads-area-chart";
 import { EmptyState } from "@/components/ui/skeleton";
@@ -11,7 +12,14 @@ import { formatRate, plural } from "./tipos";
  * Por isso ela tem duas coisas, não oito. O número grande responde "quanto",
  * a curva responde "como chegou aqui", e nada mais divide a atenção.
  */
-export function AbaVisaoGeral({ overview }: { overview: Overview }) {
+export function AbaVisaoGeral({
+  overview,
+  anuncios,
+}: {
+  overview: Overview;
+  /** Os números dos anúncios, entre o resumo de leads e a curva: o que custou, ao lado do que entrou. */
+  anuncios?: ReactNode;
+}) {
   const { totals, comparacao, daily } = overview;
 
   return (
@@ -35,6 +43,8 @@ export function AbaVisaoGeral({ overview }: { overview: Overview }) {
           },
         ]}
       />
+
+      {anuncios}
 
       <section className="surface p-6">
         <h2 className="font-display text-destaque font-semibold tracking-tight text-ink">Leads e vendas por dia</h2>

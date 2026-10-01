@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { unstable_rethrow } from "next/navigation";
 import { AtualizaAoVivo } from "@/components/notifications/atualiza-ao-vivo";
@@ -17,6 +18,8 @@ import { Procedencia } from "./procedencia";
 import { concluiAtendimento, concluiFunil, concluiOrigem, concluiPagina, concluiVisaoGeral } from "./conclusao";
 import { FunilDoPeriodo, InsightsDaPagina, Overview } from "./tipos";
 import { AbaPagina } from "./aba-pagina";
+import { SecaoDeAnuncios } from "./secao-de-anuncios";
+import { leMetricas, Metrica, metricasDoConjunto, sugereConjunto } from "@/lib/campanhas/metricas";
 import { Alert } from "@/components/ui/alert";
 import { Frescor, FrescorDosDados } from "@/components/ui/frescor";
 import { sessaoAtual } from "@/lib/sessao";
@@ -54,7 +57,15 @@ type Aba = (typeof ABAS_DE_LEADS)[number]["chave"] | "local" | "pagina";
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ days?: string; aba?: string; campanha?: string; origem?: string; responsavel?: string }>;
+  searchParams: Promise<{
+    days?: string;
+    aba?: string;
+    campanha?: string;
+    origem?: string;
+    responsavel?: string;
+    /** As métricas dos anúncios, separadas por vírgula, como na tela de Campanhas. */
+    metricas?: string;
+  }>;
 }) {
   const params = await searchParams;
   const days = PERIODOS.includes(Number(params.days)) ? Number(params.days) : 30;
@@ -97,18 +108,45 @@ export default async function DashboardPage({
       ? ABAS
       : ABAS.filter((opcao) => opcao.chave === "geral" || opcao.chave === "local" || opcao.chave === "pagina");
 
-  // Só quando não há medida: é o que se sabe do período sem o WhatsApp, e a
-  // tela precisa ter algo verdadeiro para mostrar no lugar das abas.
-  const anuncios =
-    medicao === "medido"
-      ? null
-      : await apiFetch<DesempenhoDeCampanhas>(`/analytics/campanhas?de=${de}&ate=${ate}`).catch(() => null);
+  // Os números dos anúncios: na visão geral, e no lugar das abas quando não
+  // há lead para medir, porque eles não dependem do WhatsApp.
+  const mostraAnuncios = !local && !naPagina && (aba === "geral" || medicao !== "medido");
+  const anuncios = mostraAnuncios ? await buscaAnuncios(de, ate, days) : null;
+
+  // A mesma escolha de métricas da tela de Campanhas, e a mesma sugestão pelo
+  // objetivo de onde está o investimento.
+  const escolhidas = leMetricas(params.metricas);
+  const sugestao = sugereConjunto(
+    (anuncios?.campanhas ?? []).flatMap((linha) =>
+      linha.atual ? [{ objetivo: linha.objetivo, gastoCentavos: linha.atual.gastoCentavos }] : [],
+    ),
+  );
+  const metricas = escolhidas ?? metricasDoConjunto(sugestao.conjunto);
+  // A escolha vai junto ao trocar de período e de aba, e para a tela de Campanhas.
+  const comMetricas = escolhidas ? `&${new URLSearchParams({ metricas: escolhidas.join(",") }).toString()}` : "";
+  const hrefDasMetricas = (lista: Metrica[] | null) => {
+    const destino = new URLSearchParams({ aba, days: String(days) });
+    if (lista) destino.set("metricas", lista.join(","));
+    return `/dashboard?${destino.toString()}`;
+  };
+  const secaoDeAnuncios = (medido: boolean) =>
+    anuncios ? (
+      <SecaoDeAnuncios
+        dados={anuncios}
+        metricas={metricas}
+        escolhaManual={escolhidas !== null}
+        sugestao={sugestao}
+        medido={medido}
+        href={hrefDasMetricas}
+        porCampanha={`/campanhas?de=${de}&ate=${ate}${comMetricas}`}
+      />
+    ) : null;
 
   const semOrigem = overview.byOrigin.find((bucket) => bucket.key === "unknown");
   const maioriaSemOrigem = totals.leads > 0 && (semOrigem?.leads ?? 0) / totals.leads >= 0.5;
 
   const escolhida = ABAS.find((opcao) => opcao.chave === aba)!;
-  const paraAba = (destino: string) => `/dashboard?aba=${destino}&days=${days}`;
+  const paraAba = (destino: string) => `/dashboard?aba=${destino}&days=${days}${comMetricas}`;
   // Trocar de período dentro do funil mantém os recortes: é a mesma pergunta
   // feita sobre outra janela, e refazer os filtros seria trabalho à toa.
   const comRecortes = recortes ? new URLSearchParams(recortes).toString() : "";
@@ -164,7 +202,7 @@ export default async function DashboardPage({
             opcoes={PERIODOS.map((opcao) => ({
               chave: String(opcao),
               rotulo: `${opcao} dias`,
-              href: `/dashboard?aba=${aba}&days=${opcao}${comRecortes ? `&${comRecortes}` : ""}`,
+              href: `/dashboard?aba=${aba}&days=${opcao}${comRecortes ? `&${comRecortes}` : ""}${comMetricas}`,
             }))}
           />
         </div>
@@ -210,10 +248,13 @@ export default async function DashboardPage({
           medicao={medicao}
           desde={conexao ? inicioDaMedicao(conexao) : null}
           anuncios={anuncios}
+          secaoDeAnuncios={secaoDeAnuncios(false)}
         />
       ) : null}
 
-      {medicao === "medido" && aba === "geral" ? <AbaVisaoGeral overview={overview} /> : null}
+      {medicao === "medido" && aba === "geral" ? (
+        <AbaVisaoGeral overview={overview} anuncios={secaoDeAnuncios(true)} />
+      ) : null}
       {medicao === "medido" && aba === "funil" ? (
         funil ? (
           <AbaFunil dados={funil} />
@@ -282,10 +323,13 @@ function SemMedicao({
   medicao,
   desde,
   anuncios,
+  secaoDeAnuncios,
 }: {
   medicao: Exclude<Medicao, "medido">;
   desde: string | null;
   anuncios: DesempenhoDeCampanhas | null;
+  /** Os números dos anúncios com a escolha de métricas; null quando a consulta falhou. */
+  secaoDeAnuncios: ReactNode;
 }) {
   const gasto = anuncios?.totais.gastoCentavos ?? null;
   const conversas = anuncios?.totais.conversasNaPlataforma ?? null;
@@ -294,15 +338,19 @@ function SemMedicao({
     <div className="space-y-5">
       <AvisoDeMedicao medicao={medicao} desde={desde} conversasNaPlataforma={conversas} />
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Numero rotulo="Investimento em anúncios" valor={gasto === null ? "Sem dado" : formatCentsAsBRL(gasto)} />
-        <Numero
-          rotulo="Conversas na Meta"
-          valor={conversas === null ? "Sem dado" : String(conversas)}
-          nota="O que o Gerenciador de Anúncios conta"
-        />
-        <Numero rotulo="Leads aqui" valor="Sem medida" apagado />
-      </div>
+      {/* Impressões, cliques, CTR e CPM não dependem do WhatsApp: aparecem
+          aqui mesmo sem lead nenhum para medir. */}
+      {secaoDeAnuncios ?? (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Numero rotulo="Investimento em anúncios" valor={gasto === null ? "Sem dado" : formatCentsAsBRL(gasto)} />
+          <Numero
+            rotulo="Conversas na Meta"
+            valor={conversas === null ? "Sem dado" : String(conversas)}
+            nota="O que o Gerenciador de Anúncios conta"
+          />
+          <Numero rotulo="Leads aqui" valor="Sem medida" apagado />
+        </div>
+      )}
 
       <div className="surface p-5">
         <p className="text-corpo font-semibold text-ink">O que aparece aqui com o WhatsApp recebendo</p>
@@ -401,6 +449,28 @@ async function buscaFunil(days: number, recortes: Record<string, string>): Promi
   const consulta = new URLSearchParams({ days: String(days), ...recortes });
   try {
     return await apiFetch<FunilDoPeriodo>(`/analytics/funil?${consulta.toString()}`);
+  } catch (erro) {
+    unstable_rethrow(erro);
+    return null;
+  }
+}
+
+/**
+ * Os números dos anúncios no período e no anterior do mesmo tamanho, colado
+ * nele, ou null quando a consulta falha: sem eles a seção some, e o resto do
+ * painel continua. A sessão encerrada passa adiante (`unstable_rethrow`).
+ */
+async function buscaAnuncios(de: string, ate: string, days: number): Promise<DesempenhoDeCampanhas | null> {
+  const dia = (base: string, deslocamento: number) =>
+    new Date(Date.parse(`${base}T12:00:00.000Z`) + deslocamento * 86_400_000).toISOString().slice(0, 10);
+  const consulta = new URLSearchParams({
+    de,
+    ate,
+    compararDe: dia(de, -days),
+    compararAte: dia(de, -1),
+  });
+  try {
+    return await apiFetch<DesempenhoDeCampanhas>(`/analytics/campanhas?${consulta.toString()}`);
   } catch (erro) {
     unstable_rethrow(erro);
     return null;

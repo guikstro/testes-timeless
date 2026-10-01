@@ -266,3 +266,9 @@ Decisões do usuário: convite por link, um cliente por pessoa, cadastro públic
 - Tabela `metricas_da_pagina` e colunas `pagina_*` na conexão da Meta (migration só acrescenta, com RLS). Leitura de hora em hora, separada do limite da conta de anúncios.
 - Regra completa e configuração na Meta em `docs/META_ADS.md`, "Insights da Página do Facebook".
 
+### Métricas dos anúncios também no painel (2026-10-01)
+- Pedido do usuário: o painel continuava só com leads; as métricas novas estavam só em Campanhas.
+- Visão geral ganhou a seção "Anúncios no período": investimento e as métricas escolhidas (impressões, CPM, cliques, CTR, CPC, conversas, leads...), com variação contra o período anterior do mesmo tamanho e link para Campanhas no mesmo período.
+- Sem WhatsApp, a mesma seção aparece no lugar dos três números de antes: as métricas da plataforma não dependem de lead.
+- A escolha é a mesma da tela de Campanhas (`metricas` na URL), mantida ao trocar de período e de aba. As peças ficaram num lugar só (`campanhas/metricas-ui.tsx`), para os dois lugares não mostrarem o mesmo número de jeitos diferentes.
+
