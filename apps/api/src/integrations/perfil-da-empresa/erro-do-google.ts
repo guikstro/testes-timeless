@@ -51,7 +51,7 @@ export function explicaErroDoGoogle(erro: ErroDoGoogle): string {
     return `O Google não liberou cota para esta leitura. Sem a aprovação do acesso à API do Perfil da Empresa, a cota é zero. (Google: ${original})`;
   }
   if (/has not been used|is disabled|SERVICE_DISABLED/i.test(erro.message)) {
-    return `A API do Perfil da Empresa não está ativada no projeto do Google Cloud. Ative as APIs listadas em docs/PRESENCA_LOCAL.md. (Google: ${original})`;
+    return `A API do Perfil da Empresa não está ativada no projeto do Google Cloud. Em APIs e serviços, Biblioteca, ative: My Business Account Management API, My Business Business Information API e Business Profile Performance API. (Google: ${original})`;
   }
   if (erro.codigo === "PERMISSION_DENIED" || erro.status === 403) {
     return `A conta Google da equipe não tem acesso a este perfil. Confira o convite de gerente no Gerenciador de Perfis. (Google: ${original})`;

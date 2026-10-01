@@ -101,10 +101,13 @@ contagens diferentes do Google, e uma ligação pode estar nas duas.
    em Gerenciar convites, no Gerenciador de Perfis, e o dono do perfil aprova.
 2. **Projeto no Google Cloud**, com estas APIs ativadas: My Business Account
    Management API, My Business Business Information API e Business Profile
-   Performance API. O Google precisa aprovar o projeto ("Application for Basic
-   API Access", no formulário de acesso à API do Perfil da Empresa). Antes da
-   aprovação a cota é 0 pedidos por minuto, e a tela mostra a recusa do Google
-   ("não liberou cota"); aprovado, 300.
+   Performance API. O Google precisa aprovar o projeto: formulário
+   `support.google.com/business/contact/api_default`, opção "Application for
+   Basic API Access", com o número do projeto e um e-mail que seja dono ou
+   gerente de um perfil. Para aprovar, o Google exige um perfil verificado e
+   ativo há mais de 60 dias, com site cadastrado; a análise leva de 7 a 10
+   dias úteis. Antes da aprovação a cota é 0 pedidos por minuto, e a tela
+   mostra a recusa do Google ("não liberou cota"); aprovado, 300.
 3. **Tela de consentimento OAuth.** Com Google Workspace, tipo **Interno**:
    sem revisão do Google e sem prazo no acesso. Se for Externo, publique **Em
    produção**: em "Teste", o Google derruba o acesso a cada 7 dias, e a leitura
