@@ -23,6 +23,16 @@ const escritasRecebidas: Array<{ id: string; corpo: Record<string, string> }> = 
 /** Quantas vezes a conta bloqueada foi chamada: dentro do bloqueio, nenhuma a mais. */
 let chamadasNaContaBloqueada = 0;
 
+/** A Página do dublê, e o dia civil de Brasília `n` dias antes de hoje. */
+const PAGINA = "1234567890";
+function diaAtras(n: number): string {
+  const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  return new Date(Date.parse(`${hoje}T12:00:00.000Z`) - n * 86_400_000).toISOString().slice(0, 10);
+}
+/** Como a Meta marca o valor de um dia: a virada do dia seguinte, no fuso da Página (aqui, Califórnia). */
+const fimDoDia = (dia: string) =>
+  `${new Date(Date.parse(`${dia}T12:00:00.000Z`) + 86_400_000).toISOString().slice(0, 10)}T07:00:00+0000`;
+
 function startMockMetaServer(): Promise<{ server: http.Server; baseUrl: string }> {
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
@@ -148,6 +158,59 @@ function startMockMetaServer(): Promise<{ server: http.Server; baseUrl: string }
           escritasRecebidas.push({ id: url.pathname.slice(1), corpo: JSON.parse(corpo || "{}") });
           res.end(JSON.stringify({ success: true }));
         });
+        return;
+      }
+
+      // A Página: o token dela só vem para quem tem a Página entre os ativos.
+      if (url.pathname === `/${PAGINA}` && req.method === "GET") {
+        res.end(JSON.stringify({ id: PAGINA, name: "Timeless Co.", access_token: "token-da-pagina" }));
+        return;
+      }
+
+      if (url.pathname === `/${PAGINA}/insights`) {
+        // Só o token da Página lê os Insights, como na Meta.
+        if (url.searchParams.get("access_token") !== "token-da-pagina") {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: { message: "(#190) This method must be called with a Page Access Token", code: 190 } }));
+          return;
+        }
+        const periodo = url.searchParams.get("period");
+        if (periodo === "day") {
+          const diaria = (name: string, ontem: number, anteontem: number) => ({
+            name,
+            period: "day",
+            values: [
+              { value: anteontem, end_time: fimDoDia(diaAtras(2)) },
+              { value: ontem, end_time: fimDoDia(diaAtras(1)) },
+            ],
+          });
+          res.end(
+            JSON.stringify({
+              data: [
+                diaria("page_media_view", 1_200, 800),
+                diaria("page_views_total", 40, 30),
+                diaria("page_post_engagements", 15, 9),
+                diaria("page_daily_follows_unique", 6, 4),
+                diaria("page_daily_unfollows_unique", 1, 2),
+                diaria("page_video_views", 20, 10),
+                diaria("page_video_view_time", 300_000, 200_000),
+                diaria("page_follows", 1_507, 1_502),
+              ],
+            }),
+          );
+          return;
+        }
+        res.end(
+          JSON.stringify({
+            data: [
+              {
+                name: "page_total_media_view_unique",
+                period: periodo,
+                values: [{ value: periodo === "week" ? 900 : 3_100, end_time: fimDoDia(diaAtras(1)) }],
+              },
+            ],
+          }),
+        );
         return;
       }
 
@@ -382,6 +445,92 @@ describe("Meta Ads sync (e2e, against a local Graph API double)", () => {
       .expect(200);
     expect(new Date(tela.body.limitadaAte).getTime()).toBe(conexao.limitadaAte!.getTime());
   }, 30_000);
+
+  describe("Insights da Página", () => {
+    /*
+      Escolher a Página lê o histórico, e a tela de números lê o que foi
+      guardado. Os visualizadores únicos vêm da janela que a Meta fecha (7 e
+      28 dias), e nunca da soma dos dias.
+    */
+    it("escolher a Página lê o histórico e a rota da tela mostra os números", async () => {
+      const escolha = await request(app.getHttpServer())
+        .put("/api/integrations/meta/pagina")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .send({ paginaId: ` ${PAGINA} ` })
+        .expect(200);
+      expect(escolha.body.paginaId).toBe(PAGINA);
+
+      await waitFor(async () => {
+        const conexao = await prisma.metaConnection.findUnique({ where: { organizationId: orgId } });
+        return conexao?.paginaSincronizadaEm ? conexao : null;
+      });
+
+      const tela = await request(app.getHttpServer())
+        .get("/api/analytics/pagina?days=30")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .expect(200);
+
+      expect(tela.body.pagina).toMatchObject({ id: PAGINA, nome: "Timeless Co.", erro: null });
+      expect(tela.body.atual).toEqual({
+        visualizacoes: 2_000,
+        visitas: 70,
+        interacoes: 24,
+        novosSeguidores: 10,
+        deixaramDeSeguir: 3,
+        seguidoresLiquidos: 7,
+        seguidores: 1_507,
+        videos: 30,
+        tempoDeVideoSegundos: 500,
+      });
+      expect(tela.body.visualizadores).toEqual({
+        semana: { valor: 900, ate: diaAtras(1) },
+        mes: { valor: 3_100, ate: diaAtras(1) },
+      });
+      expect(tela.body.porDia).toHaveLength(30);
+
+      const frescor = await request(app.getHttpServer())
+        .get("/api/analytics/frescor")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .expect(200);
+      expect(frescor.body.pagina.estado).toBe("em-dia");
+    });
+
+    it("recusa o que não é id de Página, e tirar a Página não apaga a conexão", async () => {
+      await request(app.getHttpServer())
+        .put("/api/integrations/meta/pagina")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .send({ paginaId: "minha página" })
+        .expect(400);
+
+      const tirada = await request(app.getHttpServer())
+        .put("/api/integrations/meta/pagina")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .send({ paginaId: null })
+        .expect(200);
+      expect(tirada.body).toMatchObject({ paginaId: null, adAccountId: "act_123" });
+
+      const tela = await request(app.getHttpServer())
+        .get("/api/analytics/pagina?days=30")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .expect(200);
+      expect(tela.body.pagina).toBeNull();
+    });
+
+    it("pede a conta de anúncios conectada antes da Página", async () => {
+      const outra = await request(app.getHttpServer()).post("/api/auth/register").send({
+        name: "User P",
+        email: "user-p@meta-ads-e2e.local",
+        password: "password123",
+        organizationName: "Meta Ads E2E Org P",
+      });
+      const resposta = await request(app.getHttpServer())
+        .put("/api/integrations/meta/pagina")
+        .set("Authorization", `Bearer ${outra.body.accessToken}`)
+        .send({ paginaId: PAGINA })
+        .expect(400);
+      expect(resposta.body.code).toBe("NOT_CONNECTED");
+    });
+  });
 
   it("never lets one organization see another organization's Meta connection or campaigns", async () => {
     const otherOrg = await request(app.getHttpServer()).post("/api/auth/register").send({

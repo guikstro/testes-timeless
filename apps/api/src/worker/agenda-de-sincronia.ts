@@ -5,6 +5,7 @@ import { PrismaService } from "../common/prisma/prisma.service";
 import {
   META_SYNC_QUEUE,
   SINCRONIA_APOS_LIMITE,
+  SINCRONIA_DA_PAGINA,
   SINCRONIA_DE_UMA,
   SINCRONIA_PERIODICA,
 } from "../common/queue/queue.constants";
@@ -126,6 +127,34 @@ export class AgendaDeSincronia implements OnApplicationBootstrap, OnApplicationS
     }
 
     this.logger.log(JSON.stringify({ event: "sincronia_periodica_enfileirada", organizacoes: conexoes.length }));
+    return conexoes.length;
+  }
+
+  /**
+   * Uma leitura dos Insights por Página escolhida.
+   *
+   * Sem olhar o bloqueio dos anúncios: a leitura da Página é outro limite na
+   * Meta, e um bloqueio da conta de anúncios não diz nada sobre ela.
+   */
+  async enfileiraPaginas(): Promise<number> {
+    const conexoes = await this.prisma.metaConnection.findMany({
+      where: { paginaId: { not: null }, status: { in: ["CONNECTED", "SYNC_FAILED"] } },
+      select: { organizationId: true },
+    });
+
+    for (const conexao of conexoes) {
+      await this.fila.add(
+        SINCRONIA_DA_PAGINA,
+        { organizationId: conexao.organizationId },
+        {
+          jobId: `${SINCRONIA_DA_PAGINA}:${conexao.organizationId}:${this.janelaAtual()}`,
+          attempts: 2,
+          backoff: { type: "exponential", delay: 60_000 },
+          removeOnComplete: true,
+          removeOnFail: 20,
+        },
+      );
+    }
     return conexoes.length;
   }
 

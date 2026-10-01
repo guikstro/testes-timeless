@@ -179,6 +179,7 @@ model Organization {
   conversations        Conversation[]
   leadEvents           LeadEvent[]
   metricasLocais       MetricaLocal[]
+  metricasDaPagina     MetricaDaPagina[]
 
   @@map("organizations")
 }
@@ -1001,6 +1002,19 @@ model MetaConnection {
    * Até quando a Meta bloqueou as chamadas desta conta por excesso de pedidos. Enquanto não passar, nenhuma sincronia chama a Meta: tentar dentro do bloqueio só renova o bloqueio e conta como erro.
    */
   limitadaAte          DateTime?            @map("limitada_ate")
+  /**
+   * A Página do Facebook desta conta, para os Insights da Página. Opcional e separada da conta de anúncios: uma organização pode anunciar sem querer acompanhar a Página, e o contrário também.
+   */
+  paginaId             String?              @map("pagina_id")
+  /**
+   * O nome da Página como a Meta devolve, para a tela confirmar que é a Página certa.
+   */
+  paginaNome           String?              @map("pagina_nome")
+  paginaSincronizadaEm DateTime?            @map("pagina_sincronizada_em")
+  /**
+   * O motivo da última leitura da Página que não deu certo, em palavras de gente. Separado de `lastSyncError`: os números da Página e os dos anúncios falham por motivos diferentes.
+   */
+  paginaErro           String?              @map("pagina_erro")
   connectedAt          DateTime             @default(now()) @map("connected_at")
   disconnectedAt       DateTime?            @map("disconnected_at")
   createdAt            DateTime             @default(now()) @map("created_at")
@@ -1540,6 +1554,29 @@ enum FocoDoCliente {
  * `escopo` é o que o número descreve dentro da fonte: a campanha do Google Ads
  * ou o local do Perfil da Empresa. Nunca vazio, para a unicidade valer.
  */
+/**
+ * Os Insights da Página do Facebook, um número por dia e por métrica, como a Meta devolve.
+ * Guardados aqui, e não pedidos a cada abertura de tela, pelo mesmo motivo do gasto: a tela não pode depender de uma chamada externa para desenhar, e o histórico continua depois que a Meta deixa de mostrá-lo (ela guarda dois anos).
+ */
+model MetricaDaPagina {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  paginaId       String   @map("pagina_id")
+  /**
+   * O nome da métrica na Meta (page_media_view, page_daily_follows_unique). Os visualizadores únicos de 7 e 28 dias levam o período no nome: page_total_media_view_unique:week.
+   */
+  metrica        String
+  dia            DateTime @db.Date
+  valor          Float
+  atualizadoEm   DateTime @default(now()) @updatedAt @map("atualizado_em")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, paginaId, metrica, dia])
+  @@index([organizationId, dia])
+  @@map("metricas_da_pagina")
+}
+
 model MetricaLocal {
   id             String              @id @default(uuid())
   organizationId String              @map("organization_id")

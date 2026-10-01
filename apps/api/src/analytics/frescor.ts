@@ -58,6 +58,30 @@ export function frescorDaMeta(conexao: ConexaoDaMeta | null, agora = new Date())
   return { estado: "em-dia", atualizadoEm, motivo: null };
 }
 
+interface ConexaoDaPagina {
+  status: string;
+  paginaId: string | null;
+  paginaSincronizadaEm: Date | null;
+  paginaErro: string | null;
+}
+
+/**
+ * A Página escolhida aparece; sem Página, não. O erro da leitura é falha:
+ * permissão faltando ou Página errada não se resolve sozinho.
+ */
+export function frescorDaPagina(conexao: ConexaoDaPagina | null, agora = new Date()): FrescorDaFonte | null {
+  if (!conexao?.paginaId || conexao.status === "DISCONNECTED") return null;
+  const atualizadoEm = conexao.paginaSincronizadaEm?.toISOString() ?? null;
+  if (conexao.paginaErro) return { estado: "falha", atualizadoEm, motivo: conexao.paginaErro };
+  if (!conexao.paginaSincronizadaEm) {
+    return { estado: "atrasada", atualizadoEm, motivo: "A primeira leitura da Página ainda não terminou." };
+  }
+  if (atrasado(conexao.paginaSincronizadaEm, agora)) {
+    return { estado: "atrasada", atualizadoEm, motivo: "A Página é lida de hora em hora e passou de 3 horas sem leitura." };
+  }
+  return { estado: "em-dia", atualizadoEm, motivo: null };
+}
+
 export function frescorDoGoogle(conexao: ConexaoDoGoogle | null, agora = new Date()): FrescorDaFonte | null {
   if (!conexao) return null;
   const atualizadoEm = conexao.ultimoEnvioEm?.toISOString() ?? null;

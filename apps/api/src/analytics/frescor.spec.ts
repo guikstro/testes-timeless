@@ -1,4 +1,4 @@
-import { frescorDaMeta, frescorDoGoogle } from "./frescor";
+import { frescorDaMeta, frescorDaPagina, frescorDoGoogle } from "./frescor";
 
 const agora = new Date("2026-09-29T15:00:00.000Z");
 const ha = (horas: number) => new Date(agora.getTime() - horas * 60 * 60 * 1000);
@@ -55,5 +55,32 @@ describe("frescor dos dados", () => {
 
   it("a primeira sincronia que não terminou diz onde tentar de novo", () => {
     expect(frescorDaMeta({ status: "CONNECTED", lastSyncedAt: null }, agora)?.motivo).toContain("Sincronizar agora");
+  });
+
+  describe("Página", () => {
+    const pagina = (over: Record<string, unknown> = {}) => ({
+      status: "CONNECTED",
+      paginaId: "226094994111312",
+      paginaSincronizadaEm: ha(1),
+      paginaErro: null,
+      ...over,
+    });
+
+    it("sem Página escolhida, a fonte não aparece", () => {
+      expect(frescorDaPagina(pagina({ paginaId: null }), agora)).toBeNull();
+      expect(frescorDaPagina(null, agora)).toBeNull();
+    });
+
+    it("lida há pouco é em dia; há mais de 3 horas, atrasada", () => {
+      expect(frescorDaPagina(pagina(), agora)?.estado).toBe("em-dia");
+      expect(frescorDaPagina(pagina({ paginaSincronizadaEm: ha(4) }), agora)?.estado).toBe("atrasada");
+    });
+
+    it("erro da leitura é falha, com o motivo", () => {
+      expect(frescorDaPagina(pagina({ paginaErro: "Falta read_insights." }), agora)).toMatchObject({
+        estado: "falha",
+        motivo: "Falta read_insights.",
+      });
+    });
   });
 });

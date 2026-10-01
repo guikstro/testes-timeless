@@ -292,6 +292,7 @@ describe("Isolamento entre organizações (e2e)", () => {
       "/analytics/anuncios",
       "/presenca-local?days=30",
       "/analytics/frescor",
+      "/analytics/pagina?days=30",
       "/presenca-local/campanhas?de=2020-01-01&ate=2030-12-31&compararDe=2019-01-01&compararAte=2019-12-31",
       "/notifications",
       "/classification-rules",

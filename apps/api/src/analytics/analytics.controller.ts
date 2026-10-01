@@ -26,6 +26,12 @@ export class AnalyticsController {
     return this.analyticsService.funil(user.organizationId, user.userId, query);
   }
 
+  /** Os Insights da Página do Facebook escolhida em Integrações, no período. */
+  @Get("pagina")
+  pagina(@CurrentUser() user: AuthenticatedUser, @Query() query: OverviewQueryDto) {
+    return this.analyticsService.pagina(user.organizationId, query.days ?? 30);
+  }
+
   /** De quando é o último dado da Meta e do Google Ads: a tela diz se o número é de agora. */
   @Get("frescor")
   frescor(@CurrentUser() user: AuthenticatedUser) {

@@ -28,7 +28,7 @@ import { fimDoDia, inicioDoDia, diaCivilLocal, FUSO, hojeLocal } from "../common
 import { gastoPorDia, medidoAte } from "./gasto-por-dia";
 import { identificacaoDosLeads, LeadIdentificado, MetodoDeIdentificacao } from "./identificacao-dos-leads";
 import { completaIdsDoAnuncio, HierarquiaDoAnuncio } from "./vinculo-do-anuncio";
-import { frescorDaMeta, frescorDoGoogle } from "./frescor";
+import { frescorDaMeta, frescorDaPagina, frescorDoGoogle } from "./frescor";
 import {
   aplicaFiltros,
   FiltrosDoFunil,
@@ -40,7 +40,16 @@ import {
   SEM_CAMPANHA,
 } from "./funil";
 import { FunilQueryDto } from "./dto/funil-query.dto";
-import { janelas } from "../presenca-local/calculo";
+import { diasDa, janelas } from "../presenca-local/calculo";
+import {
+  LinhaGuardada,
+  porDiaDaPagina,
+  resumoDaPagina,
+  ResumoDaPagina,
+  visualizadoresUnicos,
+  VisualizadoresUnicos,
+  DiaDaPagina,
+} from "./pagina";
 import {
   agregaDesempenhoPorCampanha,
   CampanhaComparada,
@@ -80,6 +89,18 @@ export interface FunilDoPeriodo {
     origens: OpcaoDeFiltro[];
     responsaveis: { id: string; name: string }[];
   };
+}
+
+export interface InsightsDaPagina {
+  periodo: { de: string; ate: string };
+  anterior: { de: string; ate: string };
+  /** Null quando nenhuma Página foi escolhida em Integrações. */
+  pagina: { id: string; nome: string | null; sincronizadaEm: string | null; erro: string | null } | null;
+  atual: ResumoDaPagina;
+  /** O período anterior do mesmo tamanho, para a variação. */
+  comparacao: ResumoDaPagina;
+  visualizadores: { semana: VisualizadoresUnicos | null; mes: VisualizadoresUnicos | null };
+  porDia: DiaDaPagina[];
 }
 
 export interface Janela {
@@ -140,11 +161,73 @@ export class AnalyticsService {
     const [meta, google] = await Promise.all([
       this.prisma.metaConnection.findUnique({
         where: { organizationId },
-        select: { status: true, lastSyncedAt: true, lastSyncError: true },
+        select: {
+          status: true,
+          lastSyncedAt: true,
+          lastSyncError: true,
+          paginaId: true,
+          paginaSincronizadaEm: true,
+          paginaErro: true,
+        },
       }),
       this.prisma.googleAdsConexao.findUnique({ where: { organizationId }, select: { ultimoEnvioEm: true } }),
     ]);
-    return { meta: frescorDaMeta(meta), google: frescorDoGoogle(google) };
+    return { meta: frescorDaMeta(meta), google: frescorDoGoogle(google), pagina: frescorDaPagina(meta) };
+  }
+
+  /**
+   * Os Insights da Página do Facebook no período, e no período anterior do
+   * mesmo tamanho, para a tela mostrar a variação como a Meta mostra.
+   */
+  async pagina(organizationId: string, dias: number): Promise<InsightsDaPagina> {
+    const { atual, anterior } = janelas(hojeLocal(), dias);
+    const conexao = await this.prisma.metaConnection.findUnique({
+      where: { organizationId },
+      select: { status: true, paginaId: true, paginaNome: true, paginaSincronizadaEm: true, paginaErro: true },
+    });
+
+    if (!conexao?.paginaId || conexao.status === "DISCONNECTED") {
+      const vazio = resumoDaPagina([], atual);
+      return {
+        periodo: atual,
+        anterior,
+        pagina: null,
+        atual: vazio,
+        comparacao: vazio,
+        visualizadores: { semana: null, mes: null },
+        porDia: [],
+      };
+    }
+
+    // O dia é um dia civil sem hora, guardado à meia-noite UTC como o gasto.
+    const guardadas = await this.prisma.metricaDaPagina.findMany({
+      where: {
+        organizationId,
+        paginaId: conexao.paginaId,
+        dia: { gte: new Date(`${anterior.de}T00:00:00.000Z`), lte: new Date(`${atual.ate}T00:00:00.000Z`) },
+      },
+      select: { metrica: true, dia: true, valor: true },
+    });
+    const linhas: LinhaGuardada[] = guardadas.map((linha) => ({
+      metrica: linha.metrica,
+      dia: linha.dia.toISOString().slice(0, 10),
+      valor: linha.valor,
+    }));
+
+    return {
+      periodo: atual,
+      anterior,
+      pagina: {
+        id: conexao.paginaId,
+        nome: conexao.paginaNome,
+        sincronizadaEm: conexao.paginaSincronizadaEm?.toISOString() ?? null,
+        erro: conexao.paginaErro,
+      },
+      atual: resumoDaPagina(linhas, atual),
+      comparacao: resumoDaPagina(linhas, anterior),
+      visualizadores: visualizadoresUnicos(linhas, atual),
+      porDia: porDiaDaPagina(linhas, diasDa(atual)),
+    };
   }
 
   async overview(organizationId: string, days: number): Promise<Overview> {

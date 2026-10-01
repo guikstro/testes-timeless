@@ -5,7 +5,8 @@ import { PrismaService } from "../../common/prisma/prisma.service";
 import { EncryptionService } from "../../common/encryption/encryption.service";
 import { AppException } from "../../common/exceptions/app-exception";
 import { isUniqueConstraintError } from "../../common/utils/is-unique-constraint-error";
-import { META_SYNC_QUEUE } from "../../common/queue/queue.constants";
+import { META_SYNC_QUEUE, SINCRONIA_DA_PAGINA } from "../../common/queue/queue.constants";
+import { DIAS_DO_HISTORICO } from "./insights-da-pagina";
 import { MetaSyncJob } from "../../common/queue/meta-sync.job";
 import { montaSaudeDaConta, SaudeDaConta } from "./saude-da-conta";
 import { ConnectMetaDto } from "./dto/connect-meta.dto";
@@ -117,6 +118,52 @@ export class MetaConnectionsService {
     }
 
     await this.enfileiraSincronia(organizationId, connection.limitadaAte ?? null);
+  }
+
+  /**
+   * Escolhe, troca ou tira a Página do Facebook dos Insights.
+   *
+   * Ao escolher, lê o histórico inteiro que cabe numa chamada da Meta: a tela
+   * nasce com três meses, e não vazia até a primeira hora passar. Trocar de
+   * Página apaga o nome e o erro da anterior, mas não os números dela.
+   */
+  async definePagina(organizationId: string, paginaId: string | null) {
+    const existente = await this.prisma.metaConnection.findUnique({ where: { organizationId } });
+    if (!existente) {
+      throw new AppException(
+        "NOT_CONNECTED",
+        "Conecte a conta de anúncios da Meta antes de escolher a Página.",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const conexao = await this.prisma.metaConnection.update({
+      where: { organizationId },
+      data:
+        existente.paginaId === paginaId
+          ? { paginaErro: null }
+          : { paginaId, paginaNome: null, paginaSincronizadaEm: null, paginaErro: null },
+    });
+
+    if (paginaId) await this.enfileiraLeituraDaPagina(organizationId, DIAS_DO_HISTORICO);
+    return this.redact(conexao);
+  }
+
+  /** "Ler agora": os últimos dias da Página, fora da hora cheia. */
+  async leiaPagina(organizationId: string): Promise<void> {
+    const conexao = await this.prisma.metaConnection.findUnique({ where: { organizationId }, select: { paginaId: true } });
+    if (!conexao?.paginaId) {
+      throw new AppException("NOT_CONFIGURED", "Escolha a Página antes de pedir a leitura.", HttpStatus.BAD_REQUEST);
+    }
+    await this.enfileiraLeituraDaPagina(organizationId, 3);
+  }
+
+  private async enfileiraLeituraDaPagina(organizationId: string, dias: number): Promise<void> {
+    await this.syncQueue.add(
+      SINCRONIA_DA_PAGINA,
+      { organizationId, dias },
+      { attempts: 2, backoff: { type: "exponential", delay: 60_000 }, removeOnComplete: true, removeOnFail: 20 },
+    );
   }
 
   /**

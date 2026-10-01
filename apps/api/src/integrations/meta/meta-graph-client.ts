@@ -9,7 +9,9 @@ import {
   MetaConversionsApiResponse,
   MetaErrorResponse,
   MetaInsight,
+  MetaInsightDaPagina,
   MetaPagedResponse,
+  MetaPagina,
 } from "./meta-graph-types";
 
 /** O objeto da conta de anúncios, com os campos que este produto lê. */
@@ -110,6 +112,48 @@ export class MetaGraphClient {
       limit: LINHAS_DE_NUMEROS_POR_PAGINA,
     });
     return this.fetchAllPages<MetaInsight>(url);
+  }
+
+  /**
+   * A Página do Facebook, e o token dela.
+   *
+   * O token do usuário do sistema não lê os Insights direto: a Meta exige o
+   * token da própria Página, que ela devolve aqui quando o usuário do sistema
+   * tem a Página entre os ativos dele.
+   */
+  async getPagina(paginaId: string, accessToken: string): Promise<MetaPagina> {
+    const url = this.buildUrl(`/${paginaId}`, accessToken, { fields: "id,name,access_token" });
+    const response = await fetch(url);
+    const body = await response.json();
+    this.throwIfError(response, body);
+    return body as MetaPagina;
+  }
+
+  /**
+   * Os Insights da Página, várias métricas numa chamada.
+   *
+   * Sem seguir `paging.next`: nos Insights ele aponta para a janela seguinte
+   * no tempo, e seguir andaria para o futuro. Quem chama pede a janela certa,
+   * de no máximo 90 dias, que é o teto da Meta.
+   */
+  async getInsightsDaPagina(
+    paginaId: string,
+    tokenDaPagina: string,
+    metricas: string[],
+    periodo: "day" | "week" | "days_28",
+    desde: string,
+    ate: string,
+  ): Promise<MetaInsightDaPagina[]> {
+    const url = this.buildUrl(`/${paginaId}/insights`, tokenDaPagina, {
+      metric: metricas.join(","),
+      period: periodo,
+      since: desde,
+      until: ate,
+    });
+    const response = await fetch(url);
+    const body = await response.json();
+    this.throwIfError(response, body);
+    return ((body as { data?: MetaInsightDaPagina[] }).data ?? []) as MetaInsightDaPagina[];
   }
 
   /**

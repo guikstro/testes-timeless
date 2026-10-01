@@ -25,6 +25,7 @@ import { WhatsAppEventProcessor } from "./processors/whatsapp-event.processor";
 import { WhatsAppIngestionService } from "./processors/whatsapp-ingestion.service";
 import { MetaSyncProcessor } from "./processors/meta-sync.processor";
 import { MetaSyncService } from "./processors/meta-sync.service";
+import { PaginaSyncService } from "./processors/pagina-sync.service";
 import { MetaConversionSendProcessor } from "./processors/meta-conversion-send.processor";
 import { MetaConversionSendService } from "./processors/meta-conversion-send.service";
 import { WhatsAppSendProcessor } from "./processors/whatsapp-send.processor";
@@ -69,6 +70,7 @@ import { WhatsAppConnectionsModule } from "../integrations/whatsapp/whatsapp-con
     WhatsAppSendService,
     MetaSyncProcessor,
     MetaSyncService,
+    PaginaSyncService,
     MetaConversionSendProcessor,
     MetaConversionSendService,
     MetaGraphClient,

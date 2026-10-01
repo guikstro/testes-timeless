@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Res, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Put, Query, Res, UseGuards } from "@nestjs/common";
 import { Response } from "express";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
@@ -10,6 +10,7 @@ import { ConversionEventsService } from "./conversion-events.service";
 import { ConnectMetaDto } from "./dto/connect-meta.dto";
 import { AuditoriaService, autorDe } from "../../auditoria/auditoria.service";
 import { ConnectMetaCapiDto } from "./dto/connect-meta-capi.dto";
+import { PaginaDaMetaDto } from "./dto/pagina-da-meta.dto";
 
 @Controller("integrations/meta")
 @UseGuards(JwtAuthGuard)
@@ -58,6 +59,29 @@ export class MetaConnectionsController {
       depois: { integracao: "Meta Ads", contaDeAnuncios: conexao?.adAccountId ?? null, status: conexao?.status ?? null },
     });
     return conexao;
+  }
+
+  /** A Página do Facebook dos Insights: escolher, trocar ou tirar. */
+  @Requer("integration.manage")
+  @Put("pagina")
+  async definePagina(@CurrentUser() user: AuthenticatedUser, @Body() dto: PaginaDaMetaDto) {
+    const antes = await this.metaConnectionsService.getCurrent(user.organizationId);
+    const conexao = await this.metaConnectionsService.definePagina(user.organizationId, dto.paginaId);
+    await this.auditoria.registra(autorDe(user), {
+      acao: "INTEGRATION_UPDATED",
+      entidade: "MetaConnection",
+      entidadeId: conexao?.id ?? user.organizationId,
+      antes: { integracao: "Página do Facebook", pagina: antes?.paginaId ?? null },
+      depois: { integracao: "Página do Facebook", pagina: conexao?.paginaId ?? null },
+    });
+    return conexao;
+  }
+
+  @Requer("integration.manage")
+  @Post("pagina/sync")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async leiaPagina(@CurrentUser() user: AuthenticatedUser): Promise<void> {
+    await this.metaConnectionsService.leiaPagina(user.organizationId);
   }
 
   @Requer("integration.manage")

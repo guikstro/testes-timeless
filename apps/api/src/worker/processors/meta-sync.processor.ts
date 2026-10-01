@@ -1,10 +1,16 @@
 import { Processor, WorkerHost } from "@nestjs/bullmq";
 import { Logger } from "@nestjs/common";
 import { Job } from "bullmq";
-import { META_SYNC_QUEUE, SINCRONIA_APOS_LIMITE, SINCRONIA_PERIODICA } from "../../common/queue/queue.constants";
+import {
+  META_SYNC_QUEUE,
+  SINCRONIA_APOS_LIMITE,
+  SINCRONIA_DA_PAGINA,
+  SINCRONIA_PERIODICA,
+} from "../../common/queue/queue.constants";
 import { MetaSyncJob } from "../../common/queue/meta-sync.job";
 import { AgendaDeSincronia } from "../agenda-de-sincronia";
 import { MetaSyncService } from "./meta-sync.service";
+import { PaginaSyncService } from "./pagina-sync.service";
 
 @Processor(META_SYNC_QUEUE)
 export class MetaSyncProcessor extends WorkerHost {
@@ -13,6 +19,7 @@ export class MetaSyncProcessor extends WorkerHost {
   constructor(
     private readonly metaSyncService: MetaSyncService,
     private readonly agenda: AgendaDeSincronia,
+    private readonly paginaSync: PaginaSyncService,
   ) {
     super();
   }
@@ -22,10 +29,17 @@ export class MetaSyncProcessor extends WorkerHost {
     // cliente vira um job próprio com a própria retentativa.
     if (job.name === SINCRONIA_PERIODICA) {
       await this.agenda.enfileirarTodas();
+      await this.agenda.enfileiraPaginas();
       return;
     }
 
-    const { organizationId } = job.data as MetaSyncJob;
+    const { organizationId, dias } = job.data as MetaSyncJob;
+
+    // Os Insights da Página: outro limite na Meta, outro serviço.
+    if (job.name === SINCRONIA_DA_PAGINA) {
+      await this.paginaSync.sincroniza(organizationId, dias);
+      return;
+    }
 
     try {
       const { limitadaAte } = await this.metaSyncService.sync(organizationId);

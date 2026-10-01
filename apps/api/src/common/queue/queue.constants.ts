@@ -22,6 +22,8 @@ export const SINCRONIA_DE_UMA = "sync";
  * hora em hora, e o erro não vira laço.
  */
 export const SINCRONIA_APOS_LIMITE = "sincronia-apos-limite";
+/** A leitura dos Insights da Página do Facebook, separada da dos anúncios: é outro limite de uso na Meta. */
+export const SINCRONIA_DA_PAGINA = "sincronia-da-pagina";
 
 /** O job diário de faxina. */
 export const FAXINA_PERIODICA = "faxina";

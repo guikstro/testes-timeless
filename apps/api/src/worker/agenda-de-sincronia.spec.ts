@@ -205,6 +205,22 @@ describe("AgendaDeSincronia", () => {
       expect(ids[0]).toBe(ids[1]);
     });
 
+    it("enfileira uma leitura por Página escolhida, sem olhar o bloqueio dos anúncios", async () => {
+      const { agenda, prisma, fila } = montar([{ organizationId: "org-1" }]);
+
+      expect(await agenda.enfileiraPaginas()).toBe(1);
+
+      // O bloqueio da conta de anúncios não entra no filtro: é outro limite.
+      expect(prisma.metaConnection.findMany).toHaveBeenCalledWith({
+        where: { paginaId: { not: null }, status: { in: ["CONNECTED", "SYNC_FAILED"] } },
+        select: { organizationId: true },
+      });
+      const [nome, dado, opcoes] = fila.add.mock.calls[0] as [string, unknown, { jobId: string }];
+      expect(nome).toBe("sincronia-da-pagina");
+      expect(dado).toEqual({ organizationId: "org-1" });
+      expect(opcoes.jobId).toMatch(/^sincronia-da-pagina:org-1:\d+$/);
+    });
+
     it("não enfileira nada quando ninguém tem a Meta conectada", async () => {
       const { agenda, fila } = montar([]);
 

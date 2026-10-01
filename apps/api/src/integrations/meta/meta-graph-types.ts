@@ -97,3 +97,23 @@ export interface MetaConversionsApiResponse {
   events_received: number;
   fbtrace_id: string;
 }
+
+/** A Página do Facebook, com o token dela quando quem pede tem acesso. */
+export interface MetaPagina {
+  id: string;
+  name?: string;
+  /** Só vem quando o token de quem pede enxerga a Página com permissão de ler os Insights. */
+  access_token?: string;
+}
+
+/**
+ * Uma métrica dos Insights da Página: um valor por período.
+ *
+ * `end_time` é o fim do período no fuso da Página: o valor do dia 1º chega
+ * com `end_time` na virada do dia 2.
+ */
+export interface MetaInsightDaPagina {
+  name: string;
+  period: string;
+  values: { value: number | Record<string, number>; end_time?: string }[];
+}
