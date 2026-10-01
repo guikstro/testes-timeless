@@ -86,7 +86,7 @@ export function OriginTable({ origens }: { origens: Origem[] }) {
                   <span className="flex items-center gap-2">
                     <span className="truncate text-ink-soft">{origem.label}</span>
                     {destaque ? (
-                      <span className="shrink-0 rounded-full bg-accent/12 px-1.5 py-0.5 text-rotulo font-medium text-accent">
+                      <span className="shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-rotulo font-medium text-accent">
                         melhor taxa
                       </span>
                     ) : null}

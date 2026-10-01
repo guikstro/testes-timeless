@@ -137,7 +137,7 @@ export function LeadCard({
               Transforma a lista em fila de trabalho: o tempo de espera é a
               informação que decide o que fazer primeiro.
             */
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/12 px-2 py-0.5 text-rotulo font-medium text-warning">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2 py-0.5 text-rotulo font-medium text-warning">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="absolute inline-flex h-full w-full rounded-full bg-current opacity-60 motion-safe:animate-ping" />
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-current" />

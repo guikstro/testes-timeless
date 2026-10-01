@@ -364,7 +364,7 @@ function SeletorDeMetricas({
                 scroll={false}
                 className={`focus-ring inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-apoio transition-all duration-200 ease-soft active:scale-95 ${
                   ligada
-                    ? "bg-accent/12 font-medium text-ink ring-1 ring-inset ring-accent/40"
+                    ? "bg-accent/15 font-medium text-ink ring-1 ring-inset ring-accent/50"
                     : "border border-line bg-panel text-ink-mute hover:border-ink/20 hover:text-ink"
                 }`}
               >
