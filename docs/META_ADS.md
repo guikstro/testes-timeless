@@ -59,7 +59,9 @@ upsert em MetaConnection (status=CONNECTED) + enfileira job "sync" imediato
   expondo só `hasAccessToken: true`).
 - Reconectar (`connect` de novo) faz `upsert` pela mesma `organizationId`
   única — nunca cria uma segunda `MetaConnection`, e desconectar é só uma
-  troca de status (`DISCONNECTED` + `disconnectedAt`), nunca um DELETE.
+  troca de status (`DISCONNECTED` + `disconnectedAt`, limpando o
+  `lastSyncError`, porque o erro era da conexão que acabou de ser
+  desligada), nunca um DELETE.
   Campanhas, ad sets, ads e histórico de gasto sincronizados nunca são
   apagados por desconectar.
 - `POST /sync` dispara uma resincronização manual a qualquer momento
@@ -68,42 +70,183 @@ upsert em MetaConnection (status=CONNECTED) + enfileira job "sync" imediato
 ## Como a sincronização funciona
 
 ```
-MetaConnectionsService.connect()
+MetaConnectionsService.connect()        ao conectar a conta
+MetaConnectionsService.triggerSync()    POST /sync, botão "Sincronizar agora"
+AgendaDeSincronia.enfileirarTodas()     sozinha, a cada 60 min por padrão
   |
   v
-enfileira job em "meta-sync" (BullMQ) — attempts: 5, backoff exponencial (5s)
+enfileira job "sync" em "meta-sync" (BullMQ), um por organização
   |
   v
-(processo worker separado)
+(worker dentro do processo da API: WorkerModule, importado pelo AppModule)
 MetaSyncProcessor -> MetaSyncService.sync(organizationId)
   |
   v
 busca campanhas + ad sets + ads em paralelo (Promise.all)
   |
   v
-upsert campanhas (por externalId) -> upsert ad sets (linkados por campaignId
-interno, via Map em memória — evita N+1) -> upsert ads (mesma técnica)
+upsert campanhas (organização + externalId) -> upsert ad sets (campanha +
+externalId, achada num Map em memória para evitar N+1) -> upsert ads
+(conjunto + externalId, mesma técnica)
   |
   v
-busca insights dos últimos 7 dias -> upsert AdSpend por (campaignId, date)
+busca os números dos últimos 7 dias, uma linha por anúncio e por dia
+(level=ad): gasto, impressões, cliques e conversas iniciadas
+  |
+  +-> upsert AdInsight por (adId, date), só para anúncio conhecido
+  +-> soma por campanha e dia -> upsert AdSpend por (campaignId, date)
   |
   v
-status = CONNECTED, lastSyncedAt = agora, lastSyncError = null
+lê a saúde da conta (status, teto, acumulado, saldo); se falhar, segue sem
+  |
+  v
+status = CONNECTED, lastSyncedAt = agora, lastSyncError = null, e as colunas
+de saúde com healthSyncedAt, quando a leitura deu certo
 ```
 
+- **O worker roda dentro do processo da API**: o `WorkerModule` é importado
+  pelo `AppModule`, e não existe mais processo worker separado (saíram o
+  `worker/main.ts` e o `start:worker`; ver "Backend num processo só" em
+  `contexct.md`). O motivo é o WhatsApp por QR Code: a conexão fica em
+  memória, e um worker à parte abriria uma segunda conexão para o mesmo
+  número. A fila continua no meio mesmo assim: quem conecta ou clica em
+  "Sincronizar agora" só enfileira e já recebe a resposta, e a retentativa
+  fica por conta do BullMQ.
+- **A retentativa depende de quem enfileirou**: `connect()` e `POST /sync`
+  usam `attempts: 5` com backoff exponencial a partir de 5s; a agenda usa
+  `attempts: 3` a partir de 30s.
 - **Hierarquia sempre completa a cada sync**: campanhas/ad sets/ads são
   poucos por organização na prática, então cada sincronização busca e faz
   upsert do conjunto inteiro — não há sincronização incremental de
   metadados. Só os insights de gasto usam uma janela (7 dias, constante
   `INSIGHTS_LOOKBACK_DAYS`), evitando reprocessar o histórico completo a
   cada execução (Seção 86: "incremental").
-- **Gasto (`AdSpend.spendCents`)**: a Meta devolve `spend` como string
-  decimal (`"750.00"`); a conversão para centavos é
-  `Math.round(Number(spend) * 100)` — nunca ponto flutuante persistido.
+- **Gasto por anúncio e por campanha, na mesma chamada**: os números vêm no
+  nível do anúncio (`level=ad`), e o total da campanha sai da soma dessas
+  mesmas linhas. Antes vinham no nível da campanha, e o produto sabia qual
+  criativo trouxe cada lead, mas não quanto ele custou. A Meta devolve
+  `spend` como string decimal (`"750.00"`), convertida para centavos com
+  `Math.round(Number(spend) * 100)`: nunca ponto flutuante persistido.
+- **O total da campanha é somado da resposta, e não da tabela de anúncios**:
+  várias linhas caem na mesma campanha e no mesmo dia, e gravar uma a uma
+  faria o total virar o gasto do último anúncio do laço. A soma parte da
+  resposta inteira porque a conta pode devolver gasto de anúncio que já não
+  está na lista sincronizada, e somar só os anúncios conhecidos encolheria o
+  total sem ninguém perceber. O detalhe por anúncio (`AdInsight`), esse sim,
+  só é gravado para anúncio conhecido.
+- **Conversas iniciadas**: vêm nas `actions` de cada linha, no tipo
+  `onsite_conversion.messaging_conversation_started_7d`, o mesmo número da
+  coluna "Conversas por mensagem iniciadas" do Gerenciador. Ficam ao lado da
+  contagem do próprio produto de propósito: a diferença entre as duas é o
+  que o produto existe para mostrar.
+- **Saúde da conta na mesma rodada**: a sincronia lê também o objeto da
+  conta de anúncios (`account_status`, `spend_cap`, `amount_spent`,
+  `balance`, `name`, `currency`) e grava na própria `MetaConnection`, junto
+  com `healthSyncedAt`. Fica guardada, e não buscada a cada abertura de
+  tela, porque a tela não pode depender de uma chamada externa para
+  desenhar; a tela Verba lê por `GET /api/integrations/meta/saude`. Um
+  `spend_cap` igual a zero quer dizer sem teto na Meta, e vira `null` já na
+  leitura (`normalizaRespostaDaConta`). Se a leitura falhar, a sincronia
+  segue: sem o gasto a tela mente sobre números, sem a saúde ela só deixa de
+  mostrar um aviso. As colunas ficam como estavam, e `healthSyncedAt`
+  continua apontando para a última leitura que funcionou.
 - **Ad sets/ads órfãos são ignorados, não adivinhados**: se a Meta devolver
-  um ad set cujo `campaign_id` não corresponde a nenhuma campanha desta
-  sincronização, a linha é pulada silenciosamente em vez de criar um
+  um ad set cujo `campaign_id` não corresponde a nenhuma campanha conhecida
+  da organização, a linha é pulada silenciosamente em vez de criar um
   relacionamento incorreto ou falhar a sincronização inteira.
+
+### Agenda automática
+
+Antes da agenda, nada disparava a sincronização sozinho: o gasto só era
+buscado ao conectar a conta ou ao clicar em "Sincronizar agora". Quem
+conectava e não clicava em mais nada seguia vendo o custo por lead da época
+em que conectou, sem nenhuma marca de que o número estava velho, o que é pior
+do que não ter número nenhum.
+
+`AgendaDeSincronia` (`apps/api/src/worker/agenda-de-sincronia.ts`) registra
+no Redis, pelo BullMQ, um job repetido com id fixo `meta-sync-periodica` na
+fila `meta-sync` (`META_SYNC_QUEUE`):
+
+```
+subida da API: AgendaDeSincronia.onApplicationBootstrap()
+  |
+  v  sem await
+registraAgenda()
+  -> upsertJobScheduler("meta-sync-periodica", { every: minutos * 60_000 })
+  |
+  v  a cada intervalo, o BullMQ cria o job
+job "sincronizar-todas" na fila "meta-sync" (sem organização, attempts: 1)
+  |
+  v
+MetaSyncProcessor -> AgendaDeSincronia.enfileirarTodas()
+  |
+  v
+um job "sync" por conexão em CONNECTED ou SYNC_FAILED
+(attempts: 3, backoff exponencial a partir de 30s)
+  |
+  v
+MetaSyncService.sync(organizationId), o mesmo caminho do diagrama acima
+```
+
+- **De quanto em quanto tempo**: a cada 60 minutos por padrão. Quando a
+  agenda ainda não existe no Redis, a primeira rodada sai na hora do
+  registro; as seguintes contam o intervalo a partir dali, e não da virada
+  do relógio.
+- **Como ajustar**: pela variável `META_SYNC_INTERVAL_MINUTES`, em minutos,
+  que já está no `.env.example` (no Render, nas variáveis de ambiente do
+  serviço da API). O mínimo é 5, porque abaixo disso não é sincronizar, é
+  martelar a API da Meta: um valor como `1` vira 5. Sem a variável, ou com
+  um valor vazio, zero, negativo ou que não seja número, vale o padrão de 60;
+  fração é truncada. A agenda é registrada com o valor lido na subida da
+  API, então a mudança vale a partir do próximo início. Como o id é sempre o
+  mesmo, a agenda nova substitui a antiga no Redis, e com o intervalo trocado
+  a primeira rodada no ritmo novo sai na hora.
+- **Por que a agenda vive no Redis, e não num `setInterval` do processo**:
+  para sobreviver a reinício (reiniciar a API mantém a próxima rodada no
+  mesmo horário, em vez de recomeçar a contagem) e não disparar em dobro
+  quando houver dois processos da API no ar, cada um com o seu worker.
+  Registrar de novo com o mesmo id substitui a agenda em vez de criar outra,
+  e o próprio BullMQ garante uma execução só por intervalo. A contrapartida
+  é depender do Redis para guardar a agenda (ver "Vigia", abaixo).
+- **Registro sem `await` na subida**: `onApplicationBootstrap()` chama
+  `registraAgenda()` com `void`, sem esperar. Com o Redis fora do ar, o
+  BullMQ não devolve erro: fica esperando a conexão para sempre. E o Nest só
+  abre a porta HTTP depois que os hooks de bootstrap terminam, então, com
+  `await`, a API ficava no ar sem porta e o Render derrubava o deploy. Se o
+  Redis responder com erro, a falha vai para o log
+  (`agenda_de_sincronia_falhou`) e a API continua de pé.
+- **Vigia**: o Redis de produção é o Key Value gratuito do Render, que não
+  guarda nada em disco, e a Render pode reiniciá-lo a qualquer momento: ele
+  volta vazio, e a agenda some junto, sem erro nenhum. Antes da vigia, ela
+  só voltava na próxima subida da API, e até lá nada sincronizava sozinho.
+  Agora, depois do registro da subida, `mantemAgenda`
+  (`apps/api/src/worker/vigia-de-agenda.ts`) confere a cada 5 minutos se a
+  agenda continua no Redis e a registra de novo quando ela some
+  (`agenda_sumiu_do_redis` no log). Agenda recém-criada roda na hora, então
+  a volta já cobre o intervalo perdido. A vigia só lê uma agenda viva, nunca
+  registra por cima dela, e o relógio dela não sincroniza nada. Também é ela
+  que refaz um registro que falhou na subida. A faxina diária usa a mesma
+  vigia.
+- **Um job por organização, e não um que percorre todas**: o job repetido
+  não traz organização. Quando ele chega, o `MetaSyncProcessor` chama
+  `enfileirarTodas()`, que enfileira um job `sync` para cada conexão. Assim
+  a falha de um cliente não interrompe a sincronização dos outros, e cada um
+  tem a própria retentativa. O job repetido em si roda com `attempts: 1`:
+  repetir uma rodada que falhou não adianta, porque o próximo intervalo
+  refaz o mesmo trabalho.
+- **Quem entra na rodada**: conexões em `CONNECTED` e em `SYNC_FAILED`,
+  porque falha passageira é justamente o que uma nova tentativa resolve.
+  `TOKEN_EXPIRED` fica de fora de propósito: o acesso só volta quando alguém
+  reconecta com um token válido, e insistir a cada intervalo com um token
+  morto só rende chamada recusada. `DISCONNECTED` também fica de fora.
+- **Sem sincronização empilhada**: o id de cada job junta a organização e o
+  número do intervalo (`sync:<organizationId>:<intervalo>`). Enquanto o job
+  de uma organização ainda estiver na fila, outro do mesmo intervalo não
+  entra, e uma rodada atrasada não vira duas sincronizações empilhadas.
+- **Como conferir**: na subida, a API escreve
+  `agenda_de_sincronia_registrada` no log, com o intervalo em minutos, e cada
+  rodada escreve `sincronia_periodica_enfileirada`, com quantas organizações
+  entraram.
 
 ## Tratamento de erro e mapeamento de status
 
@@ -117,9 +260,20 @@ tipo de erro devolvido pela Graph API:
 | Qualquer outro erro (rede, 5xx, etc.)  | `SYNC_FAILED`      | Sim |
 
 Em todos os casos o erro é relançado após atualizar o status, para que o
-BullMQ aplique o retry configurado (`attempts: 5`, backoff exponencial a
-partir de 5s). A UI (`/integrations/meta`) mostra `lastSyncError` e um aviso
-específico para pedir reconexão quando o status é `TOKEN_EXPIRED`.
+BullMQ aplique o retry configurado no job: `attempts: 5` com backoff
+exponencial a partir de 5s quando ele vem de `connect()` ou `POST /sync`, e
+`attempts: 3` a partir de 30s quando vem da agenda automática. A UI
+(`/integrations/meta`) mostra `lastSyncError` e um aviso específico para
+pedir reconexão quando o status é `TOKEN_EXPIRED`.
+
+**Aviso no sino.** Quando a conexão passa de saudável para `TOKEN_EXPIRED`
+("Meta Ads desconectou") ou para `SYNC_FAILED` ("Sincronização do Meta Ads
+falhou", com a causa no texto), a organização recebe um aviso do tipo
+`sistema.erro`. Só na passagem: se a conexão já estava quebrada, a falha
+seguinte não avisa de novo, porque a sincronia roda de hora em hora e um
+sino cheio do mesmo problema é um sino que ninguém lê. O limite de uso não
+avisa. E o aviso nunca derruba a sincronia: `NotificationsService.notificar`
+registra no log a própria falha em vez de lançar.
 
 **Limite de uso.** Até 2026-09-30 o limite não gravava nada: uma conta
 recém-conectada que batia nele ficava em "Conectado, última sincronização:
@@ -160,41 +314,55 @@ reverter uma desconexão explícita. Coberto por teste em
 ## Modelo de dados desta fase
 
 ```
-MetaConnection  (1 por organização, organizationId único)
+MetaConnection  (1 por organização, organizationId único; guarda também a
+                 saúde da conta e o Pixel e o token do Conversions API)
         |
         v
-    Campaign  (externalId único)
+    Campaign  (organizationId + externalId único)
         |
         v
-     AdSet  (externalId único, campaignId FK)
+     AdSet  (campaignId + externalId único)
         |
         v
-      Ad  (externalId único, adSetId FK)
+      Ad  (adSetId + externalId único)
+        |
+        v
+  AdInsight  (adId + date único: spendCents, impressions, clicks,
+              conversasIniciadas)
 
 Campaign
    |
    v
- AdSpend  (campaignId + date único, spendCents)
+ AdSpend  (campaignId + date único: spendCents, conversasIniciadas)
 ```
+
+Os ids externos são únicos dentro do pai, e não no sistema inteiro. Eram
+globais, e isso vazava entre clientes: registrar uma campanha à mão com um
+id já usado revelava que outra organização o usava (e bloqueava quem
+tentasse), e a sincronização, que casa a linha por esse campo, escreveria o
+nome da campanha de um cliente dentro da linha de outro. O `AdSpend` tem
+outras colunas (impressões, cliques, conversões na plataforma), preenchidas
+pelo script do Google Ads; a sincronia da Meta grava só `spendCents` e
+`conversasIniciadas`.
 
 ## Limitações conhecidas (deliberadas, não descuido)
 
-- **Gasto só no nível de campanha.** `AdSpend` é agregado por campanha, não
-  por ad set ou anúncio individual — suficiente para o dashboard desta fase
-  (Seção 51). Gasto por ad set/anúncio fica para uma fase futura, sem exigir
-  mudança de schema incompatível (bastaria um novo modelo `AdSetSpend`/
-  `AdSpendByAd` seguindo o mesmo padrão de `@@unique`).
+- **Gasto por anúncio só para anúncio conhecido.** `AdInsight` só grava a
+  linha de um anúncio que está na hierarquia sincronizada. Gasto de anúncio
+  que a Meta devolve nos números, mas que não está na lista de anúncios,
+  entra no total da campanha (`AdSpend`) e para por aí, então a soma dos
+  anúncios pode ficar abaixo do total da campanha. Não há tabela de gasto
+  por conjunto de anúncios.
 - **Sem OAuth/App Review da Meta.** Conexão manual via `adAccountId` +
   `accessToken` de sistema, mesma decisão e mesmos motivos documentados em
   `docs/WHATSAPP.md`.
 - **Sincronização de metadados sempre completa, nunca incremental** (só o
   gasto usa janela de datas) — aceitável para os volumes esperados de
   campanhas/ad sets/ads por organização.
-- **Sem sincronização automática periódica (cron).** Hoje a sincronização só
-  ocorre ao conectar ou por acionamento manual (`POST /sync`). Uma
-  sincronização periódica (ex.: a cada N horas via `@nestjs/schedule` ou um
-  repeatable job do BullMQ) é uma extensão natural, não implementada nesta
-  fase por não estar no escopo mínimo do dashboard.
+- **A agenda automática não tenta token expirado.** Conexão em
+  `TOKEN_EXPIRED` só volta a sincronizar depois que alguém reconecta com um
+  token válido; até lá, o gasto fica parado na última sincronização que
+  funcionou (ver "Agenda automática").
 
 ## Credenciais necessárias para homologação real
 

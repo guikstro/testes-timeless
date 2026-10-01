@@ -177,7 +177,7 @@ para cada mensagem no payload: enfileira 1 job em "whatsapp-events" (BullMQ)
 responde 200 imediatamente          <- nunca faz trabalho de banco aqui
   |
   v
-(processo worker separado)
+(worker dentro do processo da API)
 WhatsAppEventProcessor -> WhatsAppIngestionService.ingest(job)
 ```
 

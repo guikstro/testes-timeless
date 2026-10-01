@@ -232,3 +232,18 @@ Decisões do usuário: convite por link, um cliente por pessoa, cadastro públic
 - As listas da Meta pedem 500 itens por página e os números por anúncio, 100, em vez dos 25 padrão: menos chamadas contadas no limite.
 - A Saúde da plataforma lista a conta "limitada pela Meta" e a "primeira sincronia não terminou" (15 minutos depois de conectar), que antes apareciam como sincronizando.
 - Conta sem nenhuma sincronia ganhou uma instrução na tela de integração: pode levar alguns minutos; passando de 10, clicar em Sincronizar agora.
+
+### `docs/META_ADS.md` em dia com a agenda automática (2026-09-30)
+- A seção de sincronização da Meta passou a descrever a agenda automática (`AgendaDeSincronia`, a cada 60 min, ajustável por `META_SYNC_INTERVAL_MINUTES`) e o worker dentro do processo da API. Só documentação, nenhum código mudou.
+
+### Documentação: worker e intervalo da Meta (2026-09-30)
+- `docs/WHATSAPP.md`: o diagrama do webhook passa a dizer que o worker roda dentro do processo da API. `.env.example`: `META_SYNC_INTERVAL_MINUTES` abaixo de 5 vira 5, e não é ignorado, como dizia o comentário. Só documentação.
+
+### `docs/META_ADS.md`: números por anúncio, saúde da conta e aviso no sino (2026-10-01)
+- A sincronização passou a descrever o que faz hoje: números por anúncio (`AdInsight`), com o total da campanha somado da resposta, conversas iniciadas, a leitura da saúde da conta na mesma rodada e o aviso no sino quando a conexão quebra. O modelo de dados mostra os ids únicos dentro do pai (campanha por organização, conjunto por campanha, anúncio por conjunto), e a limitação "gasto só no nível de campanha" saiu. Só documentação.
+
+### Agendas voltam sozinhas quando o Redis perde os dados (2026-10-01)
+- O Redis de produção (Key Value gratuito do Render) não guarda nada em disco, e a Render pode reiniciá-lo a qualquer momento. A agenda da Meta e a da faxina eram registradas só na subida da API, então sumiam junto, sem erro, até o próximo deploy.
+- `worker/vigia-de-agenda.ts` (novo): depois do registro da subida, confere a cada 5 minutos se a agenda continua no Redis e a registra de novo quando ela some. Nunca mexe numa agenda viva e para quando a API desliga. Usada pela `AgendaDeSincronia` e pela `AgendaDeFaxina`. Descrita em `docs/META_ADS.md`, "Vigia".
+- Testes: `vigia-de-agenda.spec.ts` (9 casos), `agenda-de-faxina.spec.ts` (novo, 2) e 3 casos novos em `agenda-de-sincronia.spec.ts`. Suíte da API: 912 de 919 passam; os 7 que falham são dos dois testes que precisam de um Redis de verdade (`redis-throttler.storage.spec.ts` e `notifications.integration.spec.ts`), que não havia no ambiente onde rodei.
+- Pendente (decisão do usuário): plano pago do Key Value, porque jobs na fila, links de conexão e convites guardados no Redis ainda se perdem quando ele reinicia; e conferir no Render se a política de memória está em `noeviction`.
