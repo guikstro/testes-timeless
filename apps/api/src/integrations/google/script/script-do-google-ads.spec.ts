@@ -107,7 +107,7 @@ describe("o script do Google Ads", () => {
       fim = diaAntes(bloco.periodo.de);
     }
 
-    // 396 dias contando hoje: o mesmo dia do ano passado, menos um.
+    // Desde o dia 1º do mês de 13 meses atrás.
     expect(blocos.at(-1)!.periodo.de).toBe("2025-09-01");
     expect(blocos.map((b) => b.historicoFim)).toEqual([...blocos.slice(1).map(() => false), true]);
 
@@ -115,6 +115,14 @@ describe("o script do Google Ads", () => {
     for (const bloco of blocos) {
       expect(bloco.campanhas[0].dias).toEqual([expect.objectContaining({ data: bloco.periodo.de })]);
     }
+  });
+
+  it("o histórico começa no dia 1º: colado no dia 20, setembro do ano passado vem inteiro", () => {
+    const { envios } = roda("2026-10-20T15:00:00.000Z", () => ({ historicoPendente: true }));
+    const blocos = envios.slice(1);
+    expect(blocos.at(-1)!.periodo.de).toBe("2025-09-01");
+    expect(blocos.at(-1)!.historicoFim).toBe(true);
+    expect(blocos.every((b) => diasEntre(b.periodo.de, b.periodo.ate) <= 60)).toBe(true);
   });
 
   it("conta o dia de hoje no fuso da conta: às 23h de Brasília ainda é o mesmo dia", () => {

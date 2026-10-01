@@ -49,8 +49,9 @@ Da versão 3 em diante:
   `google_ads_conexoes.coberto_desde`, e só anda para trás. Na primeira vez,
   o gasto que um script antigo já tinha mandado também conta.
 - Enquanto a resposta disser `historicoPendente: true`, a mesma rodada manda
-  os 13 meses anteriores (396 dias contando hoje), em blocos de 60 dias com
-  `historico: true`. O último bloco vai com `historicoFim: true`, que grava
+  o que vem antes, desde o dia 1º do mês de 13 meses atrás, em blocos de 60
+  dias com `historico: true`. Do dia 1º para "setembro contra setembro do ano
+  passado" ter o mês do ano passado inteiro, colado em qualquer dia. O último bloco vai com `historicoFim: true`, que grava
   `historico_completo_em` e encerra o pedido. Os blocos não trocam a versão
   nem as partes da conexão: as que valem são as da rodada de hora em hora.
 - O gasto é gravado em lote (`INSERT ... ON CONFLICT`), 500 dias por comando.

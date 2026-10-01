@@ -17,8 +17,10 @@
  * no fim de setembro tinha agosto com cinco dias, e a comparação de setembro
  * com agosto mostrava altas de 300% que não aconteceram. Agora cada envio diz
  * o período que consultou, e enquanto a Timeless responder que falta
- * histórico, a rodada manda também os 13 meses anteriores, em blocos de 60
- * dias (o teto por campanha num envio é 62).
+ * histórico, a rodada manda também o que vem antes, desde o dia 1º do mês de
+ * 13 meses atrás, em blocos de 60 dias (o teto por campanha num envio é 62).
+ * Do dia 1º, e não 396 dias contados de hoje: assim "setembro contra setembro
+ * do ano passado" tem o mês do ano passado inteiro em qualquer dia de outubro.
  */
 export const VERSAO_DO_SCRIPT = 3;
 
@@ -34,7 +36,7 @@ export function scriptDoGoogleAds(endereco: string, chave: string): string {
 var ENDERECO = ${JSON.stringify(endereco)};
 var CHAVE = ${JSON.stringify(chave)};
 var DIAS = 35;
-var DIAS_DE_HISTORICO = 396;
+var MESES_DE_HISTORICO = 13;
 var DIAS_POR_BLOCO = 60;
 var VERSAO = ${VERSAO_DO_SCRIPT};
 var DIA = 24 * 60 * 60 * 1000;
@@ -50,9 +52,10 @@ function main() {
   var inicio = new Date(hoje.getTime() - (DIAS - 1) * DIA);
   var resposta = envia(conta, leia(formata(inicio), formata(hoje)), {});
 
-  // Enquanto a Timeless disser que falta histórico: os 13 meses anteriores, em blocos.
+  // Enquanto a Timeless disser que falta histórico: desde o dia 1º do mês de
+  // 13 meses atrás, em blocos.
   if (resposta.historicoPendente) {
-    var limite = new Date(hoje.getTime() - (DIAS_DE_HISTORICO - 1) * DIA);
+    var limite = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth() - MESES_DE_HISTORICO, 1, 12));
     var fim = new Date(inicio.getTime() - DIA);
     while (fim.getTime() >= limite.getTime()) {
       var comeco = new Date(Math.max(fim.getTime() - (DIAS_POR_BLOCO - 1) * DIA, limite.getTime()));
