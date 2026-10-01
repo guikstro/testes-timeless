@@ -238,3 +238,6 @@ Decisões do usuário: convite por link, um cliente por pessoa, cadastro públic
 
 ### Documentação: worker e intervalo da Meta (2026-09-30)
 - `docs/WHATSAPP.md`: o diagrama do webhook passa a dizer que o worker roda dentro do processo da API. `.env.example`: `META_SYNC_INTERVAL_MINUTES` abaixo de 5 vira 5, e não é ignorado, como dizia o comentário. Só documentação.
+
+### `docs/META_ADS.md`: números por anúncio, saúde da conta e aviso no sino (2026-10-01)
+- A sincronização passou a descrever o que faz hoje: números por anúncio (`AdInsight`), com o total da campanha somado da resposta, conversas iniciadas, a leitura da saúde da conta na mesma rodada e o aviso no sino quando a conexão quebra. O modelo de dados mostra os ids únicos dentro do pai (campanha por organização, conjunto por campanha, anúncio por conjunto), e a limitação "gasto só no nível de campanha" saiu. Só documentação.

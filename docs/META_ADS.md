@@ -59,7 +59,9 @@ upsert em MetaConnection (status=CONNECTED) + enfileira job "sync" imediato
   expondo só `hasAccessToken: true`).
 - Reconectar (`connect` de novo) faz `upsert` pela mesma `organizationId`
   única — nunca cria uma segunda `MetaConnection`, e desconectar é só uma
-  troca de status (`DISCONNECTED` + `disconnectedAt`), nunca um DELETE.
+  troca de status (`DISCONNECTED` + `disconnectedAt`, limpando o
+  `lastSyncError`, porque o erro era da conexão que acabou de ser
+  desligada), nunca um DELETE.
   Campanhas, ad sets, ads e histórico de gasto sincronizados nunca são
   apagados por desconectar.
 - `POST /sync` dispara uma resincronização manual a qualquer momento
@@ -83,14 +85,23 @@ MetaSyncProcessor -> MetaSyncService.sync(organizationId)
 busca campanhas + ad sets + ads em paralelo (Promise.all)
   |
   v
-upsert campanhas (por externalId) -> upsert ad sets (linkados por campaignId
-interno, via Map em memória — evita N+1) -> upsert ads (mesma técnica)
+upsert campanhas (organização + externalId) -> upsert ad sets (campanha +
+externalId, achada num Map em memória para evitar N+1) -> upsert ads
+(conjunto + externalId, mesma técnica)
   |
   v
-busca insights dos últimos 7 dias -> upsert AdSpend por (campaignId, date)
+busca os números dos últimos 7 dias, uma linha por anúncio e por dia
+(level=ad): gasto, impressões, cliques e conversas iniciadas
+  |
+  +-> upsert AdInsight por (adId, date), só para anúncio conhecido
+  +-> soma por campanha e dia -> upsert AdSpend por (campaignId, date)
   |
   v
-status = CONNECTED, lastSyncedAt = agora, lastSyncError = null
+lê a saúde da conta (status, teto, acumulado, saldo); se falhar, segue sem
+  |
+  v
+status = CONNECTED, lastSyncedAt = agora, lastSyncError = null, e as colunas
+de saúde com healthSyncedAt, quando a leitura deu certo
 ```
 
 - **O worker roda dentro do processo da API**: o `WorkerModule` é importado
@@ -110,12 +121,38 @@ status = CONNECTED, lastSyncedAt = agora, lastSyncError = null
   metadados. Só os insights de gasto usam uma janela (7 dias, constante
   `INSIGHTS_LOOKBACK_DAYS`), evitando reprocessar o histórico completo a
   cada execução (Seção 86: "incremental").
-- **Gasto (`AdSpend.spendCents`)**: a Meta devolve `spend` como string
-  decimal (`"750.00"`); a conversão para centavos é
-  `Math.round(Number(spend) * 100)` — nunca ponto flutuante persistido.
+- **Gasto por anúncio e por campanha, na mesma chamada**: os números vêm no
+  nível do anúncio (`level=ad`), e o total da campanha sai da soma dessas
+  mesmas linhas. Antes vinham no nível da campanha, e o produto sabia qual
+  criativo trouxe cada lead, mas não quanto ele custou. A Meta devolve
+  `spend` como string decimal (`"750.00"`), convertida para centavos com
+  `Math.round(Number(spend) * 100)`: nunca ponto flutuante persistido.
+- **O total da campanha é somado da resposta, e não da tabela de anúncios**:
+  várias linhas caem na mesma campanha e no mesmo dia, e gravar uma a uma
+  faria o total virar o gasto do último anúncio do laço. A soma parte da
+  resposta inteira porque a conta pode devolver gasto de anúncio que já não
+  está na lista sincronizada, e somar só os anúncios conhecidos encolheria o
+  total sem ninguém perceber. O detalhe por anúncio (`AdInsight`), esse sim,
+  só é gravado para anúncio conhecido.
+- **Conversas iniciadas**: vêm nas `actions` de cada linha, no tipo
+  `onsite_conversion.messaging_conversation_started_7d`, o mesmo número da
+  coluna "Conversas por mensagem iniciadas" do Gerenciador. Ficam ao lado da
+  contagem do próprio produto de propósito: a diferença entre as duas é o
+  que o produto existe para mostrar.
+- **Saúde da conta na mesma rodada**: a sincronia lê também o objeto da
+  conta de anúncios (`account_status`, `spend_cap`, `amount_spent`,
+  `balance`, `name`, `currency`) e grava na própria `MetaConnection`, junto
+  com `healthSyncedAt`. Fica guardada, e não buscada a cada abertura de
+  tela, porque a tela não pode depender de uma chamada externa para
+  desenhar; a tela Verba lê por `GET /api/integrations/meta/saude`. Um
+  `spend_cap` igual a zero quer dizer sem teto na Meta, e vira `null` já na
+  leitura (`normalizaRespostaDaConta`). Se a leitura falhar, a sincronia
+  segue: sem o gasto a tela mente sobre números, sem a saúde ela só deixa de
+  mostrar um aviso. As colunas ficam como estavam, e `healthSyncedAt`
+  continua apontando para a última leitura que funcionou.
 - **Ad sets/ads órfãos são ignorados, não adivinhados**: se a Meta devolver
-  um ad set cujo `campaign_id` não corresponde a nenhuma campanha desta
-  sincronização, a linha é pulada silenciosamente em vez de criar um
+  um ad set cujo `campaign_id` não corresponde a nenhuma campanha conhecida
+  da organização, a linha é pulada silenciosamente em vez de criar um
   relacionamento incorreto ou falhar a sincronização inteira.
 
 ### Agenda automática
@@ -218,6 +255,15 @@ exponencial a partir de 5s quando ele vem de `connect()` ou `POST /sync`, e
 (`/integrations/meta`) mostra `lastSyncError` e um aviso específico para
 pedir reconexão quando o status é `TOKEN_EXPIRED`.
 
+**Aviso no sino.** Quando a conexão passa de saudável para `TOKEN_EXPIRED`
+("Meta Ads desconectou") ou para `SYNC_FAILED` ("Sincronização do Meta Ads
+falhou", com a causa no texto), a organização recebe um aviso do tipo
+`sistema.erro`. Só na passagem: se a conexão já estava quebrada, a falha
+seguinte não avisa de novo, porque a sincronia roda de hora em hora e um
+sino cheio do mesmo problema é um sino que ninguém lê. O limite de uso não
+avisa. E o aviso nunca derruba a sincronia: `NotificationsService.notificar`
+registra no log a própria falha em vez de lançar.
+
 **Limite de uso.** Até 2026-09-30 o limite não gravava nada: uma conta
 recém-conectada que batia nele ficava em "Conectado, última sincronização:
 nunca", sem erro na tela, e parecia um erro no passo a passo do token. Agora:
@@ -257,30 +303,45 @@ reverter uma desconexão explícita. Coberto por teste em
 ## Modelo de dados desta fase
 
 ```
-MetaConnection  (1 por organização, organizationId único)
+MetaConnection  (1 por organização, organizationId único; guarda também a
+                 saúde da conta e o Pixel e o token do Conversions API)
         |
         v
-    Campaign  (externalId único)
+    Campaign  (organizationId + externalId único)
         |
         v
-     AdSet  (externalId único, campaignId FK)
+     AdSet  (campaignId + externalId único)
         |
         v
-      Ad  (externalId único, adSetId FK)
+      Ad  (adSetId + externalId único)
+        |
+        v
+  AdInsight  (adId + date único: spendCents, impressions, clicks,
+              conversasIniciadas)
 
 Campaign
    |
    v
- AdSpend  (campaignId + date único, spendCents)
+ AdSpend  (campaignId + date único: spendCents, conversasIniciadas)
 ```
+
+Os ids externos são únicos dentro do pai, e não no sistema inteiro. Eram
+globais, e isso vazava entre clientes: registrar uma campanha à mão com um
+id já usado revelava que outra organização o usava (e bloqueava quem
+tentasse), e a sincronização, que casa a linha por esse campo, escreveria o
+nome da campanha de um cliente dentro da linha de outro. O `AdSpend` tem
+outras colunas (impressões, cliques, conversões na plataforma), preenchidas
+pelo script do Google Ads; a sincronia da Meta grava só `spendCents` e
+`conversasIniciadas`.
 
 ## Limitações conhecidas (deliberadas, não descuido)
 
-- **Gasto só no nível de campanha.** `AdSpend` é agregado por campanha, não
-  por ad set ou anúncio individual — suficiente para o dashboard desta fase
-  (Seção 51). Gasto por ad set/anúncio fica para uma fase futura, sem exigir
-  mudança de schema incompatível (bastaria um novo modelo `AdSetSpend`/
-  `AdSpendByAd` seguindo o mesmo padrão de `@@unique`).
+- **Gasto por anúncio só para anúncio conhecido.** `AdInsight` só grava a
+  linha de um anúncio que está na hierarquia sincronizada. Gasto de anúncio
+  que a Meta devolve nos números, mas que não está na lista de anúncios,
+  entra no total da campanha (`AdSpend`) e para por aí, então a soma dos
+  anúncios pode ficar abaixo do total da campanha. Não há tabela de gasto
+  por conjunto de anúncios.
 - **Sem OAuth/App Review da Meta.** Conexão manual via `adAccountId` +
   `accessToken` de sistema, mesma decisão e mesmos motivos documentados em
   `docs/WHATSAPP.md`.
