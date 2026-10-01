@@ -131,7 +131,8 @@ describe("Google Ads por script (e2e)", () => {
     expect(deA.body.meta).toBeNull();
 
     const deB = await request(app.getHttpServer()).get("/api/analytics/frescor").set("Authorization", `Bearer ${tokenB}`).expect(200);
-    expect(deB.body).toEqual({ meta: null, google: null });
+    // Nenhuma fonte: nem anúncios, nem Google, nem Página.
+    expect(deB.body).toEqual({ meta: null, google: null, pagina: null });
   });
 
   describe("presença local: ligações e rotas", () => {
