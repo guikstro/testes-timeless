@@ -92,15 +92,15 @@ export class AdminService {
     // em vez de uma por linha (Seção 75 — evitar N+1).
     const organizationIds = organizations.map((organization) => organization.id);
     const salesByOrganization = await this.prisma.sale.groupBy({
-      by: ["organizationId"],
-      where: { organizationId: { in: organizationIds }, deletedAt: null },
+      by: ["organizationId", "currency"],
+      where: { organizationId: { in: organizationIds }, deletedAt: null, status: "CONFIRMED", needsReview: false },
       _count: { _all: true },
       _sum: { amountCents: true },
     });
-    const salesIndex = new Map(salesByOrganization.map((row) => [row.organizationId, row]));
+    const salesIndex = new Map(salesByOrganization.map((row) => [`${row.organizationId}:${row.currency ?? "BRL"}`, row]));
 
     const items = organizations.map((organization) => {
-      const sales = salesIndex.get(organization.id);
+      const sales = salesIndex.get(`${organization.id}:${organization.currency ?? "BRL"}`);
       const { memberships, _count, ...rest } = organization;
 
       return {

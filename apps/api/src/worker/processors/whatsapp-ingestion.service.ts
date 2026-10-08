@@ -56,8 +56,18 @@ export class WhatsAppIngestionService {
    * concurrent delivery for the same phone number. See docs/WHATSAPP.md.
    */
   async ingest(job: WhatsAppInboundMessageJob): Promise<void> {
-    const alreadyProcessed = await this.prisma.message.findUnique({ where: { externalId: job.messageId } });
+    const alreadyProcessed = await this.prisma.message.findUnique({ where: { externalId: job.messageId }, include: { conversation: { include: { lead: true, whatsappConnection: true } } } });
     if (alreadyProcessed) {
+      // Persistence may have succeeded before classification failed. Replay only
+      // the idempotent classifier, scoped to the original transport and tenant.
+      const conversation = alreadyProcessed.conversation;
+      const connection = conversation?.whatsappConnection;
+      if (connection && connection.provider === job.provider &&
+        (job.provider === "CLOUD_API" ? connection.phoneNumberId : connection.instanceName) === job.routingKey) {
+        await this.classifier.classify({ organizationId: conversation.organizationId, lead: conversation.lead,
+          messageId: alreadyProcessed.id, messageText: alreadyProcessed.text ?? undefined,
+          occurredAt: alreadyProcessed.timestamp, direction: alreadyProcessed.direction });
+      }
       this.logger.log(JSON.stringify({ event: "duplicate_message_skipped", messageId: job.messageId }));
       return;
     }

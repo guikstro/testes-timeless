@@ -1,3 +1,4 @@
+import { DeterministicSaleClassifier } from "../sales/sale-classifier";
 import { Lead, Prisma } from "@prisma/client";
 import { ConversationClassifierService } from "./conversation-classifier.service";
 import { PrismaService } from "../common/prisma/prisma.service";
@@ -35,17 +36,21 @@ describe("ConversationClassifierService", () => {
       lead: { update: jest.fn() },
       leadEvent: { create: jest.fn() },
       sale: { create: jest.fn() },
+      organization: { findUniqueOrThrow: jest.fn().mockResolvedValue({ currency: "BRL" }) },
+      message: { findFirst: jest.fn().mockResolvedValue({ conversation: { coverage: "PARTIAL" } }) },
     };
     const conversionEvents = {
       recordLead: jest.fn(),
       recordQualifiedLead: jest.fn(),
       recordPurchase: jest.fn(),
     };
+    const sales = { record: jest.fn() };
     const service = new ConversationClassifierService(
       prisma as unknown as PrismaService,
       conversionEvents as unknown as ConversionEventsService,
+      sales as never, new DeterministicSaleClassifier(),
     );
-    return { service, prisma, conversionEvents };
+    return { service, prisma, conversionEvents, sales };
   }
 
   it("does nothing when the message has no text (e.g. media message)", async () => {
@@ -54,7 +59,7 @@ describe("ConversationClassifierService", () => {
     expect(prisma.classificationRule.findMany).not.toHaveBeenCalled();
   });
 
-  it("never re-evaluates a lead that is already WON", async () => {
+  it("continues reading evidence after the lead lifecycle reaches WON", async () => {
     const { service, prisma } = buildService();
     await service.classify({
       organizationId: "org-1",
@@ -64,7 +69,7 @@ describe("ConversationClassifierService", () => {
       direction: "INBOUND",
       occurredAt: new Date(),
     });
-    expect(prisma.classificationRule.findMany).not.toHaveBeenCalled();
+    expect(prisma.classificationRule.findMany).toHaveBeenCalled();
   });
 
   it("qualifies a NEW lead when a QUALIFIED trigger matches", async () => {
@@ -131,132 +136,20 @@ describe("ConversationClassifierService", () => {
     expect(prisma.lead.update).not.toHaveBeenCalled();
   });
 
-  it("marks WON, creates a Sale, and extracts revenue when a WON trigger matches with a value", async () => {
-    const { service, prisma, conversionEvents } = buildService();
-    prisma.classificationRule.findMany.mockResolvedValue([
-      { id: "rule-2", targetStatus: "WON", phrase: "contrato fechado" },
-    ]);
-
-    await service.classify({
-      organizationId: "org-1",
-      lead: buildLead({ status: "QUALIFIED", qualifiedAt: new Date(0) }),
-      messageId: "msg-2",
-      messageText: "contrato fechado! Fechamos por 2 mil",
-      direction: "INBOUND",
-      occurredAt: new Date("2026-01-02T00:00:00Z"),
-    });
-
-    expect(prisma.lead.update).toHaveBeenCalledWith({
-      where: { id: "lead-1" },
-      data: { status: "WON", wonAt: new Date("2026-01-02T00:00:00Z") },
-    });
-    expect(prisma.sale.create).toHaveBeenCalledWith({
-      data: {
-        organizationId: "org-1",
-        leadId: "lead-1",
-        amountCents: 200000,
-        classifierType: "RULE",
-        evidenceMessageId: "msg-2",
-        detectedAt: new Date("2026-01-02T00:00:00Z"),
-      },
-    });
-    const eventTypes = prisma.leadEvent.create.mock.calls.map((c) => c[0].data.type);
-    expect(eventTypes).toEqual(["SALE_DETECTED", "REVENUE_DETECTED"]);
-    expect(conversionEvents.recordPurchase).toHaveBeenCalledWith("org-1", "lead-1", new Date("2026-01-02T00:00:00Z"), 200000);
-    // Already QUALIFIED before this message — no implicit re-qualification event sent to Meta.
-    expect(conversionEvents.recordQualifiedLead).not.toHaveBeenCalled();
-  });
-
-  it("leaves amountCents null (never guesses) when no value can be extracted, and skips REVENUE_DETECTED", async () => {
-    const { service, prisma, conversionEvents } = buildService();
-    prisma.classificationRule.findMany.mockResolvedValue([
-      { id: "rule-2", targetStatus: "WON", phrase: "contrato fechado" },
-    ]);
-
-    await service.classify({
-      organizationId: "org-1",
-      lead: buildLead({ status: "QUALIFIED" }),
-      messageId: "msg-2",
-      messageText: "contrato fechado, muito obrigado!",
-      direction: "INBOUND",
-      occurredAt: new Date(),
-    });
-
-    expect(prisma.sale.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ amountCents: null }) }),
-    );
-    const eventTypes = prisma.leadEvent.create.mock.calls.map((c) => c[0].data.type);
-    expect(eventTypes).toEqual(["SALE_DETECTED"]);
-    // No value known yet — never send an incomplete Purchase to Meta.
+  it.each(["INBOUND", "OUTBOUND"] as const)("records a possible sale from %s without changing the lead or sending Purchase", async (direction) => {
+    const { service, prisma, sales, conversionEvents } = buildService();
+    prisma.classificationRule.findMany.mockResolvedValue([{ targetStatus: "WON", phrase: "contrato fechado" }]);
+    await service.classify({ organizationId: "org-1", lead: buildLead(), messageId: "msg-1", messageText: "contrato fechado por R$ 850,00", direction, occurredAt: new Date() });
+    expect(sales.record).toHaveBeenCalledWith(expect.objectContaining({ source: "CONVERSATION", status: "POSSIBLE", valueCents: 85000, eventKey: "message:msg-1" }));
+    expect(prisma.lead.update).not.toHaveBeenCalled();
     expect(conversionEvents.recordPurchase).not.toHaveBeenCalled();
   });
 
-  it("jumping straight from NEW to WON also synthesizes a QUALIFIED event, to keep the funnel consistent", async () => {
-    const { service, prisma, conversionEvents } = buildService();
-    prisma.classificationRule.findMany.mockResolvedValue([
-      { id: "rule-2", targetStatus: "WON", phrase: "contrato fechado" },
-    ]);
-
-    await service.classify({
-      organizationId: "org-1",
-      lead: buildLead({ status: "NEW" }),
-      messageId: "msg-2",
-      messageText: "contrato fechado!",
-      direction: "INBOUND",
-      occurredAt: new Date("2026-01-03T00:00:00Z"),
-    });
-
-    expect(prisma.lead.update).toHaveBeenCalledWith({
-      where: { id: "lead-1" },
-      data: { status: "WON", wonAt: new Date("2026-01-03T00:00:00Z"), qualifiedAt: new Date("2026-01-03T00:00:00Z") },
-    });
-    const eventTypes = prisma.leadEvent.create.mock.calls.map((c) => c[0].data.type);
-    expect(eventTypes).toEqual(["QUALIFIED", "SALE_DETECTED"]);
-    expect(conversionEvents.recordQualifiedLead).toHaveBeenCalledWith("org-1", "lead-1", new Date("2026-01-03T00:00:00Z"));
-    // "contrato fechado!" has no extractable value — no Purchase sent.
-    expect(conversionEvents.recordPurchase).not.toHaveBeenCalled();
-  });
-
-  it("prioritizes a WON match over a QUALIFIED match on the same message", async () => {
-    const { service, prisma } = buildService();
-    prisma.classificationRule.findMany.mockResolvedValue([
-      { id: "rule-1", targetStatus: "QUALIFIED", phrase: "vamos marcar" },
-      { id: "rule-2", targetStatus: "WON", phrase: "contrato fechado" },
-    ]);
-
-    await service.classify({
-      organizationId: "org-1",
-      lead: buildLead(),
-      messageId: "msg-1",
-      messageText: "vamos marcar? ah não precisa, contrato fechado já",
-      direction: "INBOUND",
-      occurredAt: new Date(),
-    });
-
-    expect(prisma.sale.create).toHaveBeenCalled();
-  });
-
-  it("never creates a second sale when it loses a race to a concurrent message also matching WON", async () => {
-    const { service, prisma, conversionEvents } = buildService();
-    prisma.classificationRule.findMany.mockResolvedValue([
-      { id: "rule-2", targetStatus: "WON", phrase: "fechado" },
-    ]);
-    prisma.sale.create.mockRejectedValue(uniqueConstraintError());
-
-    await expect(
-      service.classify({
-        organizationId: "org-1",
-        lead: buildLead({ status: "QUALIFIED" }),
-        messageId: "msg-2",
-        messageText: "fechado!",
-        direction: "INBOUND",
-        occurredAt: new Date(),
-      }),
-    ).resolves.not.toThrow();
-
-    const eventTypes = prisma.leadEvent.create.mock.calls.map((c) => c[0].data.type);
-    expect(eventTypes).not.toContain("SALE_DETECTED");
-    expect(conversionEvents.recordPurchase).not.toHaveBeenCalled();
+  it.each(["não fechamos", "se fechamos amanhã", "talvez fechamos"])("does not detect a sale for %s", async (text) => {
+    const { service, prisma, sales } = buildService();
+    prisma.classificationRule.findMany.mockResolvedValue([{ targetStatus: "WON", phrase: "fechamos" }]);
+    await service.classify({ organizationId: "org-1", lead: buildLead(), messageId: "msg-1", messageText: text, direction: "INBOUND", occurredAt: new Date() });
+    expect(sales.record).not.toHaveBeenCalled();
   });
 
   describe("reunião marcada (Fase 11)", () => {
@@ -370,7 +263,7 @@ describe("ConversationClassifierService", () => {
     });
 
     /** Entre dois gatilhos na mesma mensagem, vence o estágio mais avançado. */
-    it("dá prioridade à venda sobre a reunião numa mensagem do lead", async () => {
+    it("registra evidência sem substituir o estágio de reunião", async () => {
       const { service, prisma } = buildService();
       prisma.classificationRule.findMany.mockResolvedValue([
         meetingRule,
@@ -379,8 +272,8 @@ describe("ConversationClassifierService", () => {
 
       await classify(service, "INBOUND");
 
-      expect(prisma.sale.create).toHaveBeenCalled();
-      expect(prisma.lead.update.mock.calls[0][0].data.status).toBe("WON");
+      expect(prisma.sale.create).not.toHaveBeenCalled();
+      expect(prisma.lead.update.mock.calls[0][0].data.status).toBe("MEETING_SCHEDULED");
     });
 
     /** Automático e manual não podem divergir no mesmo funil. */

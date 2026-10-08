@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api-client";
+import Link from "next/link";
 import { temLeads } from "@/lib/foco";
 import { tempoRelativo } from "@/lib/relative-time";
 import { sessaoAtual } from "@/lib/sessao";
@@ -63,6 +64,7 @@ export default async function IntegrationsPage() {
 
   return (
     <div className="mx-auto max-w-5xl">
+      <Link href="/integrations/sales" className="surface mb-6 block p-5"><span className="font-semibold">Fontes de vendas</span><p className="mt-1 text-ink-mute">CRM, pagamentos, ERP e automações pela API universal.</p></Link>
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Integrações</h1>
       <p className="mb-6 mt-1 text-corpo text-ink-mute">
         {comLeads

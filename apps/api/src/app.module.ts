@@ -34,6 +34,7 @@ import { OrigemDaRequisicaoMiddleware } from "./auditoria/contexto-da-requisicao
 import { GoogleConversionsModule } from "./integrations/google/google-conversions.module";
 import { PerfilDaEmpresaModule } from "./integrations/perfil-da-empresa/perfil-da-empresa.module";
 import { WorkerModule } from "./worker/worker.module";
+import { SalesModule } from "./sales/sales.module";
 import { ObservabilidadeModule } from "./observabilidade/observabilidade.module";
 
 @Module({
@@ -75,6 +76,7 @@ import { ObservabilidadeModule } from "./observabilidade/observabilidade.module"
     PerfilDaEmpresaModule,
     TelemetriaModule,
     WorkerModule,
+    SalesModule,
     ObservabilidadeModule,
   ],
   providers: [

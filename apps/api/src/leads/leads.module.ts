@@ -1,3 +1,4 @@
+import { SalesModule } from "../sales/sales.module";
 import { Module } from "@nestjs/common";
 import { BullModule } from "@nestjs/bullmq";
 import { ConversionEventsModule } from "../integrations/meta/conversion-events.module";
@@ -9,6 +10,7 @@ import { NotificationsModule } from "../notifications/notifications.module";
 @Module({
   imports: [
     ConversionEventsModule,
+    SalesModule,
     NotificationsModule,
     BullModule.registerQueue({ name: WHATSAPP_SEND_QUEUE }),
   ],

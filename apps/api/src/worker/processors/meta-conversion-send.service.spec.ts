@@ -7,6 +7,7 @@ import { MetaGraphClient } from "../../integrations/meta/meta-graph-client";
 describe("MetaConversionSendService", () => {
   function buildService() {
     const prisma = {
+      sale: { findFirst: jest.fn().mockResolvedValue({ amountCents: 200000, currency: "BRL" }) },
       conversionEvent: { findUnique: jest.fn(), update: jest.fn() },
       metaConnection: { findUnique: jest.fn() },
     };
@@ -23,6 +24,7 @@ describe("MetaConversionSendService", () => {
   function eventRow(overrides: Record<string, unknown> = {}) {
     return {
       id: "event-1",
+      saleId: "sale-1",
       organizationId: "org-1",
       leadId: "lead-1",
       type: "LEAD",

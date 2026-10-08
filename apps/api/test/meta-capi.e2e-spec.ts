@@ -229,7 +229,7 @@ describe("Meta Conversions API — Lead/QualifiedLead/Purchase end to end (e2e)"
     );
 
     const conversionEvent = await waitFor(async () => {
-      const current = await prisma.conversionEvent.findUnique({ where: { leadId_type: { leadId: lead.id, type: "LEAD" } } });
+      const current = await prisma.conversionEvent.findFirst({ where: { leadId: lead.id, type: "LEAD" } });
       return current?.status === "SENT" ? current : null;
     });
     expect(conversionEvent.sentAt).not.toBeNull();
@@ -250,34 +250,39 @@ describe("Meta Conversions API — Lead/QualifiedLead/Purchase end to end (e2e)"
       prisma.lead.findUnique({ where: { organizationId_normalizedPhone: { organizationId: orgId, normalizedPhone: `+${from}` } } }),
     );
     await waitFor(async () => {
-      const current = await prisma.conversionEvent.findUnique({ where: { leadId_type: { leadId: lead.id, type: "LEAD" } } });
+      const current = await prisma.conversionEvent.findFirst({ where: { leadId: lead.id, type: "LEAD" } });
       return current?.status === "SENT" ? current : null;
     });
 
     await sendMessage(from, "wamid.CAPI-3", "beleza, vamos marcar sua consulta amanhã?", 1700000100);
 
     await waitFor(async () => {
-      const current = await prisma.conversionEvent.findUnique({ where: { leadId_type: { leadId: lead.id, type: "QUALIFIED_LEAD" } } });
+      const current = await prisma.conversionEvent.findFirst({ where: { leadId: lead.id, type: "QUALIFIED_LEAD" } });
       return current?.status === "SENT" ? current : null;
     });
     const sent = eventsFor(lead.id).find((e) => e.body.event_name === "QualifiedLead");
     expect(sent).toBeDefined();
   });
 
-  it("sends a Purchase event with the value converted from cents to the main currency unit", async () => {
+  it("sends Purchase only after explicit confirmation, with cents converted to the main currency unit", async () => {
     const from = "5585933333333";
     await sendMessage(from, "wamid.CAPI-4", "contrato fechado! Fechamos por 2 mil", 1700000000);
     const lead = await waitFor(() =>
       prisma.lead.findUnique({ where: { organizationId_normalizedPhone: { organizationId: orgId, normalizedPhone: `+${from}` } } }),
     );
 
+    const sale = await waitFor(() => prisma.sale.findFirst({ where: { leadId: lead.id } }));
+    expect(await prisma.conversionEvent.count({ where: { leadId: lead.id, type: "PURCHASE" } })).toBe(0);
+    await request(app.getHttpServer()).post(`/api/sales/${sale.id}/review`)
+      .set("Authorization", `Bearer ${orgToken}`).send({ requestId: crypto.randomUUID(), action: "CONFIRM", valueCents: 200000 }).expect(201);
+
     const conversionEvent = await waitFor(async () => {
-      const current = await prisma.conversionEvent.findUnique({ where: { leadId_type: { leadId: lead.id, type: "PURCHASE" } } });
+      const current = await prisma.conversionEvent.findFirst({ where: { leadId: lead.id, type: "PURCHASE" } });
       return current?.status === "SENT" ? current : null;
     });
     expect(conversionEvent.valueCents).toBe(200000);
 
-    const sent = eventsFor(lead.id).find((e) => e.body.event_name === "Purchase");
+    const sent = eventsFor(`sale:${sale.id}`).find((e) => e.body.event_name === "Purchase");
     expect(sent?.body.custom_data).toEqual({ value: 2000, currency: "BRL" });
   });
 
@@ -287,10 +292,10 @@ describe("Meta Conversions API — Lead/QualifiedLead/Purchase end to end (e2e)"
     const lead = await waitFor(() =>
       prisma.lead.findUnique({ where: { organizationId_normalizedPhone: { organizationId: orgId, normalizedPhone: `+${from}` } } }),
     );
-    await waitFor(() => prisma.sale.findUnique({ where: { leadId: lead.id } }));
+    await waitFor(() => prisma.sale.findFirst({ where: { leadId: lead.id } }));
 
     await new Promise((resolve) => setTimeout(resolve, 400));
-    let conversionEvent = await prisma.conversionEvent.findUnique({ where: { leadId_type: { leadId: lead.id, type: "PURCHASE" } } });
+    let conversionEvent = await prisma.conversionEvent.findFirst({ where: { leadId: lead.id, type: "PURCHASE" } });
     expect(conversionEvent).toBeNull();
     expect(eventsFor(lead.id).find((e) => e.body.event_name === "Purchase")).toBeUndefined();
 
@@ -301,7 +306,7 @@ describe("Meta Conversions API — Lead/QualifiedLead/Purchase end to end (e2e)"
       .expect(200);
 
     conversionEvent = await waitFor(async () => {
-      const current = await prisma.conversionEvent.findUnique({ where: { leadId_type: { leadId: lead.id, type: "PURCHASE" } } });
+      const current = await prisma.conversionEvent.findFirst({ where: { leadId: lead.id, type: "PURCHASE" } });
       return current?.status === "SENT" ? current : null;
     });
     expect(conversionEvent!.valueCents).toBe(30000);
@@ -361,7 +366,7 @@ describe("Meta Conversions API — Lead/QualifiedLead/Purchase end to end (e2e)"
       }),
     );
     const conversionEvent = await waitFor(async () => {
-      const current = await prisma.conversionEvent.findUnique({ where: { leadId_type: { leadId: lead.id, type: "LEAD" } } });
+      const current = await prisma.conversionEvent.findFirst({ where: { leadId: lead.id, type: "LEAD" } });
       return current && current.status !== "PENDING" ? current : null;
     });
     expect(conversionEvent.status).toBe("RETRYING");

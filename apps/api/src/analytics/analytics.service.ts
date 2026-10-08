@@ -247,6 +247,7 @@ export class AnalyticsService {
     const anteriorDe = new Date(from);
     anteriorDe.setDate(anteriorDe.getDate() - days);
 
+    const currency = (await this.prisma.organization.findUnique({ where: { id: organizationId }, select: { currency: true } }))?.currency ?? "BRL";
     const selecao = {
       status: true,
       firstContactAt: true,
@@ -254,7 +255,7 @@ export class AnalyticsService {
       wonAt: true,
       meetingScheduledAt: true,
       disqualifiedAt: true,
-      sale: { select: { amountCents: true } },
+      sales: { where: { status: "CONFIRMED", needsReview: false, deletedAt: null, currency }, select: { amountCents: true, currency: true, occurredAt: true } },
       attribution: {
         select: {
           method: true,
@@ -293,9 +294,14 @@ export class AnalyticsService {
     // lugares diriam números diferentes para a mesma espera.
     const expediente = expedienteDa(organizacao);
 
-    // A venda é 1:1 com o lead, mas só conta aqui se não foi removida:
-    // `sale` já vem null para vendas apagadas por causa do soft delete.
-    const aggregationLeads = leads as unknown as AggregationLead[];
+    // Os relatórios de aquisição mantêm a contagem de clientes compradores.
+    // Somam compras confirmadas na moeda da organização; outras moedas ficam em Vendas.
+    const legacyRevenue = <T extends { sales: { amountCents: number | null }[]; status?: string }>(lead: T) => ({
+      ...lead,
+      sale: lead.sales.length ? { amountCents: lead.sales.reduce((sum, sale) => sum + (sale.amountCents ?? 0), 0) } : null,
+      confirmed: lead.sales.length > 0,
+    });
+    const aggregationLeads = leads.map(legacyRevenue) as unknown as AggregationLead[];
     const totals = aggregateTotals(aggregationLeads);
 
     /*
@@ -324,7 +330,7 @@ export class AnalyticsService {
     return {
       period: { days, from: from.toISOString(), to: to.toISOString() },
       totals,
-      comparacao: comparaTotais(totals, aggregateTotals(anteriores as unknown as AggregationLead[])),
+      comparacao: comparaTotais(totals, aggregateTotals(anteriores.map(legacyRevenue) as unknown as AggregationLead[])),
       byOrigin: aggregateByOrigin(aggregationLeads),
       daily: aggregateDaily(aggregationLeads, from, to),
       chegadas: agregaChegadas(aggregationLeads),
@@ -607,6 +613,7 @@ export class AnalyticsService {
     const deDia = new Date(`${janela.de}T00:00:00.000Z`);
     const ateDia = new Date(`${janela.ate}T00:00:00.000Z`);
 
+    const currency = (await this.prisma.organization.findUnique({ where: { id: organizationId }, select: { currency: true } }))?.currency ?? "BRL";
     const [campanhas, leads] = await Promise.all([
       this.prisma.campaign.findMany({
         where: { organizationId },
@@ -629,7 +636,7 @@ export class AnalyticsService {
         select: {
           qualifiedAt: true,
           wonAt: true,
-          sale: { select: { amountCents: true } },
+          sales: { where: { status: "CONFIRMED", needsReview: false, deletedAt: null, currency }, select: { amountCents: true, currency: true, occurredAt: true } },
           attribution: {
             select: {
               evidence: true,
@@ -657,8 +664,8 @@ export class AnalyticsService {
     const atribuidos: LeadAtribuido[] = leads.map((lead, i) => ({
       campaignExternalId: completaIdsDoAnuncio(idsBrutos[i], hierarquia).campaignId,
       qualifiedAt: lead.qualifiedAt,
-      wonAt: lead.wonAt,
-      sale: lead.sale,
+      wonAt: lead.sales.length ? lead.sales[0].occurredAt : null,
+      sale: lead.sales.length ? { amountCents: lead.sales.reduce((sum, s) => sum + (s.amountCents ?? 0), 0) } : null,
     }));
 
     const comAtividade = new Set(atribuidos.map((lead) => lead.campaignExternalId));
@@ -723,6 +730,7 @@ export class AnalyticsService {
     const deDia = new Date(`${janela.de}T00:00:00.000Z`);
     const ateDia = new Date(`${janela.ate}T00:00:00.000Z`);
 
+    const currency = (await this.prisma.organization.findUnique({ where: { id: organizationId }, select: { currency: true } }))?.currency ?? "BRL";
     const [linhas, leads, conexao] = await Promise.all([
       this.prisma.adInsight.findMany({
         // O escopo desce pela campanha: anúncio e conjunto não carregam
@@ -749,7 +757,7 @@ export class AnalyticsService {
         select: {
           qualifiedAt: true,
           wonAt: true,
-          sale: { select: { amountCents: true } },
+          sales: { where: { status: "CONFIRMED", needsReview: false, deletedAt: null, currency }, select: { amountCents: true, currency: true, occurredAt: true } },
           attribution: {
             select: {
               // O método entra aqui para a tela poder dizer *como* cada lead
@@ -806,8 +814,8 @@ export class AnalyticsService {
     const atribuidos: LeadDoAnuncio[] = leads.map((lead) => ({
       adExternalId: extractAdIds(lead.attribution).adId,
       qualifiedAt: lead.qualifiedAt,
-      wonAt: lead.wonAt,
-      sale: lead.sale,
+      wonAt: lead.sales.length ? lead.sales[0].occurredAt : null,
+      sale: lead.sales.length ? { amountCents: lead.sales.reduce((sum, s) => sum + (s.amountCents ?? 0), 0) } : null,
     }));
 
     /*
@@ -879,4 +887,3 @@ function coberturaMaisAntiga(a: string | null, b: string | null): string | null 
   if (!b) return a;
   return a < b ? a : b;
 }
-

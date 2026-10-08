@@ -16,7 +16,18 @@ export interface LeadParaExportar {
   name: string | null;
   qualifiedAt: Date | null;
   wonAt: Date | null;
-  sale: { amountCents: number | null; detectedAt: Date } | null;
+  sale: {
+    amountCents: number | null;
+    detectedAt: Date;
+    occurredAt?: Date | null;
+    currency?: string;
+  } | null;
+  sales?: {
+    amountCents: number | null;
+    detectedAt: Date;
+    occurredAt: Date | null;
+    currency: string;
+  }[];
   gclid: string;
   clickedAt: Date;
 }
@@ -30,6 +41,7 @@ export interface LinhaDeConversao {
   conversionTime: string;
   ocorridoEm: string;
   valorCentavos: number | null;
+  currency?: string;
   /**
    * O Google recusa conversão cujo clique tenha mais de noventa dias. A linha
    * continua na lista, marcada: sumir com ela esconderia por que o número
@@ -65,7 +77,8 @@ export function formataHorario(instante: Date, fusoPedido: string): string {
     second: "2-digit",
   }).formatToParts(instante);
 
-  const pega = (tipo: string) => partes.find((parte) => parte.type === tipo)?.value ?? "00";
+  const pega = (tipo: string) =>
+    partes.find((parte) => parte.type === tipo)?.value ?? "00";
   const hora = pega("hour") === "24" ? "00" : pega("hour");
   const relogio = `${pega("year")}-${pega("month")}-${pega("day")} ${hora}:${pega("minute")}:${pega("second")}`;
 
@@ -75,7 +88,10 @@ export function formataHorario(instante: Date, fusoPedido: string): string {
 /** O deslocamento do fuso naquele instante, como `-03:00`. */
 function deslocamento(instante: Date, fusoPedido: string): string {
   const fuso = fusoSeguro(fusoPedido);
-  const nomeado = new Intl.DateTimeFormat("en-US", { timeZone: fuso, timeZoneName: "longOffset" })
+  const nomeado = new Intl.DateTimeFormat("en-US", {
+    timeZone: fuso,
+    timeZoneName: "longOffset",
+  })
     .formatToParts(instante)
     .find((parte) => parte.type === "timeZoneName")?.value;
 
@@ -85,7 +101,12 @@ function deslocamento(instante: Date, fusoPedido: string): string {
   return limpo === "" ? "+00:00" : limpo;
 }
 
-export function montaLinhas(leads: LeadParaExportar[], de: Date, ate: Date, fuso: string): LinhaDeConversao[] {
+export function montaLinhas(
+  leads: LeadParaExportar[],
+  de: Date,
+  ate: Date,
+  fuso: string,
+): LinhaDeConversao[] {
   const linhas: LinhaDeConversao[] = [];
 
   const dentroDaJanela = (quando: Date) => quando >= de && quando <= ate;
@@ -104,22 +125,27 @@ export function montaLinhas(leads: LeadParaExportar[], de: Date, ate: Date, fuso
         // Sem valor: qualificar não é receita, e mandar um número inventado
         // aqui ensinaria o Google a otimizar por uma receita que não existe.
         valorCentavos: null,
-        foraDaJanela: idadeEmDias(lead.qualifiedAt, lead.clickedAt) > DIAS_DESDE_O_CLIQUE,
+        foraDaJanela:
+          idadeEmDias(lead.qualifiedAt, lead.clickedAt) > DIAS_DESDE_O_CLIQUE,
       });
     }
 
     // A venda usa o instante em que foi detectada, e não `wonAt`, quando os
     // dois existem: é o carimbo que a venda de fato tem.
-    const vendaEm = lead.sale?.detectedAt ?? lead.wonAt;
-    if (vendaEm && dentroDaJanela(vendaEm)) {
-      linhas.push({
-        ...comum,
-        tipo: "WON",
-        conversionTime: formataHorario(vendaEm, fuso),
-        ocorridoEm: vendaEm.toISOString(),
-        valorCentavos: lead.sale?.amountCents ?? null,
-        foraDaJanela: idadeEmDias(vendaEm, lead.clickedAt) > DIAS_DESDE_O_CLIQUE,
-      });
+    for (const sale of lead.sales ?? (lead.sale ? [lead.sale] : [])) {
+      const vendaEm = sale.occurredAt ?? sale.detectedAt;
+      if (vendaEm && dentroDaJanela(vendaEm)) {
+        linhas.push({
+          ...comum,
+          tipo: "WON",
+          conversionTime: formataHorario(vendaEm, fuso),
+          ocorridoEm: vendaEm.toISOString(),
+          valorCentavos: sale.amountCents,
+          ...(sale.currency ? { currency: sale.currency } : {}),
+          foraDaJanela:
+            idadeEmDias(vendaEm, lead.clickedAt) > DIAS_DESDE_O_CLIQUE,
+        });
+      }
     }
   }
 

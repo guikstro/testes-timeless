@@ -11,6 +11,7 @@ testUrl.searchParams.set("schema", "test");
 
 process.env.DATABASE_URL = testUrl.toString();
 process.env.JWT_SECRET = process.env.JWT_SECRET ?? "test-secret-e2e-only";
+process.env.TOKEN_ENCRYPTION_KEY = process.env.TOKEN_ENCRYPTION_KEY ?? "a1".repeat(32);
 process.env.WHATSAPP_APP_SECRET = process.env.WHATSAPP_APP_SECRET || "test-app-secret-e2e-only";
 process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || "test-verify-token-e2e-only";
 process.env.NODE_ENV = "test";

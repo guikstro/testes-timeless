@@ -8,7 +8,7 @@
 export type Foco = "LEADS" | "PRESENCA_LOCAL" | "AMBOS";
 
 /** Telas que só existem em volta do lead que chega pelo WhatsApp. */
-const SO_DE_LEADS = ["/conversas", "/leads", "/links", "/integrations/whatsapp"];
+const SO_DE_LEADS = ["/conversas", "/leads", "/vendas", "/links", "/integrations/whatsapp", "/integrations/sales"];
 
 export const temLeads = (foco: Foco | null | undefined) => foco !== "PRESENCA_LOCAL";
 export const temPresencaLocal = (foco: Foco | null | undefined) => foco === "PRESENCA_LOCAL" || foco === "AMBOS";

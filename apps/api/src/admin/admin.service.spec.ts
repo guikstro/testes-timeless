@@ -78,7 +78,7 @@ describe("AdminService", () => {
 
       expect(prisma.sale.groupBy).toHaveBeenCalledTimes(1);
       expect(prisma.sale.groupBy).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { organizationId: { in: ["org-1", "org-2"] }, deletedAt: null } }),
+        expect.objectContaining({ where: { organizationId: { in: ["org-1", "org-2"] }, deletedAt: null, status: "CONFIRMED", needsReview: false } }),
       );
       expect(result.items[0]).toMatchObject({ leadCount: 3, saleCount: 2, revenueCents: 250000 });
       // Sem vendas significa zero, nunca null/undefined na tela.

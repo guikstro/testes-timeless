@@ -53,6 +53,7 @@ const ICON_PROPS = {
 };
 
 const NAV_ITEMS: NavItem[] = [
+  { href: "/vendas", label: "Vendas e receita", icon: <svg {...ICON_PROPS}><path d="M4 4h16v16H4zM8 9h8M8 13h5M8 17h8" /></svg> },
   {
     href: "/dashboard",
     label: "Dashboard",

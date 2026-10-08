@@ -163,6 +163,11 @@ model Organization {
   attributions         Attribution[]
   classificationRules  ClassificationRule[]
   sales                Sale[]
+  units                Unit[]
+  salesSources         SalesSource[]
+  saleEvidence         SaleEvidence[]
+  externalIdentities   ExternalIdentity[]
+  externalDeals        ExternalDeal[]
   auditLogs            AuditLog[]
   metaConnection       MetaConnection?
   campaigns            Campaign[]
@@ -592,7 +597,10 @@ model Lead {
   conversations    Conversation[]
   events           LeadEvent[]
   attribution      Attribution?
-  sale             Sale?
+  sales            Sale[]
+  email            String?
+  unitId           String? @map("unit_id")
+  unit             Unit? @relation(fields: [unitId], references: [id])
   conversionEvents ConversionEvent[]
   notifications    Notification[]
 
@@ -603,6 +611,7 @@ model Lead {
 }
 
 model Conversation {
+  coverage             ConversationCoverage @default(UNKNOWN)
   id                   String   @id @default(uuid())
   organizationId       String   @map("organization_id")
   leadId               String   @map("lead_id")
@@ -657,6 +666,8 @@ enum OutboundStatus {
 }
 
 model Message {
+  source         MessageSource @default(PROVIDER)
+  author         String?
   id             String           @id @default(uuid())
   conversationId String           @map("conversation_id")
   /**
@@ -813,9 +824,28 @@ model Sale {
   id                String         @id @default(uuid())
   organizationId    String         @map("organization_id")
   /**
-   * One sale per lead in this phase — a lead is either won or not (Section 16).
+   * A customer may buy repeatedly; a sale can also await lead identification.
    */
-  leadId            String         @unique @map("lead_id")
+  leadId            String?        @map("lead_id")
+  unitId            String?        @map("unit_id")
+  sourceId          String?        @map("source_id")
+  externalId        String?        @map("external_id")
+  status            SaleStatus     @default(POSSIBLE)
+  currency          String         @default("BRL")
+  confidence        Float?
+  confirmationSource SaleConfirmationSource @default(CONVERSATION) @map("confirmation_source")
+  confirmedAt       DateTime?      @map("confirmed_at")
+  rejectedAt        DateTime?      @map("rejected_at")
+  cancelledAt       DateTime?      @map("cancelled_at")
+  occurredAt        DateTime?      @map("occurred_at")
+  needsReview       Boolean        @default(false) @map("needs_review")
+  conflicts         Json?
+  attributionSnapshot Json?        @map("attribution_snapshot")
+  customerName      String?        @map("customer_name")
+  customerPhone     String?        @map("customer_phone")
+  product           String?
+  notes             String?
+  lossReason        String?        @map("loss_reason")
   /**
    * Cents, never float (Section 48). Null until a value can be confirmed — never guessed (Section 109).
    */
@@ -831,11 +861,174 @@ model Sale {
   deletedAt         DateTime?      @map("deleted_at")
 
   organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  lead            Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead            Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  unit            Unit?        @relation(fields: [unitId], references: [id])
+  source          SalesSource? @relation(fields: [sourceId], references: [id])
+  evidence        SaleEvidence[]
+  conversionEvents ConversionEvent[]
+  externalDeals   ExternalDeal[]
   evidenceMessage Message?     @relation(fields: [evidenceMessageId], references: [id])
 
   @@index([organizationId])
+  @@index([organizationId, status, occurredAt])
+  @@index([leadId])
+  @@unique([sourceId, externalId])
   @@map("sales")
+}
+
+enum SaleStatus {
+  POSSIBLE
+  PROBABLE
+  CONFIRMED
+  REJECTED
+  CANCELLED
+}
+
+enum SaleConfirmationSource {
+  CONVERSATION
+  CRM
+  PAYMENT
+  ERP
+  ECOMMERCE
+  MANUAL
+  API
+}
+
+enum SaleEvidenceType {
+  MESSAGE
+  SALE_INTENT
+  PAYMENT_INTENT
+  CRM_WON
+  CRM_LOST
+  PAYMENT_CONFIRMED
+  PAYMENT_REFUNDED
+  ERP_ORDER
+  ECOMMERCE_ORDER
+  MANUAL_CONFIRMATION
+  MANUAL_REJECTION
+  EXTERNAL_API
+  CANCELLATION
+  LEGACY_IMPORT
+}
+
+enum ConversationCoverage {
+  COMPLETE
+  PARTIAL
+  UNKNOWN
+}
+
+enum MessageSource {
+  TIMELESS
+  WHATSAPP_DEVICE
+  CRM
+  PROVIDER
+  IMPORT
+  OTHER
+}
+
+model Unit {
+  id String @id @default(uuid())
+  organizationId String @map("organization_id")
+  name String
+  code String
+  active Boolean @default(true)
+  timezone String?
+  address String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sales Sale[]
+  leads Lead[]
+  sources SalesSource[]
+  @@unique([organizationId, code])
+  @@map("units")
+}
+
+model SalesSource {
+  id String @id @default(uuid())
+  organizationId String @map("organization_id")
+  unitId String? @map("unit_id")
+  name String
+  type SaleConfirmationSource @default(API)
+  credentialHash String? @unique @map("credential_hash")
+  credentialPrefix String? @map("credential_prefix")
+  revokedAt DateTime? @map("revoked_at")
+  lastEventAt DateTime? @map("last_event_at")
+  lastSuccessAt DateTime? @map("last_success_at")
+  lastError String? @map("last_error")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  unit Unit? @relation(fields: [unitId], references: [id])
+  sales Sale[]
+  identities ExternalIdentity[]
+  deals ExternalDeal[]
+  @@index([organizationId])
+  @@map("sales_sources")
+}
+
+model SaleEvidence {
+  sequence Int @default(autoincrement())
+  sourceId String? @map("source_id")
+  id String @id @default(uuid())
+  organizationId String @map("organization_id")
+  saleId String @map("sale_id")
+  type SaleEvidenceType
+  source SaleConfirmationSource
+  eventKey String @map("event_key")
+  fingerprint String
+  actorId String? @map("actor_id")
+  status SaleStatus
+  confidence Float?
+  valueCents Int? @map("value_cents")
+  currency String
+  payload Json?
+  occurredAt DateTime @map("occurred_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  @@unique([organizationId, eventKey])
+  @@index([saleId, occurredAt])
+  @@map("sale_evidence")
+}
+
+model ExternalIdentity {
+  id String @id @default(uuid())
+  organizationId String @map("organization_id")
+  sourceId String @map("source_id")
+  externalId String @map("external_id")
+  leadId String @map("lead_id")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  source SalesSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  @@unique([sourceId, externalId])
+  @@index([organizationId, leadId])
+  @@map("external_identities")
+}
+
+// Normalized external opportunity/order, independent of a vendor payload.
+model ExternalDeal {
+  id String @id @default(uuid())
+  organizationId String @map("organization_id")
+  sourceId String @map("source_id")
+  externalId String @map("external_id")
+  saleId String @map("sale_id")
+  status String
+  provider String
+  pipeline String?
+  stage String?
+  ownerExternalId String? @map("owner_external_id")
+  ownerName String? @map("owner_name")
+  valueCents Int? @map("value_cents")
+  currency String
+  lastSyncedAt DateTime @default(now()) @map("last_synced_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  source SalesSource @relation(fields: [sourceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  @@unique([sourceId, externalId])
+  @@index([organizationId, saleId])
+  @@map("external_deals")
 }
 
 enum AuditAction {
@@ -1447,6 +1640,9 @@ enum ConversionEventStatus {
  * why a PURCHASE row is never created with a null valueCents.
  */
 model ConversionEvent {
+  saleId         String? @map("sale_id")
+  sale           Sale? @relation(fields: [saleId], references: [id])
+  deduplicationKey String @unique @map("deduplication_key")
   id             String                @id @default(uuid())
   organizationId String                @map("organization_id")
   leadId         String                @map("lead_id")
@@ -1467,7 +1663,7 @@ model ConversionEvent {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
-  @@unique([leadId, type])
+  @@index([leadId, type])
   @@index([organizationId])
   @@map("conversion_events")
 }

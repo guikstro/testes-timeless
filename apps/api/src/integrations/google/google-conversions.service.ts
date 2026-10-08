@@ -24,9 +24,10 @@ export class GoogleConversionsService {
     const de = inicioDoDia(periodo.de);
     const ate = fimDoDia(periodo.ate);
 
+    const vendasNaJanela = { status: "CONFIRMED" as const, needsReview: false, deletedAt: null, occurredAt: { gte: de, lte: ate } };
     const naJanela = {
       organizationId,
-      OR: [{ qualifiedAt: { gte: de, lte: ate } }, { wonAt: { gte: de, lte: ate } }],
+      OR: [{ qualifiedAt: { gte: de, lte: ate } }, { sales: { some: vendasNaJanela } }],
     };
 
     // O gclid é o que liga a conversão ao clique pago do Google. Sem ele não
@@ -45,15 +46,15 @@ export class GoogleConversionsService {
           name: true,
           qualifiedAt: true,
           wonAt: true,
-          sale: { select: { amountCents: true, detectedAt: true } },
+          sales: { where: vendasNaJanela, select: { amountCents: true, occurredAt: true, detectedAt: true, currency: true }, orderBy: { occurredAt: "desc" } },
           attribution: { select: { trackingClick: { select: { gclid: true, clickedAt: true } } } },
         },
       }),
       this.prisma.lead.count({
         where: { organizationId, qualifiedAt: { gte: de, lte: ate }, NOT: comGclid },
       }),
-      this.prisma.lead.count({
-        where: { organizationId, wonAt: { gte: de, lte: ate }, NOT: comGclid },
+      this.prisma.sale.count({
+        where: { organizationId, ...vendasNaJanela, OR: [{ leadId: null }, { lead: { NOT: comGclid } }] },
       }),
     ]);
 
@@ -68,8 +69,9 @@ export class GoogleConversionsService {
             id: lead.id,
             name: lead.name,
             qualifiedAt: lead.qualifiedAt,
-            wonAt: lead.wonAt,
-            sale: lead.sale,
+            wonAt: null,
+            sale: null,
+            sales: lead.sales,
             gclid: clique.gclid,
             clickedAt: clique.clickedAt,
           },

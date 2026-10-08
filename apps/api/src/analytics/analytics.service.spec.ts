@@ -39,7 +39,7 @@ describe("AnalyticsService", () => {
     const recebido = new Date("2026-01-01T12:00:00Z");
     const respondido = new Date("2026-01-01T12:02:30Z");
     prisma.lead.findMany.mockResolvedValueOnce([
-      { id: "lead-1", status: "NEW", firstContactAt: recebido, qualifiedAt: null, wonAt: null, meetingScheduledAt: null, disqualifiedAt: null, sale: null, attribution: null },
+      { id: "lead-1", status: "NEW", firstContactAt: recebido, qualifiedAt: null, wonAt: null, meetingScheduledAt: null, disqualifiedAt: null, sales: [], attribution: null },
     ]);
     prisma.$queryRaw.mockResolvedValue([
       { leadId: "lead-1", primeiroRecebido: recebido, primeiraResposta: respondido, ultimoSentido: "OUTBOUND" },
@@ -57,7 +57,7 @@ describe("AnalyticsService", () => {
     const { service, prisma } = buildService();
     const recebido = new Date("2026-01-01T12:00:00Z");
     prisma.lead.findMany.mockResolvedValueOnce([
-      { id: "lead-1", status: "NEW", firstContactAt: recebido, qualifiedAt: null, wonAt: null, meetingScheduledAt: null, disqualifiedAt: null, sale: null, attribution: null },
+      { id: "lead-1", status: "NEW", firstContactAt: recebido, qualifiedAt: null, wonAt: null, meetingScheduledAt: null, disqualifiedAt: null, sales: [], attribution: null },
     ]);
     prisma.$queryRaw.mockResolvedValue([
       { leadId: "lead-1", primeiroRecebido: recebido, primeiraResposta: null, ultimoSentido: "INBOUND" },
@@ -152,6 +152,7 @@ describe("AnalyticsService", () => {
 describe("AnalyticsService.desempenhoPorCampanha", () => {
   function buildService(campanhas: unknown[] = [], leads: unknown[] = []) {
     const prisma = {
+      organization: { findUnique: jest.fn().mockResolvedValue({ currency: "BRL" }) },
       campaign: { findMany: jest.fn().mockResolvedValue(campanhas) },
       lead: { findMany: jest.fn().mockResolvedValue(leads) },
       // A cobertura: sem conexão nenhuma, ela não restringe nada.
@@ -239,11 +240,11 @@ describe("AnalyticsService.desempenhoPorCampanha", () => {
         {
           qualifiedAt: new Date("2026-03-03T10:00:00.000Z"),
           wonAt: new Date("2026-03-05T10:00:00.000Z"),
-          sale: { amountCents: 90000 },
+          sales: [{ amountCents: 90000, occurredAt: new Date("2026-01-10T12:00:00Z") }],
           attribution: { evidence: null, trackingClick: { campaignId: "ext-1", adsetId: null, adId: null } },
         },
         // Sem atribuição nenhuma: entra na contagem à parte, não numa campanha.
-        { qualifiedAt: null, wonAt: null, sale: null, attribution: null },
+        { qualifiedAt: null, wonAt: null, sales: [], attribution: null },
       ],
     );
 
@@ -280,7 +281,7 @@ describe("AnalyticsService.desempenhoPorCampanha", () => {
   it("aceita o id da campanha vindo só da evidência, como no clique para WhatsApp", async () => {
     const { service } = buildService(
       [{ id: "c1", externalId: "ext-9", name: "CTWA", platform: "META", spend: [] }],
-      [{ qualifiedAt: null, wonAt: null, sale: null, attribution: { evidence: { campaignId: "ext-9" }, trackingClick: null } }],
+      [{ qualifiedAt: null, wonAt: null, sales: [], attribution: { evidence: { campaignId: "ext-9" }, trackingClick: null } }],
     );
 
     const resultado = await service.desempenhoPorCampanha("org-1", marco, null);

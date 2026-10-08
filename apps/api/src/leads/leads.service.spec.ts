@@ -18,7 +18,7 @@ describe("LeadsService", () => {
       conversation: { findFirst: jest.fn(), update: jest.fn() },
       ad: { findFirst: jest.fn() },
       campaign: { findFirst: jest.fn() },
-      organization: { findUnique: jest.fn().mockResolvedValue(null) },
+      organization: { findUnique: jest.fn().mockResolvedValue(null), findUniqueOrThrow: jest.fn().mockResolvedValue({ currency: "BRL" }) },
     };
     const conversionEvents = {
       recordLead: jest.fn(),
@@ -27,14 +27,16 @@ describe("LeadsService", () => {
     };
     const sendQueue = { add: jest.fn() };
     const notifications = { notificar: jest.fn().mockResolvedValue(undefined) };
+    const sales = { record: jest.fn() };
     const service = new LeadsService(
       prisma as unknown as PrismaService,
       conversionEvents as unknown as ConversionEventsService,
       sendQueue as never,
       notifications as never,
       new AuditoriaService(prisma as unknown as PrismaService),
+      sales as never,
     );
-    return { service, prisma, conversionEvents, sendQueue, notifications };
+    return { service, prisma, conversionEvents, sendQueue, notifications, sales };
   }
 
   it("scopes the list query to the caller's organization", async () => {
@@ -77,7 +79,7 @@ describe("LeadsService", () => {
       id: "lead-1",
       organizationId: "org-1",
       attribution: { method: "TRACKING_LINK", trackingClick: { trackingLink: { name: "Bio do Instagram" } } },
-      sale: { amountCents: 200000 },
+      sales: [{ amountCents: 200000, status: "CONFIRMED", needsReview: false }],
     });
 
     const result = await service.findOne("org-1", "lead-1");
@@ -86,7 +88,7 @@ describe("LeadsService", () => {
       expect.objectContaining({
         include: {
           attribution: { include: { trackingClick: { include: { trackingLink: true } } } },
-          sale: true,
+          sales: { where: { deletedAt: null }, orderBy: { createdAt: "desc" }, take: 100 },
           responsavel: { select: { id: true, name: true } },
           conversionEvents: { orderBy: { occurredAt: "asc" } },
         },
@@ -230,7 +232,7 @@ describe("LeadsService", () => {
 
     expect(prisma.lead.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        include: expect.objectContaining({ attribution: true, sale: true }),
+        include: expect.objectContaining({ attribution: true, sales: { where: { deletedAt: null }, orderBy: { createdAt: "desc" }, take: 100 } }),
       }),
     );
   });
@@ -248,7 +250,7 @@ describe("LeadsService", () => {
         wonAt: null,
         disqualifiedAt: null,
         disqualifiedReason: null,
-        sale: null,
+        sales: [],
         ...overrides,
       };
     }
@@ -308,76 +310,29 @@ describe("LeadsService", () => {
       expect(conversionEvents.recordQualifiedLead).toHaveBeenCalledWith("org-1", "lead-1", expect.any(Date));
     });
 
-    it("manually marking WON with a revenue creates the Sale, audits SALE_CREATED, and records the Meta Purchase", async () => {
-      const { service, prisma, conversionEvents } = buildService();
-      prisma.lead.findFirst
-        .mockResolvedValueOnce(existingLead({ status: "QUALIFIED", qualifiedAt: new Date(0) }))
-        .mockResolvedValueOnce(existingLead({ status: "WON" }));
-      prisma.lead.update.mockResolvedValue({});
-      prisma.sale.create.mockResolvedValue({ id: "sale-1", amountCents: 200000 });
-
+    it("sends explicit manual value to the resolution engine", async () => {
+      const { service, prisma, sales, conversionEvents } = buildService();
+      prisma.lead.findFirst.mockResolvedValue(existingLead({ status: "QUALIFIED" }));
       await service.update("org-1", "lead-1", "user-1", { status: "WON", revenueCents: 200000 });
-
-      expect(prisma.sale.create).toHaveBeenCalledWith({
-        data: {
-          organizationId: "org-1",
-          leadId: "lead-1",
-          amountCents: 200000,
-          classifierType: "MANUAL",
-          detectedAt: expect.any(Date),
-        },
-      });
-      expect(prisma.auditLog.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ action: "SALE_CREATED", entity: "Sale", entityId: "sale-1" }),
-      });
-      const eventTypes = prisma.leadEvent.create.mock.calls.map((c) => c[0].data.type);
-      expect(eventTypes).toEqual(["SALE_DETECTED"]);
-      expect(conversionEvents.recordPurchase).toHaveBeenCalledWith("org-1", "lead-1", expect.any(Date), 200000);
-      // Was already QUALIFIED before this request — no implicit re-qualification sent to Meta.
-      expect(conversionEvents.recordQualifiedLead).not.toHaveBeenCalled();
-    });
-
-    it("jumping straight from NEW to WON manually also synthesizes QUALIFIED, like the automatic classifier", async () => {
-      const { service, prisma, conversionEvents } = buildService();
-      prisma.lead.findFirst.mockResolvedValueOnce(existingLead()).mockResolvedValueOnce(existingLead({ status: "WON" }));
-      prisma.lead.update.mockResolvedValue({});
-      prisma.sale.create.mockResolvedValue({ id: "sale-1", amountCents: null });
-
-      await service.update("org-1", "lead-1", "user-1", { status: "WON" });
-
-      expect(prisma.lead.update).toHaveBeenCalledWith({
-        where: { id: "lead-1" },
-        data: { status: "WON", wonAt: expect.any(Date), qualifiedAt: expect.any(Date) },
-      });
-      const eventTypes = prisma.leadEvent.create.mock.calls.map((c) => c[0].data.type);
-      expect(eventTypes).toEqual(["QUALIFIED", "SALE_DETECTED"]);
-      expect(conversionEvents.recordQualifiedLead).toHaveBeenCalledWith("org-1", "lead-1", expect.any(Date));
-      // No revenueCents given — value unknown, so no Purchase is sent yet.
+      expect(sales.record).toHaveBeenCalledWith(expect.objectContaining({ source: "MANUAL", type: "MANUAL_CONFIRMATION", valueCents: 200000, actorId: "user-1", leadId: "lead-1" }));
+      expect(prisma.sale.create).not.toHaveBeenCalled();
       expect(conversionEvents.recordPurchase).not.toHaveBeenCalled();
     });
 
-    it("correcting the revenue of an existing sale updates it, audits SALE_UPDATED with before/after, and records the Meta Purchase now that the value is known", async () => {
-      const { service, prisma, conversionEvents } = buildService();
-      prisma.lead.findFirst
-        .mockResolvedValueOnce(existingLead({ status: "WON", wonAt: new Date(0), sale: { id: "sale-1", amountCents: 100000 } }))
-        .mockResolvedValueOnce(existingLead({ status: "WON" }));
-      prisma.sale.update.mockResolvedValue({ id: "sale-1", amountCents: 250000 });
+    it("WON alone never confirms revenue", async () => {
+      const { service, prisma, sales } = buildService();
+      prisma.lead.findFirst.mockResolvedValue(existingLead());
+      await service.update("org-1", "lead-1", "user-1", { status: "WON" });
+      expect(sales.record).not.toHaveBeenCalled();
+      expect(prisma.sale.create).not.toHaveBeenCalled();
+    });
 
+    it("correcting revenue appends evidence to the existing sale", async () => {
+      const { service, prisma, sales } = buildService();
+      prisma.lead.findFirst.mockResolvedValue(existingLead({ status: "WON", sales: [{ id: "sale-1", amountCents: 100000, detectedAt: new Date("2026-10-01T12:00:00Z") }] }));
       await service.update("org-1", "lead-1", "user-1", { revenueCents: 250000 });
-
-      expect(prisma.sale.update).toHaveBeenCalledWith({ where: { id: "sale-1" }, data: { amountCents: 250000 } });
-      expect(prisma.auditLog.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          action: "SALE_UPDATED",
-          before: { amountCents: 100000 },
-          after: { amountCents: 250000 },
-        }),
-      });
-      const eventTypes = prisma.leadEvent.create.mock.calls.map((c) => c[0].data.type);
-      expect(eventTypes).toEqual(["REVENUE_DETECTED"]);
-      // ConversionEventsService itself dedupes on (leadId, type) — calling
-      // this again for an already-sent Purchase is safe and a no-op there.
-      expect(conversionEvents.recordPurchase).toHaveBeenCalledWith("org-1", "lead-1", expect.any(Date), 250000);
+      expect(sales.record).toHaveBeenCalledWith(expect.objectContaining({ saleId: "sale-1", valueCents: 250000, actorId: "user-1" }));
+      expect(prisma.sale.update).not.toHaveBeenCalled();
     });
 
     it("traz a última mensagem de cada lead na listagem", async () => {
@@ -589,7 +544,7 @@ describe("LeadsService", () => {
         disqualifiedReason: null,
         emAtendimentoAt: null,
         responsavelId: null,
-        sale: null,
+        sales: [],
         ...overrides,
       };
     }

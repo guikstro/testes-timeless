@@ -16,6 +16,7 @@ export interface LinhaDeConversao {
   conversionTime: string;
   ocorridoEm: string;
   valorCentavos: number | null;
+  currency?: string;
   foraDaJanela: boolean;
 }
 
@@ -70,7 +71,7 @@ export function montaCsv(
         celula(nome(linha.tipo) as string),
         celula(linha.conversionTime),
         valor(linha.valorCentavos),
-        celula(moeda),
+        celula(linha.currency ?? moeda),
       ].join(","),
     );
 

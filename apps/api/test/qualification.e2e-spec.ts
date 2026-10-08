@@ -161,14 +161,13 @@ describe("Qualification & Sale — trigger phrases end to end (e2e)", () => {
     expect(lead.qualifiedAt).not.toBeNull();
 
     await sendMessage(from, "wamid.HOMOLOG-3", "contrato fechado! Fechamos por 2 mil", 1700086400);
-    lead = await waitFor(async () => {
-      const current = await prisma.lead.findUnique({ where: { id: lead.id } });
-      return current?.status === "WON" ? current : null;
-    });
-    expect(lead.wonAt).not.toBeNull();
+    await waitFor(() => prisma.sale.findFirst({ where: { leadId: lead.id } }));
+    lead = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
+    expect(lead.status).toBe("QUALIFIED");
+    expect(lead.wonAt).toBeNull();
 
-    const sale = await prisma.sale.findUnique({ where: { leadId: lead.id } });
-    expect(sale).toMatchObject({ amountCents: 200000, classifierType: "RULE" });
+    const sale = await prisma.sale.findFirst({ where: { leadId: lead.id } });
+    expect(sale).toMatchObject({ amountCents: 200000, classifierType: "RULE", status: "POSSIBLE", needsReview: true });
 
     const events = await prisma.leadEvent.findMany({ where: { leadId: lead.id }, orderBy: [{ occurredAt: "asc" }, { sequence: "asc" }] });
     expect(events.map((e) => e.type)).toEqual([
@@ -179,7 +178,6 @@ describe("Qualification & Sale — trigger phrases end to end (e2e)", () => {
       "QUALIFIED",
       "MESSAGE_RECEIVED",
       "SALE_DETECTED",
-      "REVENUE_DETECTED",
     ]);
 
     // Dashboard-relevant aggregate (Section 100/103's "+1 lead, +1 qualified, +1 sale, +R$2.000")
@@ -187,7 +185,8 @@ describe("Qualification & Sale — trigger phrases end to end (e2e)", () => {
       .get(`/api/leads/${lead.id}`)
       .set("Authorization", `Bearer ${orgToken}`)
       .expect(200);
-    expect(detail.body.sale.amountCents).toBe(200000);
+    expect(detail.body.sale).toBeNull();
+    expect(detail.body.sales[0].amountCents).toBe(200000);
   });
 
   it("resending the exact same closing message never creates a second sale (idempotency)", async () => {
@@ -198,7 +197,7 @@ describe("Qualification & Sale — trigger phrases end to end (e2e)", () => {
     const lead = await waitFor(() =>
       prisma.lead.findUnique({ where: { organizationId_normalizedPhone: { organizationId: orgId, normalizedPhone: `+${from}` } } }),
     );
-    await waitFor(() => prisma.sale.findUnique({ where: { leadId: lead.id } }));
+    await waitFor(() => prisma.sale.findFirst({ where: { leadId: lead.id } }));
 
     // A real Meta retry of the same webhook delivery.
     await sendMessage(from, "wamid.DUP-2", "contrato fechado, R$ 500", 1700000100);
@@ -215,7 +214,7 @@ describe("Qualification & Sale — trigger phrases end to end (e2e)", () => {
     const lead = await waitFor(() =>
       prisma.lead.findUnique({ where: { organizationId_normalizedPhone: { organizationId: orgId, normalizedPhone: `+${from}` } } }),
     );
-    const sale = await waitFor(() => prisma.sale.findUnique({ where: { leadId: lead.id } }));
+    const sale = await waitFor(() => prisma.sale.findFirst({ where: { leadId: lead.id } }));
     expect(sale.amountCents).toBeNull();
   });
 
@@ -280,7 +279,7 @@ describe("Qualification & Sale — trigger phrases end to end (e2e)", () => {
       const lead = await waitFor(() =>
         prisma.lead.findUnique({ where: { organizationId_normalizedPhone: { organizationId: orgId, normalizedPhone: `+${from}` } } }),
       );
-      await waitFor(() => prisma.sale.findUnique({ where: { leadId: lead.id } }));
+      await waitFor(() => prisma.sale.findFirst({ where: { leadId: lead.id } }));
 
       const updated = await request(app.getHttpServer())
         .patch(`/api/leads/${lead.id}`)
@@ -289,7 +288,7 @@ describe("Qualification & Sale — trigger phrases end to end (e2e)", () => {
         .expect(200);
       expect(updated.body.sale.amountCents).toBe(15000);
 
-      const auditEntries = await prisma.auditLog.findMany({ where: { entityId: (await prisma.sale.findUnique({ where: { leadId: lead.id } }))!.id, action: "SALE_UPDATED" } });
+      const auditEntries = await prisma.auditLog.findMany({ where: { entityId: (await prisma.sale.findFirst({ where: { leadId: lead.id } }))!.id, action: "SALE_UPDATED" } });
       expect(auditEntries[0]).toMatchObject({ before: { amountCents: 10000 }, after: { amountCents: 15000 } });
     });
   });
@@ -369,12 +368,13 @@ describe("Qualification & Sale — trigger phrases end to end (e2e)", () => {
     });
 
     await sendMessage(from, "wamid.MEETING-SALE-2", "contrato fechado por 1500", 1700300100);
-    const lead = await waitFor(async () => {
-      const current = await prisma.lead.findUnique({ where: { id: created.id } });
-      return current?.status === "WON" ? current : null;
-    });
+    const sale = await waitFor(() => prisma.sale.findFirst({ where: { leadId: created.id } }));
+    await request(app.getHttpServer()).post(`/api/sales/${sale.id}/review`)
+      .set("Authorization", `Bearer ${orgToken}`).send({ requestId: crypto.randomUUID(), action: "CONFIRM", valueCents: 150000 }).expect(201);
+    const lead = await prisma.lead.findUniqueOrThrow({ where: { id: created.id } });
 
     expect(lead.meetingScheduledAt).not.toBeNull();
-    expect(lead.wonAt).not.toBeNull();
+    expect(lead.status).toBe("MEETING_SCHEDULED");
+    expect((await prisma.sale.findUniqueOrThrow({ where: { id: sale.id } })).status).toBe("CONFIRMED");
   }, 30000);
 });

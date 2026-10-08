@@ -1,7 +1,7 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
-import { ConversionEventType } from "@prisma/client";
+import { ConversionEventType, Prisma, Sale } from "@prisma/client";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { isUniqueConstraintError } from "../../common/utils/is-unique-constraint-error";
 import { PaginatedResult, PaginationQueryDto } from "../../common/dto/pagination.dto";
@@ -16,6 +16,8 @@ interface RecordInput {
   type: ConversionEventType;
   occurredAt: Date;
   valueCents?: number;
+  saleId?: string;
+  currency?: string;
 }
 
 /**
@@ -27,7 +29,49 @@ interface RecordInput {
  * window anyway, and there is nothing to attribute them to).
  */
 @Injectable()
-export class ConversionEventsService {
+export class ConversionEventsService implements OnModuleInit, OnModuleDestroy {
+  private timer?: ReturnType<typeof setInterval>;
+  private draining = false;
+  private readonly logger = new Logger(ConversionEventsService.name);
+
+  onModuleInit() {
+    this.timer = setInterval(() => void this.recoverOutbox(), 30000);
+    this.timer.unref();
+  }
+  onModuleDestroy() { if (this.timer) clearInterval(this.timer); }
+
+  private async recoverOutbox() {
+    if (this.draining) return;
+    this.draining = true;
+    try {
+      const events = await this.prisma.conversionEvent.findMany({ where: { status: "PENDING" }, orderBy: { createdAt: "asc" }, take: 100 });
+      for (const event of events) await this.enqueue(event.id);
+    } catch { this.logger.warn("conversion_outbox_retry_pending"); }
+    finally { this.draining = false; }
+  }
+
+  private async enqueue(id: string) {
+    const job = await this.conversionQueue.getJob(id);
+    if (job && await job.getState() === "failed") { await job.retry(); return; }
+    await this.conversionQueue.add("send", { conversionEventId: id }, { ...SEND_JOB_OPTS, jobId: id });
+  }
+
+  /** Purchase outbox is committed in the same transaction as the confirmed sale. */
+  async stageConfirmedSale(tx: Prisma.TransactionClient, sale: Sale) {
+    if (sale.status !== "CONFIRMED" || sale.needsReview || !sale.leadId || sale.amountCents === null || sale.deletedAt) return;
+    if (!await tx.metaConnection.findUnique({ where: { organizationId: sale.organizationId } })) return;
+    const existing = await tx.conversionEvent.findFirst({ where: { organizationId: sale.organizationId, saleId: sale.id, type: "PURCHASE" } });
+    if (existing) {
+      // Keep sent facts and their Meta IDs immutable. Correct an unsent purchase atomically.
+      await tx.conversionEvent.updateMany({ where: { id: existing.id, status: { in: ["PENDING", "FAILED"] } }, data: {
+        leadId: sale.leadId, valueCents: sale.amountCents, currency: sale.currency,
+        occurredAt: sale.occurredAt ?? sale.detectedAt, status: "PENDING", lastError: null,
+      } });
+      return;
+    }
+    await tx.conversionEvent.create({ data: { organizationId: sale.organizationId, leadId: sale.leadId, saleId: sale.id,
+      deduplicationKey: `sale:${sale.id}:PURCHASE`, type: "PURCHASE", valueCents: sale.amountCents, currency: sale.currency, occurredAt: sale.occurredAt ?? sale.detectedAt } });
+  }
   constructor(
     private readonly prisma: PrismaService,
     @InjectQueue(META_CONVERSIONS_QUEUE) private readonly conversionQueue: Queue<MetaConversionSendJob>,
@@ -42,8 +86,22 @@ export class ConversionEventsService {
   }
 
   /** Never call this with an unknown value — see docs/META_CAPI.md for why a Purchase is only ever recorded once its value is known. */
-  recordPurchase(organizationId: string, leadId: string, occurredAt: Date, valueCents: number): Promise<void> {
-    return this.record({ organizationId, leadId, type: "PURCHASE", occurredAt, valueCents });
+  async recordPurchase(organizationId: string, leadId: string, _occurredAt: Date, _valueCents: number): Promise<void> {
+    const sale = await this.prisma.sale.findFirst({ where: { organizationId, leadId, status: "CONFIRMED", needsReview: false, deletedAt: null }, orderBy: { createdAt: "desc" } });
+    if (sale) await this.recordConfirmedSale(organizationId, sale.id);
+  }
+
+  async recordConfirmedSale(organizationId: string, saleId: string): Promise<void> {
+    const sale = await this.prisma.sale.findFirst({ where: { id: saleId, organizationId, status: "CONFIRMED", needsReview: false, deletedAt: null } });
+    if (!sale?.leadId || sale.amountCents === null) return;
+    const existing = await this.prisma.conversionEvent.findFirst({ where: { organizationId, saleId, type: "PURCHASE" } });
+    if (existing) {
+      if (existing.status === "SENT") return;
+      try { await this.enqueue(existing.id); }
+      catch { this.logger.warn("conversion_outbox_retry_pending"); }
+      return;
+    }
+    await this.record({ organizationId, leadId: sale.leadId, saleId, type: "PURCHASE", valueCents: sale.amountCents, currency: sale.currency, occurredAt: sale.occurredAt ?? sale.detectedAt });
   }
 
   async list(organizationId: string, pagination: PaginationQueryDto) {
@@ -76,7 +134,7 @@ export class ConversionEventsService {
     });
 
     for (const event of events) {
-      await this.conversionQueue.add("send", { conversionEventId: event.id }, SEND_JOB_OPTS);
+      await this.enqueue(event.id);
     }
   }
 
@@ -84,24 +142,29 @@ export class ConversionEventsService {
     const connection = await this.prisma.metaConnection.findUnique({ where: { organizationId: input.organizationId } });
     if (!connection) return;
 
+    const deduplicationKey = input.saleId ? `sale:${input.saleId}:PURCHASE` : `${input.leadId}:${input.type}`;
     let event;
     try {
       event = await this.prisma.conversionEvent.create({
         data: {
           organizationId: input.organizationId,
+          deduplicationKey,
+          saleId: input.saleId,
           leadId: input.leadId,
           type: input.type,
           valueCents: input.valueCents ?? null,
-          currency: input.valueCents !== undefined ? await this.currencyFor(input.organizationId) : null,
+          currency: input.valueCents !== undefined ? input.currency ?? await this.currencyFor(input.organizationId) : null,
           occurredAt: input.occurredAt,
         },
       });
     } catch (error) {
-      if (isUniqueConstraintError(error)) return; // already recorded for this (lead, type) — never resend/overwrite
-      throw error;
+      if (isUniqueConstraintError(error)) {
+        event = await this.prisma.conversionEvent.findUnique({ where: { deduplicationKey } });
+        if (!event || event.status === "SENT") return;
+      } else throw error;
     }
 
-    await this.conversionQueue.add("send", { conversionEventId: event.id }, SEND_JOB_OPTS);
+    await this.enqueue(event.id);
   }
 
   private async currencyFor(organizationId: string): Promise<string> {

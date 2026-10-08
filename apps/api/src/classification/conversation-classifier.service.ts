@@ -1,10 +1,10 @@
 import { ORDEM_DO_FUNIL } from "../leads/ordem-do-funil";
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { Lead, MessageDirection } from "@prisma/client";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { matchesTriggerPhrase } from "../common/utils/matches-trigger-phrase";
-import { extractRevenueCents } from "../common/utils/extract-revenue-cents";
-import { isUniqueConstraintError } from "../common/utils/is-unique-constraint-error";
+import { SalesService } from "../sales/sales.service";
+import { SaleClassifier } from "../sales/sale-classifier";
 import { ConversionEventsService } from "../integrations/meta/conversion-events.service";
 
 export interface ClassifyInput {
@@ -28,15 +28,16 @@ const STATUS_ORDER = ORDEM_DO_FUNIL;
  */
 @Injectable()
 export class ConversationClassifierService {
-  private readonly logger = new Logger(ConversationClassifierService.name);
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly conversionEvents: ConversionEventsService,
+    private readonly sales: SalesService,
+    private readonly saleClassifier: SaleClassifier,
   ) {}
 
   async classify(input: ClassifyInput): Promise<void> {
-    if (!input.messageText || input.lead.status === "WON") return;
+    if (!input.messageText) return;
 
     const rules = await this.prisma.classificationRule.findMany({
       where: { organizationId: input.organizationId },
@@ -52,11 +53,20 @@ export class ConversationClassifierService {
     // Reunião é a exceção porque quem agenda é justamente o atendente.
     const isOutbound = input.direction === "OUTBOUND";
 
-    if (!isOutbound) {
-      const wonRule = match("WON");
-      if (wonRule) {
-        await this.markWon(input, wonRule.id, wonRule.phrase);
-        return;
+    const wonRules = rules.filter((rule) => rule.targetStatus === "WON");
+    if (wonRules.length) {
+      const [organization, message] = await Promise.all([
+        this.prisma.organization.findUniqueOrThrow({ where: { id: input.organizationId }, select: { currency: true } }),
+        this.prisma.message.findFirst({ where: { id: input.messageId, conversation: { organizationId: input.organizationId } }, include: { conversation: true } }),
+      ]);
+      const result = await this.saleClassifier.classify({ text, positive: wonRules.map((r) => r.phrase), currency: organization.currency, coverage: message?.conversation.coverage ?? "UNKNOWN" });
+      if (result.saleLikely) {
+        await this.sales.record({
+          organizationId: input.organizationId, leadId: input.lead.id, eventKey: `message:${input.messageId}`,
+          source: "CONVERSATION", type: "SALE_INTENT", status: result.confidence >= 0.7 ? "PROBABLE" : "POSSIBLE",
+          valueCents: result.valueCents ?? undefined, currency: result.currency, confidence: result.confidence,
+          occurredAt: input.occurredAt, payload: { messageId: input.messageId, text, direction: input.direction, reason: result.reason, signals: result.evidence, coverage: message?.conversation.coverage ?? "UNKNOWN" },
+        });
       }
     }
 
@@ -153,80 +163,4 @@ export class ConversationClassifierService {
     await this.conversionEvents.recordQualifiedLead(input.organizationId, input.lead.id, input.occurredAt);
   }
 
-  private async markWon(input: ClassifyInput, ruleId: string, phrase: string): Promise<void> {
-    const wasAlreadyQualified = input.lead.status === "QUALIFIED";
-    const revenueCents = extractRevenueCents(input.messageText!);
-
-    await this.prisma.lead.update({
-      where: { id: input.lead.id },
-      data: {
-        status: "WON",
-        wonAt: input.occurredAt,
-        // A sale implies the person was qualified in some real sense even if
-        // no explicit qualification message was ever sent — keeps the
-        // Leads -> Qualified -> Sales funnel consistent for later reporting.
-        ...(wasAlreadyQualified ? {} : { qualifiedAt: input.occurredAt }),
-      },
-    });
-
-    if (!wasAlreadyQualified) {
-      await this.prisma.leadEvent.create({
-        data: {
-          organizationId: input.organizationId,
-          leadId: input.lead.id,
-          type: "QUALIFIED",
-          occurredAt: input.occurredAt,
-          metadata: { classifierType: "RULE", implicitFromSale: true },
-        },
-      });
-      await this.conversionEvents.recordQualifiedLead(input.organizationId, input.lead.id, input.occurredAt);
-    }
-
-    try {
-      await this.prisma.sale.create({
-        data: {
-          organizationId: input.organizationId,
-          leadId: input.lead.id,
-          amountCents: revenueCents,
-          classifierType: "RULE",
-          evidenceMessageId: input.messageId,
-          detectedAt: input.occurredAt,
-        },
-      });
-    } catch (error) {
-      if (isUniqueConstraintError(error)) {
-        // Lost a race with another message that also matched a WON trigger
-        // for this lead — one sale per lead, first one wins.
-        this.logger.log(JSON.stringify({ event: "duplicate_sale_skipped", leadId: input.lead.id }));
-        return;
-      }
-      throw error;
-    }
-
-    await this.prisma.leadEvent.create({
-      data: {
-        organizationId: input.organizationId,
-        leadId: input.lead.id,
-        type: "SALE_DETECTED",
-        occurredAt: input.occurredAt,
-        metadata: { classifierType: "RULE", ruleId, phrase, messageId: input.messageId },
-      },
-    });
-
-    if (revenueCents !== null) {
-      await this.prisma.leadEvent.create({
-        data: {
-          organizationId: input.organizationId,
-          leadId: input.lead.id,
-          type: "REVENUE_DETECTED",
-          occurredAt: input.occurredAt,
-          metadata: { amountCents: revenueCents, messageId: input.messageId },
-        },
-      });
-      // Only sent once a value is actually known (Section: never guess) —
-      // a sale detected without a value waits for a manual correction to
-      // set one (see LeadsService.update) before Meta ever hears about it.
-      await this.conversionEvents.recordPurchase(input.organizationId, input.lead.id, input.occurredAt, revenueCents);
-    }
-  }
 }

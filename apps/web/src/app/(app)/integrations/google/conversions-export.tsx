@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { GrupoDePilulas } from "@/components/ui/pill-group";
-import { formatCentsAsBRL } from "@/lib/currency";
 import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
 import { contaExportaveis, LinhaDeConversao, montaCsv, NomesDasAcoes } from "@/lib/google/conversoes-csv";
 import { EstadoDasAcoes, registraExportacao, salvarAcoesDeConversao } from "./conversion-actions";
@@ -160,7 +159,7 @@ export function ConversionsExport({
                       {tempoRelativo(linha.ocorridoEm)}
                     </td>
                     <td className="px-3.5 py-2.5 text-right text-apoio tabular-nums text-ink-soft">
-                      {linha.valorCentavos === null ? "Sem valor" : formatCentsAsBRL(linha.valorCentavos)}
+                      {linha.valorCentavos === null ? "Sem valor" : (linha.valorCentavos / 100).toLocaleString("pt-BR", { style: "currency", currency: linha.currency ?? moeda })}
                     </td>
                   </tr>
                 ))}

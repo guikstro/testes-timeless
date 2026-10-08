@@ -12,6 +12,7 @@ import { AttributionMethod, LeadStatus } from "@prisma/client";
 /** Só o que a agregação lê. */
 export interface AggregationLead {
   status: LeadStatus;
+  confirmed?: boolean;
   firstContactAt: Date;
   /** Fonte da verdade para "teve reunião": o status avança para WON depois, mas a data fica. */
   meetingScheduledAt: Date | null;
@@ -100,7 +101,7 @@ export function aggregateTotals(leads: AggregationLead[]): OverviewTotals {
   const disqualified = leads.filter((lead) => lead.disqualifiedAt !== null).length;
   const qualified = leads.filter((lead) => ESTAGIOS_QUALIFICADOS.has(lead.status)).length;
   const meetings = leads.filter((lead) => lead.meetingScheduledAt !== null).length;
-  const won = leads.filter((lead) => lead.status === "WON").length;
+  const won = leads.filter((lead) => (lead.confirmed ?? lead.status === "WON")).length;
   const revenueCents = leads.reduce((sum, lead) => sum + (lead.sale?.amountCents ?? 0), 0);
 
   // Leads descartados saem do denominador: eles nunca foram oportunidade, e
@@ -142,7 +143,7 @@ export function aggregateByOrigin(leads: AggregationLead[]): OriginBucket[] {
     // status tenha pulado direto. Em atendimento não conta.
     if (ESTAGIOS_QUALIFICADOS.has(lead.status)) bucket.qualified += 1;
     if (lead.meetingScheduledAt !== null) bucket.meetings += 1;
-    if (lead.status === "WON") bucket.won += 1;
+    if ((lead.confirmed ?? lead.status === "WON")) bucket.won += 1;
     if (lead.disqualifiedAt !== null) bucket.disqualified += 1;
     bucket.revenueCents += lead.sale?.amountCents ?? 0;
 
@@ -185,7 +186,7 @@ export function aggregateDaily(leads: AggregationLead[], from: Date, to: Date): 
     // Um lead fora da janela não cria um ponto novo — a série é o período pedido.
     if (!point) continue;
     point.leads += 1;
-    if (lead.status === "WON") point.won += 1;
+    if ((lead.confirmed ?? lead.status === "WON")) point.won += 1;
   }
 
   return [...points.values()];

@@ -25,6 +25,7 @@ export type Area = (typeof AREAS)[number]["chave"];
  * notificações, abre para todos.
  */
 export function podeVer(areas: string[] | null | undefined, caminho: string): boolean {
+  if (caminho === "/vendas" || caminho.startsWith("/vendas/")) caminho = "/leads";
   if (!areas) return true;
   const area = AREAS.find((item) => caminho === item.href || caminho.startsWith(`${item.href}/`));
   // Configurações sempre abre: é lá que a pessoa troca a própria senha.

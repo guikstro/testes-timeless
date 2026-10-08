@@ -52,6 +52,7 @@ describe("Isolamento entre organizações (e2e)", () => {
     conversa: string;
     mensagem: string;
     venda: string;
+    fonte: string;
     link: string;
     campanhaManual: string;
     campanhaMeta: string;
@@ -197,8 +198,9 @@ describe("Isolamento entre organizações (e2e)", () => {
       data: { organizationId: orgA, adAccountId: `act_${MARCA}`, accessTokenEncrypted: "x:y:z", pixelId: `${MARCA}-pixel` },
     });
     await prisma.conversionEvent.create({
-      data: { organizationId: orgA, leadId: lead.id, type: "LEAD", occurredAt: agora },
+      data: { organizationId: orgA, leadId: lead.id, type: "LEAD", occurredAt: agora, deduplicationKey: `${lead.id}:LEAD` },
     });
+    a.fonte = (await prisma.salesSource.create({ data: { organizationId: orgA, name: `${MARCA} fonte`, type: "API" } })).id;
     await prisma.mudancaNoAnuncio.create({
       data: { organizationId: orgA, userId: userA, nivel: "ANUNCIO", externalId: anuncio.externalId, nome: `${MARCA} Anúncio`, acao: "PAUSAR" },
     });
@@ -215,6 +217,10 @@ describe("Isolamento entre organizações (e2e)", () => {
 
   /** Toda tentativa de B sobre um recurso de A: o caminho e o corpo mandado. */
   const tentativas = (): { metodo: "get" | "post" | "patch" | "delete"; caminho: string; corpo?: object }[] => [
+    { metodo: "get", caminho: `/sales/${a.venda}` },
+    { metodo: "post", caminho: `/sales/${a.venda}/review`, corpo: { requestId: "12345678-1234-4234-8234-123456789012", action: "CONFIRM", valueCents: 100 } },
+    { metodo: "post", caminho: `/sales/sources/${a.fonte}/rotate` },
+    { metodo: "post", caminho: `/sales/sources/${a.fonte}/revoke` },
     { metodo: "get", caminho: `/leads/${a.lead}` },
     { metodo: "patch", caminho: `/leads/${a.lead}`, corpo: { status: "QUALIFIED" } },
     { metodo: "post", caminho: `/leads/${a.lead}/messages`, corpo: { text: "invasão" } },
@@ -274,6 +280,10 @@ describe("Isolamento entre organizações (e2e)", () => {
 
   it("nenhuma listagem de B traz qualquer dado de A", async () => {
     const leituras = [
+      "/sales",
+      "/sales/analytics",
+      "/sales/sources",
+      "/sales/units",
       "/leads",
       `/leads?search=${encodeURIComponent(MARCA)}`,
       "/leads/responsaveis",

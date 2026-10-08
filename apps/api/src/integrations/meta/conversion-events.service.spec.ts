@@ -9,11 +9,12 @@ function uniqueConstraintError(): Prisma.PrismaClientKnownRequestError {
 describe("ConversionEventsService", () => {
   function buildService() {
     const prisma = {
+      sale: { findFirst: jest.fn().mockResolvedValue({ id: "sale-1", leadId: "lead-1", amountCents: 200000, currency: "BRL", detectedAt: new Date() }) },
       metaConnection: { findUnique: jest.fn() },
-      conversionEvent: { create: jest.fn(), findMany: jest.fn(), count: jest.fn() },
+      conversionEvent: { findFirst: jest.fn(), findUnique: jest.fn(), create: jest.fn(), findMany: jest.fn(), count: jest.fn() },
       organization: { findUniqueOrThrow: jest.fn().mockResolvedValue({ id: "org-1", currency: "BRL" }) },
     };
-    const queue = { add: jest.fn() };
+    const queue = { add: jest.fn(), getJob: jest.fn() };
     const service = new ConversionEventsService(prisma as unknown as PrismaService, queue as never);
     return { service, prisma, queue };
   }
@@ -40,6 +41,8 @@ describe("ConversionEventsService", () => {
       expect(prisma.conversionEvent.create).toHaveBeenCalledWith({
         data: {
           organizationId: "org-1",
+          deduplicationKey: "lead-1:LEAD",
+          saleId: undefined,
           leadId: "lead-1",
           type: "LEAD",
           valueCents: null,
@@ -61,7 +64,7 @@ describe("ConversionEventsService", () => {
 
       await service.recordPurchase("org-1", "lead-1", new Date(), 200000);
 
-      expect(prisma.organization.findUniqueOrThrow).toHaveBeenCalledWith({ where: { id: "org-1" } });
+      expect(prisma.sale.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ status: "CONFIRMED", needsReview: false }) }));
       expect(prisma.conversionEvent.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ type: "PURCHASE", valueCents: 200000, currency: "BRL" }),
       });
@@ -96,6 +99,15 @@ describe("ConversionEventsService", () => {
   });
 
   describe("drainPending", () => {
+    it("retries an exhausted BullMQ job instead of adding an ignored duplicate job", async () => {
+      const { service, prisma, queue } = buildService();
+      const retry = jest.fn();
+      prisma.conversionEvent.findMany.mockResolvedValue([{ id: "event-1" }]);
+      queue.getJob.mockResolvedValue({ getState: async () => "failed", retry });
+      await service.drainPending("org-1");
+      expect(retry).toHaveBeenCalledTimes(1);
+      expect(queue.add).not.toHaveBeenCalled();
+    });
     it("re-enqueues every PENDING and FAILED event, but never SENT or RETRYING ones", async () => {
       const { service, prisma, queue } = buildService();
       prisma.conversionEvent.findMany.mockResolvedValue([{ id: "event-1" }, { id: "event-2" }]);

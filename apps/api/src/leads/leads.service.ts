@@ -1,3 +1,5 @@
+import { SalesService } from "../sales/sales.service";
+import { randomUUID } from "node:crypto";
 import { ORDEM_DO_FUNIL } from "./ordem-do-funil";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { LeadStatus, Prisma } from "@prisma/client";
@@ -44,6 +46,7 @@ function comUltimaMensagem<T extends ComConversas>(lead: T) {
 
   return {
     ...resto,
+    sale: (lead as T & { sales?: { status: string; needsReview: boolean }[] }).sales?.find((s) => s.status === "CONFIRMED" && !s.needsReview) ?? null,
     lastMessage: ultima ? { text: ultima.text, direction: ultima.direction, timestamp: ultima.timestamp } : null,
     awaitingReply: ultima?.direction === "INBOUND",
   };
@@ -59,6 +62,7 @@ export class LeadsService {
     @InjectQueue(WHATSAPP_SEND_QUEUE) private readonly sendQueue: Queue<WhatsAppSendJob>,
     private readonly notifications: NotificationsService,
     private readonly auditoria: AuditoriaService,
+    private readonly sales: SalesService,
   ) {}
 
   async list(organizationId: string, query: ListLeadsDto, userId?: string): Promise<PaginatedResult<unknown>> {
@@ -101,7 +105,7 @@ export class LeadsService {
         where: { ...where, disqualifiedAt: null },
         include: {
           attribution: true,
-          sale: true,
+          sales: { where: { deletedAt: null }, orderBy: { createdAt: "desc" }, take: 100 },
           responsavel: { select: { id: true, name: true } },
           conversations: { select: { messages: { orderBy: { timestamp: "desc" }, take: 1 } } },
         },
@@ -125,7 +129,7 @@ export class LeadsService {
         where,
         include: {
           attribution: true,
-          sale: true,
+          sales: { where: { deletedAt: null }, orderBy: { createdAt: "desc" }, take: 100 },
           responsavel: { select: { id: true, name: true } },
           // A última mensagem de cada conversa. É o que faz decidir se vale
           // abrir o lead, e sem ela a lista obriga a entrar em cada um para
@@ -149,7 +153,7 @@ export class LeadsService {
       where: { id, organizationId },
       include: {
         attribution: { include: { trackingClick: { include: { trackingLink: true } } } },
-        sale: true,
+        sales: { where: { deletedAt: null }, orderBy: { createdAt: "desc" }, take: 100 },
         responsavel: { select: { id: true, name: true } },
         // O sinal que voltou para a Meta faz parte da ficha do lead: sem ele
         // não há como saber se a conversão chegou ao algoritmo que o cliente
@@ -196,7 +200,7 @@ export class LeadsService {
       expedienteDa(organizacao),
     );
 
-    return { ...lead, events, messages, metrics, adReferences };
+    return { ...lead, sale: lead.sales?.find((s) => s.status === "CONFIRMED" && !s.needsReview) ?? null, events, messages, metrics, adReferences };
   }
 
   /**
@@ -254,7 +258,7 @@ export class LeadsService {
    * lead's timeline so it's visible in the same place as automatic events.
    */
   async update(organizationId: string, id: string, userId: string, dto: UpdateLeadDto, impersonating = false) {
-    const lead = await this.prisma.lead.findFirst({ where: { id, organizationId }, include: { sale: true } });
+    const lead = await this.prisma.lead.findFirst({ where: { id, organizationId }, include: { sales: { where: { deletedAt: null }, orderBy: { createdAt: "desc" }, take: 100 } } });
     if (!lead) {
       throw new AppException("NOT_FOUND", "Lead não encontrado.", HttpStatus.NOT_FOUND);
     }
@@ -271,7 +275,7 @@ export class LeadsService {
         HttpStatus.BAD_REQUEST,
       );
     }
-    if (dto.revenueCents !== undefined && dto.status !== "WON" && lead.status !== "WON") {
+    if (dto.revenueCents !== undefined && dto.status !== "WON" && lead.status !== "WON" && !lead.sales?.length) {
       throw new AppException(
         "NO_SALE",
         "Não é possível definir receita para um lead sem venda registrada.",
@@ -280,10 +284,12 @@ export class LeadsService {
     }
 
     const now = new Date();
+    if (dto.revenueCents !== undefined && lead.sales.length > 1) {
+      throw new AppException("SALE_SELECTION_REQUIRED", "Este lead tem mais de uma venda. Escolha a venda na tela Vendas e receita.", HttpStatus.BAD_REQUEST);
+    }
     const beforeStatus = lead.status;
     const data: Prisma.LeadUpdateInput = {};
     let becameQualified = false;
-    let becameWon = false;
     let scheduledMeeting = false;
 
     // Em atendimento, à mão: só a partir de Novo, como tudo no funil.
@@ -322,7 +328,6 @@ export class LeadsService {
       // `meetingScheduledAt` de propósito não é preenchido aqui: qualificação
       // é pressuposto de uma venda, reunião não é. Vender sem reunião é comum,
       // e inventar uma falsearia o funil de reuniões.
-      becameWon = true;
     }
 
     // Avançar no funil desfaz a desqualificação: se a pessoa voltou e comprou,
@@ -441,62 +446,17 @@ export class LeadsService {
       await this.conversionEvents.recordQualifiedLead(organizationId, id, now);
     }
 
-    let sale = lead.sale;
-
-    if (becameWon) {
-      sale = await this.prisma.sale.create({
-        data: {
-          organizationId,
-          leadId: id,
-          amountCents: dto.revenueCents ?? null,
-          classifierType: "MANUAL",
-          detectedAt: now,
-        },
+    // WON is a lifecycle stage, not proof of revenue. Only an explicit value
+    // entered by an authorized user becomes manual confirmation evidence.
+    if (dto.revenueCents !== undefined) {
+      const existing = lead.sales?.[0];
+      const organization = await this.prisma.organization.findUniqueOrThrow({ where: { id: organizationId } });
+      await this.sales.record({
+        organizationId, leadId: id, saleId: existing?.id, eventKey: `lead-manual:${randomUUID()}`,
+        source: "MANUAL", type: "MANUAL_CONFIRMATION", status: "CONFIRMED",
+        valueCents: dto.revenueCents, currency: organization.currency, occurredAt: now, actorId: userId, impersonating,
+        ...(existing ? { payload: { saleOccurredAt: (existing.occurredAt ?? existing.detectedAt).toISOString() } } : {}),
       });
-      await this.prisma.leadEvent.create({
-        data: {
-          organizationId,
-          leadId: id,
-          type: "SALE_DETECTED",
-          occurredAt: now,
-          metadata: { classifierType: "MANUAL", userId },
-        },
-      });
-      await this.auditoria.registra({ organizationId, userId, impersonating }, {
-        acao: "SALE_CREATED",
-        entidade: "Sale",
-        entidadeId: sale.id,
-        depois: { amountCents: sale.amountCents },
-      });
-      // Only sent once a value is known (Section: never guess) — a WON
-      // correction with no revenueCents waits for a later correction below.
-      if (dto.revenueCents !== undefined) {
-        await this.conversionEvents.recordPurchase(organizationId, id, now, dto.revenueCents);
-      }
-    } else if (dto.revenueCents !== undefined && sale) {
-      const before = { amountCents: sale.amountCents };
-      sale = await this.prisma.sale.update({ where: { id: sale.id }, data: { amountCents: dto.revenueCents } });
-      await this.prisma.leadEvent.create({
-        data: {
-          organizationId,
-          leadId: id,
-          type: "REVENUE_DETECTED",
-          occurredAt: now,
-          metadata: { classifierType: "MANUAL", userId, amountCents: dto.revenueCents },
-        },
-      });
-      await this.auditoria.registra({ organizationId, userId, impersonating }, {
-        acao: "SALE_UPDATED",
-        entidade: "Sale",
-        entidadeId: sale.id,
-        antes: before,
-        depois: { amountCents: sale.amountCents },
-      });
-      // If this is the first time a value became known, this actually sends
-      // the Purchase; if the sale was already sent, ConversionEventsService's
-      // dedup on (leadId, type) makes this a no-op — a corrected value is
-      // never re-sent to Meta (Section: known limitation, docs/META_CAPI.md).
-      await this.conversionEvents.recordPurchase(organizationId, id, now, dto.revenueCents);
     }
 
     if (data.status) {
@@ -570,6 +530,7 @@ export class LeadsService {
       data: {
         conversationId: conversation.id,
         direction: "OUTBOUND",
+        source: "TIMELESS",
         type: "TEXT",
         text: dto.text,
         timestamp: now,

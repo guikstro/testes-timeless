@@ -38,6 +38,14 @@ export class MetaConversionSendService {
       return;
     }
 
+    if (event.type === "PURCHASE") {
+      const sale = event.saleId ? await this.prisma.sale.findFirst({ where: { id: event.saleId, organizationId: event.organizationId, status: "CONFIRMED", needsReview: false, deletedAt: null } }) : null;
+      if (!sale || sale.amountCents !== event.valueCents || sale.currency !== event.currency) {
+        await this.prisma.conversionEvent.update({ where: { id: event.id }, data: { status: "FAILED", lastError: "Venda cancelada, em revisão ou valor alterado. Purchase não enviado." } });
+        return;
+      }
+    }
+
     const connection = await this.prisma.metaConnection.findUnique({ where: { organizationId: event.organizationId } });
     if (!connection || connection.status === "DISCONNECTED" || !connection.pixelId || !connection.capiAccessTokenEncrypted) {
       await this.prisma.conversionEvent.update({
@@ -93,7 +101,7 @@ export class MetaConversionSendService {
     return {
       event_name: META_EVENT_NAME_BY_TYPE[event.type],
       event_time: Math.floor(event.occurredAt.getTime() / 1000),
-      event_id: buildMetaEventId(event.leadId, event.type),
+      event_id: event.deduplicationKey ?? buildMetaEventId(event.leadId, event.type),
       action_source: "business_messaging",
       messaging_channel: "whatsapp",
       user_data: userData,
