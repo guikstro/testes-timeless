@@ -151,6 +151,30 @@ describe("TrackingService", () => {
       expect(result.destinationUrl).toContain(encodeURIComponent(`[ref:${createCall.data.attributionToken}]`));
     });
 
+    it("usa a mensagem da triagem (text=) no redirecionamento, mas não grava o texto do caso no clique", async () => {
+      const { service, prisma } = buildService();
+      prisma.trackingLink.findFirst.mockResolvedValue({
+        id: "link-1",
+        organizationId: "org-1",
+        destinationUrl: "https://wa.me/5585996837075",
+        defaultSource: "google",
+        defaultMedium: "cpc",
+        defaultCampaign: "trab-fortaleza",
+      });
+      const message = "Olá! Situação: Fui demitido(a)\nLocal: Fortaleza\nResumo: não recebi a rescisão";
+
+      const result = await service.recordClick("abc1234", { query: { text: message, gclid: "TEST123", utm_term: "advogado" } });
+
+      const data = prisma.trackingClick.create.mock.calls[0][0].data;
+      const token = data.attributionToken;
+      expect(new URL(result.destinationUrl).searchParams.get("text")).toBe(`${message}\n\n[ref:${token}]`);
+      expect(data.gclid).toBe("TEST123");
+      expect(data.utmTerm).toBe("advogado");
+      expect(data.utmSource).toBe("google");
+      expect(data.landingUrl).not.toContain(encodeURIComponent("rescisão"));
+      expect(new URL(data.landingUrl).searchParams.get("text")).toBe(`Olá! [ref:${token}]`);
+    });
+
     it("never stores an attribution token for a non-WhatsApp destination", async () => {
       const { service, prisma } = buildService();
       prisma.trackingLink.findFirst.mockResolvedValue({

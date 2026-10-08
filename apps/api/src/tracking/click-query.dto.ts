@@ -19,4 +19,6 @@ export interface ClickQuery {
   campaign_id?: string;
   adset_id?: string;
   ad_id?: string;
+  /** Mensagem pré-preenchida do WhatsApp montada pela landing page (triagem). */
+  text?: string;
 }

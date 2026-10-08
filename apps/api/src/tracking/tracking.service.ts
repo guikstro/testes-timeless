@@ -2,7 +2,7 @@ import { HttpStatus, Injectable } from "@nestjs/common";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { AppException } from "../common/exceptions/app-exception";
 import { generateTrackingCode } from "../common/utils/generate-code";
-import { buildWhatsAppRedirectUrl } from "../common/utils/build-whatsapp-redirect-url";
+import { buildWhatsAppRedirectUrl, sanitizeLeadMessage } from "../common/utils/build-whatsapp-redirect-url";
 import { ClickQuery } from "./click-query.dto";
 
 function firstValue(value: unknown): string | undefined {
@@ -54,7 +54,14 @@ export class TrackingService {
     // after tells us whether it was actually embedded, so we don't persist
     // a token that will never be looked up (Fase 4 — docs/ATTRIBUTION.md).
     const attributionToken = generateTrackingCode();
-    const redirectUrl = buildWhatsAppRedirectUrl(link.destinationUrl, attributionToken);
+    // A mensagem da triagem (respostas do lead) vai só no redirecionamento. O
+    // que fica gravado no clique é o link sem ela: o texto do caso já chega na
+    // conversa do WhatsApp, e não precisa ficar duplicado na tabela de cliques.
+    const leadMessage = sanitizeLeadMessage(firstValue(q.text));
+    const redirectUrl = buildWhatsAppRedirectUrl(link.destinationUrl, attributionToken, leadMessage);
+    const storedLandingUrl = leadMessage
+      ? buildWhatsAppRedirectUrl(link.destinationUrl, attributionToken)
+      : redirectUrl;
     const tokenWasEmbedded = redirectUrl !== link.destinationUrl;
 
     if (!registrar) {
@@ -65,7 +72,7 @@ export class TrackingService {
       data: {
         trackingLinkId: link.id,
         organizationId: link.organizationId,
-        landingUrl: redirectUrl,
+        landingUrl: storedLandingUrl,
         referrer: context.referrer,
         userAgent: context.userAgent,
         utmSource: firstValue(q.utm_source) ?? link.defaultSource ?? undefined,
