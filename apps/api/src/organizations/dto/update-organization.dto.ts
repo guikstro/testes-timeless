@@ -55,6 +55,11 @@ export class UpdateOrganizationDto {
   @IsBoolean()
   expedienteAtivo?: boolean;
 
+  /** Venda detectada na conversa confirma sozinha, ou espera revisão em Vendas. */
+  @IsOptional()
+  @IsBoolean()
+  confirmaVendaDaConversa?: boolean;
+
   /** Dias atendidos, de 0 (domingo) a 6. */
   @IsOptional()
   @IsArray()

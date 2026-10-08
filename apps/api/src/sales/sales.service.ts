@@ -16,6 +16,7 @@ import { AuditoriaService, Autor } from "../auditoria/auditoria.service";
 import { ConversionEventsService } from "../integrations/meta/conversion-events.service";
 import { IdentityResolutionService } from "./identity-resolution";
 import { resolveSale } from "./sale-resolution";
+import { ORDEM_DO_FUNIL } from "../leads/ordem-do-funil";
 import { ManualSaleDto, ReviewSaleDto, SalesQueryDto } from "./sales.dto";
 
 export interface EvidenceInput {
@@ -324,6 +325,7 @@ export class SalesService {
       tx,
     );
     await this.conversions.stageConfirmedSale(tx, updated);
+    await this.avancaLeadParaGanho(tx, updated);
     if (leadId && !before)
       await tx.leadEvent.create({
         data: {
@@ -630,5 +632,23 @@ export class SalesService {
       requiresReview: review,
       cancelledSales: cancelled,
     };
+  }
+
+  /**
+   * Venda confirmada, sem revisão pendente, leva o lead a Ganho. Só para a
+   * frente no funil: um lead já em Ganho não muda, e a data da venda vira a
+   * data de ganho. Sem isto o funil e a lista de leads ficavam em "Em
+   * atendimento" mesmo com a receita confirmada por pagamento ou CRM.
+   */
+  private async avancaLeadParaGanho(tx: Prisma.TransactionClient, sale: { status: SaleStatus; needsReview: boolean; leadId: string | null; organizationId: string; occurredAt: Date | null; detectedAt: Date }) {
+    if (sale.status !== "CONFIRMED" || sale.needsReview || !sale.leadId) return;
+    const lead = await tx.lead.findFirst({ where: { id: sale.leadId, organizationId: sale.organizationId } });
+    if (!lead || ORDEM_DO_FUNIL[lead.status] >= ORDEM_DO_FUNIL.WON) return;
+    const quando = sale.occurredAt ?? sale.detectedAt;
+    await tx.lead.update({
+      where: { id: lead.id },
+      // Comprou: a desqualificação deixa de valer, como no avanço à mão.
+      data: { status: "WON", wonAt: quando, disqualifiedAt: null, disqualifiedReason: null, ...(lead.qualifiedAt ? {} : { qualifiedAt: quando }) },
+    });
   }
 }

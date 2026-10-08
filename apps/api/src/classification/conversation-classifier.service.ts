@@ -56,16 +56,22 @@ export class ConversationClassifierService {
     const wonRules = rules.filter((rule) => rule.targetStatus === "WON");
     if (wonRules.length) {
       const [organization, message] = await Promise.all([
-        this.prisma.organization.findUniqueOrThrow({ where: { id: input.organizationId }, select: { currency: true } }),
+        this.prisma.organization.findUniqueOrThrow({ where: { id: input.organizationId }, select: { currency: true, confirmaVendaDaConversa: true } }),
         this.prisma.message.findFirst({ where: { id: input.messageId, conversation: { organizationId: input.organizationId } }, include: { conversation: true } }),
       ]);
       const result = await this.saleClassifier.classify({ text, positive: wonRules.map((r) => r.phrase), currency: organization.currency, coverage: message?.conversation.coverage ?? "UNKNOWN" });
       if (result.saleLikely) {
+        const provavel = result.confidence >= 0.7;
+        // O cliente escolhe se a frase confirma a venda (o padrão, como sempre
+        // foi) ou se ela espera revisão. A cobertura da conversa não entra:
+        // ela nasce "desconhecida" em toda conversa, e a frase de venda já
+        // confirmava antes. Condicional nunca confirma sozinha.
+        const confirma = organization.confirmaVendaDaConversa && !result.conditional;
         await this.sales.record({
           organizationId: input.organizationId, leadId: input.lead.id, eventKey: `message:${input.messageId}`,
-          source: "CONVERSATION", type: "SALE_INTENT", status: result.confidence >= 0.7 ? "PROBABLE" : "POSSIBLE",
+          source: "CONVERSATION", type: "SALE_INTENT", status: confirma ? "CONFIRMED" : provavel ? "PROBABLE" : "POSSIBLE",
           valueCents: result.valueCents ?? undefined, currency: result.currency, confidence: result.confidence,
-          occurredAt: input.occurredAt, payload: { messageId: input.messageId, text, direction: input.direction, reason: result.reason, signals: result.evidence, coverage: message?.conversation.coverage ?? "UNKNOWN" },
+          occurredAt: input.occurredAt, payload: { messageId: input.messageId, text, direction: input.direction, reason: result.reason, signals: result.evidence, coverage: message?.conversation.coverage ?? "UNKNOWN", ...(confirma ? { autoConfirmed: true } : {}) },
         });
       }
     }

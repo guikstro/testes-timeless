@@ -201,6 +201,28 @@ describe("deterministic sale signals", () => {
     expect(complete).toMatchObject({ saleLikely: true, valueCents: 85000 });
     expect(partial.confidence).toBeLessThan(complete.confidence);
   });
+  // Frases reais de fechamento que a lista de palavras proibidas descartava.
+  it.each([
+    "Fechamos o orçamento de R$ 2.500, pode emitir",
+    "Fechado, ainda hoje faço o pagamento",
+    "Fechado. Não tem problema, eu pago na entrega",
+    "Fechado, pode mandar o contrato",
+  ])("accepts a real closing sentence: %s", (text) => {
+    const positive = [...input.positive, "fechamos o orçamento"];
+    expect(classifier.classify({ ...input, positive, text }).saleLikely).toBe(true);
+  });
+  it.each([
+    "O contrato fechado ontem ainda não chegou",
+    "Fechado?",
+    "Fechado, quanto custa a entrega?",
+  ])("rejects a sentence that only mentions the phrase: %s", (text) => {
+    expect(classifier.classify({ ...input, text }).saleLikely).toBe(false);
+  });
+  it("a condition after the phrase keeps it as a possible sale, not a probable one", () => {
+    const result = classifier.classify({ ...input, text: "Fechado, mando o comprovante se der certo hoje" });
+    expect(result.saleLikely).toBe(true);
+    expect(result.confidence).toBeLessThan(0.7);
+  });
   it("supports customer-specific negative phrases", () => {
     expect(
       classifier.classify({

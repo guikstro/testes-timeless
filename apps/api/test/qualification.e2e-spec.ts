@@ -161,13 +161,15 @@ describe("Qualification & Sale — trigger phrases end to end (e2e)", () => {
     expect(lead.qualifiedAt).not.toBeNull();
 
     await sendMessage(from, "wamid.HOMOLOG-3", "contrato fechado! Fechamos por 2 mil", 1700086400);
-    await waitFor(() => prisma.sale.findFirst({ where: { leadId: lead.id } }));
-    lead = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
-    expect(lead.status).toBe("QUALIFIED");
-    expect(lead.wonAt).toBeNull();
+    // O padrão de todo cliente: a frase de venda confirma, como sempre foi.
+    lead = await waitFor(async () => {
+      const current = await prisma.lead.findUnique({ where: { id: lead.id } });
+      return current?.status === "WON" ? current : null;
+    });
+    expect(lead.wonAt).not.toBeNull();
 
     const sale = await prisma.sale.findFirst({ where: { leadId: lead.id } });
-    expect(sale).toMatchObject({ amountCents: 200000, classifierType: "RULE", status: "POSSIBLE", needsReview: true });
+    expect(sale).toMatchObject({ amountCents: 200000, classifierType: "RULE", status: "CONFIRMED", needsReview: false });
 
     const events = await prisma.leadEvent.findMany({ where: { leadId: lead.id }, orderBy: [{ occurredAt: "asc" }, { sequence: "asc" }] });
     expect(events.map((e) => e.type)).toEqual([
@@ -185,8 +187,42 @@ describe("Qualification & Sale — trigger phrases end to end (e2e)", () => {
       .get(`/api/leads/${lead.id}`)
       .set("Authorization", `Bearer ${orgToken}`)
       .expect(200);
-    expect(detail.body.sale).toBeNull();
+    expect(detail.body.sale).toMatchObject({ amountCents: 200000, status: "CONFIRMED" });
     expect(detail.body.sales[0].amountCents).toBe(200000);
+  });
+
+  it("com a revisão ligada, a frase só põe a venda na fila, e o lead não vai a Ganho", async () => {
+    await request(app.getHttpServer())
+      .patch("/api/organizations/current")
+      .set("Authorization", `Bearer ${orgToken}`)
+      .send({ confirmaVendaDaConversa: false })
+      .expect(200);
+    try {
+      const from = "5585944444444";
+      await sendMessage(from, "wamid.REVISAO-1", "contrato fechado por R$ 900", 1700000000);
+      const lead = await waitFor(() =>
+        prisma.lead.findUnique({ where: { organizationId_normalizedPhone: { organizationId: orgId, normalizedPhone: `+${from}` } } }),
+      );
+      const sale = await waitFor(() => prisma.sale.findFirst({ where: { leadId: lead.id } }));
+      expect(sale).toMatchObject({ status: "POSSIBLE", needsReview: true, amountCents: 90000 });
+      expect((await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } })).status).not.toBe("WON");
+    } finally {
+      await request(app.getHttpServer())
+        .patch("/api/organizations/current")
+        .set("Authorization", `Bearer ${orgToken}`)
+        .send({ confirmaVendaDaConversa: true })
+        .expect(200);
+    }
+  });
+
+  it("frase de venda com condição fica para revisão mesmo com a confirmação ligada", async () => {
+    const from = "5585955555555";
+    await sendMessage(from, "wamid.CONDICAO-1", "contrato fechado, pago se o banco liberar", 1700000000);
+    const lead = await waitFor(() =>
+      prisma.lead.findUnique({ where: { organizationId_normalizedPhone: { organizationId: orgId, normalizedPhone: `+${from}` } } }),
+    );
+    const sale = await waitFor(() => prisma.sale.findFirst({ where: { leadId: lead.id } }));
+    expect(sale).toMatchObject({ status: "POSSIBLE", needsReview: true });
   });
 
   it("resending the exact same closing message never creates a second sale (idempotency)", async () => {
@@ -373,8 +409,9 @@ describe("Qualification & Sale — trigger phrases end to end (e2e)", () => {
       .set("Authorization", `Bearer ${orgToken}`).send({ requestId: crypto.randomUUID(), action: "CONFIRM", valueCents: 150000 }).expect(201);
     const lead = await prisma.lead.findUniqueOrThrow({ where: { id: created.id } });
 
+    // A venda confirmada leva a Ganho e a data da reunião fica.
     expect(lead.meetingScheduledAt).not.toBeNull();
-    expect(lead.status).toBe("MEETING_SCHEDULED");
+    expect(lead.status).toBe("WON");
     expect((await prisma.sale.findUniqueOrThrow({ where: { id: sale.id } })).status).toBe("CONFIRMED");
   }, 30000);
 });

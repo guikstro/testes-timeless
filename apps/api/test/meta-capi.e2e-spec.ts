@@ -264,26 +264,46 @@ describe("Meta Conversions API — Lead/QualifiedLead/Purchase end to end (e2e)"
     expect(sent).toBeDefined();
   });
 
-  it("sends Purchase only after explicit confirmation, with cents converted to the main currency unit", async () => {
-    const from = "5585933333333";
-    await sendMessage(from, "wamid.CAPI-4", "contrato fechado! Fechamos por 2 mil", 1700000000);
+  it("com a confirmação pela conversa (o padrão), a frase com valor manda o Purchase sozinha", async () => {
+    const from = "5585939393939";
+    await sendMessage(from, "wamid.CAPI-AUTO", "contrato fechado por R$ 750", 1700000000);
     const lead = await waitFor(() =>
       prisma.lead.findUnique({ where: { organizationId_normalizedPhone: { organizationId: orgId, normalizedPhone: `+${from}` } } }),
     );
-
-    const sale = await waitFor(() => prisma.sale.findFirst({ where: { leadId: lead.id } }));
-    expect(await prisma.conversionEvent.count({ where: { leadId: lead.id, type: "PURCHASE" } })).toBe(0);
-    await request(app.getHttpServer()).post(`/api/sales/${sale.id}/review`)
-      .set("Authorization", `Bearer ${orgToken}`).send({ requestId: crypto.randomUUID(), action: "CONFIRM", valueCents: 200000 }).expect(201);
-
     const conversionEvent = await waitFor(async () => {
       const current = await prisma.conversionEvent.findFirst({ where: { leadId: lead.id, type: "PURCHASE" } });
       return current?.status === "SENT" ? current : null;
     });
-    expect(conversionEvent.valueCents).toBe(200000);
+    expect(conversionEvent.valueCents).toBe(75000);
+  });
 
-    const sent = eventsFor(`sale:${sale.id}`).find((e) => e.body.event_name === "Purchase");
-    expect(sent?.body.custom_data).toEqual({ value: 2000, currency: "BRL" });
+  it("sends Purchase only after explicit confirmation when the client chose review, with cents converted to the main currency unit", async () => {
+    await request(app.getHttpServer()).patch("/api/organizations/current")
+      .set("Authorization", `Bearer ${orgToken}`).send({ confirmaVendaDaConversa: false }).expect(200);
+    try {
+      const from = "5585933333333";
+      await sendMessage(from, "wamid.CAPI-4", "contrato fechado! Fechamos por 2 mil", 1700000000);
+      const lead = await waitFor(() =>
+        prisma.lead.findUnique({ where: { organizationId_normalizedPhone: { organizationId: orgId, normalizedPhone: `+${from}` } } }),
+      );
+
+      const sale = await waitFor(() => prisma.sale.findFirst({ where: { leadId: lead.id } }));
+      expect(await prisma.conversionEvent.count({ where: { leadId: lead.id, type: "PURCHASE" } })).toBe(0);
+      await request(app.getHttpServer()).post(`/api/sales/${sale.id}/review`)
+        .set("Authorization", `Bearer ${orgToken}`).send({ requestId: crypto.randomUUID(), action: "CONFIRM", valueCents: 200000 }).expect(201);
+
+      const conversionEvent = await waitFor(async () => {
+        const current = await prisma.conversionEvent.findFirst({ where: { leadId: lead.id, type: "PURCHASE" } });
+        return current?.status === "SENT" ? current : null;
+      });
+      expect(conversionEvent.valueCents).toBe(200000);
+
+      const sent = eventsFor(`sale:${sale.id}`).find((e) => e.body.event_name === "Purchase");
+      expect(sent?.body.custom_data).toEqual({ value: 2000, currency: "BRL" });
+    } finally {
+      await request(app.getHttpServer()).patch("/api/organizations/current")
+        .set("Authorization", `Bearer ${orgToken}`).send({ confirmaVendaDaConversa: true }).expect(200);
+    }
   });
 
   it("never sends an incomplete Purchase — waits for the value to be known via manual correction, then sends it", async () => {

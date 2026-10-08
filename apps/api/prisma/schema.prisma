@@ -133,6 +133,11 @@ model Organization {
    */
   expedienteAtivo  Boolean @default(false) @map("expediente_ativo")
   /**
+   * Venda detectada na conversa com confiança alta conta como confirmada (true) ou vai para a fila de revisão em Vendas (false).
+   * Ligado por padrão para não mudar o que os clientes já tinham: a frase de venda confirmava a venda, levava o lead a Ganho e mandava o Purchase à Meta. Quem quer conferir antes desliga.
+   */
+  confirmaVendaDaConversa Boolean @default(true) @map("confirma_venda_da_conversa")
+  /**
    * Dias atendidos. 0 é domingo, como no Date do JavaScript.
    */
   expedienteDias   Int[]   @default([1, 2, 3, 4, 5]) @map("expediente_dias")

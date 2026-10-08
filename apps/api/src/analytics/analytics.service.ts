@@ -255,7 +255,7 @@ export class AnalyticsService {
       wonAt: true,
       meetingScheduledAt: true,
       disqualifiedAt: true,
-      sales: { where: { status: "CONFIRMED", needsReview: false, deletedAt: null, currency }, select: { amountCents: true, currency: true, occurredAt: true } },
+      sales: { where: { status: "CONFIRMED", needsReview: false, deletedAt: null, currency }, orderBy: { occurredAt: "asc" }, select: { amountCents: true, currency: true, occurredAt: true } },
       attribution: {
         select: {
           method: true,
@@ -636,7 +636,7 @@ export class AnalyticsService {
         select: {
           qualifiedAt: true,
           wonAt: true,
-          sales: { where: { status: "CONFIRMED", needsReview: false, deletedAt: null, currency }, select: { amountCents: true, currency: true, occurredAt: true } },
+          sales: { where: { status: "CONFIRMED", needsReview: false, deletedAt: null, currency }, orderBy: { occurredAt: "asc" }, select: { amountCents: true, currency: true, occurredAt: true } },
           attribution: {
             select: {
               evidence: true,
@@ -757,7 +757,7 @@ export class AnalyticsService {
         select: {
           qualifiedAt: true,
           wonAt: true,
-          sales: { where: { status: "CONFIRMED", needsReview: false, deletedAt: null, currency }, select: { amountCents: true, currency: true, occurredAt: true } },
+          sales: { where: { status: "CONFIRMED", needsReview: false, deletedAt: null, currency }, orderBy: { occurredAt: "asc" }, select: { amountCents: true, currency: true, occurredAt: true } },
           attribution: {
             select: {
               // O método entra aqui para a tela poder dizer *como* cada lead

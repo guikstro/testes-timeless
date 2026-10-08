@@ -44,7 +44,8 @@ seguem a ordem de auditoria e mantêm a data comercial da venda ao corrigir o va
 sem deslocar a receita para o dia da revisão. Duas credenciais
 CRM são fontes distintas. Divergência de estado, moeda ou valor entre fontes
 autoritativas gera revisão. Uma fonte mais fraca não substitui silenciosamente
-uma mais forte. Uma evidência de conversa não confirma receita nova.
+uma mais forte. Uma evidência de conversa só confirma receita quando o cliente
+escolheu isso (ver "Confirmação pela conversa").
 
 Resolver um conflito exige escolher a evidência e registrar o motivo. A decisão
 reconhece apenas as evidências existentes naquele momento. Evidências posteriores
@@ -53,6 +54,39 @@ pelo histórico. Receita em revisão fica fora dos totais confirmados.
 
 Confirmação sem valor é preservada como fato externo, mas não inventa receita
 nem gera Purchase. A tela informa a quantidade de vendas sem valor conhecido.
+
+## Confirmação pela conversa (por cliente)
+
+`Organization.confirmaVendaDaConversa`, em Configurações → Operação. Ligada
+por padrão, porque era o comportamento de todos os clientes: a frase de venda
+confirma a venda, leva o lead a Ganho e, com valor, gera o Purchase da Meta.
+Desligada, toda venda da conversa entra como POSSIBLE/PROBABLE e espera
+revisão em Vendas.
+
+- A evidência confirmada pela política leva `payload.autoConfirmed`; só ela
+  escapa do rebaixamento de conversa para PROBABLE no motor.
+- Frase condicional ("fechado, pago se o banco liberar") nunca confirma
+  sozinha: fica POSSIBLE nos dois modos.
+- Fonte mais forte continua vencendo: um CRM ou pagamento divergente abre
+  revisão como antes.
+- Venda confirmada (de qualquer fonte, sem revisão pendente) leva o lead a
+  Ganho, só para a frente no funil, e desfaz a desqualificação.
+
+O detector lê o contexto na frase em que a expressão aparece: negação logo
+antes ("não está fechado"), "ainda não" na mesma frase, dúvida ("talvez",
+"vou pensar") e pergunta de preço descartam; condição antes descarta e depois
+rebaixa. "Orçamento", "se" ou "ainda" em outro ponto da mensagem não bloqueiam
+mais.
+
+## Implantação
+
+A migração 20261008120000 acrescenta um gatilho em `conversion_events` que
+preenche `deduplication_key` com `lead:tipo` quando ela vem vazia. É para os
+instantes do deploy em que a versão anterior ainda atende depois da migração:
+sem ele, os eventos da Meta dela falhavam. A chave é a mesma que a migração
+deu aos eventos antigos, então a deduplicação daquela versão continua valendo.
+Pode ser removido numa migração futura, depois que nenhuma versão anterior
+estiver no ar.
 
 ## API universal
 

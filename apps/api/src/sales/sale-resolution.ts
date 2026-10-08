@@ -86,9 +86,15 @@ export function resolveSale(
     winner.source === "MANUAL"
       ? (winner.payload as { saleOccurredAt?: string } | null)?.saleOccurredAt
       : undefined;
+  // Conversa sozinha não confirma receita, a não ser que o cliente tenha
+  // escolhido isso (Configurações, Operação): aí a evidência vem marcada.
+  const confirmadaPelaPolitica = Boolean(
+    (winner.payload as { autoConfirmed?: boolean } | null)?.autoConfirmed,
+  );
   const status =
     winner.source === "CONVERSATION" &&
     winner.type !== "LEGACY_IMPORT" &&
+    !confirmadaPelaPolitica &&
     winner.status === "CONFIRMED"
       ? "PROBABLE"
       : winner.status;

@@ -52,6 +52,7 @@ const CAMPOS_DA_CONTA: Record<string, string> = {
   googleConversionQualified: "ação de lead qualificado no Google",
   googleConversionWon: "ação de venda no Google",
   expedienteAtivo: "horário de atendimento",
+  confirmaVendaDaConversa: "confirmação da venda pela conversa",
   expedienteDias: "dias de atendimento",
   expedienteInicio: "abertura do atendimento",
   expedienteFim: "fechamento do atendimento",

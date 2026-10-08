@@ -47,7 +47,7 @@ describe("SalesWorkspace form submissions", () => {
     render(<SalesWorkspace canManage canAnalyze={false} />);
     await screen.findByText("Maria");
     fireEvent.click(
-      screen.getByRole("button", { name: "Registrar venda", exact: true }),
+      screen.getByRole("button", { name: /^Registrar venda$/ }),
     );
     fireEvent.change(screen.getByLabelText("Cliente"), {
       target: { value: "Maria" },

@@ -5,12 +5,14 @@ import { EmptyState } from "@/components/ui/skeleton";
 import { CreateRuleForm } from "./create-rule-form";
 import { DeleteRuleButton } from "./delete-rule-button";
 import { ExpedienteForm } from "./expediente-form";
+import { VendaPelaConversaForm } from "./venda-pela-conversa-form";
 
 interface Organizacao {
   expedienteAtivo: boolean;
   expedienteDias: number[];
   expedienteInicio: number;
   expedienteFim: number;
+  confirmaVendaDaConversa?: boolean;
 }
 
 interface ClassificationRule {
@@ -85,6 +87,10 @@ export async function AbaOperacao() {
             ))}
           </ul>
         )}
+
+        <div className="mt-5 border-t border-line/60 pt-5">
+          <VendaPelaConversaForm confirma={organizacao.confirmaVendaDaConversa ?? true} />
+        </div>
 
         <p className="mt-3 text-rotulo leading-relaxed text-ink-mute">
           Prefira frases distintas e específicas. Uma frase genérica como &ldquo;ok&rdquo; qualificaria quase toda
