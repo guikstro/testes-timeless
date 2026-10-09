@@ -28,4 +28,11 @@ export interface WhatsAppInboundMessageJob {
   text?: string;
   timestampSeconds: number;
   referral?: InboundMessageReferral;
+  /**
+   * Verdadeiro quando a mensagem foi enviada pela própria empresa em outro
+   * aparelho (celular, WhatsApp Web), e não pelo sistema. Ausente = mensagem
+   * do lead. Nesse caso `waId` é o contato com quem a empresa falou e
+   * `profileName` nunca vem preenchido (o nome do remetente seria o nosso).
+   */
+  fromMe?: boolean;
 }

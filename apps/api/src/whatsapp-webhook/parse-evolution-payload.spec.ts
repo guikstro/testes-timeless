@@ -48,12 +48,36 @@ describe("parseEvolutionPayload", () => {
     expect(parsed).toMatchObject({ job: { type: "other", text: undefined } });
   });
 
-  it("ignores our own outgoing messages (fromMe), so a reply never creates or re-qualifies a lead", () => {
+  it("turns a reply sent from another device (fromMe) into a message of ours, with no lead name and no ad referral", () => {
     const parsed = parseEvolutionPayload(
-      buildMessagePayload({ key: { remoteJid: "5585999999999@s.whatsapp.net", fromMe: true, id: "3EB0MINE" } }),
+      buildMessagePayload({
+        key: { remoteJid: "5585999999999@s.whatsapp.net", fromMe: true, id: "3EB0MINE" },
+        pushName: "Atendente",
+        contextInfo: { ctwaClid: "CLID" },
+      }),
     );
 
-    expect(parsed).toBeNull();
+    expect(parsed).toMatchObject({
+      kind: "message",
+      job: { waId: "5585999999999", messageId: "3EB0MINE", fromMe: true, profileName: undefined, referral: undefined },
+    });
+  });
+
+  it("finds the phone of a fromMe reply to a LID contact through remoteJidAlt", () => {
+    const parsed = parseEvolutionPayload(
+      buildMessagePayload({
+        key: { remoteJid: "123456@lid", remoteJidAlt: "5585988887777@s.whatsapp.net", fromMe: true, id: "3EB0LIDME" },
+      }),
+    );
+
+    expect(parsed).toMatchObject({ job: { waId: "5585988887777", fromMe: true } });
+  });
+
+  it("drops a fromMe reply to a LID contact whose phone is unknown, and never marks an inbound message as fromMe", () => {
+    expect(
+      parseEvolutionPayload(buildMessagePayload({ key: { remoteJid: "123456@lid", fromMe: true, id: "3EB0X" } })),
+    ).toBeNull();
+    expect(parseEvolutionPayload(buildMessagePayload())).not.toHaveProperty("job.fromMe");
   });
 
   it("ignores group messages — this product tracks 1:1 conversations with a lead", () => {

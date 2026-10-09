@@ -102,6 +102,11 @@ export class WhatsAppIngestionService {
     const normalizedPhone = normalizePhone(job.waId);
     const occurredAt = new Date(job.timestampSeconds * 1000);
 
+    if (job.fromMe) {
+      await this.ingestDeviceReply(connection.id, organizationId, normalizedPhone, job, occurredAt);
+      return;
+    }
+
     const encontrado = await this.findOrCreateLead(
       organizationId,
       normalizedPhone,
@@ -177,7 +182,8 @@ export class WhatsAppIngestionService {
       messageId: message.id,
       messageText: job.type === "text" ? job.text : undefined,
       occurredAt,
-      // A ingestão só recebe mensagens do lead: o parser descarta `fromMe`.
+      // Daqui em diante é sempre mensagem do lead: a resposta dada em outro
+      // aparelho sai antes, em `ingestDeviceReply`.
       direction: "INBOUND",
     });
 
@@ -189,6 +195,119 @@ export class WhatsAppIngestionService {
     // O aviso sai por último, com tudo já gravado. Ao contrário, a tela
     // poderia receber o evento e ir buscar um lead que ainda não existe.
     await this.avisar(organizationId, lead, leadWasCreated, job, occurredAt);
+  }
+
+  /**
+   * Resposta da equipe dada fora do sistema (celular, WhatsApp Web).
+   *
+   * Só se agarra a um lead e a uma conversa que já existem: uma mensagem
+   * nossa nunca cria lead, nem toca na origem ou na campanha. Para quem não
+   * é lead, a mensagem é descartada sem gravar nada.
+   */
+  private async ingestDeviceReply(
+    connectionId: string,
+    organizationId: string,
+    normalizedPhone: string,
+    job: WhatsAppInboundMessageJob,
+    occurredAt: Date,
+  ): Promise<void> {
+    const lead = await this.prisma.lead.findUnique({
+      where: { organizationId_normalizedPhone: { organizationId, normalizedPhone } },
+    });
+    if (!lead) {
+      this.logger.log(JSON.stringify({ event: "resposta_do_aparelho_sem_lead", organizationId, messageId: job.messageId }));
+      return;
+    }
+
+    const conversation = await this.prisma.conversation.findFirst({
+      where: { leadId: lead.id, whatsappConnectionId: connectionId },
+    });
+    if (!conversation) {
+      this.logger.log(JSON.stringify({ event: "resposta_do_aparelho_sem_conversa", leadId: lead.id, messageId: job.messageId }));
+      return;
+    }
+
+    // O eco de uma mensagem que o próprio sistema acabou de enviar pode chegar
+    // antes de o envio gravar o id do provider. Sem este teste, ela apareceria
+    // duas vezes na conversa.
+    if (job.type === "text" && job.text) {
+      const eco = await this.prisma.message.findFirst({
+        where: {
+          conversationId: conversation.id,
+          direction: "OUTBOUND",
+          source: "TIMELESS",
+          externalId: null,
+          text: job.text,
+          createdAt: { gte: new Date(Date.now() - 2 * 60 * 1000) },
+        },
+        select: { id: true },
+      });
+      if (eco) return;
+    }
+
+    let message: Message;
+    try {
+      message = await this.prisma.message.create({
+        data: {
+          conversationId: conversation.id,
+          externalId: job.messageId,
+          direction: "OUTBOUND",
+          source: "WHATSAPP_DEVICE",
+          type: job.type === "text" ? "TEXT" : "OTHER",
+          text: job.type === "text" ? job.text : undefined,
+          timestamp: occurredAt,
+        },
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) return;
+      throw error;
+    }
+
+    if (occurredAt > conversation.lastMessageAt) {
+      await this.prisma.conversation.update({ where: { id: conversation.id }, data: { lastMessageAt: occurredAt } });
+    }
+
+    const status = await this.entraEmAtendimento(lead, message);
+
+    await this.classifier.classify({
+      organizationId,
+      lead: { ...lead, status },
+      messageId: message.id,
+      messageText: job.type === "text" ? job.text : undefined,
+      occurredAt,
+      direction: "OUTBOUND",
+    });
+
+    await this.prisma.whatsAppConnection.update({ where: { id: connectionId }, data: { lastEventAt: new Date() } });
+
+  }
+
+  /** Igual ao envio pelo sistema: a primeira resposta tira o lead de Novo. Nunca lança. */
+  private async entraEmAtendimento(
+    lead: { id: string; organizationId: string; status: LeadStatus; disqualifiedAt: Date | null },
+    message: Message,
+  ): Promise<LeadStatus> {
+    if (lead.status !== "NEW" || lead.disqualifiedAt) return lead.status;
+    try {
+      const { count } = await this.prisma.lead.updateMany({
+        where: { id: lead.id, status: "NEW", disqualifiedAt: null },
+        data: { status: "IN_PROGRESS", emAtendimentoAt: message.timestamp },
+      });
+      if (count !== 1) return lead.status;
+      await this.prisma.leadEvent.create({
+        data: {
+          organizationId: lead.organizationId,
+          leadId: lead.id,
+          type: "ATTENDANCE_STARTED",
+          occurredAt: message.timestamp,
+          metadata: { messageId: message.id },
+        },
+      });
+      return "IN_PROGRESS";
+    } catch (erro) {
+      this.logger.error(JSON.stringify({ event: "atendimento_nao_marcado", leadId: lead.id, error: String(erro) }));
+      return lead.status;
+    }
   }
 
   /**

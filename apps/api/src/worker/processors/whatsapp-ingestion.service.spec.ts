@@ -600,4 +600,70 @@ describe("WhatsAppIngestionService", () => {
       expect(rastreado.lead.create).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe("resposta dada em outro aparelho (fromMe)", () => {
+    const resposta = () => buildJob({ fromMe: true, profileName: undefined, messageId: "3EB0MINE", text: "Posso te ajudar sim" });
+    const lead = { id: "lead-1", organizationId: "org-1", status: "NEW", disqualifiedAt: null, name: "João", rawPhone: "+5585999999999" };
+
+    function comLeadEConversa() {
+      const prisma = buildPrismaMock();
+      (prisma as any).lead.updateMany = jest.fn().mockResolvedValue({ count: 1 });
+      (prisma as any).message.findFirst = jest.fn().mockResolvedValue(null);
+      prisma.lead.findUnique.mockResolvedValue(lead);
+      prisma.conversation.findFirst.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
+      return prisma;
+    }
+
+    it("grava como OUTBOUND do aparelho, move o lead para em atendimento e classifica como nossa", async () => {
+      const prisma = comLeadEConversa();
+      const classifier = buildClassifierMock();
+      await buildService(prisma, buildAttributionEngineMock(), classifier).ingest(resposta());
+
+      expect(prisma.message.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ direction: "OUTBOUND", source: "WHATSAPP_DEVICE", externalId: "3EB0MINE", conversationId: "conv-1" }),
+      });
+      expect((prisma as any).lead.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "IN_PROGRESS" }) }));
+      expect(prisma.leadEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ type: "ATTENDANCE_STARTED" }) });
+      expect(classifier.classify).toHaveBeenCalledWith(expect.objectContaining({ direction: "OUTBOUND", lead: expect.objectContaining({ status: "IN_PROGRESS" }) }));
+      expect(prisma.conversation.update).toHaveBeenCalled();
+    });
+
+    it("nunca cria lead nem atribuição: sem lead, descarta", async () => {
+      const prisma = buildPrismaMock();
+      const attribution = buildAttributionEngineMock();
+      await buildService(prisma, attribution).ingest(resposta());
+
+      expect(prisma.lead.create).not.toHaveBeenCalled();
+      expect(prisma.message.create).not.toHaveBeenCalled();
+      expect(attribution.resolve).not.toHaveBeenCalled();
+    });
+
+    it("sem conversa nesta conexão, descarta sem criar nada", async () => {
+      const prisma = buildPrismaMock();
+      prisma.lead.findUnique.mockResolvedValue(lead);
+      await buildService(prisma).ingest(resposta());
+
+      expect(prisma.conversation.create).not.toHaveBeenCalled();
+      expect(prisma.message.create).not.toHaveBeenCalled();
+    });
+
+    it("não duplica o eco de uma mensagem que o próprio sistema acabou de enviar", async () => {
+      const prisma = comLeadEConversa();
+      (prisma as any).message.findFirst.mockResolvedValue({ id: "msg-sistema" });
+      await buildService(prisma).ingest(resposta());
+
+      expect(prisma.message.create).not.toHaveBeenCalled();
+    });
+
+    it("não move para em atendimento um lead que já saiu de Novo e ignora reentrega", async () => {
+      const prisma = comLeadEConversa();
+      prisma.lead.findUnique.mockResolvedValue({ ...lead, status: "QUALIFIED" });
+      prisma.message.create.mockRejectedValue(uniqueConstraintError());
+      const classifier = buildClassifierMock();
+      await buildService(prisma, buildAttributionEngineMock(), classifier).ingest(resposta());
+
+      expect((prisma as any).lead.updateMany).not.toHaveBeenCalled();
+      expect(classifier.classify).not.toHaveBeenCalled();
+    });
+  });
 });

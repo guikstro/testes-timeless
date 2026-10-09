@@ -9,7 +9,7 @@ interface RawEvolutionPayload {
   event?: string;
   instance?: string;
   data?: {
-    key?: { remoteJid?: string; fromMe?: boolean; id?: string };
+    key?: { remoteJid?: string; remoteJidAlt?: string; fromMe?: boolean; id?: string };
     pushName?: string;
     messageTimestamp?: number | string;
     message?: {
@@ -63,16 +63,21 @@ export function parseEvolutionPayload(payload: unknown): ParsedEvolution {
 
   const data = body.data;
   const key = data?.key;
-  // `fromMe` é o eco das mensagens que nós mesmos enviamos. Ignorar aqui é o
-  // que impede um lead de ser "criado" por uma mensagem nossa e impede que a
-  // própria resposta do atendente dispare os gatilhos de qualificação.
-  if (!key?.id || !key.remoteJid || key.fromMe) return null;
+  if (!key?.id || !key.remoteJid) return null;
+
+  // `fromMe` é uma mensagem enviada pela própria empresa. As que saem pelo
+  // sistema não chegam aqui (o motor só repassa eventos "notify"), então o que
+  // sobra é a resposta dada em outro aparelho. Ela entra como mensagem nossa,
+  // sem nunca criar lead nem aproveitar o nome do remetente (seria o nosso).
+  const fromMe = key.fromMe === true;
 
   // Grupos (`@g.us`) e status/broadcast não são leads individuais — este
-  // produto rastreia conversas 1:1 com um número.
-  if (!key.remoteJid.endsWith("@s.whatsapp.net")) return null;
+  // produto rastreia conversas 1:1 com um número. Um contato LID sem o
+  // telefone conhecido também não identifica ninguém.
+  const jid = key.remoteJid.endsWith("@s.whatsapp.net") ? key.remoteJid : fromMe ? key.remoteJidAlt : undefined;
+  if (!jid?.endsWith("@s.whatsapp.net")) return null;
 
-  const waId = key.remoteJid.split("@")[0];
+  const waId = jid.split("@")[0]?.split(":")[0];
   if (!waId) return null;
 
   const text = data?.message?.conversation ?? data?.message?.extendedTextMessage?.text;
@@ -87,12 +92,13 @@ export function parseEvolutionPayload(payload: unknown): ParsedEvolution {
       provider: "EVOLUTION",
       routingKey: instanceName,
       waId,
-      profileName: data?.pushName,
+      profileName: fromMe ? undefined : data?.pushName,
       messageId: key.id,
       type: text ? "text" : "other",
       text: text ?? undefined,
       timestampSeconds,
-      referral: ctwaClid
+      ...(fromMe ? { fromMe: true } : {}),
+      referral: ctwaClid && !fromMe
         ? {
             ctwaClid,
             sourceId: data?.contextInfo?.externalAdReply?.sourceId,
