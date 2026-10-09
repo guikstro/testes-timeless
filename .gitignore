@@ -9,3 +9,7 @@ coverage/
 .DS_Store
 apps/api/prisma/dev.db
 .regas-main
+
+# Resultado do teste da IA de vendas: tem o texto das conversas, nunca versionar.
+apps/api/resultado-teste-ia/
+resultado-teste-ia/

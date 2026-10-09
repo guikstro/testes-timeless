@@ -12,6 +12,7 @@
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "jest",
+    "teste:ia-vendas": "ts-node --transpile-only scripts/teste-ia-vendas.ts",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json",
@@ -26,6 +27,7 @@
     "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.132.0",
     "@nestjs/bullmq": "^11.0.2",
     "@nestjs/common": "^11.0.11",
     "@nestjs/config": "^4.0.1",
@@ -51,7 +53,8 @@
     "prisma": "^6.4.1",
     "qrcode": "^1.5.4",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.4",
