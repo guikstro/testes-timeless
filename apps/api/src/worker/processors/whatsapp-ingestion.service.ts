@@ -280,6 +280,15 @@ export class WhatsAppIngestionService {
 
     await this.prisma.whatsAppConnection.update({ where: { id: connectionId }, data: { lastEventAt: new Date() } });
 
+    // Último passo, com tudo gravado: a tela que receber o evento já encontra
+    // a mensagem. Sem sino e sem cartão, a equipe acabou de responder.
+    await this.notifications.anunciar({
+      type: "message.sent",
+      organizationId,
+      leadId: lead.id,
+      title: "Resposta enviada",
+      timestamp: occurredAt.toISOString(),
+    });
   }
 
   /** Igual ao envio pelo sistema: a primeira resposta tira o lead de Novo. Nunca lança. */

@@ -83,7 +83,7 @@ describe("WhatsAppIngestionService", () => {
   }
 
   function buildNotificationsMock() {
-    return { notificar: jest.fn().mockResolvedValue(undefined) };
+    return { notificar: jest.fn().mockResolvedValue(undefined), anunciar: jest.fn().mockResolvedValue(undefined) };
   }
 
   function buildService(
@@ -626,6 +626,15 @@ describe("WhatsAppIngestionService", () => {
       expect(prisma.leadEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ type: "ATTENDANCE_STARTED" }) });
       expect(classifier.classify).toHaveBeenCalledWith(expect.objectContaining({ direction: "OUTBOUND", lead: expect.objectContaining({ status: "IN_PROGRESS" }) }));
       expect(prisma.conversation.update).toHaveBeenCalled();
+    });
+
+    it("avisa as telas abertas sem passar pelo sino", async () => {
+      const prisma = comLeadEConversa();
+      const notifications = buildNotificationsMock();
+      await buildService(prisma, buildAttributionEngineMock(), buildClassifierMock(), buildConversionEventsMock(), notifications).ingest(resposta());
+
+      expect(notifications.anunciar).toHaveBeenCalledWith(expect.objectContaining({ type: "message.sent", leadId: "lead-1", organizationId: "org-1" }));
+      expect(notifications.notificar).not.toHaveBeenCalled();
     });
 
     it("nunca cria lead nem atribuição: sem lead, descarta", async () => {

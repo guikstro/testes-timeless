@@ -63,6 +63,25 @@ export class NotificationsService implements OnModuleDestroy {
   }
 
   /**
+   * Só avisa as telas abertas, sem gravar na caixa do sino.
+   *
+   * Para fatos que não são novidade para ninguém, como uma resposta que a
+   * própria equipe acabou de dar: a conversa aberta precisa se atualizar, mas
+   * um cartão e um número no sino seriam ruído. Nunca lança, pelo mesmo
+   * motivo de `notificar`.
+   */
+  async anunciar(evento: Omit<NotificationEvent, "timestamp"> & { timestamp?: string }): Promise<void> {
+    const completo: NotificationEvent = { ...evento, timestamp: evento.timestamp ?? new Date().toISOString() };
+    try {
+      await this.publicador.publish(canalDaOrganizacao(completo.organizationId), JSON.stringify(completo));
+    } catch (erro) {
+      this.logger.error(
+        JSON.stringify({ event: "notification_publish_failed", type: completo.type, error: String(erro) }),
+      );
+    }
+  }
+
+  /**
    * Uma linha por pessoa da organização.
    *
    * O estado de leitura pertence a quem lê. Com uma linha só para todos, o

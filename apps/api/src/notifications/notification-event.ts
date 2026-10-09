@@ -14,6 +14,8 @@ export type TipoDeNotificacao =
   | "lead.stage_changed"
   | "message.received"
   | "message.failed"
+  /** Resposta da equipe dada em outro aparelho. Só atualiza telas: nunca vai para o sino. */
+  | "message.sent"
   /** Algo que a operação precisa resolver: integração caída, sincronia falhando. */
   | "sistema.erro"
   /** Alguém se cadastrou e criou uma organização: a equipe Timeless fica sabendo. */

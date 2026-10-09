@@ -128,6 +128,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        // A resposta dada em outro aparelho só atualiza as telas: não há
+        // cartão nem releitura do sino, porque nada foi gravado nele.
+        if (evento.type === "message.sent") {
+          ouvintes.current.forEach((ouvinte) => ouvinte(evento));
+          return;
+        }
+
         setAvisosNaTela((atuais) => [...atuais, { chave: proximaChave.current++, evento }]);
         ouvintes.current.forEach((ouvinte) => ouvinte(evento));
 

@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
 import type { Responsavel } from "@/lib/leads/acompanhamento";
 import { AcompanhamentoForm } from "./acompanhamento-form";
+import { AtualizaAoVivo } from "@/components/notifications/atualiza-ao-vivo";
 import { Conversation } from "./conversation";
 import { DisqualifyForm, ManualEditForm } from "./manual-edit-form";
 import { ReplyBox } from "./reply-box";
@@ -240,6 +241,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="mx-auto max-w-6xl">
+      <AtualizaAoVivo />
       <Link
         href="/leads"
         className="focus-ring group mb-5 inline-flex items-center gap-1.5 rounded text-corpo text-ink-mute transition-colors hover:text-ink"

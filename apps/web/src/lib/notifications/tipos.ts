@@ -6,6 +6,8 @@ export type TipoDeNotificacao =
   | "lead.stage_changed"
   | "message.received"
   | "message.failed"
+  /** Resposta dada em outro aparelho: atualiza telas, não aparece no sino. */
+  | "message.sent"
   /** Algo que a operação precisa resolver: integração caída, sincronia falhando. */
   | "sistema.erro"
   /** Alguém se cadastrou e criou uma organização: só a equipe Timeless recebe. */
@@ -49,6 +51,7 @@ export const ROTULO_POR_TIPO: Record<TipoDeNotificacao, string> = {
   "lead.stage_changed": "Mudou de etapa",
   "message.received": "Mensagem",
   "message.failed": "Falha no envio",
+  "message.sent": "Resposta enviada",
   "sistema.erro": "Problema no sistema",
   "conta.nova": "Conta nova",
 };
