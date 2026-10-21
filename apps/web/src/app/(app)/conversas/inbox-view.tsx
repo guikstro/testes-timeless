@@ -23,15 +23,17 @@ export function InboxView({
   caixaInicial,
   motivoParaNaoResponder,
   leadInicial,
+  filtroInicial = "all",
 }: {
   caixaInicial: Caixa;
   motivoParaNaoResponder: string | null;
   /** Veio de `?lead=` na URL, para um link de aviso abrir direto na conversa. */
   leadInicial: string | null;
+  filtroInicial?: FiltroDaCaixa;
 }) {
   const [caixa, setCaixa] = useState<Caixa>(caixaInicial);
   const [busca, setBusca] = useState("");
-  const [filtro, setFiltro] = useState<FiltroDaCaixa>("all");
+  const [filtro, setFiltro] = useState<FiltroDaCaixa>(filtroInicial);
   const [carregandoLista, setCarregandoLista] = useState(false);
 
   const [selecionado, setSelecionado] = useState<string | null>(leadInicial);

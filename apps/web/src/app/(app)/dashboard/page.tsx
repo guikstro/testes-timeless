@@ -10,7 +10,7 @@ import { formatCentsAsBRL } from "@/lib/currency";
 import { inicioDaMedicao, Medicao, medicaoDeLeads } from "@/lib/medicao-de-leads";
 import { DesempenhoDeCampanhas } from "../campanhas/tipos";
 import { formataDia } from "@/lib/periodo";
-import { AbaVisaoGeral } from "./aba-visao-geral";
+import { ResumoSimples } from "./resumo-simples";
 import { AbaFunil } from "./aba-funil";
 import { AbaOrigem } from "./aba-origem";
 import { AbaAtendimento } from "./aba-atendimento";
@@ -38,7 +38,7 @@ const PERIODOS = [7, 30, 90];
  * pergunta não aparece.
  */
 const ABAS_DE_LEADS = [
-  { chave: "geral", rotulo: "Visão geral", conclui: concluiVisaoGeral },
+  { chave: "geral", rotulo: "Resumo", conclui: concluiVisaoGeral },
   // A frase do funil sai do próprio funil, que já vem com os recortes: ver
   // `subtitulo` abaixo.
   { chave: "funil", rotulo: "Funil", conclui: () => "" },
@@ -163,6 +163,37 @@ export default async function DashboardPage({
           : "O funil não carregou agora."
         : escolhida.conclui(overview);
 
+  // A visão geral virou a tela simples: um número, o contexto e o que fazer
+  // agora. As outras abas são o "relatório completo", um clique adiante.
+  const simples = !local && !naPagina && medicao === "medido" && aba === "geral";
+
+  if (simples) {
+    return (
+      <div className="mx-auto max-w-6xl">
+        <AtualizaAoVivo />
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-rotulo font-semibold uppercase tracking-[0.14em] text-ink-mute">
+            Últimos {days} dias · {formataDia(de)} a {formataDia(ate)}
+          </p>
+          <GrupoDePilulas
+            ativo={String(days)}
+            opcoes={PERIODOS.map((opcao) => ({
+              chave: String(opcao),
+              rotulo: `${opcao} dias`,
+              href: `/dashboard?days=${opcao}${comMetricas}`,
+            }))}
+          />
+        </header>
+        <ResumoSimples
+          overview={overview}
+          gastoCentavos={anuncios?.totais.gastoCentavos ?? null}
+          dias={days}
+          relatorioCompleto={paraAba("funil")}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-6xl">
       <AtualizaAoVivo />
@@ -252,9 +283,6 @@ export default async function DashboardPage({
         />
       ) : null}
 
-      {medicao === "medido" && aba === "geral" ? (
-        <AbaVisaoGeral overview={overview} anuncios={secaoDeAnuncios(true)} />
-      ) : null}
       {medicao === "medido" && aba === "funil" ? (
         funil ? (
           <AbaFunil dados={funil} />

@@ -12,6 +12,8 @@ export interface OriginBucket {
   qualified: number;
   meetings: number;
   won: number;
+  /** Reunião marcada ou venda. */
+  clientes: number;
   disqualified: number;
   revenueCents: number;
 }
@@ -30,6 +32,10 @@ export interface Overview {
     qualified: number;
     meetings: number;
     won: number;
+    /** Reunião marcada ou venda, sem contar duas vezes. */
+    clientes: number;
+    /** Em atendimento ou qualificados que ainda não viraram clientes. */
+    emConversa: number;
     revenueCents: number;
     qualificationRate: number | null;
     closeRate: number | null;
@@ -39,6 +45,7 @@ export interface Overview {
     qualified: Variacao;
     meetings: Variacao;
     won: Variacao;
+    clientes: Variacao;
     revenueCents: Variacao;
   };
   atendimento: {

@@ -26,6 +26,7 @@ function origem(over: Partial<OriginBucket> = {}): OriginBucket {
     qualified: 4,
     meetings: 2,
     won: 1,
+    clientes: 2,
     disqualified: 0,
     revenueCents: 100_000,
     ...over,
@@ -36,7 +37,7 @@ function overview(over: Partial<Overview> = {}): Overview {
   return {
     period: { days: 30, from: "2026-08-23T00:00:00.000Z", to: "2026-09-22T23:59:59.000Z" },
     totals: {
-      leads: 48, disqualified: 8, workable: 40, qualified: 20, meetings: 9, won: 4,
+      leads: 48, disqualified: 8, workable: 40, qualified: 20, meetings: 9, won: 4, clientes: 10, emConversa: 12,
       revenueCents: 3_200_000, qualificationRate: 0.5, closeRate: 0.2,
     },
     comparacao: {
@@ -44,6 +45,7 @@ function overview(over: Partial<Overview> = {}): Overview {
       qualified: { delta: null, anterior: 0 },
       meetings: { delta: null, anterior: 0 },
       won: { delta: null, anterior: 0 },
+      clientes: { delta: null, anterior: 0 },
       revenueCents: { delta: null, anterior: 0 },
     },
     atendimento: { medianaPrimeiraRespostaSegundos: 840, respondidos: 40, semResposta: 8, aguardando: 6 },

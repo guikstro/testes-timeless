@@ -271,4 +271,26 @@ describe("agregação do dashboard", () => {
       expect(medianaPrimeiraResposta([null, null])).toBeNull();
     });
   });
+
+  describe("clientes e em conversa (tela simples)", () => {
+    it("conta como cliente quem marcou reunião ou comprou, uma vez só", () => {
+      const reuniao = new Date("2026-01-11T12:00:00");
+      const totais = aggregateTotals([
+        lead({ status: "MEETING_SCHEDULED", meetingScheduledAt: reuniao }),
+        lead({ status: "WON", meetingScheduledAt: reuniao }),
+        lead({ status: "WON" }),
+        lead({ status: "IN_PROGRESS" }),
+        lead({ status: "QUALIFIED" }),
+        lead({ status: "QUALIFIED", disqualifiedAt: reuniao }),
+        lead({ status: "NEW" }),
+      ]);
+      expect(totais.clientes).toBe(3);
+      expect(totais.emConversa).toBe(2);
+    });
+
+    it("soma clientes por origem", () => {
+      const [bucket] = aggregateByOrigin([lead({ status: "WON" }), lead({ meetingScheduledAt: new Date() }), lead()]);
+      expect(bucket.clientes).toBe(2);
+    });
+  });
 });

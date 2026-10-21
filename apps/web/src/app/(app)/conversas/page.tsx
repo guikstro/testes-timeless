@@ -30,13 +30,15 @@ function motivoParaNaoResponder(conexao: ConexaoDoWhatsApp | null | undefined): 
 export default async function ConversasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ lead?: string }>;
+  searchParams: Promise<{ lead?: string; filtro?: string }>;
 }) {
-  const { lead } = await searchParams;
+  const { lead, filtro } = await searchParams;
+  // `?filtro=awaiting` vem do atalho "Responder" do dashboard.
+  const filtroInicial = filtro === "awaiting" || filtro === "unread" ? filtro : "all";
 
   // A primeira lista vem do servidor para a tela abrir preenchida; daí em
   // diante quem manda é o cliente, que troca de conversa sem recarregar.
-  const [caixa, conexao] = await Promise.all([apiFetch<Caixa>("/conversations"), conexaoDoWhatsApp()]);
+  const [caixa, conexao] = await Promise.all([apiFetch<Caixa>(filtroInicial === "all" ? "/conversations" : `/conversations?status=${filtroInicial}`), conexaoDoWhatsApp()]);
 
   /*
     Caixa vazia e sem WhatsApp: a caixa de entrada em branco, com "nenhuma
@@ -61,6 +63,7 @@ export default async function ConversasPage({
       caixaInicial={caixa}
       motivoParaNaoResponder={motivoParaNaoResponder(conexao)}
       leadInicial={typeof lead === "string" && lead ? lead : null}
+      filtroInicial={filtroInicial}
     />
   );
 }

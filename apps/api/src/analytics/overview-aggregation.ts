@@ -31,6 +31,8 @@ export interface OriginBucket {
   qualified: number;
   meetings: number;
   won: number;
+  /** Reunião marcada ou venda: o "virou cliente" da tela simples. */
+  clientes: number;
   disqualified: number;
   revenueCents: number;
 }
@@ -50,6 +52,10 @@ export interface OverviewTotals {
   qualified: number;
   meetings: number;
   won: number;
+  /** Reunião marcada ou venda, sem contar duas vezes quem teve as duas. */
+  clientes: number;
+  /** Em atendimento ou qualificados, sem descartados e sem quem já virou cliente. */
+  emConversa: number;
   revenueCents: number;
   /** Null sem base para calcular: 0% diria que ninguém converteu, o que é diferente de "não houve ninguém". */
   qualificationRate: number | null;
@@ -97,12 +103,24 @@ export function rotuloDaOrigem(chave: string): string {
   return chave.startsWith("link:") ? chave.slice("link:".length) : chave;
 }
 
+/** Para quem não entende de funil: marcou reunião ou comprou, virou cliente. */
+export function virouCliente(lead: Pick<AggregationLead, "meetingScheduledAt" | "confirmed" | "status">): boolean {
+  return lead.meetingScheduledAt !== null || (lead.confirmed ?? lead.status === "WON");
+}
+
 export function aggregateTotals(leads: AggregationLead[]): OverviewTotals {
   const disqualified = leads.filter((lead) => lead.disqualifiedAt !== null).length;
   const qualified = leads.filter((lead) => ESTAGIOS_QUALIFICADOS.has(lead.status)).length;
   const meetings = leads.filter((lead) => lead.meetingScheduledAt !== null).length;
   const won = leads.filter((lead) => (lead.confirmed ?? lead.status === "WON")).length;
   const revenueCents = leads.reduce((sum, lead) => sum + (lead.sale?.amountCents ?? 0), 0);
+  const clientes = leads.filter(virouCliente).length;
+  const emConversa = leads.filter(
+    (lead) =>
+      lead.disqualifiedAt === null &&
+      !virouCliente(lead) &&
+      (lead.status === "IN_PROGRESS" || lead.status === "QUALIFIED"),
+  ).length;
 
   // Leads descartados saem do denominador: eles nunca foram oportunidade, e
   // mantê-los ali faria a taxa de qualificação cair como se fossem negócios
@@ -116,6 +134,8 @@ export function aggregateTotals(leads: AggregationLead[]): OverviewTotals {
     qualified,
     meetings,
     won,
+    clientes,
+    emConversa,
     revenueCents,
     qualificationRate: workable > 0 ? qualified / workable : null,
     closeRate: qualified > 0 ? won / qualified : null,
@@ -134,6 +154,7 @@ export function aggregateByOrigin(leads: AggregationLead[]): OriginBucket[] {
       qualified: 0,
       meetings: 0,
       won: 0,
+      clientes: 0,
       disqualified: 0,
       revenueCents: 0,
     };
@@ -144,6 +165,7 @@ export function aggregateByOrigin(leads: AggregationLead[]): OriginBucket[] {
     if (ESTAGIOS_QUALIFICADOS.has(lead.status)) bucket.qualified += 1;
     if (lead.meetingScheduledAt !== null) bucket.meetings += 1;
     if ((lead.confirmed ?? lead.status === "WON")) bucket.won += 1;
+    if (virouCliente(lead)) bucket.clientes += 1;
     if (lead.disqualifiedAt !== null) bucket.disqualified += 1;
     bucket.revenueCents += lead.sale?.amountCents ?? 0;
 
@@ -216,6 +238,7 @@ export interface ComparacaoTotais {
   qualified: Variacao;
   meetings: Variacao;
   won: Variacao;
+  clientes: Variacao;
   revenueCents: Variacao;
 }
 
@@ -225,6 +248,7 @@ export function comparaTotais(atual: OverviewTotals, anterior: OverviewTotals): 
     qualified: compara(atual.qualified, anterior.qualified),
     meetings: compara(atual.meetings, anterior.meetings),
     won: compara(atual.won, anterior.won),
+    clientes: compara(atual.clientes, anterior.clientes),
     revenueCents: compara(atual.revenueCents, anterior.revenueCents),
   };
 }
