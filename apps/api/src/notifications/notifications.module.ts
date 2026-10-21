@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { NotificationsService } from "./notifications.service";
+import { PushService } from "./push.service";
 
 /**
  * Só quem produz avisos.
@@ -10,7 +11,7 @@ import { NotificationsService } from "./notifications.service";
  * abriria lá uma assinatura de Redis que ninguém leria.
  */
 @Module({
-  providers: [NotificationsService],
-  exports: [NotificationsService],
+  providers: [NotificationsService, PushService],
+  exports: [NotificationsService, PushService],
 })
 export class NotificationsModule {}

@@ -1,9 +1,13 @@
-import { HttpStatus, Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
+import { HttpStatus, Injectable, Logger, OnModuleDestroy, Optional } from "@nestjs/common";
 import Redis from "ioredis";
 import { PrismaService } from "../common/prisma/prisma.service";
 import { criaConexaoRedis } from "../common/queue/redis-connection";
 import { canalDaOrganizacao, NotificationEvent } from "./notification-event";
 import { AppException } from "../common/exceptions/app-exception";
+import { PushService } from "./push.service";
+
+/** Só o que pede atenção de quem está longe da tela vira aviso no aparelho. */
+const TIPOS_COM_PUSH = new Set<NotificationEvent["type"]>(["lead.created", "message.received"]);
 
 /** De quem é a caixa: a pessoa, dentro da organização da sessão. */
 export interface DonoDaCaixa {
@@ -19,7 +23,10 @@ export class NotificationsService implements OnModuleDestroy {
   private readonly logger = new Logger(NotificationsService.name);
   private readonly publicador: Redis;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly push?: PushService,
+  ) {
     this.publicador = criaConexaoRedis("NotificationsService");
   }
 
@@ -59,6 +66,15 @@ export class NotificationsService implements OnModuleDestroy {
       this.logger.error(
         JSON.stringify({ event: "notification_publish_failed", type: completo.type, error: String(erro) }),
       );
+    }
+
+    if (this.push && TIPOS_COM_PUSH.has(completo.type)) {
+      await this.push.enviarParaOrganizacao(completo.organizationId, {
+        title: completo.title,
+        body: completo.body,
+        url: completo.leadId ? `/conversas?lead=${completo.leadId}` : "/conversas",
+        tag: completo.leadId ? `lead-${completo.leadId}` : undefined,
+      });
     }
   }
 

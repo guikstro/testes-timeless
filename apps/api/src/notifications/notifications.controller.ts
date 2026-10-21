@@ -1,4 +1,4 @@
-import { Controller, Get, MessageEvent, Param, Patch, Post, Query, Sse, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Headers, MessageEvent, Param, Patch, Post, Query, Sse, UseGuards } from "@nestjs/common";
 import { interval, map, merge, Observable, of } from "rxjs";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
@@ -6,6 +6,8 @@ import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { NotificationsGateway } from "./notifications.gateway";
 import { NotificationsService } from "./notifications.service";
 import { ListarNotificacoesDto } from "./dto/listar-notificacoes.dto";
+import { PushService } from "./push.service";
+import { CancelarPushDto, InscreverPushDto } from "./dto/push.dto";
 
 /**
  * Um comentário a cada vinte e cinco segundos.
@@ -22,6 +24,7 @@ export class NotificationsController {
   constructor(
     private readonly gateway: NotificationsGateway,
     private readonly notifications: NotificationsService,
+    private readonly push: PushService,
   ) {}
 
   /**
@@ -40,6 +43,28 @@ export class NotificationsController {
       this.gateway.fluxo(user.organizationId).pipe(map((evento): MessageEvent => ({ data: evento }))),
       interval(BATIMENTO_MS).pipe(map((): MessageEvent => ({ type: "ping", data: "" }))),
     );
+  }
+
+  /** A chave pública que o navegador precisa para se inscrever nos avisos. */
+  @Get("push/chave")
+  async chaveDoPush() {
+    return { chave: await this.push.chavePublica() };
+  }
+
+  @Post("push/inscrever")
+  async inscreverNoPush(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: InscreverPushDto,
+    @Headers("user-agent") userAgent?: string,
+  ) {
+    await this.push.inscrever(user, { endpoint: dto.endpoint, keys: dto.keys }, userAgent);
+    return { ok: true };
+  }
+
+  @Delete("push/inscrever")
+  async cancelarPush(@CurrentUser() user: AuthenticatedUser, @Body() dto: CancelarPushDto) {
+    await this.push.cancelar(user, dto.endpoint);
+    return { ok: true };
   }
 
   @Get()

@@ -1,0 +1,9 @@
+{
+  "name": "Timeless",
+  "short_name": "Timeless",
+  "description": "Leads, conversas e vendas do WhatsApp",
+  "start_url": "/conversas",
+  "scope": "/",
+  "display": "standalone",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

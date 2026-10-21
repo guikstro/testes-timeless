@@ -5,6 +5,7 @@ import { useState } from "react";
 import { ROTULO_POR_TIPO } from "@/lib/notifications/tipos";
 import { tempoRelativo } from "@/lib/relative-time";
 import { corDaNotificacao, IconeDaNotificacao } from "./notification-icons";
+import { AvisosNoAparelho } from "./avisos-no-aparelho";
 import { useNotificacoes } from "./notification-provider";
 
 export function NotificationBell() {
@@ -115,6 +116,8 @@ export function NotificationBell() {
                 })
               )}
             </div>
+
+            <AvisosNoAparelho />
 
             <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-2.5">
               <Link

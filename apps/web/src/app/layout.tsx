@@ -11,6 +11,9 @@ const manrope = Manrope({ subsets: ["latin"], display: "swap", variable: "--font
 export const metadata: Metadata = {
   title: "Tracking Platform",
   description: "Tracking e atribuição de conversões: anúncio → clique → WhatsApp → venda",
+  manifest: "/manifest.webmanifest",
+  // No iPhone, os avisos só chegam para o sistema instalado na tela inicial.
+  appleWebApp: { capable: true, title: "Timeless" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

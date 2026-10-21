@@ -132,4 +132,29 @@ describe("NotificationsService", () => {
 
     await expect(service.marcarComoLida(DONO, "n-alheia")).rejects.toMatchObject({ status: 404 });
   });
+
+  describe("aviso no aparelho (push)", () => {
+    function comPush() {
+      const { prisma } = buildService();
+      const push = { enviarParaOrganizacao: jest.fn().mockResolvedValue(undefined) };
+      const service = new NotificationsService(prisma as unknown as PrismaService, push as never);
+      return { service, push };
+    }
+
+    it("manda push para mensagem recebida, com o link da conversa", async () => {
+      const { service, push } = comPush();
+      await service.notificar({ ...evento, type: "message.received", title: "Ana respondeu" });
+      expect(push.enviarParaOrganizacao).toHaveBeenCalledWith(
+        "org-1",
+        expect.objectContaining({ title: "Ana respondeu", url: "/conversas?lead=lead-1", tag: "lead-lead-1" }),
+      );
+    });
+
+    it("não manda push para o que não pede atenção longe da tela", async () => {
+      const { service, push } = comPush();
+      await service.notificar({ ...evento, type: "lead.stage_changed" });
+      await service.anunciar({ ...evento, type: "message.sent" });
+      expect(push.enviarParaOrganizacao).not.toHaveBeenCalled();
+    });
+  });
 });

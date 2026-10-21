@@ -177,6 +177,7 @@ model Organization {
   metaConnection       MetaConnection?
   campaigns            Campaign[]
   conversionEvents     ConversionEvent[]
+  pushSubscriptions    PushSubscription[]
   notifications        Notification[]
   budgets              Budget[]
   mudancasNoAnuncio    MudancaNoAnuncio[]
@@ -218,6 +219,7 @@ model User {
   emailChangeTokens   EmailChangeToken[]
   refreshTokens       RefreshToken[]
   auditLogs           AuditLog[]
+  pushSubscriptions   PushSubscription[]
   notifications       Notification[]
   leadsResponsavel    Lead[]               @relation("ResponsavelDoLead")
   mudancasNoAnuncio   MudancaNoAnuncio[]
@@ -1860,4 +1862,34 @@ model LocalDoPerfil {
 
   @@index([organizationId])
   @@map("locais_do_perfil")
+}
+
+/// Um aparelho ou navegador que aceitou receber avisos de mensagem nova.
+model PushSubscription {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  /// O endereço do serviço de push do navegador. Único por aparelho.
+  endpoint       String   @unique
+  p256dh         String
+  auth           String
+  userAgent      String?  @map("user_agent")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("push_subscriptions")
+}
+
+/// As chaves VAPID do Web Push, geradas uma vez pelo próprio sistema. Uma linha só (id = 1).
+model PushConfig {
+  id            Int      @id @default(1)
+  publicKey     String   @map("public_key")
+  /// Criptografada com TOKEN_ENCRYPTION_KEY, como os demais segredos.
+  privateKeyEnc String   @map("private_key_enc")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("push_config")
 }
