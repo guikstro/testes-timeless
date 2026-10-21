@@ -567,6 +567,8 @@ model Lead {
   organizationId     String     @map("organization_id")
   normalizedPhone    String     @map("normalized_phone")
   rawPhone           String     @map("raw_phone")
+  /// Identificador LID do contato no WhatsApp, aprendido quando ele escreve. Liga a resposta dada no celular ao lead.
+  whatsappLid        String?    @map("whatsapp_lid")
   name               String?
   status             LeadStatus @default(NEW)
   firstContactAt     DateTime   @map("first_contact_at")
@@ -614,6 +616,7 @@ model Lead {
   @@unique([organizationId, normalizedPhone])
   @@index([organizationId, lastContactAt])
   @@index([organizationId, responsavelId])
+  @@index([organizationId, whatsappLid])
   @@map("leads")
 }
 

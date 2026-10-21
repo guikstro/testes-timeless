@@ -41,7 +41,9 @@ export type FiltroDaCaixa = "all" | "unread" | "awaiting";
 /** Texto curto para a prévia, sem quebras de linha atravessando a lista. */
 function previa(direcao: string | null, tipo: string | null, texto: string | null): string | null {
   if (!direcao) return null;
-  if (tipo !== "TEXT" || !texto) return "Mensagem não textual";
+  // Mídia chega com o rótulo ("[Foto]") na coluna de texto; sem ele, é uma
+  // mensagem antiga, de antes de o rótulo existir.
+  if (!texto) return "Mensagem não textual";
   return texto.replace(/\s+/g, " ").trim() || null;
 }
 

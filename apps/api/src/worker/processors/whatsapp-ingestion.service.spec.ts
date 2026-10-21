@@ -637,6 +637,28 @@ describe("WhatsAppIngestionService", () => {
       expect(notifications.notificar).not.toHaveBeenCalled();
     });
 
+    it("liga a resposta ao lead pelo LID quando não há telefone", async () => {
+      const prisma = comLeadEConversa();
+      (prisma as any).lead.findFirst = jest.fn().mockResolvedValue({ ...lead, whatsappLid: "123456" });
+      prisma.lead.findUnique.mockResolvedValue(null);
+      await buildService(prisma).ingest({ ...resposta(), waId: "", lid: "123456" });
+
+      expect((prisma as any).lead.findFirst).toHaveBeenCalledWith({ where: { organizationId: "org-1", whatsappLid: "123456" } });
+      expect(prisma.message.create).toHaveBeenCalledWith({ data: expect.objectContaining({ source: "WHATSAPP_DEVICE" }) });
+    });
+
+    it("aprende o LID do lead quando ele escreve", async () => {
+      const prisma = buildPrismaMock();
+      const existente = { id: "lead-1", status: "NEW", name: "João", lastContactAt: new Date(0), whatsappLid: null, attribution: { id: "a" } };
+      prisma.lead.findUnique.mockResolvedValue(existente);
+      prisma.lead.update.mockResolvedValue(existente);
+      prisma.conversation.findFirst.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
+      prisma.conversation.update.mockResolvedValue({ id: "conv-1" });
+      await buildService(prisma).ingest(buildJob({ lid: "123456" }));
+
+      expect(prisma.lead.update).toHaveBeenCalledWith({ where: { id: "lead-1" }, data: { whatsappLid: "123456" } });
+    });
+
     it("nunca cria lead nem atribuição: sem lead, descarta", async () => {
       const prisma = buildPrismaMock();
       const attribution = buildAttributionEngineMock();
@@ -673,6 +695,32 @@ describe("WhatsAppIngestionService", () => {
 
       expect((prisma as any).lead.updateMany).not.toHaveBeenCalled();
       expect(classifier.classify).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("mídia recebida do lead", () => {
+    it("guarda o rótulo da mídia e a legenda na conversa", async () => {
+      const prisma = buildPrismaMock();
+      prisma.lead.create.mockResolvedValue({ id: "lead-1", name: null, lastContactAt: new Date(0) });
+      prisma.conversation.create.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
+      const classifier = buildClassifierMock();
+      await buildService(prisma, buildAttributionEngineMock(), classifier).ingest(
+        buildJob({ type: "other", mediaKind: "image", text: "meu contrato" }),
+      );
+
+      expect(prisma.message.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ type: "OTHER", text: "[Foto] meu contrato" }),
+      });
+      expect(classifier.classify).toHaveBeenCalledWith(expect.objectContaining({ messageText: "meu contrato" }));
+    });
+
+    it("áudio sem legenda vira só o rótulo", async () => {
+      const prisma = buildPrismaMock();
+      prisma.lead.create.mockResolvedValue({ id: "lead-1", name: null, lastContactAt: new Date(0) });
+      prisma.conversation.create.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
+      await buildService(prisma).ingest(buildJob({ type: "other", mediaKind: "audio", text: undefined }));
+
+      expect(prisma.message.create).toHaveBeenCalledWith({ data: expect.objectContaining({ text: "[Áudio]" }) });
     });
   });
 });

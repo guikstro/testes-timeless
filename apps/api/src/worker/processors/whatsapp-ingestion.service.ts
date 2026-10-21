@@ -3,7 +3,7 @@ import { LeadStatus, Message } from "@prisma/client";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { normalizePhone } from "../../common/utils/normalize-phone";
 import { isUniqueConstraintError } from "../../common/utils/is-unique-constraint-error";
-import { WhatsAppInboundMessageJob } from "../../common/queue/whatsapp-event.job";
+import { ROTULO_DA_MIDIA, WhatsAppInboundMessageJob } from "../../common/queue/whatsapp-event.job";
 import { AttributionEngine, AttributionResult } from "../../attribution/attribution-engine";
 import { ConversationClassifierService } from "../../classification/conversation-classifier.service";
 import { ConversionEventsService } from "../../integrations/meta/conversion-events.service";
@@ -16,6 +16,17 @@ import { ANUNCIO_POR_ESTAGIO } from "../../notifications/notification-event";
 
 /** Quanto de uma mensagem cabe num aviso sem virar parede de texto. */
 const LIMITE_DA_PREVIA = 140;
+
+/**
+ * O que fica na coluna de texto: a fala, ou o rótulo da mídia ("[Foto] legenda")
+ * para a conversa mostrar o que o lead mandou. O conteúdo da mídia em si não é
+ * guardado.
+ */
+export function textoGuardado(job: WhatsAppInboundMessageJob): string | undefined {
+  if (!job.mediaKind) return job.type === "text" ? job.text : undefined;
+  const rotulo = `[${ROTULO_DA_MIDIA[job.mediaKind]}]`;
+  return job.text ? `${rotulo} ${job.text}` : rotulo;
+}
 
 function recorta(texto: string | undefined): string | undefined {
   if (!texto) return undefined;
@@ -99,13 +110,13 @@ export class WhatsAppIngestionService {
     }
 
     const organizationId = connection.organizationId;
-    const normalizedPhone = normalizePhone(job.waId);
     const occurredAt = new Date(job.timestampSeconds * 1000);
 
     if (job.fromMe) {
-      await this.ingestDeviceReply(connection.id, organizationId, normalizedPhone, job, occurredAt);
+      await this.ingestDeviceReply(connection.id, organizationId, job, occurredAt);
       return;
     }
+    const normalizedPhone = normalizePhone(job.waId);
 
     const encontrado = await this.findOrCreateLead(
       organizationId,
@@ -132,6 +143,7 @@ export class WhatsAppIngestionService {
     }
 
     const { lead, wasCreated: leadWasCreated, semOrigem } = encontrado;
+    await this.aprendeLid(lead, job.lid);
 
     if (leadWasCreated) {
       // A origem já foi gravada junto do lead, na mesma transação. Aqui fica
@@ -180,7 +192,7 @@ export class WhatsAppIngestionService {
       organizationId,
       lead,
       messageId: message.id,
-      messageText: job.type === "text" ? job.text : undefined,
+      messageText: job.text,
       occurredAt,
       // Daqui em diante é sempre mensagem do lead: a resposta dada em outro
       // aparelho sai antes, em `ingestDeviceReply`.
@@ -207,17 +219,25 @@ export class WhatsAppIngestionService {
   private async ingestDeviceReply(
     connectionId: string,
     organizationId: string,
-    normalizedPhone: string,
     job: WhatsAppInboundMessageJob,
     occurredAt: Date,
   ): Promise<void> {
-    const lead = await this.prisma.lead.findUnique({
-      where: { organizationId_normalizedPhone: { organizationId, normalizedPhone } },
-    });
+    // Pelo telefone quando ele vem; senão pelo LID que o lead trouxe da última
+    // vez que escreveu.
+    const lead = job.waId
+      ? await this.prisma.lead.findUnique({
+          where: { organizationId_normalizedPhone: { organizationId, normalizedPhone: normalizePhone(job.waId) } },
+        })
+      : job.lid
+        ? await this.prisma.lead.findFirst({ where: { organizationId, whatsappLid: job.lid } })
+        : null;
     if (!lead) {
-      this.logger.log(JSON.stringify({ event: "resposta_do_aparelho_sem_lead", organizationId, messageId: job.messageId }));
+      this.logger.log(
+        JSON.stringify({ event: "resposta_do_aparelho_sem_lead", organizationId, messageId: job.messageId, porLid: !job.waId }),
+      );
       return;
     }
+    await this.aprendeLid(lead, job.lid);
 
     const conversation = await this.prisma.conversation.findFirst({
       where: { leadId: lead.id, whatsappConnectionId: connectionId },
@@ -254,7 +274,7 @@ export class WhatsAppIngestionService {
           direction: "OUTBOUND",
           source: "WHATSAPP_DEVICE",
           type: job.type === "text" ? "TEXT" : "OTHER",
-          text: job.type === "text" ? job.text : undefined,
+          text: textoGuardado(job),
           timestamp: occurredAt,
         },
       });
@@ -273,7 +293,7 @@ export class WhatsAppIngestionService {
       organizationId,
       lead: { ...lead, status },
       messageId: message.id,
-      messageText: job.type === "text" ? job.text : undefined,
+      messageText: job.text,
       occurredAt,
       direction: "OUTBOUND",
     });
@@ -289,6 +309,16 @@ export class WhatsAppIngestionService {
       title: "Resposta enviada",
       timestamp: occurredAt.toISOString(),
     });
+  }
+
+  /** Guarda o LID do contato para ligar as respostas dadas no celular. Nunca lança. */
+  private async aprendeLid(lead: { id: string; whatsappLid?: string | null }, lid: string | undefined): Promise<void> {
+    if (!lid || lead.whatsappLid === lid) return;
+    try {
+      await this.prisma.lead.update({ where: { id: lead.id }, data: { whatsappLid: lid } });
+    } catch (erro) {
+      this.logger.warn(JSON.stringify({ event: "lid_nao_guardado", leadId: lead.id, error: String(erro).slice(0, 120) }));
+    }
   }
 
   /** Igual ao envio pelo sistema: a primeira resposta tira o lead de Novo. Nunca lança. */
@@ -336,7 +366,7 @@ export class WhatsAppIngestionService {
     occurredAt: Date,
   ): Promise<void> {
     const nome = leadAntes.name ?? leadAntes.rawPhone;
-    const previa = job.type === "text" ? recorta(job.text) : undefined;
+    const previa = recorta(textoGuardado(job));
     const comum = {
       organizationId,
       leadId: leadAntes.id,
@@ -565,7 +595,7 @@ export class WhatsAppIngestionService {
           externalId: job.messageId,
           direction: "INBOUND",
           type: job.type === "text" ? "TEXT" : "OTHER",
-          text: job.type === "text" ? job.text : undefined,
+          text: textoGuardado(job),
           timestamp: occurredAt,
         },
       });

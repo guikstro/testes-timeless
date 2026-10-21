@@ -57,7 +57,7 @@ export function Conversation({ messages }: { messages: Message[] }) {
               }`}
             >
               <p className="whitespace-pre-wrap break-words">
-                {message.type === "TEXT" ? message.text : "Mensagem não textual"}
+                {message.text ?? "Mensagem não textual"}
               </p>
               {/*
                 O carimbo de hora não usa opacidade sobre o acento: texto de

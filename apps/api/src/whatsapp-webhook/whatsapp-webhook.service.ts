@@ -57,7 +57,10 @@ export class WhatsAppWebhookService implements OnModuleInit {
    */
   async enqueueEvolutionEvent(payload: unknown): Promise<number> {
     const parsed = parseEvolutionPayload(payload);
-    if (!parsed) return 0;
+    if (!parsed) {
+      this.logarDescarte(payload);
+      return 0;
+    }
 
     if (parsed.kind === "connection") {
       const conectou = await this.connections.syncEvolutionState(parsed.instanceName, parsed.state);
@@ -70,6 +73,25 @@ export class WhatsAppWebhookService implements OnModuleInit {
 
     await this.enqueue(parsed.job);
     return 1;
+  }
+
+  /**
+   * Uma mensagem que o parser não aceitou deixa rastro, sem telefone nem texto:
+   * só o tipo do endereço e se era nossa. É o que permite descobrir de onde
+   * vem uma conversa com buracos.
+   */
+  private logarDescarte(payload: unknown): void {
+    const corpo = payload as { event?: string; data?: { key?: { remoteJid?: string; fromMe?: boolean }; message?: Record<string, unknown> } };
+    if (corpo?.event !== "messages.upsert") return;
+    const jid = corpo.data?.key?.remoteJid ?? "";
+    this.logger.log(
+      JSON.stringify({
+        event: "mensagem_descartada",
+        fromMe: corpo.data?.key?.fromMe === true,
+        endereco: jid.split("@")[1] ?? "sem-endereco",
+        conteudo: Object.keys(corpo.data?.message ?? {}).slice(0, 3),
+      }),
+    );
   }
 
   private async enqueue(job: WhatsAppInboundMessageJob): Promise<void> {

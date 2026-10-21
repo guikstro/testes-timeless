@@ -5,7 +5,7 @@ import * as QRCode from "qrcode";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { EncryptionService } from "../../common/encryption/encryption.service";
 import { apagaSessaoDoBanco, carregaSessaoDoBanco, instanciasComSessao } from "./sessao-no-banco";
-import { EstadoDaConexao, EventoDoMotor, eventoDeConexao, eventoDeMensagem } from "./evento-do-motor";
+import { EstadoDaConexao, EventoDoMotor, eventoDeConexao, eventoDeMensagem, ehRecente } from "./evento-do-motor";
 
 /** Códigos de `DisconnectReason` do Baileys usados aqui. */
 const DESCONECTADO_PELO_CELULAR = 401;
@@ -102,9 +102,16 @@ export class MotorWhatsApp implements OnApplicationBootstrap, OnApplicationShutd
       this.aoMudarConexao(instanceName, instancia, atualizacao, Boolean(state.creds.me)),
     );
     socket.ev.on("messages.upsert", ({ messages, type }) => {
-      // "append" é histórico sincronizado ao conectar, não mensagem nova.
-      if (type !== "notify") return;
-      for (const mensagem of messages) this.emite(eventoDeMensagem(instanceName, mensagem));
+      // O servidor marca como "append" o que ficou na fila enquanto esta
+      // conexão estava fora (um deploy, uma queda). São mensagens reais do
+      // lead e respostas da equipe, e descartá-las deixava buracos na
+      // conversa. Só as recentes entram: o histórico antigo não é novidade, e
+      // a ingestão ignora a mensagem que já conhece.
+      const agora = Date.now();
+      for (const mensagem of messages) {
+        if (type !== "notify" && !(type === "append" && ehRecente(mensagem, agora))) continue;
+        this.emite(eventoDeMensagem(instanceName, mensagem));
+      }
     });
   }
 

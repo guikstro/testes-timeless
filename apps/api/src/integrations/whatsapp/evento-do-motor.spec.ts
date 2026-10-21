@@ -1,6 +1,6 @@
 import type { WAMessage } from "baileys";
 import { parseEvolutionPayload } from "../../whatsapp-webhook/parse-evolution-payload";
-import { eventoDeConexao, eventoDeMensagem } from "./evento-do-motor";
+import { ehRecente, eventoDeConexao, eventoDeMensagem } from "./evento-do-motor";
 
 /** O que importa é o evento do motor passar pelo parser que já existia. */
 describe("evento do motor", () => {
@@ -57,5 +57,19 @@ describe("evento do motor", () => {
       instanceName: "org-1",
       state: "open",
     });
+  });
+
+  it("guarda o LID original quando troca o endereço pelo telefone", () => {
+    const evento = eventoDeMensagem("org", {
+      key: { remoteJid: "123456@lid", senderPn: "5585988887777@s.whatsapp.net", fromMe: false, id: "A" },
+      messageTimestamp: 1700000000,
+    } as never);
+    expect((evento.data.key as { remoteJid: string; lid: string })).toMatchObject({ remoteJid: "5585988887777@s.whatsapp.net", lid: "123456" });
+  });
+
+  it("só aceita como novidade o que é recente (mensagens append)", () => {
+    const agora = Date.now();
+    expect(ehRecente({ messageTimestamp: Math.floor(agora / 1000) - 3600 } as never, agora)).toBe(true);
+    expect(ehRecente({ messageTimestamp: Math.floor(agora / 1000) - 30 * 86400 } as never, agora)).toBe(false);
   });
 });

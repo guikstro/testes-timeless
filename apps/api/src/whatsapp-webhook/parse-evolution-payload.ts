@@ -1,4 +1,4 @@
-import { WhatsAppInboundMessageJob } from "../common/queue/whatsapp-event.job";
+import { MediaKind, WhatsAppInboundMessageJob } from "../common/queue/whatsapp-event.job";
 
 /**
  * Subconjunto do webhook da Evolution API (v2) que este produto realmente lê.
@@ -9,7 +9,7 @@ interface RawEvolutionPayload {
   event?: string;
   instance?: string;
   data?: {
-    key?: { remoteJid?: string; remoteJidAlt?: string; fromMe?: boolean; id?: string };
+    key?: { remoteJid?: string; remoteJidAlt?: string; lid?: string; fromMe?: boolean; id?: string };
     pushName?: string;
     messageTimestamp?: number | string;
     message?: {
@@ -26,6 +26,67 @@ interface RawEvolutionPayload {
       externalAdReply?: { sourceId?: string; sourceUrl?: string; title?: string };
     };
   };
+}
+
+type Conteudo = Record<string, unknown>;
+
+/** Mensagens que o WhatsApp manda por baixo dos panos e ninguém vê na conversa. */
+const SEM_CONTEUDO_VISIVEL = ["reactionMessage", "protocolMessage", "senderKeyDistributionMessage", "pollUpdateMessage"];
+
+const ENVELOPES = ["ephemeralMessage", "viewOnceMessage", "viewOnceMessageV2", "viewOnceMessageV2Extension", "documentWithCaptionMessage"];
+
+const MIDIAS: [string, MediaKind][] = [
+  ["audioMessage", "audio"],
+  ["imageMessage", "image"],
+  ["videoMessage", "video"],
+  ["ptvMessage", "video"],
+  ["stickerMessage", "sticker"],
+  ["documentMessage", "document"],
+  ["locationMessage", "location"],
+  ["liveLocationMessage", "location"],
+  ["contactMessage", "contact"],
+  ["contactsArrayMessage", "contact"],
+];
+
+function texto(valor: unknown): string | undefined {
+  return typeof valor === "string" && valor.trim() ? valor : undefined;
+}
+
+/** Abre os envelopes (mensagem temporária, de visualização única, documento com legenda). */
+function desembrulha(mensagem: Conteudo | undefined): Conteudo | undefined {
+  let atual = mensagem;
+  for (let i = 0; i < 4 && atual; i++) {
+    const chave = ENVELOPES.find((nome) => atual && typeof atual[nome] === "object" && atual[nome] !== null);
+    if (!chave) break;
+    atual = (atual[chave] as { message?: Conteudo }).message;
+  }
+  return atual;
+}
+
+/**
+ * O que a mensagem diz. `null` é uma mensagem sem nada para mostrar (reação,
+ * protocolo): ela não vira linha na conversa.
+ */
+function leConteudo(bruta: Conteudo | undefined): { text?: string; mediaKind?: MediaKind } | null {
+  const mensagem = desembrulha(bruta);
+  if (!mensagem) return {};
+
+  const dito =
+    texto(mensagem.conversation) ??
+    texto((mensagem.extendedTextMessage as { text?: string } | undefined)?.text) ??
+    texto((mensagem.buttonsResponseMessage as { selectedDisplayText?: string } | undefined)?.selectedDisplayText) ??
+    texto((mensagem.templateButtonReplyMessage as { selectedDisplayText?: string } | undefined)?.selectedDisplayText) ??
+    texto((mensagem.listResponseMessage as { title?: string } | undefined)?.title);
+  if (dito) return { text: dito };
+
+  for (const [chave, mediaKind] of MIDIAS) {
+    const midia = mensagem[chave] as { caption?: string } | undefined;
+    if (midia && typeof midia === "object") return { mediaKind, text: texto(midia.caption) };
+  }
+
+  const chaves = Object.keys(mensagem).filter((chave) => chave !== "messageContextInfo");
+  if (chaves.length > 0 && chaves.every((chave) => SEM_CONTEUDO_VISIVEL.includes(chave))) return null;
+  return {};
 }
 
 export interface ParsedEvolutionEvent {
@@ -72,15 +133,19 @@ export function parseEvolutionPayload(payload: unknown): ParsedEvolution {
   const fromMe = key.fromMe === true;
 
   // Grupos (`@g.us`) e status/broadcast não são leads individuais — este
-  // produto rastreia conversas 1:1 com um número. Um contato LID sem o
-  // telefone conhecido também não identifica ninguém.
+  // produto rastreia conversas 1:1 com um número.
+  const lid = key.lid ?? (key.remoteJid.endsWith("@lid") ? key.remoteJid.split("@")[0] : undefined);
   const jid = key.remoteJid.endsWith("@s.whatsapp.net") ? key.remoteJid : fromMe ? key.remoteJidAlt : undefined;
-  if (!jid?.endsWith("@s.whatsapp.net")) return null;
+  const waId = jid?.endsWith("@s.whatsapp.net") ? (jid.split("@")[0]?.split(":")[0] ?? "") : "";
 
-  const waId = jid.split("@")[0]?.split(":")[0];
-  if (!waId) return null;
+  // Sem telefone, só uma resposta nossa a um contato LID segue adiante: a
+  // ingestão a liga ao lead pelo LID que aprendeu quando ele escreveu.
+  if (!waId && !(fromMe && lid)) return null;
+  if (!key.remoteJid.endsWith("@s.whatsapp.net") && !key.remoteJid.endsWith("@lid")) return null;
 
-  const text = data?.message?.conversation ?? data?.message?.extendedTextMessage?.text;
+  const conteudo = leConteudo(data?.message);
+  if (!conteudo) return null;
+  const { text, mediaKind } = conteudo;
   const timestampSeconds = Number(data?.messageTimestamp);
   if (!Number.isFinite(timestampSeconds) || timestampSeconds <= 0) return null;
 
@@ -94,10 +159,12 @@ export function parseEvolutionPayload(payload: unknown): ParsedEvolution {
       waId,
       profileName: fromMe ? undefined : data?.pushName,
       messageId: key.id,
-      type: text ? "text" : "other",
+      type: text && !mediaKind ? "text" : "other",
       text: text ?? undefined,
+      ...(mediaKind ? { mediaKind } : {}),
       timestampSeconds,
       ...(fromMe ? { fromMe: true } : {}),
+      ...(lid ? { lid } : {}),
       referral: ctwaClid && !fromMe
         ? {
             ctwaClid,

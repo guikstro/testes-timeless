@@ -73,11 +73,25 @@ describe("parseEvolutionPayload", () => {
     expect(parsed).toMatchObject({ job: { waId: "5585988887777", fromMe: true } });
   });
 
-  it("drops a fromMe reply to a LID contact whose phone is unknown, and never marks an inbound message as fromMe", () => {
+  it("keeps a fromMe reply to a LID contact without phone, identified by the LID alone", () => {
     expect(
       parseEvolutionPayload(buildMessagePayload({ key: { remoteJid: "123456@lid", fromMe: true, id: "3EB0X" } })),
+    ).toMatchObject({ job: { waId: "", lid: "123456", fromMe: true } });
+  });
+
+  it("drops a LID message from the lead when the phone is unknown, and never marks an inbound message as fromMe", () => {
+    expect(
+      parseEvolutionPayload(buildMessagePayload({ key: { remoteJid: "123456@lid", fromMe: false, id: "3EB0Y" } })),
     ).toBeNull();
     expect(parseEvolutionPayload(buildMessagePayload())).not.toHaveProperty("job.fromMe");
+  });
+
+  it("carries the LID of an inbound message whose phone is known", () => {
+    expect(
+      parseEvolutionPayload(
+        buildMessagePayload({ key: { remoteJid: "5585988887777@s.whatsapp.net", lid: "123456", fromMe: false, id: "3EB0Z" } }),
+      ),
+    ).toMatchObject({ job: { waId: "5585988887777", lid: "123456" } });
   });
 
   it("ignores group messages — this product tracks 1:1 conversations with a lead", () => {
@@ -142,5 +156,36 @@ describe("parseEvolutionPayload", () => {
   it("ignores a message with a missing or nonsensical timestamp instead of inventing one", () => {
     expect(parseEvolutionPayload(buildMessagePayload({ messageTimestamp: undefined }))).toBeNull();
     expect(parseEvolutionPayload(buildMessagePayload({ messageTimestamp: 0 }))).toBeNull();
+  });
+});
+
+describe("parseEvolutionPayload: o que o lead manda além de texto simples", () => {
+  const job = (message: Record<string, unknown>) =>
+    (parseEvolutionPayload({
+      event: "messages.upsert",
+      instance: "org-123",
+      data: { key: { remoteJid: "5585999999999@s.whatsapp.net", fromMe: false, id: "3EB0M" }, messageTimestamp: 1700000000, message },
+    }) as { job: Record<string, unknown> } | null)?.job;
+
+  it("reconhece o tipo de mídia e a legenda", () => {
+    expect(job({ audioMessage: { ptt: true } })).toMatchObject({ type: "other", mediaKind: "audio", text: undefined });
+    expect(job({ imageMessage: { caption: "meu contrato" } })).toMatchObject({ type: "other", mediaKind: "image", text: "meu contrato" });
+    expect(job({ stickerMessage: {} })).toMatchObject({ mediaKind: "sticker" });
+    expect(job({ documentMessage: { caption: "rescisão.pdf" } })).toMatchObject({ mediaKind: "document" });
+  });
+
+  it("lê o texto dentro de mensagem temporária e de visualização única", () => {
+    expect(job({ ephemeralMessage: { message: { extendedTextMessage: { text: "oi, tudo bem" } } } })).toMatchObject({ type: "text", text: "oi, tudo bem" });
+    expect(job({ viewOnceMessageV2: { message: { imageMessage: { caption: "x" } } } })).toMatchObject({ mediaKind: "image" });
+  });
+
+  it("lê a resposta de botão e de lista", () => {
+    expect(job({ buttonsResponseMessage: { selectedDisplayText: "Sim" } })).toMatchObject({ type: "text", text: "Sim" });
+    expect(job({ listResponseMessage: { title: "Rescisão" } })).toMatchObject({ text: "Rescisão" });
+  });
+
+  it("não cria mensagem para reação nem para aviso interno do protocolo", () => {
+    expect(job({ reactionMessage: { text: "👍" } })).toBeUndefined();
+    expect(job({ protocolMessage: { type: 0 }, messageContextInfo: {} })).toBeUndefined();
   });
 });

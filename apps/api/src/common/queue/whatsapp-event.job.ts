@@ -1,3 +1,16 @@
+export type MediaKind = "audio" | "image" | "video" | "sticker" | "document" | "location" | "contact";
+
+/** Como a mídia aparece na conversa, já que o conteúdo em si não é guardado. */
+export const ROTULO_DA_MIDIA: Record<MediaKind, string> = {
+  audio: "Áudio",
+  image: "Foto",
+  video: "Vídeo",
+  sticker: "Figurinha",
+  document: "Documento",
+  location: "Localização",
+  contact: "Contato",
+};
+
 /** Present only when the message originated from a real Click-to-WhatsApp ad — Meta attaches this itself, no correlation needed. */
 export interface InboundMessageReferral {
   ctwaClid?: string;
@@ -19,13 +32,16 @@ export interface WhatsAppInboundMessageJob {
   provider: "CLOUD_API" | "EVOLUTION";
   /** CLOUD_API: `value.metadata.phone_number_id`. EVOLUTION: o `instance` do webhook. */
   routingKey: string;
-  /** Customer's phone number as WhatsApp sends it: digits only, country code included, no `+`. */
+  /** Customer's phone number as WhatsApp sends it: digits only, country code included, no `+`. Vazio quando só o `lid` é conhecido. */
   waId: string;
   profileName?: string;
   /** O id da mensagem no provider (`wamid.*` na Meta, `3EB0...` na Evolution) — chave de idempotência. */
   messageId: string;
   type: "text" | "other";
+  /** Texto da mensagem, ou a legenda quando ela é uma mídia. */
   text?: string;
+  /** Presente quando a mensagem é áudio, foto etc. (`type` é "other"). */
+  mediaKind?: MediaKind;
   timestampSeconds: number;
   referral?: InboundMessageReferral;
   /**
@@ -35,4 +51,6 @@ export interface WhatsAppInboundMessageJob {
    * `profileName` nunca vem preenchido (o nome do remetente seria o nosso).
    */
   fromMe?: boolean;
+  /** Identificador LID do contato (só os dígitos), quando o WhatsApp o usa em vez do telefone. */
+  lid?: string;
 }
