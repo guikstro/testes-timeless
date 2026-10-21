@@ -21,13 +21,15 @@ describe("WhatsAppWebhookService", () => {
     const queue = { add: jest.fn() };
     const connections = { syncEvolutionState: jest.fn() };
     const links = { marcaConectado: jest.fn() };
+    const historico = { recupera: jest.fn().mockResolvedValue(0) };
     const service = new WhatsAppWebhookService(
       queue as unknown as Queue,
       connections as unknown as WhatsAppConnectionsService,
       { aoEvento: jest.fn() } as never,
       links as never,
+      historico as never,
     );
-    return { service, queue, connections, links };
+    return { service, queue, connections, links, historico };
   }
 
   describe("verifyHandshake", () => {
@@ -116,6 +118,15 @@ describe("WhatsAppWebhookService", () => {
       expect(links.marcaConectado).toHaveBeenCalledWith("org-1");
     });
 
+    it("conexão aberta pede ao celular o histórico das conversas recentes", async () => {
+      const { service, connections, historico } = buildService();
+      connections.syncEvolutionState.mockResolvedValue("org-1");
+
+      await service.enqueueEvolutionEvent(evento("open"));
+
+      expect(historico.recupera).toHaveBeenCalledWith("org_1");
+    });
+
     it("queda não mexe no link", async () => {
       const { service, connections, links } = buildService();
       connections.syncEvolutionState.mockResolvedValue(null);
@@ -123,6 +134,21 @@ describe("WhatsAppWebhookService", () => {
       await service.enqueueEvolutionEvent(evento("close"));
 
       expect(links.marcaConectado).not.toHaveBeenCalled();
+    });
+
+    it("marca como histórico a mensagem que veio do celular a pedido", async () => {
+      const { service, queue } = buildService();
+      await service.enqueueEvolutionEvent({
+        event: "messages.upsert",
+        instance: "org_1",
+        data: {
+          historico: true,
+          key: { remoteJid: "5585999999999@s.whatsapp.net", fromMe: true, id: "3EB0H" },
+          messageTimestamp: 1700000000,
+          message: { conversation: "Pode mandar os documentos" },
+        },
+      });
+      expect(queue.add).toHaveBeenCalledWith("inbound-message", expect.objectContaining({ historico: true, fromMe: true }), expect.anything());
     });
   });
 });

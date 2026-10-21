@@ -628,6 +628,8 @@ model Conversation {
   whatsappConnectionId String   @map("whatsapp_connection_id")
   startedAt            DateTime @default(now()) @map("started_at")
   lastMessageAt        DateTime @default(now()) @map("last_message_at")
+  /// Quando o histórico desta conversa foi pedido ao celular (recuperação das respostas antigas).
+  historyRequestedAt   DateTime? @map("history_requested_at")
   createdAt            DateTime @default(now()) @map("created_at")
 
   organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)

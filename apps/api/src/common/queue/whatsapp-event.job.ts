@@ -53,4 +53,6 @@ export interface WhatsAppInboundMessageJob {
   fromMe?: boolean;
   /** Identificador LID do contato (só os dígitos), quando o WhatsApp o usa em vez do telefone. */
   lid?: string;
+  /** Veio do histórico pedido ao celular: só completa conversas que já existem, sem avisos. */
+  historico?: boolean;
 }

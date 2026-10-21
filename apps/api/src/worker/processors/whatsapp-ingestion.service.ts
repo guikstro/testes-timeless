@@ -116,6 +116,10 @@ export class WhatsAppIngestionService {
       await this.ingestDeviceReply(connection.id, organizationId, job, occurredAt);
       return;
     }
+    if (job.historico) {
+      await this.ingestHistoricoDoLead(connection.id, organizationId, job, occurredAt);
+      return;
+    }
     const normalizedPhone = normalizePhone(job.waId);
 
     const encontrado = await this.findOrCreateLead(
@@ -289,6 +293,10 @@ export class WhatsAppIngestionService {
 
     const status = await this.entraEmAtendimento(lead, message);
 
+    // O histórico só completa a conversa: frases antigas não reabrem venda nem
+    // qualificação, e ninguém precisa ser avisado do que já passou.
+    if (job.historico) return;
+
     await this.classifier.classify({
       organizationId,
       lead: { ...lead, status },
@@ -309,6 +317,37 @@ export class WhatsAppIngestionService {
       title: "Resposta enviada",
       timestamp: occurredAt.toISOString(),
     });
+  }
+
+  /**
+   * Mensagem antiga do lead, vinda do histórico pedido ao celular.
+   *
+   * Só completa uma conversa que já existe: nunca cria lead (a regra de quem
+   * vira lead vale para o primeiro contato ao vivo), não classifica e não
+   * avisa ninguém.
+   */
+  private async ingestHistoricoDoLead(
+    connectionId: string,
+    organizationId: string,
+    job: WhatsAppInboundMessageJob,
+    occurredAt: Date,
+  ): Promise<void> {
+    const lead = await this.prisma.lead.findUnique({
+      where: { organizationId_normalizedPhone: { organizationId, normalizedPhone: normalizePhone(job.waId) } },
+    });
+    if (!lead) return;
+    await this.aprendeLid(lead, job.lid);
+
+    const conversation = await this.prisma.conversation.findFirst({
+      where: { leadId: lead.id, whatsappConnectionId: connectionId },
+    });
+    if (!conversation) return;
+
+    const message = await this.createMessageIfAbsent(conversation.id, job, occurredAt);
+    if (!message) return;
+    if (occurredAt > conversation.lastMessageAt) {
+      await this.prisma.conversation.update({ where: { id: conversation.id }, data: { lastMessageAt: occurredAt } });
+    }
   }
 
   /** Guarda o LID do contato para ligar as respostas dadas no celular. Nunca lança. */

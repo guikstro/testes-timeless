@@ -9,6 +9,7 @@ interface RawEvolutionPayload {
   event?: string;
   instance?: string;
   data?: {
+    historico?: boolean;
     key?: { remoteJid?: string; remoteJidAlt?: string; lid?: string; fromMe?: boolean; id?: string };
     pushName?: string;
     messageTimestamp?: number | string;
@@ -165,6 +166,7 @@ export function parseEvolutionPayload(payload: unknown): ParsedEvolution {
       timestampSeconds,
       ...(fromMe ? { fromMe: true } : {}),
       ...(lid ? { lid } : {}),
+      ...(data?.historico === true ? { historico: true } : {}),
       referral: ctwaClid && !fromMe
         ? {
             ctwaClid,

@@ -1,6 +1,6 @@
 import type { WAMessage } from "baileys";
 import { parseEvolutionPayload } from "../../whatsapp-webhook/parse-evolution-payload";
-import { ehRecente, eventoDeConexao, eventoDeMensagem } from "./evento-do-motor";
+import { ehRecente, eventoDeConexao, eventoDeMensagem, mensagensDoHistorico } from "./evento-do-motor";
 
 /** O que importa é o evento do motor passar pelo parser que já existia. */
 describe("evento do motor", () => {
@@ -71,5 +71,29 @@ describe("evento do motor", () => {
     const agora = Date.now();
     expect(ehRecente({ messageTimestamp: Math.floor(agora / 1000) - 3600 } as never, agora)).toBe(true);
     expect(ehRecente({ messageTimestamp: Math.floor(agora / 1000) - 30 * 86400 } as never, agora)).toBe(false);
+  });
+
+  describe("mensagens do histórico pedido ao celular", () => {
+    const agora = 1_700_000_000_000;
+    const msg = (remoteJid: string, fromMe: boolean, dias = 1) =>
+      ({ key: { remoteJid, fromMe, id: `${remoteJid}-${fromMe}` }, messageTimestamp: agora / 1000 - dias * 86400, message: { conversation: "oi" } }) as never;
+
+    it("troca o LID pelo telefone que a lista de conversas informa e guarda o LID", () => {
+      const [m] = mensagensDoHistorico([{ id: "123@lid", pnJid: "5585988887777@s.whatsapp.net" }], [msg("123@lid", true)], agora);
+      expect((m as { key: object }).key).toMatchObject({ remoteJid: "5585988887777@s.whatsapp.net", lid: "123", fromMe: true });
+    });
+
+    it("guarda o LID quando a conversa vem pelo telefone", () => {
+      const [m] = mensagensDoHistorico([{ id: "5585988887777@s.whatsapp.net", lidJid: "123@lid" }], [msg("5585988887777@s.whatsapp.net", false)], agora);
+      expect((m as { key: object }).key).toMatchObject({ lid: "123" });
+    });
+
+    it("descarta grupos e o que é mais antigo que trinta dias", () => {
+      expect(mensagensDoHistorico([], [msg("1@g.us", false), msg("5585@s.whatsapp.net", true, 40)], agora)).toHaveLength(0);
+    });
+
+    it("marca o evento como histórico", () => {
+      expect(eventoDeMensagem("org", msg("5585@s.whatsapp.net", true), { historico: true }).data).toMatchObject({ historico: true });
+    });
   });
 });

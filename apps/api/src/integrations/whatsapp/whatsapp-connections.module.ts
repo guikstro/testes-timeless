@@ -4,6 +4,7 @@ import { WhatsAppConnectionsService } from "./whatsapp-connections.service";
 import { MotorWhatsApp } from "./motor-whatsapp";
 import { LinkDeConexaoService } from "./link-de-conexao.service";
 import { LinkPublicoController } from "./link-publico.controller";
+import { RecuperaHistoricoService } from "./recupera-historico.service";
 
 /**
  * Exporta o motor para existir uma cópia só no processo: o envio (fila) e
@@ -11,7 +12,7 @@ import { LinkPublicoController } from "./link-publico.controller";
  */
 @Module({
   controllers: [WhatsAppConnectionsController, LinkPublicoController],
-  providers: [WhatsAppConnectionsService, MotorWhatsApp, LinkDeConexaoService],
-  exports: [WhatsAppConnectionsService, MotorWhatsApp, LinkDeConexaoService],
+  providers: [WhatsAppConnectionsService, MotorWhatsApp, LinkDeConexaoService, RecuperaHistoricoService],
+  exports: [WhatsAppConnectionsService, MotorWhatsApp, LinkDeConexaoService, RecuperaHistoricoService],
 })
 export class WhatsAppConnectionsModule {}

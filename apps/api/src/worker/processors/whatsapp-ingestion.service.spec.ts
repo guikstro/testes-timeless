@@ -723,4 +723,43 @@ describe("WhatsAppIngestionService", () => {
       expect(prisma.message.create).toHaveBeenCalledWith({ data: expect.objectContaining({ text: "[Áudio]" }) });
     });
   });
+
+  describe("histórico pedido ao celular", () => {
+    it("resposta antiga da equipe entra na conversa sem classificar nem avisar", async () => {
+      const prisma = buildPrismaMock();
+      (prisma as any).lead.updateMany = jest.fn().mockResolvedValue({ count: 1 });
+      (prisma as any).message.findFirst = jest.fn().mockResolvedValue(null);
+      prisma.lead.findUnique.mockResolvedValue({ id: "lead-1", organizationId: "org-1", status: "NEW", disqualifiedAt: null, name: "Ana", rawPhone: "+55" });
+      prisma.conversation.findFirst.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
+      const classifier = buildClassifierMock();
+      const notifications = buildNotificationsMock();
+      await buildService(prisma, buildAttributionEngineMock(), classifier, buildConversionEventsMock(), notifications).ingest(
+        buildJob({ fromMe: true, historico: true, profileName: undefined }),
+      );
+
+      expect(prisma.message.create).toHaveBeenCalledWith({ data: expect.objectContaining({ direction: "OUTBOUND", source: "WHATSAPP_DEVICE" }) });
+      expect((prisma as any).lead.updateMany).toHaveBeenCalled();
+      expect(classifier.classify).not.toHaveBeenCalled();
+      expect(notifications.anunciar).not.toHaveBeenCalled();
+    });
+
+    it("mensagem antiga do lead completa a conversa, mas nunca cria lead", async () => {
+      const semLead = buildPrismaMock();
+      await buildService(semLead).ingest(buildJob({ historico: true }));
+      expect(semLead.lead.create).not.toHaveBeenCalled();
+      expect(semLead.message.create).not.toHaveBeenCalled();
+
+      const prisma = buildPrismaMock();
+      prisma.lead.findUnique.mockResolvedValue({ id: "lead-1", whatsappLid: null });
+      prisma.conversation.findFirst.mockResolvedValue({ id: "conv-1", lastMessageAt: new Date(0) });
+      const classifier = buildClassifierMock();
+      const notifications = buildNotificationsMock();
+      await buildService(prisma, buildAttributionEngineMock(), classifier, buildConversionEventsMock(), notifications).ingest(
+        buildJob({ historico: true }),
+      );
+      expect(prisma.message.create).toHaveBeenCalledWith({ data: expect.objectContaining({ direction: "INBOUND", conversationId: "conv-1" }) });
+      expect(classifier.classify).not.toHaveBeenCalled();
+      expect(notifications.notificar).not.toHaveBeenCalled();
+    });
+  });
 });

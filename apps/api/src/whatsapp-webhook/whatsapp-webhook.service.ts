@@ -6,6 +6,7 @@ import { WhatsAppInboundMessageJob } from "../common/queue/whatsapp-event.job";
 import { WhatsAppConnectionsService } from "../integrations/whatsapp/whatsapp-connections.service";
 import { MotorWhatsApp } from "../integrations/whatsapp/motor-whatsapp";
 import { LinkDeConexaoService } from "../integrations/whatsapp/link-de-conexao.service";
+import { RecuperaHistoricoService } from "../integrations/whatsapp/recupera-historico.service";
 import { parseWebhookPayload } from "./parse-webhook-payload";
 import { parseEvolutionPayload } from "./parse-evolution-payload";
 import { verifyWhatsAppSignature } from "./verify-signature";
@@ -19,6 +20,7 @@ export class WhatsAppWebhookService implements OnModuleInit {
     private readonly connections: WhatsAppConnectionsService,
     private readonly motor: MotorWhatsApp,
     private readonly links: LinkDeConexaoService,
+    private readonly historico: RecuperaHistoricoService,
   ) {}
 
   /** O WhatsApp por QR Code entrega seus eventos aqui, sem passar por HTTP. */
@@ -68,6 +70,9 @@ export class WhatsAppWebhookService implements OnModuleInit {
       // a página já fechada. Senão, numa queda, quem tivesse o link poria
       // outro celular na conta.
       if (conectou) await this.links.marcaConectado(conectou);
+      // Solto de propósito: são minutos de pedidos ao celular, e o evento de
+      // conexão não pode esperar por eles.
+      if (conectou) void this.historico.recupera(parsed.instanceName);
       return 0;
     }
 

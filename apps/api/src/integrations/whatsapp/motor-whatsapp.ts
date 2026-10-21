@@ -5,7 +5,7 @@ import * as QRCode from "qrcode";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { EncryptionService } from "../../common/encryption/encryption.service";
 import { apagaSessaoDoBanco, carregaSessaoDoBanco, instanciasComSessao } from "./sessao-no-banco";
-import { EstadoDaConexao, EventoDoMotor, eventoDeConexao, eventoDeMensagem, ehRecente } from "./evento-do-motor";
+import { EstadoDaConexao, EventoDoMotor, eventoDeConexao, eventoDeMensagem, ehRecente, mensagensDoHistorico } from "./evento-do-motor";
 
 /** Códigos de `DisconnectReason` do Baileys usados aqui. */
 const DESCONECTADO_PELO_CELULAR = 401;
@@ -113,6 +113,36 @@ export class MotorWhatsApp implements OnApplicationBootstrap, OnApplicationShutd
         this.emite(eventoDeMensagem(instanceName, mensagem));
       }
     });
+    // O histórico que o celular manda: ao parear, e quando o sistema pede
+    // (`pedeHistorico`). É por ele que voltam as respostas dadas no celular
+    // antes de o sistema saber guardá-las.
+    socket.ev.on("messaging-history.set", ({ chats, messages, syncType }) => {
+      const aproveitadas = mensagensDoHistorico(chats ?? [], messages ?? [], Date.now());
+      this.logger.log(
+        JSON.stringify({ event: "historico_recebido", syncType, mensagens: messages?.length ?? 0, aproveitadas: aproveitadas.length }),
+      );
+      for (const mensagem of aproveitadas) this.emite(eventoDeMensagem(instanceName, mensagem, { historico: true }));
+    });
+  }
+
+  /**
+   * Pede ao celular as mensagens de uma conversa anteriores à âncora. A
+   * resposta chega depois, pelo evento de histórico. Devolve false quando a
+   * conexão não está aberta.
+   */
+  async pedeHistorico(
+    instanceName: string,
+    ancora: { remoteJid: string; fromMe: boolean; id: string; timestampMs: number },
+    quantidade: number,
+  ): Promise<boolean> {
+    const instancia = this.instancias.get(instanceName);
+    if (instancia?.estado !== "open") return false;
+    await instancia.socket.fetchMessageHistory(
+      quantidade,
+      { remoteJid: ancora.remoteJid, fromMe: ancora.fromMe, id: ancora.id },
+      ancora.timestampMs,
+    );
+    return true;
   }
 
   estado(instanceName: string): EstadoDaConexao {
