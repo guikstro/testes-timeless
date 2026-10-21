@@ -45,6 +45,8 @@ export interface DesempenhoDeCampanha {
   leads: number;
   qualificados: number;
   vendas: number;
+  /** Reunião marcada ou venda. Ausente na API anterior. */
+  clientes?: number;
   receitaCentavos: number;
   vendasSemValor: number;
   custoPorLeadCentavos: number | null;
@@ -83,6 +85,8 @@ export interface DesempenhoDeCampanhas {
     gastoCentavos: number;
     leads: number;
     vendas: number;
+    /** Reunião marcada ou venda. Ausente na API anterior. */
+    clientes?: number;
     receitaCentavos: number;
     conversasNaPlataforma: number | null;
     impressoes: number | null;

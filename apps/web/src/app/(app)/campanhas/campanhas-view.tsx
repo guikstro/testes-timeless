@@ -26,6 +26,7 @@ import {
   rotuloDoObjetivo,
 } from "@/lib/campanhas/metricas";
 import { CampanhaComparada, DesempenhoDeCampanha, DesempenhoDeCampanhas } from "./tipos";
+import { CampanhasSimples } from "./campanhas-simples";
 import { resumoDaMetrica, retorno, Resumo, SEM_DADO, SeletorDeMetricas, somaAnteriores } from "./metricas-ui";
 
 export { Resumo };
@@ -101,7 +102,7 @@ export function CampanhasView({
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Campanhas</h1>
           <p className="mt-1 max-w-2xl text-corpo text-ink-mute">
-            Quanto cada campanha custou e o que trouxe: da impressão e do clique na Meta até o lead e a venda aqui.
+            Quanto você investiu e o que cada campanha trouxe.
           </p>
           <FrescorDosDados frescor={frescor} className="mt-2" />
         </div>
@@ -122,60 +123,76 @@ export function CampanhasView({
         className="mb-5"
       />
 
-      <SeletorDeMetricas
-        metricas={metricas}
-        escolhaManual={escolhaManual}
-        sugestao={sugestao}
-        href={(lista) => {
-          const params = new URLSearchParams(busca);
-          if (lista) params.set("metricas", lista.join(","));
-          else params.delete("metricas");
-          return `/campanhas?${params.toString()}`;
-        }}
-      />
-
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Resumo
-          titulo="Investimento"
-          valor={formatCentsAsBRL(totais.gastoCentavos)}
-          atual={totais.gastoCentavos}
-          anterior={anteriores?.gastoCentavos}
-        />
-        {cartoes.map((metrica) => (
-          <Resumo key={metrica} {...resumoDaMetrica(metrica, totais, anteriores, medido)} />
-        ))}
-      </div>
-
-      {campanhas.length === 0 ? (
-        <div className="surface p-8 text-center">
-          <p className="text-corpo text-ink-soft">Nenhuma campanha com gasto ou lead em {rotuloDoIntervalo(periodo)}.</p>
-          <p className="mt-1.5 text-apoio text-ink-mute">
-            Conecte a Meta em Integrações, ou lance o gasto por CSV ou à mão, para as campanhas aparecerem aqui.
-          </p>
-        </div>
-      ) : (
-        <Tabela
-          campanhas={campanhas}
-          metricas={metricas}
-          medido={medido}
-          rotuloDaComparacao={comparacao ? rotuloDoIntervalo(comparacao) : null}
-          comVariacao={comVariacao}
-        />
-      )}
+      <CampanhasSimples dados={dados} medido={medido} />
 
       {/*
-        As definições ficam ao pé da tabela, uma vez só, em vez de repetidas em
-        cada cabeçalho: é a primeira coisa que alguém procura quando dois
-        números parecidos não batem. Só as das colunas à vista.
+        As métricas da plataforma ficam guardadas: quem cuida dos anúncios
+        abre; quem só quer saber se o dinheiro voltou, não precisa.
       */}
-      <dl className="mt-5 grid gap-x-8 gap-y-3 text-apoio leading-relaxed text-ink-mute md:grid-cols-3">
-        {metricas.map((metrica) => (
-          <div key={metrica}>
-            <dt className="font-semibold text-ink-soft">{DEFINICAO[metrica].rotulo}</dt>
-            <dd>{DEFINICAO[metrica].definicao}</dd>
+      <details className="group">
+        <summary className="focus-ring mx-auto mb-5 flex w-fit cursor-pointer list-none items-center gap-1.5 rounded-full border border-line bg-panel px-4 py-2 text-corpo font-medium text-ink-soft transition-colors hover:text-ink [&::-webkit-details-marker]:hidden">
+          <span className="group-open:hidden">Ver métricas técnicas</span>
+          <span className="hidden group-open:inline">Esconder métricas técnicas</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden>
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </summary>
+
+        <SeletorDeMetricas
+          metricas={metricas}
+          escolhaManual={escolhaManual}
+          sugestao={sugestao}
+          href={(lista) => {
+            const params = new URLSearchParams(busca);
+            if (lista) params.set("metricas", lista.join(","));
+            else params.delete("metricas");
+            return `/campanhas?${params.toString()}`;
+          }}
+        />
+
+        <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <Resumo
+            titulo="Investimento"
+            valor={formatCentsAsBRL(totais.gastoCentavos)}
+            atual={totais.gastoCentavos}
+            anterior={anteriores?.gastoCentavos}
+          />
+          {cartoes.map((metrica) => (
+            <Resumo key={metrica} {...resumoDaMetrica(metrica, totais, anteriores, medido)} />
+          ))}
+        </div>
+
+        {campanhas.length === 0 ? (
+          <div className="surface p-8 text-center">
+            <p className="text-corpo text-ink-soft">Nenhuma campanha com gasto ou lead em {rotuloDoIntervalo(periodo)}.</p>
+            <p className="mt-1.5 text-apoio text-ink-mute">
+              Conecte a Meta em Integrações, ou lance o gasto por CSV ou à mão, para as campanhas aparecerem aqui.
+            </p>
           </div>
-        ))}
-      </dl>
+        ) : (
+          <Tabela
+            campanhas={campanhas}
+            metricas={metricas}
+            medido={medido}
+            rotuloDaComparacao={comparacao ? rotuloDoIntervalo(comparacao) : null}
+            comVariacao={comVariacao}
+          />
+        )}
+
+        {/*
+          As definições ficam ao pé da tabela, uma vez só, em vez de repetidas em
+          cada cabeçalho: é a primeira coisa que alguém procura quando dois
+          números parecidos não batem. Só as das colunas à vista.
+        */}
+        <dl className="mt-5 grid gap-x-8 gap-y-3 text-apoio leading-relaxed text-ink-mute md:grid-cols-3">
+          {metricas.map((metrica) => (
+            <div key={metrica}>
+              <dt className="font-semibold text-ink-soft">{DEFINICAO[metrica].rotulo}</dt>
+              <dd>{DEFINICAO[metrica].definicao}</dd>
+            </div>
+          ))}
+        </dl>
+      </details>
 
       {/*
         A soma das linhas não fecha com o total de leads da organização, e uma

@@ -123,6 +123,7 @@ export interface DesempenhoDeCampanhas {
     gastoCentavos: number;
     leads: number;
     vendas: number;
+    clientes: number;
     receitaCentavos: number;
     /** Null quando nenhuma campanha do período trouxe a contagem da plataforma. */
     conversasNaPlataforma: number | null;
@@ -535,6 +536,7 @@ export class AnalyticsService {
             gastoCentavos: soma.gastoCentavos + linha.gastoCentavos,
             leads: soma.leads + linha.leads,
             vendas: soma.vendas + linha.vendas,
+            clientes: soma.clientes + linha.clientes,
             receitaCentavos: soma.receitaCentavos + linha.receitaCentavos,
             // Só soma quem tem o número: uma campanha de CSV não conta conversa
             // nenhuma, e isso não pode apagar a contagem das que contam.
@@ -547,6 +549,7 @@ export class AnalyticsService {
             gastoCentavos: 0,
             leads: 0,
             vendas: 0,
+            clientes: 0,
             receitaCentavos: 0,
             conversasNaPlataforma: null as number | null,
           },
@@ -636,6 +639,7 @@ export class AnalyticsService {
         select: {
           qualifiedAt: true,
           wonAt: true,
+          meetingScheduledAt: true,
           sales: { where: { status: "CONFIRMED", needsReview: false, deletedAt: null, currency }, orderBy: { occurredAt: "asc" }, select: { amountCents: true, currency: true, occurredAt: true } },
           attribution: {
             select: {
@@ -665,6 +669,7 @@ export class AnalyticsService {
       campaignExternalId: completaIdsDoAnuncio(idsBrutos[i], hierarquia).campaignId,
       qualifiedAt: lead.qualifiedAt,
       wonAt: lead.sales.length ? lead.sales[0].occurredAt : null,
+      meetingScheduledAt: lead.meetingScheduledAt,
       sale: lead.sales.length ? { amountCents: lead.sales.reduce((sum, s) => sum + (s.amountCents ?? 0), 0) } : null,
     }));
 

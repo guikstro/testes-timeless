@@ -53,6 +53,8 @@ export interface LeadAtribuido {
   campaignExternalId: string | null;
   qualifiedAt: Date | null;
   wonAt: Date | null;
+  /** Reunião marcada. Junto com a venda, é o "virou cliente" das telas simples. */
+  meetingScheduledAt?: Date | null;
   sale: { amountCents: number | null } | null;
 }
 
@@ -111,6 +113,8 @@ export interface DesempenhoDeCampanha {
   leads: number;
   qualificados: number;
   vendas: number;
+  /** Reunião marcada ou venda, sem contar duas vezes. */
+  clientes: number;
   receitaCentavos: number;
   /**
    * Vendas fechadas sem valor registrado. Elas entram em `vendas` mas não em
@@ -276,6 +280,7 @@ export function agregaDesempenhoPorCampanha(
       leads: 0,
       qualificados: 0,
       vendas: 0,
+      clientes: 0,
       receitaCentavos: 0,
       vendasSemValor: 0,
       custoPorLeadCentavos: null,
@@ -295,6 +300,7 @@ export function agregaDesempenhoPorCampanha(
 
     linha.leads += 1;
     if (lead.qualifiedAt) linha.qualificados += 1;
+    if (lead.wonAt || lead.meetingScheduledAt) linha.clientes += 1;
     if (lead.wonAt) {
       linha.vendas += 1;
       if (lead.sale && lead.sale.amountCents !== null) {

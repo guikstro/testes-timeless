@@ -265,6 +265,7 @@ describe("AnalyticsService.desempenhoPorCampanha", () => {
       gastoCentavos: 20000,
       leads: 1,
       vendas: 1,
+      clientes: 1,
       receitaCentavos: 90000,
       conversasNaPlataforma: null,
       // Gasto lançado sem entrega (CSV): sem número, e nunca zero.

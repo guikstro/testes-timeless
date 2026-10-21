@@ -28,6 +28,20 @@ function lead(over: Partial<LeadAtribuido> = {}): LeadAtribuido {
 const dia = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 
 describe("agregaDesempenhoPorCampanha", () => {
+  it("conta como cliente quem marcou reunião ou comprou, uma vez só", () => {
+    const { campanhas } = agregaDesempenhoPorCampanha(
+      [campanha()],
+      [
+        lead({ meetingScheduledAt: dia("2026-09-10") }),
+        lead({ meetingScheduledAt: dia("2026-09-10"), wonAt: dia("2026-09-12") }),
+        lead({ wonAt: dia("2026-09-12") }),
+        lead(),
+      ],
+    );
+    expect(campanhas[0].clientes).toBe(3);
+    expect(campanhas[0].vendas).toBe(2);
+  });
+
   it("soma as conversas que a plataforma contou e diz quando a conta está completa", () => {
     const { campanhas } = agregaDesempenhoPorCampanha(
       [
