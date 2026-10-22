@@ -18,6 +18,8 @@ interface Envio {
 function roda(agora: string, respostaDaTimeless: (envio: Envio) => object | string, fuso = "America/Sao_Paulo") {
   const envios: Envio[] = [];
   const consultas: string[] = [];
+  const subidas: { colunas: string[]; opcoes: object; conversoes: boolean; linhas: Record<string, unknown>[]; aplicada: boolean }[] = [];
+  const confirmacoes: { endereco: string; chaves: string[] }[] = [];
 
   const formatDate = (data: Date, zona: string, formato: string) => {
     expect(formato).toBe("yyyy-MM-dd");
@@ -60,10 +62,26 @@ function roda(agora: string, respostaDaTimeless: (envio: Envio) => object | stri
         let i = 0;
         return { hasNext: () => i < linhas.length, next: () => linhas[i++] };
       },
+      bulkUploads: () => ({
+        newCsvUpload: (colunas: string[], opcoes: object) => {
+          const subida = { colunas, opcoes, conversoes: false, linhas: [] as Record<string, unknown>[], aplicada: false };
+          subidas.push(subida);
+          return {
+            forOfflineConversions: () => { subida.conversoes = true; },
+            setFileName: () => undefined,
+            append: (linha: Record<string, unknown>) => { subida.linhas.push(linha); },
+            apply: () => { subida.aplicada = true; },
+          };
+        },
+      }),
     },
     Utilities: { formatDate },
     UrlFetchApp: {
-      fetch: (_endereco: string, opcoes: { payload: string }) => {
+      fetch: (endereco: string, opcoes: { payload: string }) => {
+        if (endereco.endsWith("/conversoes-enviadas")) {
+          confirmacoes.push({ endereco, chaves: (JSON.parse(opcoes.payload) as { chaves: string[] }).chaves });
+          return { getResponseCode: () => 200, getContentText: () => "{}" };
+        }
         const envio = JSON.parse(opcoes.payload) as Envio;
         envios.push(envio);
         const resposta = respostaDaTimeless(envio);
@@ -75,7 +93,7 @@ function roda(agora: string, respostaDaTimeless: (envio: Envio) => object | stri
   };
 
   runInNewContext(`${scriptDoGoogleAds("https://exemplo.test/api/publico/google-ads/envio", "tml_gads_teste")}\nmain();`, contexto);
-  return { envios, consultas };
+  return { envios, consultas, subidas, confirmacoes };
 }
 
 const diasEntre = (de: string, ate: string) => Math.round((Date.parse(ate) - Date.parse(de)) / 86_400_000) + 1;
@@ -148,5 +166,44 @@ describe("o script do Google Ads", () => {
   it("uma resposta que não é JSON não derruba a rodada: só não manda o histórico", () => {
     const { envios } = roda("2026-10-01T15:00:00.000Z", () => "<html>ok</html>");
     expect(envios).toHaveLength(1);
+  });
+
+  it("sobe como conversão off-line o que a Timeless devolveu e confirma as chaves", () => {
+    const conversao = {
+      chave: "lead-1:WON:2026-10-20T15:00:00.000Z",
+      gclid: "Cj0KCQ-teste",
+      nome: "Venda",
+      horario: "2026-10-20 12:00:00-03:00",
+      valor: 1500,
+      moeda: "BRL",
+    };
+    const { subidas, confirmacoes } = roda("2026-10-21T15:00:00Z", (envio) =>
+      envio.historico ? {} : { historicoPendente: false, conversoes: [conversao] },
+    );
+
+    expect(subidas).toHaveLength(1);
+    expect(subidas[0]).toMatchObject({ conversoes: true, aplicada: true, opcoes: { timeZone: "America/Sao_Paulo", moneyInMicros: false } });
+    expect(subidas[0].linhas).toEqual([
+      {
+        "Google Click ID": "Cj0KCQ-teste",
+        "Conversion Name": "Venda",
+        "Conversion Time": "2026-10-20 12:00:00-03:00",
+        "Conversion Value": 1500,
+        "Conversion Currency": "BRL",
+      },
+    ]);
+    expect(confirmacoes).toEqual([
+      { endereco: "https://exemplo.test/api/publico/google-ads/conversoes-enviadas", chaves: [conversao.chave] },
+    ]);
+  });
+
+  it("sem conversão pendente, não sobe nada; e conversão sem valor vai sem a coluna de valor", () => {
+    expect(roda("2026-10-21T15:00:00Z", () => ({ historicoPendente: false })).subidas).toHaveLength(0);
+
+    const { subidas } = roda("2026-10-21T15:00:00Z", () => ({
+      historicoPendente: false,
+      conversoes: [{ chave: "k", gclid: "g", nome: "Qualificado", horario: "2026-10-20 12:00:00-03:00", valor: null, moeda: "BRL" }],
+    }));
+    expect(subidas[0].linhas[0]).not.toHaveProperty("Conversion Value");
   });
 });

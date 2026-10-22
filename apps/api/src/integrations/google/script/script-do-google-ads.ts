@@ -21,16 +21,27 @@
  * 13 meses atrás, em blocos de 60 dias (o teto por campanha num envio é 62).
  * Do dia 1º, e não 396 dias contados de hoje: assim "setembro contra setembro
  * do ano passado" tem o mês do ano passado inteiro em qualquer dia de outubro.
+ *
+ * Versão 4: o caminho de volta. A resposta do envio traz as conversões
+ * (qualificado e venda, pelo gclid do clique) que a Timeless ainda não
+ * entregou, e o script as sobe como importação de conversões off-line, na
+ * própria conta. Assim o Google passa a otimizar para quem virou cliente, sem
+ * arquivo para baixar e sem login no Google. Uma falha aqui não derruba o
+ * envio do gasto, e o que não subiu volta na próxima rodada.
  */
-export const VERSAO_DO_SCRIPT = 3;
+export const VERSAO_DO_SCRIPT = 4;
+
+/** As conversões sobem sozinhas desde a versão 4. */
+export const VERSAO_DAS_CONVERSOES = 4;
 
 /** Ligações e rotas chegam desde a versão 2: um script na 2 continua medindo. */
 export const VERSAO_DAS_ACOES_LOCAIS = 2;
 
 export function scriptDoGoogleAds(endereco: string, chave: string): string {
   return `/**
- * Timeless: envia o gasto, as ligações e as ações locais das campanhas desta conta.
- * Só lê. Não pausa, não muda orçamento, não mexe em nada.
+ * Timeless: envia o gasto, as ligações e as ações locais das campanhas desta conta,
+ * e devolve ao Google quem virou cliente (importação de conversões off-line).
+ * Não pausa, não muda orçamento, não mexe em campanha nenhuma.
  * Agende para rodar a cada hora.
  */
 var ENDERECO = ${JSON.stringify(endereco)};
@@ -51,6 +62,14 @@ function main() {
   // A rodada de hora em hora: os últimos 35 dias.
   var inicio = new Date(hoje.getTime() - (DIAS - 1) * DIA);
   var resposta = envia(conta, leia(formata(inicio), formata(hoje)), {});
+
+  // O caminho de volta: quem virou cliente vai para o Google. Protegido, para
+  // uma recusa aqui não impedir o histórico abaixo.
+  try {
+    sobeConversoes(resposta.conversoes || []);
+  } catch (e) {
+    Logger.log("As conversões não subiram nesta rodada: " + String(e).slice(0, 300));
+  }
 
   // Enquanto a Timeless disser que falta histórico: desde o dia 1º do mês de
   // 13 meses atrás, em blocos.
@@ -141,6 +160,37 @@ function leia(de, ate) {
     locais: locais,
     campanhas: Object.keys(campanhas).map(function (k) { return campanhas[k]; })
   };
+}
+
+function sobeConversoes(conversoes) {
+  if (!conversoes.length) return;
+  var colunas = ["Google Click ID", "Conversion Name", "Conversion Time", "Conversion Value", "Conversion Currency"];
+  // O horário já vem com o fuso escrito; o fuso aqui é o que o Google exige
+  // declarar para importação de conversões.
+  var envio = AdsApp.bulkUploads().newCsvUpload(colunas, { moneyInMicros: false, timeZone: "America/Sao_Paulo" });
+  envio.forOfflineConversions();
+  envio.setFileName("Timeless - conversões " + Utilities.formatDate(new Date(), "UTC", "yyyy-MM-dd"));
+  for (var i = 0; i < conversoes.length; i++) {
+    var c = conversoes[i];
+    var linha = {
+      "Google Click ID": c.gclid,
+      "Conversion Name": c.nome,
+      "Conversion Time": c.horario,
+      "Conversion Currency": c.moeda
+    };
+    if (c.valor !== null && c.valor !== undefined) linha["Conversion Value"] = c.valor;
+    envio.append(linha);
+  }
+  envio.apply();
+  Logger.log("Conversões enviadas ao Google: " + conversoes.length);
+
+  UrlFetchApp.fetch(ENDERECO.slice(0, ENDERECO.lastIndexOf("/")) + "/conversoes-enviadas", {
+    method: "post",
+    contentType: "application/json",
+    headers: { "X-Chave-Timeless": CHAVE },
+    payload: JSON.stringify({ chaves: conversoes.map(function (c) { return c.chave; }) }),
+    muteHttpExceptions: true
+  });
 }
 
 function envia(conta, lido, extras) {

@@ -53,7 +53,9 @@ export function ConversionsExport({
         </h2>
         <p className="mt-1 text-corpo leading-relaxed text-ink-soft">
           O Google só sabe quem clicou. Sem receber de volta quem virou cliente, ele continua comprando o tráfego que
-          gera clique, e não o que gera venda. Este arquivo conta a ele o que aconteceu depois do clique.
+          gera clique, e não o que gera venda. Com o script atualizado, isso vai sozinho de hora em hora: basta
+          informar abaixo os nomes das ações de conversão criadas no Google Ads. O arquivo continua aqui para quem
+          prefere subir à mão.
         </p>
       </div>
 

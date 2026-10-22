@@ -383,6 +383,79 @@ describe("Google Ads por script (e2e)", () => {
     });
   });
 
+  describe("versão 4: as conversões voltam para o Google pelo script", () => {
+    let gclid: string;
+
+    beforeAll(async () => {
+      const org = await prisma.organization.findFirstOrThrow({ where: { name: "Org GAds A" } });
+      await prisma.organization.update({
+        where: { id: org.id },
+        data: { googleConversionQualified: "Qualificado", googleConversionWon: "Venda" },
+      });
+      const link = await prisma.trackingLink.create({
+        data: { organizationId: org.id, code: `gads-e2e-${Date.now()}`, destinationUrl: "https://wa.me/5585999990000", name: "Google" },
+      });
+      gclid = `Cj0-e2e-${Date.now()}`;
+      const clique = await prisma.trackingClick.create({
+        data: { trackingLinkId: link.id, organizationId: org.id, landingUrl: "https://wa.me/5585999990000", gclid, clickedAt: new Date(Date.now() - 3 * 86_400_000) },
+      });
+      const vendidoEm = new Date(Date.now() - 86_400_000);
+      await prisma.lead.create({
+        data: {
+          organizationId: org.id,
+          normalizedPhone: "+5585999990000",
+          rawPhone: "5585999990000",
+          name: "Cliente do Google",
+          status: "WON",
+          firstContactAt: new Date(Date.now() - 2 * 86_400_000),
+          lastContactAt: vendidoEm,
+          wonAt: vendidoEm,
+          attribution: { create: { organizationId: org.id, method: "TRACKING_LINK", confidence: "HIGH", trackingClickId: clique.id } },
+          sales: {
+            create: {
+              organizationId: org.id,
+              status: "CONFIRMED",
+              amountCents: 150_000,
+              classifierType: "MANUAL",
+              detectedAt: vendidoEm,
+              occurredAt: vendidoEm,
+              confirmedAt: vendidoEm,
+            },
+          },
+        },
+      });
+    });
+
+    it("o script antigo não recebe conversão nenhuma", async () => {
+      const resposta = await manda(chaveA, { ...envio(), versao: 3 }).expect(200);
+      expect(resposta.body.conversoes).toEqual([]);
+    });
+
+    it("a versão 4 recebe a venda com o gclid, o nome da ação e o valor em reais; confirmada, não volta mais", async () => {
+      const primeira = await manda(chaveA, { ...envio(), versao: 4 }).expect(200);
+      const venda = primeira.body.conversoes.find((c: { nome: string }) => c.nome === "Venda");
+      expect(venda).toMatchObject({ gclid, nome: "Venda", valor: 1500, moeda: "BRL" });
+      expect(venda.horario).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
+
+      await request(app.getHttpServer())
+        .post("/api/publico/google-ads/conversoes-enviadas")
+        .set("X-Chave-Timeless", chaveA)
+        .send({ chaves: primeira.body.conversoes.map((c: { chave: string }) => c.chave) })
+        .expect(200);
+
+      const segunda = await manda(chaveA, { ...envio(), versao: 4 }).expect(200);
+      expect(segunda.body.conversoes).toEqual([]);
+    });
+
+    it("a confirmação recusa chave errada", async () => {
+      await request(app.getHttpServer())
+        .post("/api/publico/google-ads/conversoes-enviadas")
+        .set("X-Chave-Timeless", "tml_gads_errada")
+        .send({ chaves: ["x"] })
+        .expect(401);
+    });
+  });
+
   it("recusa envio sem chave ou com chave errada, e não grava nada", async () => {
     const antes = await prisma.adSpend.count();
     await manda(null, envio()).expect(401);

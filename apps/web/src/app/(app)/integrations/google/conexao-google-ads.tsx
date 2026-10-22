@@ -20,6 +20,8 @@ export interface SituacaoDoGoogleAds {
     atrasado: boolean;
     /** O script colado é anterior às ligações e rotas. */
     scriptDesatualizado?: boolean;
+    /** Script anterior à versão 4: as conversões não voltam sozinhas para o Google. */
+    semConversoesAutomaticas?: boolean;
     /** O script colado é anterior ao histórico: só os últimos 35 dias de cada rodada. */
     semHistorico?: boolean;
     historicoCompleto?: boolean;
@@ -143,6 +145,17 @@ export function ConexaoGoogleAds({
         <Alert tom="warning" className="mt-3" titulo="O script colado no Google Ads é o antigo">
           Ele manda o gasto, mas não as ligações e os pedidos de rota. Gere o script de novo aqui em cima e cole no lugar
           do atual, no Google Ads.
+        </Alert>
+      ) : null}
+
+      {/*
+        Para quem mede leads: com o script antigo, quem virou cliente não
+        volta para o Google sozinho, e o Google segue comprando clique.
+      */}
+      {foco !== "PRESENCA_LOCAL" && conexao?.semConversoesAutomaticas && !script ? (
+        <Alert tom="warning" className="mt-3" titulo="Atualize o script para o Google aprender quem virou cliente">
+          O script colado manda o gasto, mas não devolve as vendas e os leads qualificados. Gere o script de novo aqui em
+          cima e cole no lugar do atual, no Google Ads. A partir daí, as conversões vão sozinhas, de hora em hora.
         </Alert>
       ) : null}
 

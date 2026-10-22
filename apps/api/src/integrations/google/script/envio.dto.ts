@@ -170,3 +170,12 @@ export class EnvioDoScriptDto {
   @Type(() => CampanhaDoEnvioDto)
   campanhas!: CampanhaDoEnvioDto[];
 }
+
+/** O script confirma as conversões que subiu. Teto de quantidade e tamanho, como o resto. */
+export class ConfirmacaoDoScriptDto {
+  @IsArray()
+  @ArrayMaxSize(2000)
+  @IsString({ each: true })
+  @MaxLength(200, { each: true })
+  chaves!: string[];
+}

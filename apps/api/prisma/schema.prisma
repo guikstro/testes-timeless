@@ -1902,3 +1902,15 @@ model PushConfig {
 
   @@map("push_config")
 }
+
+/// Conversões que o script do Google Ads já subiu, para não mandar duas vezes.
+model GoogleConversaoEnviada {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  /// `<lead>:<QUALIFIED|WON>:<instante ISO>`: a mesma conversão gera sempre a mesma chave.
+  chave          String
+  enviadaEm      DateTime @default(now()) @map("enviada_em")
+
+  @@unique([organizationId, chave])
+  @@map("google_conversoes_enviadas")
+}

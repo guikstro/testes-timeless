@@ -8,7 +8,7 @@ import { AuthenticatedUser } from "../../../auth/jwt-payload.interface";
 import { AppException } from "../../../common/exceptions/app-exception";
 import { autorDe } from "../../../auditoria/auditoria.service";
 import { GoogleAdsScriptService } from "./google-ads-script.service";
-import { EnvioDoScriptDto } from "./envio.dto";
+import { ConfirmacaoDoScriptDto, EnvioDoScriptDto } from "./envio.dto";
 
 class PeriodoDto {
   @IsOptional()
@@ -72,6 +72,13 @@ export class GoogleAdsScriptController {
 @Controller("publico/google-ads")
 export class EnvioDoGoogleAdsController {
   constructor(private readonly servico: GoogleAdsScriptService) {}
+
+  @Post("conversoes-enviadas")
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 120 } })
+  confirma(@Headers("x-chave-timeless") chave: string | undefined, @Body() corpo: ConfirmacaoDoScriptDto) {
+    return this.servico.confirmaConversoes(chave, corpo.chaves);
+  }
 
   @Post("envio")
   @HttpCode(HttpStatus.OK)

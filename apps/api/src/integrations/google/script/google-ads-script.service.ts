@@ -7,8 +7,9 @@ import { enderecoPublico } from "../../../common/configuracao/ambiente";
 import { AuditoriaService, Autor } from "../../../auditoria/auditoria.service";
 import { contaLegivel, converteCampanha, converteMetricasLocais, metricasMedidas } from "./converte-envio";
 import { Prisma } from "@prisma/client";
-import { scriptDoGoogleAds, VERSAO_DAS_ACOES_LOCAIS, VERSAO_DO_SCRIPT } from "./script-do-google-ads";
+import { scriptDoGoogleAds, VERSAO_DAS_ACOES_LOCAIS, VERSAO_DAS_CONVERSOES, VERSAO_DO_SCRIPT } from "./script-do-google-ads";
 import { EnvioDoScriptDto } from "./envio.dto";
+import { ConversaoParaOScript, GoogleConversionsService } from "../google-conversions.service";
 
 /** Sem envio há mais que isto, a tela avisa que o script parou. */
 const ENVIO_ATRASADO_EM_HORAS = 3;
@@ -26,6 +27,7 @@ export class GoogleAdsScriptService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
+    private readonly conversoes: GoogleConversionsService,
   ) {}
 
   /**
@@ -140,6 +142,8 @@ export class GoogleAdsScriptService {
             // Script anterior ao histórico: só os últimos 35 dias de cada rodada.
             semHistorico: conexao.ultimoEnvioEm !== null && !conexao.historicoCompletoEm && (conexao.versaoDoScript ?? 1) < VERSAO_DO_SCRIPT,
             historicoCompleto: Boolean(conexao.historicoCompletoEm),
+            // Script anterior à versão 4: as conversões não vão sozinhas.
+            semConversoesAutomaticas: conexao.ultimoEnvioEm !== null && (conexao.versaoDoScript ?? 1) < VERSAO_DAS_CONVERSOES,
             cobertoDesde: conexao.cobertoDesde?.toISOString().slice(0, 10) ?? null,
             partes: (conexao.partesDoScript as Record<string, string> | null) ?? null,
           }
@@ -156,6 +160,14 @@ export class GoogleAdsScriptService {
    * vinda de outra conta é recusada, para um script colado na conta errada
    * não misturar as campanhas de dois clientes.
    */
+  /** O script avisa o que subiu, com a mesma chave do envio. */
+  async confirmaConversoes(chave: string | undefined, chaves: string[]): Promise<{ confirmadas: number }> {
+    if (!chave || chave.length > 200) throw chaveInvalida();
+    const conexao = await this.prisma.googleAdsConexao.findUnique({ where: { chaveHash: hashToken(chave) } });
+    if (!conexao) throw chaveInvalida();
+    return { confirmadas: await this.conversoes.confirmaEnvio(conexao.organizationId, chaves) };
+  }
+
   async recebe(chave: string | undefined, envio: EnvioDoScriptDto) {
     if (!chave || chave.length > 200) throw chaveInvalida();
     const conexao = await this.prisma.googleAdsConexao.findUnique({ where: { chaveHash: hashToken(chave) } });
@@ -314,16 +326,32 @@ export class GoogleAdsScriptService {
       );
     }
 
+    // Da versão 4 em diante o script sobe as conversões que voltam daqui. Só
+    // na rodada de hora em hora, e nunca às custas do gasto, que já foi gravado.
+    let conversoesPendentes: ConversaoParaOScript[] = [];
+    if (!envio.historico && (envio.versao ?? 1) >= VERSAO_DAS_CONVERSOES) {
+      try {
+        conversoesPendentes = await this.conversoes.pendentesParaOScript(organizationId);
+      } catch {
+        conversoesPendentes = [];
+      }
+    }
+
     return {
       recebido: true,
       campanhas: campanhas.length,
       dias,
       metricasLocais: locais.length,
+      conversoes: conversoesPendentes,
       // O script da versão 3 lê isto: enquanto for verdade, manda também os
       // 13 meses anteriores na mesma rodada.
       historicoPendente: !conexao.historicoCompletoEm && !envio.historicoFim,
     };
   }
+}
+
+export interface ConfirmacaoDoScript {
+  chaves: string[];
 }
 
 const chaveInvalida = () =>
