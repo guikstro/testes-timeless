@@ -52,12 +52,15 @@ export class AdminService {
   ): Promise<PaginatedResult<unknown>> {
     const offset = pagination.offset ?? 0;
     const limit = pagination.limit ?? 20;
+    const escopo = operadorId ? await this.escopoDoOperador(operadorId) : null;
 
     const where: Prisma.OrganizationWhereInput = {
       deletedAt: null,
       // A conta da própria equipe não é cliente: fora da lista, do relatório
       // geral e da escolha do convite, que leem todos daqui.
       ...(operadorId ? { memberships: { none: { userId: operadorId } } } : {}),
+      // Operador vê só os clientes que atende; sócio vê todos.
+      ...(escopo ? { id: { in: escopo } } : {}),
       ...(search?.trim()
         ? {
             OR: [
@@ -313,6 +316,11 @@ export class AdminService {
         select: { id: true, name: true },
       }),
     );
+    // Quem cadastrou um cliente passa a atendê-lo; sem isso, um operador
+    // criaria um cliente que ele mesmo não conseguiria abrir.
+    if (await this.escopoDoOperador(operadorId)) {
+      await this.prisma.operadorDoCliente.create({ data: { organizationId: cliente.id, userId: operadorId } });
+    }
     await this.auditoria.registra(
       { organizationId: cliente.id, userId: operadorId, impersonating: true },
       { acao: "ORGANIZATION_CREATED", entidade: "Organization", entidadeId: cliente.id, antes: null, depois: { nome, cor, criadaPor: "equipe da plataforma" } },
@@ -489,5 +497,158 @@ export class AdminService {
     });
     if (!organizacao) throw new AppException("ORGANIZATION_NOT_FOUND", "Cliente não encontrado.", HttpStatus.NOT_FOUND);
     return organizacao;
+  }
+
+  /**
+   * Os clientes que um operador pode ver. Null para sócio (ADMIN), que vê
+   * todos; a lista de ids para operador (SUPPORT), que vê só os seus.
+   */
+  async escopoDoOperador(userId: string): Promise<string[] | null> {
+    const usuario = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { platformRole: true, clientesQueAtendo: { select: { organizationId: true } } },
+    });
+    if (usuario?.platformRole === "ADMIN") return null;
+    return usuario?.clientesQueAtendo.map((c) => c.organizationId) ?? [];
+  }
+
+  /** Recusa o cliente que não é do operador. A mesma resposta de cliente inexistente, para não confirmar que ele existe. */
+  async exigeAcesso(userId: string, organizationId: string): Promise<void> {
+    const escopo = await this.escopoDoOperador(userId);
+    if (escopo && !escopo.includes(organizationId)) {
+      throw new AppException("ORGANIZATION_NOT_FOUND", "Cliente não encontrado.", HttpStatus.NOT_FOUND);
+    }
+  }
+
+  /** Quem da equipe atende o cliente. */
+  async operadoresDoCliente(organizationId: string) {
+    const linhas = await this.prisma.operadorDoCliente.findMany({
+      where: { organizationId },
+      select: { user: { select: { id: true, name: true, email: true } } },
+    });
+    return linhas.map((linha) => linha.user);
+  }
+
+  /** Define quem atende o cliente (só sócio). Só operadores da plataforma entram na lista. */
+  async defineOperadores(adminId: string, organizationId: string, userIds: string[]) {
+    await this.exigeCliente(organizationId);
+    const validos = await this.prisma.user.findMany({
+      where: { id: { in: userIds }, platformRole: "SUPPORT", deletedAt: null },
+      select: { id: true },
+    });
+    const antes = await this.operadoresDoCliente(organizationId);
+    await this.prisma.$transaction([
+      this.prisma.operadorDoCliente.deleteMany({ where: { organizationId } }),
+      this.prisma.operadorDoCliente.createMany({ data: validos.map((v) => ({ organizationId, userId: v.id })) }),
+    ]);
+    await this.auditoria.registra(
+      { organizationId, userId: adminId, impersonating: true },
+      {
+        acao: "OPERADORES_DO_CLIENTE_DEFINIDOS",
+        entidade: "Organization",
+        entidadeId: organizationId,
+        antes: { operadores: antes.map((o) => o.id) },
+        depois: { operadores: validos.map((v) => v.id) },
+      },
+    );
+    return this.operadoresDoCliente(organizationId);
+  }
+
+  /**
+   * O Início da administração: cada cliente do escopo, com o que ele precisa.
+   *
+   * Uma consulta por assunto para todos os clientes de uma vez, e não uma por
+   * cliente: a lista cresce, e a tela de início é a primeira que se abre.
+   */
+  async painel(operadorId: string) {
+    const escopo = await this.escopoDoOperador(operadorId);
+    const clientes = await this.prisma.organization.findMany({
+      where: {
+        deletedAt: null,
+        memberships: { none: { userId: operadorId } },
+        ...(escopo ? { id: { in: escopo } } : {}),
+      },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        foco: true,
+        brandColor: true,
+        logoUrl: true,
+        whatsappConnection: { select: { status: true, lastEventAt: true } },
+        metaConnection: { select: { status: true, lastSyncError: true, lastSyncedAt: true } },
+        googleAdsConexao: { select: { ultimoEnvioEm: true } },
+      },
+    });
+    const ids = clientes.map((c) => c.id);
+    const agora = Date.now();
+    const seteDias = new Date(agora - 7 * 86_400_000);
+
+    const [leads, esperando] = ids.length
+      ? await Promise.all([
+          this.prisma.lead.groupBy({
+            by: ["organizationId"],
+            where: { organizationId: { in: ids }, firstContactAt: { gte: seteDias } },
+            _count: { _all: true },
+          }),
+          this.prisma.$queryRaw<{ organizationId: string; quantos: number }[]>(Prisma.sql`
+            SELECT c.organization_id AS "organizationId", COUNT(*)::int AS "quantos"
+            FROM conversations c
+            JOIN LATERAL (
+              SELECT m.direction, m.timestamp FROM messages m
+              WHERE m.conversation_id = c.id
+              ORDER BY m.timestamp DESC, m.created_at DESC
+              LIMIT 1
+            ) u ON true
+            WHERE c.organization_id = ANY(${ids})
+              AND u.direction = 'INBOUND'
+              AND u.timestamp < now() - interval '24 hours'
+              AND u.timestamp > now() - interval '30 days'
+            GROUP BY c.organization_id
+          `),
+        ])
+      : [[], []];
+
+    const leadsDe = new Map(leads.map((l) => [l.organizationId, l._count._all]));
+    const esperandoDe = new Map(esperando.map((e) => [e.organizationId, e.quantos]));
+    const TRES_HORAS = 3 * 60 * 60 * 1000;
+
+    return clientes.map((cliente) => {
+      const alertas: { nivel: "erro" | "atencao"; texto: string }[] = [];
+      const medeLeads = cliente.foco !== "PRESENCA_LOCAL";
+      const zap = cliente.whatsappConnection;
+      if (medeLeads && zap && zap.status !== "CONNECTED") {
+        alertas.push({ nivel: "erro", texto: "WhatsApp desconectado. Leads não estão entrando." });
+      }
+      if (medeLeads && !zap) alertas.push({ nivel: "atencao", texto: "WhatsApp ainda não foi conectado." });
+      const google = cliente.googleAdsConexao?.ultimoEnvioEm;
+      if (google && agora - google.getTime() > TRES_HORAS) {
+        alertas.push({ nivel: "atencao", texto: "O script do Google parou de enviar." });
+      }
+      if (cliente.metaConnection && (cliente.metaConnection.status !== "CONNECTED" || cliente.metaConnection.lastSyncError)) {
+        alertas.push({ nivel: "atencao", texto: "A conta da Meta precisa ser reconectada." });
+      }
+      const esperandoUmDia = esperandoDe.get(cliente.id) ?? 0;
+      if (esperandoUmDia > 0) {
+        alertas.push({
+          nivel: "atencao",
+          texto: `${esperandoUmDia} ${esperandoUmDia === 1 ? "pessoa esperando" : "pessoas esperando"} resposta há mais de um dia.`,
+        });
+      }
+      return {
+        id: cliente.id,
+        name: cliente.name,
+        foco: cliente.foco,
+        brandColor: cliente.brandColor,
+        logoUrl: cliente.logoUrl,
+        leadsSeteDias: medeLeads ? (leadsDe.get(cliente.id) ?? 0) : null,
+        conexoes: {
+          whatsapp: medeLeads ? (zap?.status ?? null) : null,
+          meta: cliente.metaConnection?.status ?? null,
+          googleUltimoEnvio: google?.toISOString() ?? null,
+        },
+        alertas,
+      };
+    });
   }
 }

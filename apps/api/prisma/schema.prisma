@@ -160,6 +160,7 @@ model Organization {
   deletedAt      DateTime?      @map("deleted_at")
 
   memberships          Membership[]
+  operadores           OperadorDoCliente[]
   trackingLinks        TrackingLink[]
   whatsappConnection   WhatsAppConnection?
   mensagensForaDaRegra MensagemForaDaRegra[]
@@ -215,6 +216,7 @@ model User {
   deletedAt    DateTime?     @map("deleted_at")
 
   memberships         Membership[]
+  clientesQueAtendo   OperadorDoCliente[]
   passwordResetTokens PasswordResetToken[]
   emailChangeTokens   EmailChangeToken[]
   refreshTokens       RefreshToken[]
@@ -1044,6 +1046,7 @@ model ExternalDeal {
 }
 
 enum AuditAction {
+  OPERADORES_DO_CLIENTE_DEFINIDOS
   SALE_CREATED
   SALE_UPDATED
   SALE_DELETED
@@ -1915,4 +1918,18 @@ model GoogleConversaoEnviada {
 
   @@unique([organizationId, chave])
   @@map("google_conversoes_enviadas")
+}
+
+/// Os clientes que cada operador da Timeless (SUPPORT) atende. Sócio (ADMIN) vê todos e não precisa estar aqui.
+model OperadorDoCliente {
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, userId])
+  @@index([userId])
+  @@map("operadores_do_cliente")
 }

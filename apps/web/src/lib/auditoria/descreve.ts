@@ -141,6 +141,8 @@ export function descreveRegistro(r: Pick<RegistroDeAuditoria, "action" | "entity
     case "IMPERSONATION_ENDED":
       return "Saiu da conta, encerrando a visita de suporte";
 
+    case "OPERADORES_DO_CLIENTE_DEFINIDOS":
+      return "Definiu quem da equipe atende este cliente";
     case "ORGANIZATION_CREATED":
       return `Criou o cliente ${entre(texto(depois.nome))}`.trim();
     case "ORGANIZATION_DELETED":

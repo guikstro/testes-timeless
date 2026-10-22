@@ -26,6 +26,7 @@ import { CriaClienteDto } from "./dto/cria-cliente.dto";
 import { CriaConviteDto } from "./dto/cria-convite.dto";
 import { ExcluiClienteDto } from "./dto/exclui-cliente.dto";
 import { MudaFocoDto } from "./dto/muda-foco.dto";
+import { DefineOperadoresDto } from "./dto/define-operadores.dto";
 import { Throttle } from "@nestjs/throttler";
 import { CREDENCIAL } from "../common/throttling/limites";
 
@@ -55,7 +56,8 @@ export class AdminController {
 
   /** Convida alguém: para a equipe Timeless, ou para um cliente em áreas escolhidas. Devolve o link. */
   @Post("convites")
-  criaConvite(@CurrentUser() user: AuthenticatedUser, @Body() dto: CriaConviteDto) {
+  async criaConvite(@CurrentUser() user: AuthenticatedUser, @Body() dto: CriaConviteDto) {
+    if (dto.acesso === "cliente" && dto.organizationId) await this.adminService.exigeAcesso(user.userId, dto.organizationId);
     return this.adminService.criaConvite(user, dto);
   }
 
@@ -78,47 +80,54 @@ export class AdminController {
   /** Leads, presença local ou os dois: o que o cliente vê no painel dele. */
   @Put("organizations/:id/foco")
   @HttpCode(HttpStatus.NO_CONTENT)
-  mudaFoco(
+  async mudaFoco(
     @CurrentUser() user: AuthenticatedUser,
     @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: MudaFocoDto,
   ): Promise<void> {
+    await this.adminService.exigeAcesso(user.userId, id);
     return this.adminService.mudaFoco(user, id, dto.foco);
   }
 
   @Get("organizations/:id/pessoas")
-  pessoasDoCliente(@Param("id", ParseUUIDPipe) id: string) {
+  async pessoasDoCliente(@CurrentUser() user: AuthenticatedUser, @Param("id", ParseUUIDPipe) id: string) {
+    await this.adminService.exigeAcesso(user.userId, id);
     return this.adminService.pessoasDoCliente(id);
   }
 
   @Delete("organizations/:id/pessoas/:userId")
   @HttpCode(HttpStatus.NO_CONTENT)
-  removePessoa(
+  async removePessoa(
     @CurrentUser() user: AuthenticatedUser,
     @Param("id", ParseUUIDPipe) id: string,
     @Param("userId", ParseUUIDPipe) userId: string,
   ): Promise<void> {
+    await this.adminService.exigeAcesso(user.userId, id);
     return this.adminService.removePessoa(user.userId, id, userId);
   }
 
   @Get("organizations/:id/whatsapp")
-  whatsappDoCliente(@Param("id", ParseUUIDPipe) id: string) {
+  async whatsappDoCliente(@CurrentUser() user: AuthenticatedUser, @Param("id", ParseUUIDPipe) id: string) {
+    await this.adminService.exigeAcesso(user.userId, id);
     return this.adminService.whatsappDoCliente(id);
   }
 
   @Post("organizations/:id/whatsapp/link")
-  geraLinkDoWhatsApp(@CurrentUser() user: AuthenticatedUser, @Param("id", ParseUUIDPipe) id: string) {
+  async geraLinkDoWhatsApp(@CurrentUser() user: AuthenticatedUser, @Param("id", ParseUUIDPipe) id: string) {
+    await this.adminService.exigeAcesso(user.userId, id);
     return this.adminService.geraLinkDoWhatsApp(user.userId, id);
   }
 
   @Post("organizations/:id/whatsapp/desconectar")
   @HttpCode(HttpStatus.NO_CONTENT)
-  desconectaWhatsApp(@CurrentUser() user: AuthenticatedUser, @Param("id", ParseUUIDPipe) id: string): Promise<void> {
+  async desconectaWhatsApp(@CurrentUser() user: AuthenticatedUser, @Param("id", ParseUUIDPipe) id: string): Promise<void> {
+    await this.adminService.exigeAcesso(user.userId, id);
     return this.adminService.desconectaWhatsApp(user.userId, id);
   }
 
   @Post("organizations/:id/impersonate")
-  impersonate(@CurrentUser() user: AuthenticatedUser, @Param("id", ParseUUIDPipe) id: string) {
+  async impersonate(@CurrentUser() user: AuthenticatedUser, @Param("id", ParseUUIDPipe) id: string) {
+    await this.adminService.exigeAcesso(user.userId, id);
     return this.adminService.impersonate(user.userId, id);
   }
 
@@ -135,6 +144,7 @@ export class AdminController {
    */
   @Post("organizations/:id/entrada")
   async entrada(@CurrentUser() user: AuthenticatedUser, @Param("id", ParseUUIDPipe) id: string) {
+    await this.adminService.exigeAcesso(user.userId, id);
     const sessao = await this.adminService.impersonate(user.userId, id);
     return {
       organization: sessao.organization,
@@ -143,6 +153,28 @@ export class AdminController {
         refreshToken: sessao.refreshToken,
       }),
     };
+  }
+
+  /** O Início da administração: os clientes do escopo, com o que cada um precisa. */
+  @Get("painel")
+  painel(@CurrentUser() user: AuthenticatedUser) {
+    return this.adminService.painel(user.userId);
+  }
+
+  @Get("organizations/:id/operadores")
+  async operadoresDoCliente(@CurrentUser() user: AuthenticatedUser, @Param("id", ParseUUIDPipe) id: string) {
+    await this.adminService.exigeAcesso(user.userId, id);
+    return this.adminService.operadoresDoCliente(id);
+  }
+
+  @Put("organizations/:id/operadores")
+  @RequiresPlatformRole("ADMIN")
+  defineOperadores(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: DefineOperadoresDto,
+  ) {
+    return this.adminService.defineOperadores(user.userId, id, dto.userIds);
   }
 
   @Get("impersonations")

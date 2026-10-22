@@ -412,16 +412,46 @@ describe("Administração da plataforma (e2e)", () => {
         await daSegundoFator(prisma, encryption, supportUserId);
       });
 
-      it("o SUPPORT enxerga os clientes e entra neles — é o trabalho dele", async () => {
-        await request(app.getHttpServer())
+      it("o SUPPORT só enxerga e entra nos clientes que atende; quem define é o ADMIN", async () => {
+        const antes = await request(app.getHttpServer())
           .get("/api/admin/organizations")
           .set("Authorization", `Bearer ${supportToken}`)
           .expect(200);
+        expect(antes.body.items.map((o: { id: string }) => o.id)).not.toContain(clientOrgId);
+        await request(app.getHttpServer())
+          .post(`/api/admin/organizations/${clientOrgId}/impersonate`)
+          .set("Authorization", `Bearer ${supportToken}`)
+          .expect(404);
 
+        // O SUPPORT não pode se dar um cliente.
+        await request(app.getHttpServer())
+          .put(`/api/admin/organizations/${clientOrgId}/operadores`)
+          .set("Authorization", `Bearer ${supportToken}`)
+          .send({ userIds: [supportUserId] })
+          .expect(403);
+
+        const definidos = await request(app.getHttpServer())
+          .put(`/api/admin/organizations/${clientOrgId}/operadores`)
+          .set("Authorization", `Bearer ${adminToken}`)
+          .send({ userIds: [supportUserId] })
+          .expect(200);
+        expect(definidos.body.map((o: { id: string }) => o.id)).toEqual([supportUserId]);
+
+        const depois = await request(app.getHttpServer())
+          .get("/api/admin/organizations")
+          .set("Authorization", `Bearer ${supportToken}`)
+          .expect(200);
+        expect(depois.body.items.map((o: { id: string }) => o.id)).toContain(clientOrgId);
         await request(app.getHttpServer())
           .post(`/api/admin/organizations/${clientOrgId}/impersonate`)
           .set("Authorization", `Bearer ${supportToken}`)
           .expect(201);
+
+        const painel = await request(app.getHttpServer())
+          .get("/api/admin/painel")
+          .set("Authorization", `Bearer ${supportToken}`)
+          .expect(200);
+        expect(painel.body.map((c: { id: string }) => c.id)).toEqual([clientOrgId]);
       });
 
       it("o SUPPORT não consegue listar nem alterar operadores", async () => {
