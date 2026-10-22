@@ -34,6 +34,10 @@ export async function AvisoDeMedicao({
   dispensavel?: boolean;
 }) {
   if (medicao === "medido") return null;
+  // Nas telas do cliente só a queda da conexão vira aviso: quem não conectou o
+  // WhatsApp sabe disso, e explicar a conexão em cada tela só confunde. O
+  // relatório (não dispensável) continua explicando, porque vai para fora.
+  if (dispensavel && medicao !== "whatsapp-fora") return null;
 
   // Fechado nesta conta e nesta situação: nem desenha, para não piscar.
   let chave: string | null = null;

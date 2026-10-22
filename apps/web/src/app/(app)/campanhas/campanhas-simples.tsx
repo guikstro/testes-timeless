@@ -160,8 +160,7 @@ function resumoDoTrabalho(trabalho: Trabalho, itens: Item[], medido: boolean): s
     if (conversas !== null) {
       return `${contagem(conversas, "conversa aberta", "conversas abertas")}${medido ? `, ${contagem(leads, "virou lead", "viraram lead")} aqui` : ""}`;
     }
-    const cliques = soma(itens, (i) => i.atual.cliques);
-    return cliques !== null ? `${contagem(cliques, "clique", "cliques")} no anúncio` : "Sem número de cliques no período";
+    return cliquesDe(itens);
   }
   if (trabalho === "loja") {
     const ligacoes = soma(itens, (i) => i.locais?.ligacoes);
@@ -170,7 +169,12 @@ function resumoDoTrabalho(trabalho: Trabalho, itens: Item[], medido: boolean): s
   }
   const leads = itens.reduce((s, i) => s + i.atual.leads, 0);
   const clientes = itens.reduce((s, i) => s + clientesDe(i.atual), 0);
-  return medido ? `${contagem(leads, "contato", "contatos")} e ${contagem(clientes, "cliente", "clientes")}` : "Contatos aparecem com o WhatsApp recebendo";
+  return medido ? `${contagem(leads, "contato", "contatos")} e ${contagem(clientes, "cliente", "clientes")}` : cliquesDe(itens);
+}
+
+function cliquesDe(itens: Item[]): string {
+  const cliques = soma(itens, (i) => i.atual.cliques);
+  return cliques !== null ? `${contagem(cliques, "clique", "cliques")} no anúncio` : "Sem número de cliques no período";
 }
 
 interface Referencias {

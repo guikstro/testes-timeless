@@ -50,10 +50,12 @@ export default async function ConversasPage({
     return (
       <div className="mx-auto max-w-3xl">
         <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Conversas</h1>
-        <p className="mb-6 mt-1 text-corpo text-ink-mute">
-          As conversas do WhatsApp conectado, para responder sem sair do sistema.
-        </p>
-        <AvisoDeMedicao medicao={medicao} desde={conexao ? inicioDaMedicao(conexao) : null} />
+        <div className="mt-6">
+          <AvisoDeMedicao medicao={medicao} desde={conexao ? inicioDaMedicao(conexao) : null} />
+        </div>
+        {medicao !== "whatsapp-fora" ? (
+          <p className="py-16 text-center text-destaque text-ink-mute">Nenhuma conversa ainda.</p>
+        ) : null}
       </div>
     );
   }

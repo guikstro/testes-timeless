@@ -1,13 +1,10 @@
-import type { ReactNode } from "react";
 import Link from "next/link";
 import { unstable_rethrow } from "next/navigation";
 import { AtualizaAoVivo } from "@/components/notifications/atualiza-ao-vivo";
 import { GrupoDePilulas } from "@/components/ui/pill-group";
 import { apiFetch } from "@/lib/api-client";
-import { AvisoDeMedicao } from "@/components/aviso-de-medicao";
 import { conexaoDoWhatsApp } from "@/lib/conexao-do-whatsapp";
-import { formatCentsAsBRL } from "@/lib/currency";
-import { inicioDaMedicao, Medicao, medicaoDeLeads } from "@/lib/medicao-de-leads";
+import { medicaoDeLeads } from "@/lib/medicao-de-leads";
 import { DesempenhoDeCampanhas } from "../campanhas/tipos";
 import { formataDia } from "@/lib/periodo";
 import { ResumoSimples } from "./resumo-simples";
@@ -19,8 +16,7 @@ import { Procedencia } from "./procedencia";
 import { concluiAtendimento, concluiFunil, concluiOrigem, concluiPagina, concluiVisaoGeral } from "./conclusao";
 import { FunilDoPeriodo, InsightsDaPagina, Overview } from "./tipos";
 import { AbaPagina } from "./aba-pagina";
-import { SecaoDeAnuncios } from "./secao-de-anuncios";
-import { leMetricas, Metrica, metricasDoConjunto, sugereConjunto } from "@/lib/campanhas/metricas";
+import { leMetricas } from "@/lib/campanhas/metricas";
 import { Alert } from "@/components/ui/alert";
 import { Frescor, FrescorDosDados } from "@/components/ui/frescor";
 import { sessaoAtual } from "@/lib/sessao";
@@ -114,40 +110,13 @@ export default async function DashboardPage({
       ? ABAS
       : ABAS.filter((opcao) => opcao.chave === "geral" || opcao.chave === "local" || opcao.chave === "pagina");
 
-  // Os números dos anúncios: na visão geral, e no lugar das abas quando não
-  // há lead para medir, porque eles não dependem do WhatsApp.
-  const mostraAnuncios = !local && !naPagina && (aba === "geral" || medicao !== "medido");
-  const anuncios = mostraAnuncios ? await buscaAnuncios(de, ate, days) : null;
+  // Os números dos anúncios só entram no resumo, que é onde aparecem.
+  const simples = !local && !naPagina && (aba === "geral" || medicao !== "medido");
+  const anuncios = simples ? await buscaAnuncios(de, ate, days) : null;
 
-  // A mesma escolha de métricas da tela de Campanhas, e a mesma sugestão pelo
-  // objetivo de onde está o investimento.
+  // A escolha de métricas de Campanhas vai junto ao trocar de período e de aba.
   const escolhidas = leMetricas(params.metricas);
-  const sugestao = sugereConjunto(
-    (anuncios?.campanhas ?? []).flatMap((linha) =>
-      linha.atual ? [{ objetivo: linha.objetivo, gastoCentavos: linha.atual.gastoCentavos }] : [],
-    ),
-  );
-  const metricas = escolhidas ?? metricasDoConjunto(sugestao.conjunto);
-  // A escolha vai junto ao trocar de período e de aba, e para a tela de Campanhas.
   const comMetricas = escolhidas ? `&${new URLSearchParams({ metricas: escolhidas.join(",") }).toString()}` : "";
-  const hrefDasMetricas = (lista: Metrica[] | null) => {
-    const destino = new URLSearchParams({ aba, days: String(days) });
-    if (lista) destino.set("metricas", lista.join(","));
-    return `/dashboard?${destino.toString()}`;
-  };
-  const secaoDeAnuncios = (medido: boolean) =>
-    anuncios ? (
-      <SecaoDeAnuncios
-        dados={anuncios}
-        metricas={metricas}
-        escolhaManual={escolhidas !== null}
-        sugestao={sugestao}
-        medido={medido}
-        href={hrefDasMetricas}
-        porCampanha={`/campanhas?de=${de}&ate=${ate}${comMetricas}`}
-      />
-    ) : null;
-
   const semOrigem = overview.byOrigin.find((bucket) => bucket.key === "unknown");
   const maioriaSemOrigem = totals.leads > 0 && (semOrigem?.leads ?? 0) / totals.leads >= 0.5;
 
@@ -161,8 +130,6 @@ export default async function DashboardPage({
     ? concluiPresencaLocal(local)
     : naPagina
       ? concluiPagina(pagina)
-      : medicao !== "medido"
-      ? "Sem WhatsApp recebendo, não há lead para medir neste período."
       : aba === "funil"
         ? funil
           ? concluiFunil(funil)
@@ -171,7 +138,6 @@ export default async function DashboardPage({
 
   // A visão geral virou a tela simples: um número, o contexto e o que fazer
   // agora. As outras abas são o "relatório completo", um clique adiante.
-  const simples = !local && !naPagina && aba === "geral";
 
   if (simples) {
     // A mesma lista que o "Responder" abre: quem espera há mais de 30 minutos,
@@ -217,13 +183,10 @@ export default async function DashboardPage({
           /*
             Sem WhatsApp recebendo não há lead para contar, mas o dinheiro dos
             anúncios continua sendo gasto: o resumo mostra o que ele comprou, no
-            mesmo desenho de Campanhas, e diz numa linha o que falta.
+            mesmo desenho de Campanhas, sem explicar a conexão: quem conectou
+            sabe o que conectou.
           */
           <div className="mt-8">
-            <p className="mb-6 max-w-2xl text-corpo text-ink-mute">
-              O WhatsApp ainda não está recebendo, então este resumo mostra só os anúncios. Leads e clientes aparecem aqui
-              assim que as conversas começarem a chegar.
-            </p>
             {anuncios ? (
               <>
                 <CampanhasSimples dados={anuncios} medido={false} comLoja={false} />
@@ -320,15 +283,6 @@ export default async function DashboardPage({
         )
       ) : null}
 
-      {!local && !naPagina && medicao !== "medido" ? (
-        <SemMedicao
-          medicao={medicao}
-          desde={conexao ? inicioDaMedicao(conexao) : null}
-          anuncios={anuncios}
-          secaoDeAnuncios={secaoDeAnuncios(false)}
-        />
-      ) : null}
-
       {medicao === "medido" && aba === "funil" ? (
         funil ? (
           <AbaFunil dados={funil} />
@@ -381,92 +335,6 @@ export default async function DashboardPage({
       ) : null}
 
       {!local && !naPagina && medicao === "medido" ? <Procedencia overview={overview} /> : null}
-    </div>
-  );
-}
-
-/**
- * O painel quando não há lead para medir.
- *
- * As quatro abas eram pintadas mesmo assim, todas com zero, e o painel
- * parecia um segundo Gerenciador de Anúncios que não sabia nada. Aqui ele diz
- * o que se sabe (o gasto e as conversas que a Meta contou), o que não se sabe,
- * e o que passa a aparecer quando o WhatsApp estiver recebendo.
- */
-function SemMedicao({
-  medicao,
-  desde,
-  anuncios,
-  secaoDeAnuncios,
-}: {
-  medicao: Exclude<Medicao, "medido">;
-  desde: string | null;
-  anuncios: DesempenhoDeCampanhas | null;
-  /** Os números dos anúncios com a escolha de métricas; null quando a consulta falhou. */
-  secaoDeAnuncios: ReactNode;
-}) {
-  const gasto = anuncios?.totais.gastoCentavos ?? null;
-  const conversas = anuncios?.totais.conversasNaPlataforma ?? null;
-
-  return (
-    <div className="space-y-5">
-      <AvisoDeMedicao medicao={medicao} desde={desde} conversasNaPlataforma={conversas} />
-
-      {/* Impressões, cliques, CTR e CPM não dependem do WhatsApp: aparecem
-          aqui mesmo sem lead nenhum para medir. */}
-      {secaoDeAnuncios ?? (
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Numero rotulo="Investimento em anúncios" valor={gasto === null ? "Sem dado" : formatCentsAsBRL(gasto)} />
-          <Numero
-            rotulo="Conversas na Meta"
-            valor={conversas === null ? "Sem dado" : String(conversas)}
-            nota="O que o Gerenciador de Anúncios conta"
-          />
-          <Numero rotulo="Leads aqui" valor="Sem medida" apagado />
-        </div>
-      )}
-
-      <div className="surface p-5">
-        <p className="text-corpo font-semibold text-ink">O que aparece aqui com o WhatsApp recebendo</p>
-        <ul className="mt-3 grid gap-x-8 gap-y-2 text-apoio leading-relaxed text-ink-mute sm:grid-cols-2">
-          <li>Quantos leads entraram por dia, e quanto isso mudou.</li>
-          <li>De qual campanha e de qual anúncio cada lead veio.</li>
-          <li>Quantos viraram reunião e venda, e quanto cada um custou.</li>
-          <li>Quanto tempo a equipe leva para responder.</li>
-        </ul>
-        <Link
-          href="/campanhas"
-          className="focus-ring mt-4 inline-flex text-apoio font-medium text-ink underline underline-offset-2"
-        >
-          Ver o gasto por campanha
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-function Numero({
-  rotulo,
-  valor,
-  nota,
-  apagado = false,
-}: {
-  rotulo: string;
-  valor: string;
-  nota?: string;
-  apagado?: boolean;
-}) {
-  return (
-    <div className="surface p-4">
-      <p className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">{rotulo}</p>
-      <p
-        className={`mt-1.5 font-display font-semibold tabular-nums ${
-          apagado ? "text-lg text-ink-mute" : "text-xl text-ink"
-        }`}
-      >
-        {valor}
-      </p>
-      {nota ? <p className="mt-1 text-rotulo text-ink-mute">{nota}</p> : null}
     </div>
   );
 }
