@@ -11,6 +11,7 @@ import { inicioDaMedicao, Medicao, medicaoDeLeads } from "@/lib/medicao-de-leads
 import { DesempenhoDeCampanhas } from "../campanhas/tipos";
 import { formataDia } from "@/lib/periodo";
 import { ResumoSimples } from "./resumo-simples";
+import { CampanhasSimples } from "../campanhas/campanhas-simples";
 import { AbaFunil } from "./aba-funil";
 import { AbaOrigem } from "./aba-origem";
 import { AbaAtendimento } from "./aba-atendimento";
@@ -170,18 +171,30 @@ export default async function DashboardPage({
 
   // A visão geral virou a tela simples: um número, o contexto e o que fazer
   // agora. As outras abas são o "relatório completo", um clique adiante.
-  const simples = !local && !naPagina && medicao === "medido" && aba === "geral";
+  const simples = !local && !naPagina && aba === "geral";
 
   if (simples) {
     // A mesma lista que o "Responder" abre: quem espera há mais de 30 minutos,
     // em qualquer conversa, e não só entre os leads que chegaram no período.
-    const espera = await apiFetch<{ total: number; truncado: boolean }>("/conversations?status=awaiting").catch(() => null);
+    const espera =
+      medicao === "medido"
+        ? await apiFetch<{ total: number; truncado: boolean }>("/conversations?status=awaiting").catch(() => null)
+        : null;
+    const comLocal = temPresencaLocal(organization.foco);
     return (
       <div className="mx-auto max-w-6xl">
         <AtualizaAoVivo />
         <header className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-corpo text-ink-mute">
             {days === 1 ? `Hoje, ${formataDia(ate)}` : `Últimos ${days} dias, de ${formataDia(de)} a ${formataDia(ate)}`}
+            {comLocal ? (
+              <>
+                {"  "}
+                <Link href={paraAba("local")} className="ml-3 font-medium text-ink-soft underline underline-offset-2 hover:text-ink">
+                  Ver presença local
+                </Link>
+              </>
+            ) : null}
           </p>
           <GrupoDePilulas
             ativo={String(days)}
@@ -192,13 +205,37 @@ export default async function DashboardPage({
             }))}
           />
         </header>
-        <ResumoSimples
-          overview={overview}
-          gastoCentavos={anuncios?.totais.gastoCentavos ?? null}
-          esperando={espera ? { quantos: espera.total, mais: espera.truncado } : null}
-          dias={days}
-          relatorioCompleto={paraAba("funil")}
-        />
+        {medicao === "medido" ? (
+          <ResumoSimples
+            overview={overview}
+            gastoCentavos={anuncios?.totais.gastoCentavos ?? null}
+            esperando={espera ? { quantos: espera.total, mais: espera.truncado } : null}
+            dias={days}
+            relatorioCompleto={paraAba("funil")}
+          />
+        ) : (
+          /*
+            Sem WhatsApp recebendo não há lead para contar, mas o dinheiro dos
+            anúncios continua sendo gasto: o resumo mostra o que ele comprou, no
+            mesmo desenho de Campanhas, e diz numa linha o que falta.
+          */
+          <div className="mt-8">
+            <p className="mb-6 max-w-2xl text-corpo text-ink-mute">
+              O WhatsApp ainda não está recebendo, então este resumo mostra só os anúncios. Leads e clientes aparecem aqui
+              assim que as conversas começarem a chegar.
+            </p>
+            {anuncios ? (
+              <>
+                <CampanhasSimples dados={anuncios} medido={false} comLoja={false} />
+                <Link href="/campanhas" className="text-corpo font-medium text-accent underline underline-offset-2">
+                  Ver todas as campanhas
+                </Link>
+              </>
+            ) : (
+              <p className="py-10 text-center text-destaque text-ink-mute">Nenhum gasto em anúncios neste período.</p>
+            )}
+          </div>
+        )}
       </div>
     );
   }
