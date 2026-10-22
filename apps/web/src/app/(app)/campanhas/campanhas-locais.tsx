@@ -6,6 +6,7 @@ import { formatCentsAsBRL } from "@/lib/currency";
 import { rotuloDoIntervalo } from "@/lib/periodo";
 import { MedicaoLocal, SituacaoDaMedicao } from "../dashboard/painel-presenca-local";
 import { Numero, Resumo, SeletorDePeriodo, STATUS } from "./campanhas-view";
+import { CampanhasLocaisSimples } from "./campanhas-locais-simples";
 
 type Par = { atual: number | null; anterior: number | null };
 
@@ -82,7 +83,7 @@ export function CampanhasLocaisView({
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Campanhas</h1>
           <p className="mt-1 max-w-2xl text-corpo text-ink-mute">
-            Quanto cada campanha do Google custou, e quantas ligações e pedidos de rota ela trouxe.
+            Quanto você investiu e quantas pessoas cada campanha trouxe à loja.
           </p>
           <FrescorDosDados frescor={frescor} fontes={["google"]} className="mt-2" />
         </div>
@@ -103,102 +104,118 @@ export function CampanhasLocaisView({
         className="mb-5"
       />
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Resumo titulo="Investimento" {...resumo(totais.gastoCentavos, formatCentsAsBRL)} />
-        <Resumo titulo="Ligações" {...resumo(totais.ligacoes, inteiro)} nota="Pelo botão de ligar dos anúncios" />
-        <Resumo titulo="Pedidos de rota" {...resumo(totais.rotas, inteiro)} />
-        <Resumo
-          titulo="Custo por ligação"
-          {...resumo(totais.custoPorLigacao, formatCentsAsBRL, semAcao(totais.ligacoes, "Sem ligação"))}
-          invertido
-        />
-        <Resumo
-          titulo="Custo por rota"
-          {...resumo(totais.custoPorRota, formatCentsAsBRL, semAcao(totais.rotas, "Sem rota"))}
-          invertido
-        />
-      </div>
+      <CampanhasLocaisSimples campanhas={dados.campanhas} />
 
-      {dados.campanhas.length === 0 ? (
-        <div className="surface p-8 text-center">
-          <p className="text-corpo text-ink-soft">Nenhuma campanha do Google com gasto em {rotuloDoIntervalo(periodo)}.</p>
-          <p className="mt-1.5 text-apoio text-ink-mute">
-            As campanhas aparecem aqui quando o script do Google Ads, em Integrações, manda o gasto do mês.
-          </p>
+      {/*
+        Os cartões e a tabela com todas as colunas ficam guardados: quem cuida
+        dos anúncios abre; quem só quer saber se o dinheiro voltou, não precisa.
+      */}
+      <details className="group">
+        <summary className="focus-ring mx-auto mb-5 flex w-fit cursor-pointer list-none items-center gap-1.5 rounded-full border border-line bg-panel px-4 py-2 text-corpo font-medium text-ink-soft transition-colors hover:text-ink [&::-webkit-details-marker]:hidden">
+          <span className="group-open:hidden">Ver métricas técnicas</span>
+          <span className="hidden group-open:inline">Esconder métricas técnicas</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden>
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </summary>
+
+        <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <Resumo titulo="Investimento" {...resumo(totais.gastoCentavos, formatCentsAsBRL)} />
+          <Resumo titulo="Ligações" {...resumo(totais.ligacoes, inteiro)} nota="Pelo botão de ligar dos anúncios" />
+          <Resumo titulo="Pedidos de rota" {...resumo(totais.rotas, inteiro)} />
+          <Resumo
+            titulo="Custo por ligação"
+            {...resumo(totais.custoPorLigacao, formatCentsAsBRL, semAcao(totais.ligacoes, "Sem ligação"))}
+            invertido
+          />
+          <Resumo
+            titulo="Custo por rota"
+            {...resumo(totais.custoPorRota, formatCentsAsBRL, semAcao(totais.rotas, "Sem rota"))}
+            invertido
+          />
         </div>
-      ) : (
-        <div className="surface overflow-hidden">
-          {/* A tabela é larga de propósito; quem rola é ela, nunca a página. */}
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[56rem] text-corpo">
-              <thead>
-                <tr className="border-b border-line text-left text-rotulo font-semibold uppercase tracking-[0.09em] text-ink-mute">
-                  <th className="px-4 py-3 font-semibold">Campanha</th>
-                  <th className="px-4 py-3 text-right font-semibold">Investimento</th>
-                  <th className="px-4 py-3 text-right font-semibold">Cliques</th>
-                  <th className="px-4 py-3 text-right font-semibold">Ligações</th>
-                  <th className="px-4 py-3 text-right font-semibold">Rotas</th>
-                  <th className="px-4 py-3 text-right font-semibold">Custo por ligação</th>
-                  <th className="px-4 py-3 text-right font-semibold">Custo por rota</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dados.campanhas.map((linha) => {
-                  // A campanha que só rodou na comparação continua na tabela:
-                  // "não rodou" é metade da explicação de uma queda.
-                  const ausente = linha.atual === null;
-                  const n = linha.atual ?? linha.anterior!;
-                  const antes = comparando && !ausente ? linha.anterior : null;
-                  const status = STATUS[linha.status];
-                  const compara = (campo: keyof NumerosDaCampanha) =>
-                    comparando && !ausente ? variacao(n[campo], antes ? antes[campo] : 0) : undefined;
 
-                  return (
-                    <tr key={linha.externalId} className={`border-b border-line/60 last:border-0 ${ausente ? "opacity-55" : ""}`}>
-                      <td className="px-4 py-3.5 align-top">
-                        <p className="font-medium text-ink">{linha.nome}</p>
-                        {status ? (
-                          <div className="mt-1.5">
-                            <Badge tone={status.tom} dot>
-                              {status.rotulo}
-                            </Badge>
-                          </div>
-                        ) : null}
-                        {ausente ? (
-                          <p className="mt-1 text-rotulo text-ink-mute">
-                            Não rodou no período escolhido. Os números ao lado são de {rotuloDaComparacao}.
-                          </p>
-                        ) : null}
-                      </td>
-                      <Numero valor={formatCentsAsBRL(n.gastoCentavos)} variacao={compara("gastoCentavos")} />
-                      <Numero valor={inteiro(n.cliques)} />
-                      <Acoes valor={n.ligacoes} variacao={compara("ligacoes")} />
-                      <Acoes valor={n.rotas} variacao={compara("rotas")} />
-                      <Custo valor={n.custoPorLigacao} acoes={n.ligacoes} nenhuma="Sem ligação" />
-                      <Custo valor={n.custoPorRota} acoes={n.rotas} nenhuma="Sem rota" />
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        {dados.campanhas.length === 0 ? (
+          <div className="surface p-8 text-center">
+            <p className="text-corpo text-ink-soft">Nenhuma campanha do Google com gasto em {rotuloDoIntervalo(periodo)}.</p>
+            <p className="mt-1.5 text-apoio text-ink-mute">
+              As campanhas aparecem aqui quando o script do Google Ads, em Integrações, manda o gasto do mês.
+            </p>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="surface overflow-hidden">
+            {/* A tabela é larga de propósito; quem rola é ela, nunca a página. */}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[56rem] text-corpo">
+                <thead>
+                  <tr className="border-b border-line text-left text-apoio font-medium text-ink-mute">
+                    <th className="px-4 py-3 font-semibold">Campanha</th>
+                    <th className="px-4 py-3 text-right font-semibold">Investimento</th>
+                    <th className="px-4 py-3 text-right font-semibold">Cliques</th>
+                    <th className="px-4 py-3 text-right font-semibold">Ligações</th>
+                    <th className="px-4 py-3 text-right font-semibold">Rotas</th>
+                    <th className="px-4 py-3 text-right font-semibold">Custo por ligação</th>
+                    <th className="px-4 py-3 text-right font-semibold">Custo por rota</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dados.campanhas.map((linha) => {
+                    // A campanha que só rodou na comparação continua na tabela:
+                    // "não rodou" é metade da explicação de uma queda.
+                    const ausente = linha.atual === null;
+                    const n = linha.atual ?? linha.anterior!;
+                    const antes = comparando && !ausente ? linha.anterior : null;
+                    const status = STATUS[linha.status];
+                    const compara = (campo: keyof NumerosDaCampanha) =>
+                      comparando && !ausente ? variacao(n[campo], antes ? antes[campo] : 0) : undefined;
 
-      <dl className="mt-5 grid gap-x-8 gap-y-3 text-apoio leading-relaxed text-ink-mute md:grid-cols-3">
-        <div>
-          <dt className="font-semibold text-ink-soft">Ligações</dt>
-          <dd>Quem ligou pelo botão de ligar do anúncio, como o Google conta.</dd>
-        </div>
-        <div>
-          <dt className="font-semibold text-ink-soft">Pedidos de rota</dt>
-          <dd>Quem pediu o caminho até o endereço a partir do anúncio, no Maps ou na busca.</dd>
-        </div>
-        <div>
-          <dt className="font-semibold text-ink-soft">Custo por ligação</dt>
-          <dd>O investimento dividido pelas ligações. O mesmo vale para o custo por rota.</dd>
-        </div>
-      </dl>
+                    return (
+                      <tr key={linha.externalId} className={`border-b border-line/60 last:border-0 ${ausente ? "opacity-55" : ""}`}>
+                        <td className="px-4 py-3.5 align-top">
+                          <p className="font-medium text-ink">{linha.nome}</p>
+                          {status ? (
+                            <div className="mt-1.5">
+                              <Badge tone={status.tom} dot>
+                                {status.rotulo}
+                              </Badge>
+                            </div>
+                          ) : null}
+                          {ausente ? (
+                            <p className="mt-1 text-rotulo text-ink-mute">
+                              Não rodou no período escolhido. Os números ao lado são de {rotuloDaComparacao}.
+                            </p>
+                          ) : null}
+                        </td>
+                        <Numero valor={formatCentsAsBRL(n.gastoCentavos)} variacao={compara("gastoCentavos")} />
+                        <Numero valor={inteiro(n.cliques)} />
+                        <Acoes valor={n.ligacoes} variacao={compara("ligacoes")} />
+                        <Acoes valor={n.rotas} variacao={compara("rotas")} />
+                        <Custo valor={n.custoPorLigacao} acoes={n.ligacoes} nenhuma="Sem ligação" />
+                        <Custo valor={n.custoPorRota} acoes={n.rotas} nenhuma="Sem rota" />
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        <dl className="mt-5 grid gap-x-8 gap-y-3 text-apoio leading-relaxed text-ink-mute md:grid-cols-3">
+          <div>
+            <dt className="font-semibold text-ink-soft">Ligações</dt>
+            <dd>Quem ligou pelo botão de ligar do anúncio, como o Google conta.</dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-ink-soft">Pedidos de rota</dt>
+            <dd>Quem pediu o caminho até o endereço a partir do anúncio, no Maps ou na busca.</dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-ink-soft">Custo por ligação</dt>
+            <dd>O investimento dividido pelas ligações. O mesmo vale para o custo por rota.</dd>
+          </div>
+        </dl>
+      </details>
     </div>
   );
 }
