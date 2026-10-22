@@ -104,6 +104,7 @@ export function CampanhasSimples({
                 return {
                   id: linha.externalId,
                   nome: linha.nome,
+                  imagemUrl: linha.imagemUrl ?? null,
                   detalhe: `${PLATAFORMA[linha.plataforma] ?? linha.plataforma}${STATUS[linha.status] ? `, ${STATUS[linha.status]}` : ""}`,
                   gastoCentavos: atual.gastoCentavos,
                   voltou: unidade.valor(atual, locais),

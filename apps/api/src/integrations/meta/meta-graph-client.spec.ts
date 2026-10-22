@@ -133,7 +133,7 @@ describe("MetaGraphClient", () => {
     expect(new URL(fetchMock.mock.calls[0][0] as string).searchParams.get("fields")).toBe(
       "id,name,status,campaign_id",
     );
-    expect(new URL(fetchMock.mock.calls[1][0] as string).searchParams.get("fields")).toBe("id,name,status,adset_id");
+    expect(new URL(fetchMock.mock.calls[1][0] as string).searchParams.get("fields")).toBe("id,name,status,adset_id,creative{image_url,thumbnail_url}");
   });
 
   it("requests insights with a daily breakdown over the given date range", async () => {

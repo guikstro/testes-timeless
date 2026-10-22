@@ -1455,6 +1455,12 @@ model Ad {
   externalId   String   @map("external_id")
   name         String
   status       String
+  /**
+   * A imagem do criativo (ou a capa do vídeo), como a Meta entrega. O
+   * endereço é assinado e expira em dias; a sincronia de hora em hora o
+   * renova. Nulo quando a plataforma não informa.
+   */
+  imagemUrl    String?  @map("imagem_url")
   lastSyncedAt DateTime @map("last_synced_at")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")

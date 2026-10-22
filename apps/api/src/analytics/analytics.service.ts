@@ -502,6 +502,32 @@ export class AnalyticsService {
   }
 
   /**
+   * Uma imagem por campanha: a do anúncio ativo sincronizado por último, ou,
+   * sem anúncio ativo, a de qualquer um que tenha. É para reconhecer a
+   * campanha de olho, não para dizer qual anúncio rendeu mais.
+   */
+  private async imagensDasCampanhas(organizationId: string, externalIds: string[]): Promise<Map<string, string>> {
+    if (externalIds.length === 0) return new Map();
+    const anuncios = await this.prisma.ad.findMany({
+      where: {
+        imagemUrl: { not: null },
+        adSet: { campaign: { organizationId, externalId: { in: externalIds } } },
+      },
+      select: { imagemUrl: true, status: true, adSet: { select: { campaign: { select: { externalId: true } } } } },
+      orderBy: { lastSyncedAt: "desc" },
+    });
+    const imagens = new Map<string, string>();
+    for (const ativo of [true, false]) {
+      for (const anuncio of anuncios) {
+        const campanha = anuncio.adSet.campaign.externalId;
+        if (imagens.has(campanha) || (ativo && anuncio.status !== "ACTIVE")) continue;
+        imagens.set(campanha, anuncio.imagemUrl!);
+      }
+    }
+    return imagens;
+  }
+
+  /**
    * Desempenho por campanha em dois períodos escolhidos à mão.
    *
    * Períodos livres, e não uma janela de "últimos N dias", porque uma
@@ -523,13 +549,17 @@ export class AnalyticsService {
     ]);
 
     const juncao = comparaDesempenho(atual, anterior);
+    const imagens = await this.imagensDasCampanhas(
+      organizationId,
+      juncao.campanhas.map((linha) => linha.externalId),
+    );
 
     return {
       periodo,
       comparacao,
       cobertura,
       parcial: { atual: comecaAntes(periodo, cobertura.desde), comparacao: comecaAntes(comparacao, cobertura.desde) },
-      campanhas: juncao.campanhas,
+      campanhas: juncao.campanhas.map((linha) => ({ ...linha, imagemUrl: imagens.get(linha.externalId) ?? null })),
       semCampanha: juncao.semCampanha,
       totais: {
         ...atual.campanhas.reduce(

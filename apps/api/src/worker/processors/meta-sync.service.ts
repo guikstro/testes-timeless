@@ -131,10 +131,11 @@ export class MetaSyncService {
       for (const ad of ads) {
         const adSetId = adSetIdByExternalId.get(ad.adset_id);
         if (!adSetId) continue;
+        const imagemUrl = ad.creative?.image_url ?? ad.creative?.thumbnail_url ?? null;
         await this.prisma.ad.upsert({
           where: { adSetId_externalId: { adSetId, externalId: ad.id } },
-          create: { adSetId, externalId: ad.id, name: ad.name, status: ad.status, lastSyncedAt: now },
-          update: { adSetId, name: ad.name, status: ad.status, lastSyncedAt: now },
+          create: { adSetId, externalId: ad.id, name: ad.name, status: ad.status, imagemUrl, lastSyncedAt: now },
+          update: { adSetId, name: ad.name, status: ad.status, imagemUrl, lastSyncedAt: now },
         });
       }
 

@@ -375,6 +375,8 @@ export interface CampanhaComparada {
   status: string;
   criadaNaPlataformaEm: string | null;
   objetivo: string | null;
+  /** A capa de um dos anúncios da campanha, para reconhecê-la de olho. Preenchida depois da junção. */
+  imagemUrl?: string | null;
   atual: DesempenhoDeCampanha | null;
   anterior: DesempenhoDeCampanha | null;
   /** Preenchida só quando a campanha teve atividade nos dois períodos. */

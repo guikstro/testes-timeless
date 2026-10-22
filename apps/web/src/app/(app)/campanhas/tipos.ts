@@ -64,6 +64,8 @@ export interface CampanhaComparada {
   status: string;
   criadaNaPlataformaEm: string | null;
   objetivo: string | null;
+  /** A capa de um dos anúncios, para reconhecer a campanha. Null quando a plataforma não informa. */
+  imagemUrl?: string | null;
   /** Null quando a campanha não teve atividade naquele período. Não é zero: é ausência. */
   atual: DesempenhoDeCampanha | null;
   anterior: DesempenhoDeCampanha | null;

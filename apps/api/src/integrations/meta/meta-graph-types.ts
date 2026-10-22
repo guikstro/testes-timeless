@@ -22,6 +22,8 @@ export interface MetaAd {
   name: string;
   status: string;
   adset_id: string;
+  /** A capa do criativo. `image_url` só existe em anúncio de imagem; vídeo e carrossel trazem `thumbnail_url`. */
+  creative?: { image_url?: string; thumbnail_url?: string };
 }
 
 /**

@@ -85,7 +85,10 @@ export class MetaGraphClient {
 
   async getAds(adAccountId: string, accessToken: string): Promise<MetaAd[]> {
     const url = this.buildUrl(`/${adAccountId}/ads`, accessToken, {
-      fields: "id,name,status,adset_id",
+      // A capa em 600 px: o padrão é 64, pequeno demais para reconhecer o anúncio.
+      fields: "id,name,status,adset_id,creative{image_url,thumbnail_url}",
+      thumbnail_width: "600",
+      thumbnail_height: "600",
       limit: ITENS_POR_PAGINA,
     });
     return this.fetchAllPages<MetaAd>(url);

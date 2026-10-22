@@ -160,9 +160,24 @@ describe("AnalyticsService.desempenhoPorCampanha", () => {
       metaConnection: { findUnique: jest.fn().mockResolvedValue(null) },
       googleAdsConexao: { findUnique: jest.fn().mockResolvedValue(null) },
       adSpend: { aggregate: jest.fn().mockResolvedValue({ _min: { date: null } }) },
+      ad: { findMany: jest.fn().mockResolvedValue([]) },
     };
     return { service: new AnalyticsService(prisma as unknown as PrismaService), prisma };
   }
+
+  it("dá a cada campanha a imagem de um anúncio ativo, antes da de um pausado", async () => {
+    const { service, prisma } = buildService([
+      { id: "c1", externalId: "ext-1", name: "Campanha", platform: "META", status: "ACTIVE", criadaNaPlataformaEm: null, objetivo: null, spend: [{ date: new Date("2026-09-10T00:00:00.000Z"), amountCents: 1000, impressions: 10, clicks: 1, conversasNaPlataforma: null }] },
+    ]);
+    prisma.ad.findMany.mockResolvedValue([
+      { imagemUrl: "https://img/pausado.jpg", status: "PAUSED", adSet: { campaign: { externalId: "ext-1" } } },
+      { imagemUrl: "https://img/ativo.jpg", status: "ACTIVE", adSet: { campaign: { externalId: "ext-1" } } },
+    ]);
+
+    const resultado = await service.desempenhoPorCampanha("org-1", { de: "2026-09-01", ate: "2026-09-30" }, null);
+
+    expect(resultado.campanhas[0].imagemUrl).toBe("https://img/ativo.jpg");
+  });
 
   /*
     A Meta conectada em 23/09 tem dado desde 16/09 (sete dias para trás).

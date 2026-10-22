@@ -7,6 +7,8 @@ export type TomDaCampanha = "bom" | "atencao" | "ruim" | "neutro";
 export interface LinhaDaLista {
   id: string;
   nome: string;
+  /** A capa de um anúncio da campanha. O dono reconhece o anúncio pela imagem, não pelo nome. */
+  imagemUrl?: string | null;
   /** Plataforma e situação, em uma linha curta. */
   detalhe: string;
   gastoCentavos: number;
@@ -100,6 +102,7 @@ export function ListaDeCampanhas({ grupos }: { grupos: GrupoDaLista[] }) {
 function Espelhado({ linhas }: { linhas: LinhaDaLista[] }) {
   const maiorGasto = Math.max(...linhas.map((l) => l.gastoCentavos), 1);
   const maiorVolta = Math.max(...linhas.map((l) => l.voltou ?? 0), 1);
+  const comCapa = linhas.some((l) => l.imagemUrl);
   const colunas = "grid grid-cols-[minmax(0,1fr)_7.5rem_minmax(0,1fr)] items-center gap-2 sm:grid-cols-[minmax(0,1fr)_13rem_minmax(0,1fr)] sm:gap-4";
 
   return (
@@ -121,11 +124,14 @@ function Espelhado({ linhas }: { linhas: LinhaDaLista[] }) {
                   style={{ width: `${Math.max((linha.gastoCentavos / maiorGasto) * 100, 1.5)}%` }}
                 />
               </div>
-              <div className="min-w-0 text-center">
-                <p className="truncate text-apoio font-medium text-ink sm:text-corpo" title={linha.nome}>
-                  {linha.nome}
-                </p>
-                <p className="truncate text-rotulo text-ink-mute">{linha.detalhe}</p>
+              <div className="flex min-w-0 items-center justify-center gap-2.5">
+                {comCapa ? <Capa url={linha.imagemUrl} className="hidden h-9 w-9 sm:block" /> : null}
+                <div className="min-w-0 text-center">
+                  <p className="truncate text-apoio font-medium text-ink sm:text-corpo" title={linha.nome}>
+                    {linha.nome}
+                  </p>
+                  <p className="truncate text-rotulo text-ink-mute">{linha.detalhe}</p>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 {linha.voltou !== null ? (
@@ -157,6 +163,8 @@ function Extrato({ linhas }: { linhas: LinhaDaLista[] }) {
   const gasto = linhas.reduce((s, l) => s + l.gastoCentavos, 0);
   const voltou = linhas.reduce((s, l) => s + (l.voltou ?? 0), 0);
   const unidade = linhas[0]?.unidade ?? ["resultado", "resultados"];
+  // Sem nenhuma capa (só Google, por exemplo), nada de quadrados vazios.
+  const comCapa = linhas.some((l) => l.imagemUrl);
 
   return (
     <div className="mt-2">
@@ -166,28 +174,31 @@ function Extrato({ linhas }: { linhas: LinhaDaLista[] }) {
       </div>
       <ul className="border-t border-line/70">
         {linhas.map((linha) => (
-          <li key={linha.id} className="border-b border-line/70 py-3.5">
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-4">
-              <div className="flex min-w-0 items-baseline gap-2">
-                <span className="truncate text-corpo font-medium text-ink" title={linha.nome}>
-                  {linha.nome}
+          <li key={linha.id} className="flex gap-3.5 border-b border-line/70 py-3.5">
+            {comCapa ? <Capa url={linha.imagemUrl} className="mt-0.5 h-12 w-12" /> : null}
+            <div className="min-w-0 flex-1">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-4">
+                <div className="flex min-w-0 items-baseline gap-2">
+                  <span className="truncate text-corpo font-medium text-ink" title={linha.nome}>
+                    {linha.nome}
+                  </span>
+                  <span className="min-w-6 flex-1 -translate-y-1 border-b-2 border-dotted border-line" aria-hidden />
+                  <span className="shrink-0 font-display text-destaque font-semibold tabular-nums text-ink">{reais(linha.gastoCentavos)}</span>
+                </div>
+                <span className="w-28 text-right sm:w-40">
+                  <span className={`font-display text-destaque font-semibold tabular-nums ${linha.tom === "atencao" || linha.tom === "ruim" ? "text-warning" : "text-accent"}`}>
+                    {linha.voltou === null ? "–" : inteiro(linha.voltou)}
+                  </span>{" "}
+                  <span className="text-apoio text-ink-mute">{linha.voltou === 1 ? linha.unidade[0] : linha.unidade[1]}</span>
                 </span>
-                <span className="min-w-6 flex-1 -translate-y-1 border-b-2 border-dotted border-line" aria-hidden />
-                <span className="shrink-0 font-display text-destaque font-semibold tabular-nums text-ink">{reais(linha.gastoCentavos)}</span>
               </div>
-              <span className="w-28 text-right sm:w-40">
-                <span className={`font-display text-destaque font-semibold tabular-nums ${linha.tom === "atencao" || linha.tom === "ruim" ? "text-warning" : "text-accent"}`}>
-                  {linha.voltou === null ? "–" : inteiro(linha.voltou)}
-                </span>{" "}
-                <span className="text-apoio text-ink-mute">{linha.voltou === 1 ? linha.unidade[0] : linha.unidade[1]}</span>
-              </span>
+              <p className="mt-1 max-w-2xl text-apoio leading-relaxed text-ink-mute">
+                {linha.detalhe}. {linha.frase}
+              </p>
             </div>
-            <p className="mt-1 max-w-2xl text-apoio leading-relaxed text-ink-mute">
-              {linha.detalhe}. {linha.frase}
-            </p>
           </li>
         ))}
-        <li className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-4 border-t-2 border-ink py-3.5">
+        <li className={`grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-4 border-t-2 border-ink py-3.5 ${comCapa ? "pl-[3.875rem]" : ""}`}>
           <div className="flex items-baseline justify-between gap-2">
             <span className="text-corpo font-semibold text-ink">Total</span>
             <span className="font-display text-xl font-semibold tabular-nums text-ink">{reais(gasto)}</span>
@@ -239,6 +250,26 @@ function Observacoes({ linhas }: { linhas: LinhaDaLista[] }) {
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * A capa do anúncio, num quadrado. Sem imagem, o quadrado fica vazio em vez
+ * de sumir, para os nomes continuarem alinhados.
+ */
+function Capa({ url, className }: { url?: string | null; className: string }) {
+  const [quebrou, setQuebrou] = useState(false);
+  if (!url || quebrou) return <span aria-hidden className={`${className} shrink-0 rounded-lg bg-panel-soft`} />;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- endereço assinado da Meta, que muda a cada sincronia
+    <img
+      src={url}
+      alt=""
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      onError={() => setQuebrou(true)}
+      className={`${className} shrink-0 rounded-lg border border-line/70 object-cover`}
+    />
   );
 }
 
