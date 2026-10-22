@@ -31,6 +31,9 @@
  */
 export const VERSAO_DO_SCRIPT = 4;
 
+/** O histórico de 13 meses chega desde a versão 3. */
+export const VERSAO_DO_HISTORICO = 3;
+
 /** As conversões sobem sozinhas desde a versão 4. */
 export const VERSAO_DAS_CONVERSOES = 4;
 

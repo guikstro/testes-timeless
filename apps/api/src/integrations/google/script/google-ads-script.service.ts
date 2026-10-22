@@ -7,7 +7,7 @@ import { enderecoPublico } from "../../../common/configuracao/ambiente";
 import { AuditoriaService, Autor } from "../../../auditoria/auditoria.service";
 import { contaLegivel, converteCampanha, converteMetricasLocais, metricasMedidas } from "./converte-envio";
 import { Prisma } from "@prisma/client";
-import { scriptDoGoogleAds, VERSAO_DAS_ACOES_LOCAIS, VERSAO_DAS_CONVERSOES, VERSAO_DO_SCRIPT } from "./script-do-google-ads";
+import { scriptDoGoogleAds, VERSAO_DAS_ACOES_LOCAIS, VERSAO_DAS_CONVERSOES, VERSAO_DO_HISTORICO, VERSAO_DO_SCRIPT } from "./script-do-google-ads";
 import { EnvioDoScriptDto } from "./envio.dto";
 import { ConversaoParaOScript, GoogleConversionsService } from "../google-conversions.service";
 
@@ -140,7 +140,7 @@ export class GoogleAdsScriptService {
             // Script colado antes das ligações e rotas: manda gasto, e só.
             scriptDesatualizado: conexao.ultimoEnvioEm !== null && (conexao.versaoDoScript ?? 1) < VERSAO_DAS_ACOES_LOCAIS,
             // Script anterior ao histórico: só os últimos 35 dias de cada rodada.
-            semHistorico: conexao.ultimoEnvioEm !== null && !conexao.historicoCompletoEm && (conexao.versaoDoScript ?? 1) < VERSAO_DO_SCRIPT,
+            semHistorico: conexao.ultimoEnvioEm !== null && !conexao.historicoCompletoEm && (conexao.versaoDoScript ?? 1) < VERSAO_DO_HISTORICO,
             historicoCompleto: Boolean(conexao.historicoCompletoEm),
             // Script anterior à versão 4: as conversões não vão sozinhas.
             semConversoesAutomaticas: conexao.ultimoEnvioEm !== null && (conexao.versaoDoScript ?? 1) < VERSAO_DAS_CONVERSOES,
