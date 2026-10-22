@@ -19,6 +19,8 @@ describe("PushService", () => {
       pushSubscription: {
         findMany: jest.fn().mockResolvedValue([]),
         upsert: jest.fn().mockResolvedValue({}),
+        findFirst: jest.fn().mockResolvedValue(null),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
@@ -85,6 +87,27 @@ describe("PushService", () => {
     await service.cancelar(eu, "https://push/1");
     expect(prisma.pushSubscription.deleteMany).toHaveBeenCalledWith({
       where: { endpoint: "https://push/1", userId: "u1", organizationId: "org-1" },
+    });
+  });
+
+  it("manda cada tipo só para os aparelhos que querem aquele aviso", async () => {
+    const { service, prisma } = build({ publicKey: "P2", privateKeyEnc: "enc(S2)" });
+    await service.enviarParaOrganizacao("org-1", aviso, "message.received");
+    expect(prisma.pushSubscription.findMany).toHaveBeenCalledWith({ where: { organizationId: "org-1", avisaMensagem: true } });
+    await service.enviarParaOrganizacao("org-1", aviso, "lead.created");
+    expect(prisma.pushSubscription.findMany).toHaveBeenLastCalledWith({ where: { organizationId: "org-1", avisaLeadNovo: true } });
+  });
+
+  it("lê e salva as preferências só do aparelho da própria pessoa", async () => {
+    const { service, prisma } = build();
+    const eu = { userId: "u1", organizationId: "org-1" };
+    prisma.pushSubscription.findFirst.mockResolvedValue({ avisaLeadNovo: true, avisaMensagem: false });
+    expect(await service.preferencias(eu, "https://push/1")).toEqual({ leadNovo: true, mensagem: false });
+
+    expect(await service.salvaPreferencias(eu, "https://push/1", { leadNovo: false, mensagem: true })).toBe(true);
+    expect(prisma.pushSubscription.updateMany).toHaveBeenCalledWith({
+      where: { endpoint: "https://push/1", userId: "u1", organizationId: "org-1" },
+      data: { avisaLeadNovo: false, avisaMensagem: true },
     });
   });
 });

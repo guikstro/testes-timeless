@@ -1879,6 +1879,10 @@ model PushSubscription {
   p256dh         String
   auth           String
   userAgent      String?  @map("user_agent")
+  /// Avisar quando chega um lead novo.
+  avisaLeadNovo  Boolean  @default(true) @map("avisa_lead_novo")
+  /// Avisar quando um lead manda mensagem.
+  avisaMensagem  Boolean  @default(true) @map("avisa_mensagem")
   createdAt      DateTime @default(now()) @map("created_at")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)

@@ -27,7 +27,12 @@ import { temPresencaLocal } from "@/lib/foco";
 import { concluiPresencaLocal, PainelPresencaLocal, PresencaLocal } from "./painel-presenca-local";
 import { FILTRO_DE_RESPONSAVEL } from "@/lib/leads/acompanhamento";
 
-const PERIODOS = [7, 30, 90];
+const PERIODOS = [1, 7, 30, 90];
+
+/** "1 dia" se lê "Hoje" na tela. */
+function rotuloDoPeriodo(dias: number): string {
+  return dias === 1 ? "Hoje" : `${dias} dias`;
+}
 
 /**
  * Uma pergunta por aba.
@@ -168,18 +173,21 @@ export default async function DashboardPage({
   const simples = !local && !naPagina && medicao === "medido" && aba === "geral";
 
   if (simples) {
+    // A mesma lista que o "Responder" abre: quem espera há mais de 30 minutos,
+    // em qualquer conversa, e não só entre os leads que chegaram no período.
+    const espera = await apiFetch<{ total: number; truncado: boolean }>("/conversations?status=awaiting").catch(() => null);
     return (
       <div className="mx-auto max-w-6xl">
         <AtualizaAoVivo />
         <header className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-rotulo font-semibold uppercase tracking-[0.14em] text-ink-mute">
-            Últimos {days} dias · {formataDia(de)} a {formataDia(ate)}
+            {days === 1 ? `Hoje · ${formataDia(ate)}` : `Últimos ${days} dias · ${formataDia(de)} a ${formataDia(ate)}`}
           </p>
           <GrupoDePilulas
             ativo={String(days)}
             opcoes={PERIODOS.map((opcao) => ({
               chave: String(opcao),
-              rotulo: `${opcao} dias`,
+              rotulo: rotuloDoPeriodo(opcao),
               href: `/dashboard?days=${opcao}${comMetricas}`,
             }))}
           />
@@ -187,6 +195,7 @@ export default async function DashboardPage({
         <ResumoSimples
           overview={overview}
           gastoCentavos={anuncios?.totais.gastoCentavos ?? null}
+          esperando={espera ? { quantos: espera.total, mais: espera.truncado } : null}
           dias={days}
           relatorioCompleto={paraAba("funil")}
         />
@@ -232,7 +241,7 @@ export default async function DashboardPage({
             ativo={String(days)}
             opcoes={PERIODOS.map((opcao) => ({
               chave: String(opcao),
-              rotulo: `${opcao} dias`,
+              rotulo: rotuloDoPeriodo(opcao),
               href: `/dashboard?aba=${aba}&days=${opcao}${comRecortes ? `&${comRecortes}` : ""}${comMetricas}`,
             }))}
           />
@@ -441,7 +450,7 @@ async function DashboardDePresencaLocal({ days }: { days: number }) {
         </div>
         <GrupoDePilulas
           ativo={String(days)}
-          opcoes={PERIODOS.map((opcao) => ({ chave: String(opcao), rotulo: `${opcao} dias`, href: `/dashboard?days=${opcao}` }))}
+          opcoes={PERIODOS.map((opcao) => ({ chave: String(opcao), rotulo: rotuloDoPeriodo(opcao), href: `/dashboard?days=${opcao}` }))}
         />
       </header>
       <PainelPresencaLocal dados={dados} />

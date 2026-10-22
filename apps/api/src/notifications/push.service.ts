@@ -13,6 +13,14 @@ export interface AvisoDePush {
   tag?: string;
 }
 
+/** Os tipos de aviso que um aparelho pode ligar ou desligar. */
+export type TipoDePush = "lead.created" | "message.received";
+
+export interface PreferenciasDoAviso {
+  leadNovo: boolean;
+  mensagem: boolean;
+}
+
 export interface InscricaoDoNavegador {
   endpoint: string;
   keys: { p256dh: string; auth: string };
@@ -71,6 +79,28 @@ export class PushService {
     });
   }
 
+  /** As preferências deste aparelho, ou null se ele não está inscrito para esta pessoa. */
+  async preferencias(user: { userId: string; organizationId: string }, endpoint: string): Promise<PreferenciasDoAviso | null> {
+    const inscricao = await this.prisma.pushSubscription.findFirst({
+      where: { endpoint, userId: user.userId, organizationId: user.organizationId },
+      select: { avisaLeadNovo: true, avisaMensagem: true },
+    });
+    return inscricao ? { leadNovo: inscricao.avisaLeadNovo, mensagem: inscricao.avisaMensagem } : null;
+  }
+
+  /** Só mexe no aparelho da própria pessoa, na organização da sessão. */
+  async salvaPreferencias(
+    user: { userId: string; organizationId: string },
+    endpoint: string,
+    preferencias: PreferenciasDoAviso,
+  ): Promise<boolean> {
+    const { count } = await this.prisma.pushSubscription.updateMany({
+      where: { endpoint, userId: user.userId, organizationId: user.organizationId },
+      data: { avisaLeadNovo: preferencias.leadNovo, avisaMensagem: preferencias.mensagem },
+    });
+    return count > 0;
+  }
+
   async cancelar(user: { userId: string; organizationId: string }, endpoint: string): Promise<void> {
     await this.prisma.pushSubscription.deleteMany({
       where: { endpoint, userId: user.userId, organizationId: user.organizationId },
@@ -81,9 +111,15 @@ export class PushService {
    * Manda o aviso a todos os aparelhos da organização. Nunca lança: é chamado
    * de dentro da ingestão, e perder um aviso não pode custar a mensagem.
    */
-  async enviarParaOrganizacao(organizationId: string, aviso: AvisoDePush): Promise<void> {
+  async enviarParaOrganizacao(organizationId: string, aviso: AvisoDePush, tipo?: TipoDePush): Promise<void> {
     try {
-      const inscricoes = await this.prisma.pushSubscription.findMany({ where: { organizationId } });
+      const inscricoes = await this.prisma.pushSubscription.findMany({
+        where: {
+          organizationId,
+          ...(tipo === "lead.created" ? { avisaLeadNovo: true } : {}),
+          ...(tipo === "message.received" ? { avisaMensagem: true } : {}),
+        },
+      });
       if (inscricoes.length === 0) return;
 
       const { publicKey, privateKey } = await this.obterChaves();

@@ -69,12 +69,16 @@ export class NotificationsService implements OnModuleDestroy {
     }
 
     if (this.push && TIPOS_COM_PUSH.has(completo.type)) {
-      await this.push.enviarParaOrganizacao(completo.organizationId, {
-        title: completo.title,
-        body: completo.body,
-        url: completo.leadId ? `/conversas?lead=${completo.leadId}` : "/conversas",
-        tag: completo.leadId ? `lead-${completo.leadId}` : undefined,
-      });
+      await this.push.enviarParaOrganizacao(
+        completo.organizationId,
+        {
+          title: completo.title,
+          body: completo.body,
+          url: completo.leadId ? `/conversas?lead=${completo.leadId}` : "/conversas",
+          tag: completo.leadId ? `lead-${completo.leadId}` : undefined,
+        },
+        completo.type as "lead.created" | "message.received",
+      );
     }
   }
 

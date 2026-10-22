@@ -74,3 +74,36 @@ export async function desativarAvisos(): Promise<EstadoDosAvisos> {
   }
   return "desativado";
 }
+
+export interface PreferenciasDoAviso {
+  leadNovo: boolean;
+  mensagem: boolean;
+}
+
+async function enderecoDesteAparelho(): Promise<string | null> {
+  if (!navegadorSabe()) return null;
+  const registro = await navigator.serviceWorker.getRegistration("/sw.js");
+  return (await registro?.pushManager.getSubscription())?.endpoint ?? null;
+}
+
+/** Null quando este aparelho não está inscrito. */
+export async function lerPreferencias(): Promise<PreferenciasDoAviso | null> {
+  const endpoint = await enderecoDesteAparelho();
+  if (!endpoint) return null;
+  const resposta = await fetch("/api/notifications/push/preferencias/ler", {
+    method: "POST",
+    body: JSON.stringify({ endpoint }),
+  });
+  if (!resposta.ok) return null;
+  return ((await resposta.json()) as { preferencias: PreferenciasDoAviso | null }).preferencias;
+}
+
+export async function salvarPreferencias(preferencias: PreferenciasDoAviso): Promise<void> {
+  const endpoint = await enderecoDesteAparelho();
+  if (!endpoint) throw new Error("Os avisos não estão ativos neste aparelho.");
+  const resposta = await fetch("/api/notifications/push/preferencias", {
+    method: "POST",
+    body: JSON.stringify({ endpoint, ...preferencias }),
+  });
+  if (!resposta.ok) throw new Error("Não foi possível salvar a escolha.");
+}

@@ -15,12 +15,15 @@ export function ResumoSimples({
   gastoCentavos,
   dias,
   relatorioCompleto,
+  esperando,
 }: {
   overview: Overview;
   /** Gasto em anúncios no período; null quando não há conta de anúncios ligada. */
   gastoCentavos: number | null;
   dias: number;
   relatorioCompleto: string;
+  /** Quem espera resposta há mais de 30 minutos; null quando a contagem não carregou. */
+  esperando: { quantos: number; mais: boolean } | null;
 }) {
   const { totals, comparacao, atendimento, byOrigin } = overview;
   const clientes = totals.clientes;
@@ -35,10 +38,11 @@ export function ResumoSimples({
           {clientes}
         </p>
         <p className="mt-3 text-lg text-ink">
-          {clientes === 1 ? "novo cliente" : "novos clientes"} {dias === 30 ? "este mês" : `nos últimos ${dias} dias`}
+          {clientes === 1 ? "novo cliente" : "novos clientes"}{" "}
+          {dias === 1 ? "hoje" : dias === 30 ? "este mês" : `nos últimos ${dias} dias`}
         </p>
         <p className="mt-1 text-apoio text-ink-mute">Contamos quem marcou reunião ou fechou contrato.</p>
-        <Variacao diferenca={diferenca} anterior={anterior} />
+        <Variacao diferenca={diferenca} anterior={anterior} referencia={dias === 1 ? "ontem" : "no período anterior"} />
       </section>
 
       <section className="mx-auto flex max-w-xl items-stretch justify-center divide-x divide-line text-center">
@@ -50,7 +54,7 @@ export function ResumoSimples({
         />
       </section>
 
-      <FaixaDeEspera aguardando={atendimento.aguardando} />
+      {esperando ? <FaixaDeEspera aguardando={esperando.quantos} mais={esperando.mais} /> : null}
 
       <details className="group mt-8">
         <summary className="focus-ring mx-auto flex w-fit cursor-pointer list-none items-center gap-1.5 rounded-full border border-line bg-panel px-4 py-2 text-corpo font-medium text-ink-soft transition-colors hover:text-ink [&::-webkit-details-marker]:hidden">
@@ -88,12 +92,12 @@ export function ResumoSimples({
   );
 }
 
-function Variacao({ diferenca, anterior }: { diferenca: number; anterior: number }) {
+function Variacao({ diferenca, anterior, referencia }: { diferenca: number; anterior: number; referencia: string }) {
   if (anterior === 0 && diferenca === 0) return null;
   const texto =
     diferenca === 0
-      ? "o mesmo que no período anterior"
-      : `${Math.abs(diferenca)} a ${diferenca > 0 ? "mais" : "menos"} que no período anterior`;
+      ? `o mesmo que ${referencia}`
+      : `${Math.abs(diferenca)} a ${diferenca > 0 ? "mais" : "menos"} que ${referencia}`;
   return (
     <p className={`mt-3 text-corpo font-medium ${diferenca > 0 ? "text-success" : diferenca < 0 ? "text-danger" : "text-ink-mute"}`}>
       {diferenca > 0 ? "↗ " : diferenca < 0 ? "↘ " : ""}
@@ -112,12 +116,12 @@ function Pequeno({ valor, rotulo }: { valor: string; rotulo: string }) {
 }
 
 /** O que precisa de ação agora. Escura de propósito: é a única coisa da tela que pede para alguém se mexer. */
-function FaixaDeEspera({ aguardando }: { aguardando: number }) {
+function FaixaDeEspera({ aguardando, mais }: { aguardando: number; mais: boolean }) {
   if (aguardando === 0) {
     return (
       <div className="mt-8 flex items-center gap-3 rounded-2xl border border-success-line bg-success-soft px-5 py-4">
         <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-success" aria-hidden />
-        <p className="text-destaque text-ink">Ninguém esperando resposta agora.</p>
+        <p className="text-destaque text-ink">Ninguém esperando resposta há mais de 30 minutos.</p>
       </div>
     );
   }
@@ -128,8 +132,11 @@ function FaixaDeEspera({ aguardando }: { aguardando: number }) {
     >
       <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-warning-line" aria-hidden />
       <p className="flex-1 text-destaque">
-        <span className="font-semibold">{plural(aguardando, "pessoa", "pessoas")}</span>{" "}
-        {aguardando === 1 ? "está esperando" : "estão esperando"} resposta
+        <span className="font-semibold">
+          {mais ? "Mais de " : ""}
+          {plural(aguardando, "pessoa", "pessoas")}
+        </span>{" "}
+        {aguardando === 1 && !mais ? "está esperando" : "estão esperando"} resposta há mais de 30 minutos
       </p>
       <span className="text-corpo font-medium text-accent">Responder →</span>
     </Link>

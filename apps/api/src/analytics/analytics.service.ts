@@ -238,15 +238,16 @@ export class AnalyticsService {
 
   async overview(organizationId: string, days: number): Promise<Overview> {
     const to = new Date();
-    const from = new Date(to);
-    from.setDate(from.getDate() - (days - 1));
-    from.setHours(0, 0, 0, 0);
+    // A janela começa à meia-noite de Brasília, e não do relógio do servidor
+    // (UTC no Render): com "Hoje" na tela, a diferença de três horas fazia o
+    // dia virar às nove da noite.
+    const DIA_MS = 24 * 60 * 60 * 1000;
+    const from = new Date(inicioDoDia(diaCivilLocal(to)).getTime() - (days - 1) * DIA_MS);
 
     // Janela anterior de mesmo tamanho, colada na atual: é o que dá sentido a
     // "subiu 15%", em vez de um número solto sem referência.
     const anteriorAte = new Date(from.getTime() - 1);
-    const anteriorDe = new Date(from);
-    anteriorDe.setDate(anteriorDe.getDate() - days);
+    const anteriorDe = new Date(from.getTime() - days * DIA_MS);
 
     const currency = (await this.prisma.organization.findUnique({ where: { id: organizationId }, select: { currency: true } }))?.currency ?? "BRL";
     const selecao = {

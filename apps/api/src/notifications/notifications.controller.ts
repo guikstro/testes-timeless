@@ -7,7 +7,7 @@ import { NotificationsGateway } from "./notifications.gateway";
 import { NotificationsService } from "./notifications.service";
 import { ListarNotificacoesDto } from "./dto/listar-notificacoes.dto";
 import { PushService } from "./push.service";
-import { CancelarPushDto, InscreverPushDto } from "./dto/push.dto";
+import { CancelarPushDto, InscreverPushDto, PreferenciasDoPushDto } from "./dto/push.dto";
 
 /**
  * Um comentário a cada vinte e cinco segundos.
@@ -59,6 +59,18 @@ export class NotificationsController {
   ) {
     await this.push.inscrever(user, { endpoint: dto.endpoint, keys: dto.keys }, userAgent);
     return { ok: true };
+  }
+
+  /** POST e não GET: o endereço do aparelho é longo e não deve ir parar em log de URL. */
+  @Post("push/preferencias/ler")
+  async lerPreferencias(@CurrentUser() user: AuthenticatedUser, @Body() dto: CancelarPushDto) {
+    return { preferencias: await this.push.preferencias(user, dto.endpoint) };
+  }
+
+  @Post("push/preferencias")
+  async salvarPreferencias(@CurrentUser() user: AuthenticatedUser, @Body() dto: PreferenciasDoPushDto) {
+    const salvo = await this.push.salvaPreferencias(user, dto.endpoint, { leadNovo: dto.leadNovo, mensagem: dto.mensagem });
+    return { ok: salvo };
   }
 
   @Delete("push/inscrever")

@@ -1,5 +1,5 @@
 import { Type } from "class-transformer";
-import { IsNotEmptyObject, IsObject, IsString, IsUrl, MaxLength, ValidateNested } from "class-validator";
+import { IsBoolean, IsNotEmptyObject, IsObject, IsString, IsUrl, MaxLength, ValidateNested } from "class-validator";
 
 class ChavesDoPushDto {
   @IsString()
@@ -29,4 +29,16 @@ export class CancelarPushDto {
   @IsString()
   @MaxLength(1000)
   endpoint!: string;
+}
+
+export class PreferenciasDoPushDto {
+  @IsString()
+  @MaxLength(1000)
+  endpoint!: string;
+
+  @IsBoolean()
+  leadNovo!: boolean;
+
+  @IsBoolean()
+  mensagem!: boolean;
 }

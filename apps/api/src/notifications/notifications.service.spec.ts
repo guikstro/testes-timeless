@@ -147,6 +147,7 @@ describe("NotificationsService", () => {
       expect(push.enviarParaOrganizacao).toHaveBeenCalledWith(
         "org-1",
         expect.objectContaining({ title: "Ana respondeu", url: "/conversas?lead=lead-1", tag: "lead-lead-1" }),
+        "message.received",
       );
     });
 
