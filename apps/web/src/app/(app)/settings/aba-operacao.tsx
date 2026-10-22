@@ -59,7 +59,7 @@ export async function AbaOperacao() {
       <Card className="p-6">
         <CardHeader
           title="Frases que avançam o lead"
-          description="Quando o cliente escrever uma destas frases, o lead muda de etapa sozinho. Ex.: \"quero contratar\" leva para Qualificado."
+          description="Quando o cliente escrever uma destas frases, o lead muda de etapa sozinho. Ex.: “quero contratar” leva para Qualificado."
           className="mb-5"
         />
 
