@@ -20,6 +20,7 @@ interface Overview {
     qualified: number;
     meetings: number;
     won: number;
+    clientes: number;
     revenueCents: number;
   };
   comparacao: {
@@ -27,6 +28,7 @@ interface Overview {
     qualified: { anterior: number };
     meetings: { anterior: number };
     won: { anterior: number };
+    clientes: { anterior: number };
     revenueCents: { anterior: number };
   };
   atendimento: {
@@ -35,7 +37,7 @@ interface Overview {
     semResposta: number;
     respondidos: number;
   };
-  byOrigin: { label: string; leads: number; meetings: number; won: number; revenueCents: number }[];
+  byOrigin: { label: string; leads: number; meetings: number; won: number; clientes: number; revenueCents: number }[];
   daily: { date: string; leads: number; won: number }[];
 }
 
@@ -127,12 +129,14 @@ export default async function RelatorioPage({
       qualificados: overview.totals.qualified,
       reunioes: overview.totals.meetings,
       vendas: overview.totals.won,
+      clientes: overview.totals.clientes,
       receitaCentavos: overview.totals.revenueCents,
       descartados: overview.totals.disqualified,
     },
     anterior: {
       leads: overview.comparacao.leads.anterior,
       vendas: overview.comparacao.won.anterior,
+      clientes: overview.comparacao.clientes.anterior,
       receitaCentavos: overview.comparacao.revenueCents.anterior,
     },
     atendimento: {
@@ -144,6 +148,7 @@ export default async function RelatorioPage({
       nome: o.label,
       leads: o.leads,
       vendas: o.won,
+      clientes: o.clientes,
       receitaCentavos: o.revenueCents,
     })),
     investimento: investimentos

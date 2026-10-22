@@ -77,6 +77,35 @@ type Summary = {
   requiresReview: number;
   cancelledSales: number;
 };
+/** "AAAA-MM-DD" no fuso de quem está olhando, para os campos de data. */
+function diaLocal(data: Date): string {
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+  return `${data.getFullYear()}-${mes}-${dia}`;
+}
+
+/** Os últimos 30 dias, contando hoje: a mesma janela do dashboard e do relatório. */
+function ultimos30Dias(): { de: string; ate: string } {
+  const hoje = new Date();
+  const inicio = new Date(hoje);
+  inicio.setDate(inicio.getDate() - 29);
+  return { de: diaLocal(inicio), ate: diaLocal(hoje) };
+}
+
+function formataDiaCurto(dia: string): string {
+  const [ano, mes, d] = dia.split("-");
+  return `${d}/${mes}/${ano}`;
+}
+
+/** Diz de qual período é a receita, para ela não parecer um número solto. */
+function rotuloDoPeriodo(de: string, ate: string): string {
+  if (!de && !ate) return "desde o início";
+  const padrao = ultimos30Dias();
+  if (de === padrao.de && ate === padrao.ate) return "nos últimos 30 dias";
+  if (de && ate) return `de ${formataDiaCurto(de)} a ${formataDiaCurto(ate)}`;
+  return de ? `desde ${formataDiaCurto(de)}` : `até ${formataDiaCurto(ate)}`;
+}
+
 const labels: Record<string, string> = {
   POSSIBLE: "Possível",
   PROBABLE: "Provável",
@@ -147,10 +176,12 @@ export function SalesWorkspace({
     { id: string; name: string; code: string }[]
   >([]);
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [filter, setFilter] = useState("review");
+  // Abre com todas as vendas dos últimos 30 dias. Abrir em "a revisar" fazia a
+  // tela parecer vazia justamente para quem tinha vendas, só nenhuma pendente.
+  const [filter, setFilter] = useState("");
   const [unit, setUnit] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [from, setFrom] = useState(() => ultimos30Dias().de);
+  const [to, setTo] = useState(() => ultimos30Dias().ate);
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
   const [selected, setSelected] = useState<Sale | null>(null);
@@ -285,7 +316,7 @@ export function SalesWorkspace({
             Vendas e receita
           </h1>
           <p className="mt-1 text-ink-mute">
-            Da intenção à receita confirmada, com evidência de cada decisão.
+            As vendas registradas e as que o sistema percebeu nas conversas.
           </p>
         </div>
         {canManage && (
@@ -316,7 +347,7 @@ export function SalesWorkspace({
           className="grid gap-4 md:grid-cols-3"
         >
           <div className="surface p-5">
-            <p className="text-ink-mute">Receita confirmada</p>
+            <p className="text-ink-mute">Receita confirmada {rotuloDoPeriodo(from, to)}</p>
             {summary.currencies.length ? (
               summary.currencies.map((c) => (
                 <div key={c.currency}>
@@ -339,15 +370,15 @@ export function SalesWorkspace({
             )}
           </div>
           <div className="surface p-5">
-            <p className="text-ink-mute">Possíveis e prováveis</p>
+            <p className="text-ink-mute">Vendas a confirmar</p>
             <p className="text-2xl tabular-nums">{summary.possibleSales}</p>
-            <p className="text-sm text-ink-mute">Aguardam confirmação</p>
+            <p className="text-sm text-ink-mute">O sistema achou na conversa, falta alguém confirmar</p>
           </div>
           <div className="surface p-5">
-            <p className="text-ink-mute">Precisam de revisão</p>
+            <p className="text-ink-mute">Com dúvida</p>
             <p className="text-2xl tabular-nums">{summary.requiresReview}</p>
             <p className="text-sm text-ink-mute">
-              Conflitos não entram na receita confirmada
+              Informações que não batem; só entram na receita depois de revisadas
             </p>
           </div>
         </section>
@@ -426,8 +457,8 @@ export function SalesWorkspace({
               setOffset(0);
             }}
           >
-            <option value="review">A revisar</option>
             <option value="">Todas</option>
+            <option value="review">Com dúvida</option>
             {Object.entries(labels).map(([key, label]) => (
               <option key={key} value={key}>
                 {label}

@@ -28,12 +28,14 @@ export interface DadosDoRelatorio {
     qualificados: number;
     reunioes: number;
     vendas: number;
+    /** Reunião marcada ou contrato fechado: a mesma regra do dashboard. */
+    clientes: number;
     receitaCentavos: number;
     descartados: number;
   };
-  anterior: { leads: number; vendas: number; receitaCentavos: number };
+  anterior: { leads: number; vendas: number; clientes: number; receitaCentavos: number };
   atendimento: { medianaSegundos: number | null; semResposta: number; respondidos: number };
-  origens: { nome: string; leads: number; vendas: number; receitaCentavos: number }[];
+  origens: { nome: string; leads: number; vendas: number; clientes: number; receitaCentavos: number }[];
   // O id, e não o nome, identifica a linha: a Meta aceita duas campanhas com o
   // mesmo nome, e é comum duplicar uma para testar sem renomear.
   investimento: { id: string; campanha: string; plataforma: string; totalCentavos: number; dias: number }[];
@@ -52,13 +54,13 @@ export function RelatorioImpresso({ dados }: { dados: DadosDoRelatorio }) {
   const investido = dados.investimento.reduce((soma, linha) => soma + linha.totalCentavos, 0);
 
   const custoPorLead = investido > 0 && totais.leads > 0 ? Math.round(investido / totais.leads) : null;
-  const custoPorVenda = investido > 0 && totais.vendas > 0 ? Math.round(investido / totais.vendas) : null;
+  const custoPorVenda = investido > 0 && totais.clientes > 0 ? Math.round(investido / totais.clientes) : null;
   const retorno = investido > 0 ? totais.receitaCentavos / investido : null;
   const ticket = totais.vendas > 0 ? Math.round(totais.receitaCentavos / totais.vendas) : null;
   const frase = concluiRelatorioDeLeads({
     medido: dados.medido,
     leads: totais.leads,
-    vendas: totais.vendas,
+    vendas: totais.clientes,
     receitaCentavos: totais.receitaCentavos,
     investidoCentavos: investido,
   });
@@ -89,7 +91,7 @@ export function RelatorioImpresso({ dados }: { dados: DadosDoRelatorio }) {
       <Secao titulo="O período em números">
         <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
           <Numero rotulo="Leads" valor={String(totais.leads)} nota={variacao(totais.leads, anterior.leads)} />
-          <Numero rotulo="Clientes novos" valor={String(totais.vendas)} nota={variacao(totais.vendas, anterior.vendas)} />
+          <Numero rotulo="Clientes novos" valor={String(totais.clientes)} nota={variacao(totais.clientes, anterior.clientes)} />
           <Numero
             rotulo="Receita"
             valor={formatCentsAsBRL(totais.receitaCentavos)}
@@ -154,7 +156,7 @@ export function RelatorioImpresso({ dados }: { dados: DadosDoRelatorio }) {
             { chave: "leads", rotulo: "Chegaram", valor: totais.leads, saida: "foram descartados ou não responderam" },
             { chave: "qualificados", rotulo: "Qualificados", valor: totais.qualificados, saida: "não avançaram" },
             { chave: "reunioes", rotulo: "Reuniões", valor: totais.reunioes, saida: "não fecharam" },
-            { chave: "vendas", rotulo: "Clientes", valor: totais.vendas },
+            { chave: "vendas", rotulo: "Contratos fechados", valor: totais.vendas },
           ]}
         />
       </Secao>
@@ -176,9 +178,9 @@ export function RelatorioImpresso({ dados }: { dados: DadosDoRelatorio }) {
                 <tr key={origem.nome} className="border-b border-line/60 last:border-0">
                   <td className="py-2 text-corpo text-ink">{origem.nome}</td>
                   <td className="py-2 text-right text-corpo tabular-nums text-ink-soft">{origem.leads}</td>
-                  <td className="py-2 text-right text-corpo tabular-nums text-ink-soft">{origem.vendas}</td>
+                  <td className="py-2 text-right text-corpo tabular-nums text-ink-soft">{origem.clientes}</td>
                   <td className="py-2 text-right text-corpo tabular-nums text-ink-soft">
-                    {origem.leads > 0 ? `${Math.round((origem.vendas / origem.leads) * 100)}%` : "Sem base"}
+                    {origem.leads > 0 ? `${Math.round((origem.clientes / origem.leads) * 100)}%` : "Sem base"}
                   </td>
                   <td className="py-2 text-right text-corpo tabular-nums text-ink">
                     {formatCentsAsBRL(origem.receitaCentavos)}

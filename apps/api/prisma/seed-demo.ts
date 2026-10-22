@@ -223,9 +223,12 @@ async function main() {
           },
           ...(vende
             ? {
-                sale: {
+                sales: {
                   create: {
                     organizationId: org.id,
+                    status: "CONFIRMED",
+                    confirmedAt: vendidoEm!,
+                    occurredAt: vendidoEm!,
                     // Uma em cada cinco vendas sem valor confirmado, como na
                     // vida real: o sistema nunca inventa um número que ninguém
                     // disse na conversa.
