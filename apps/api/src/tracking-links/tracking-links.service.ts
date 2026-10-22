@@ -14,7 +14,7 @@ const CODE_GENERATION_MAX_ATTEMPTS = 5;
 /** O link como a lista o mostra: o registro mais o endereço já montado. */
 export type LinkListado = Prisma.TrackingLinkGetPayload<{
   include: { _count: { select: { clicks: true } } };
-}> & { publicUrl: string };
+}> & { publicUrl: string; leads: number };
 
 @Injectable()
 export class TrackingLinksService {
@@ -78,7 +78,25 @@ export class TrackingLinksService {
       para uma campanha manda todo mundo para lugar nenhum, e o dinheiro é
       gasto do mesmo jeito.
     */
-    return { items: items.map((item) => ({ ...item, publicUrl: this.enderecoDoLink(item.code) })), total, offset, limit };
+    // Quantos leads cada link trouxe: clique não é lead, e é o lead que diz
+    // se o link está funcionando. Uma consulta só para a página inteira.
+    const atribuicoes = items.length
+      ? await this.prisma.attribution.findMany({
+          where: { organizationId, trackingClick: { trackingLinkId: { in: items.map((item) => item.id) } } },
+          select: { trackingClick: { select: { trackingLinkId: true } } },
+        })
+      : [];
+    const leadsPorLink = new Map<string, number>();
+    for (const { trackingClick } of atribuicoes) {
+      if (trackingClick) leadsPorLink.set(trackingClick.trackingLinkId, (leadsPorLink.get(trackingClick.trackingLinkId) ?? 0) + 1);
+    }
+
+    return {
+      items: items.map((item) => ({ ...item, publicUrl: this.enderecoDoLink(item.code), leads: leadsPorLink.get(item.id) ?? 0 })),
+      total,
+      offset,
+      limit,
+    };
   }
 
   /** Como quem está de fora enxerga este link. */

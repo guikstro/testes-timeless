@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { createTrackingLink, CreateLinkState } from "./actions";
 import { Button } from "@/components/ui/button";
@@ -206,7 +207,10 @@ export function CreateLinkForm() {
           </p>
         ) : state.criadoEm ? (
           <p className="text-apoio text-success" role="status">
-            Link criado. Copie ele na lista abaixo.
+            Link criado.{" "}
+            <Link href="/links?aba=links" className="font-medium underline underline-offset-2">
+              Ver e copiar em Seus links
+            </Link>
           </p>
         ) : null}
       </div>
