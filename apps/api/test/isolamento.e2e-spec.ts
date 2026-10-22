@@ -375,6 +375,8 @@ describe("Isolamento entre organizações (e2e)", () => {
       "POST /api/admin/organizations/:id/whatsapp/desconectar": "rota da administração da plataforma",
       "POST /api/admin/erros/:id/resolver": "saúde da plataforma, só para a equipe",
       "PUT /api/admin/organizations/:id/foco": "rota da administração da plataforma",
+      "GET /api/admin/organizations/:id/operadores": "rota da administração da plataforma; operador só vê os clientes que atende (admin.e2e)",
+      "PUT /api/admin/organizations/:id/operadores": "rota da administração da plataforma, só sócio (admin.e2e)",
       "GET /api/admin/organizations/:id/perfil-da-empresa": "rota da administração da plataforma",
       "PUT /api/admin/organizations/:id/perfil-da-empresa": "rota da administração da plataforma",
       "POST /api/admin/organizations/:id/perfil-da-empresa/ler": "rota da administração da plataforma",
