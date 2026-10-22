@@ -274,9 +274,16 @@ export function AppNav({
     });
   }
 
+  // O relatório é trabalho da equipe Timeless, que o monta e envia ao
+  // cliente: aparece para ela dentro do cliente, e não para o cliente.
   const itensVisiveis = showAdmin
     ? ITENS_DA_TIMELESS
-    : NAV_ITEMS.filter((item) => podeVer(areas, item.href) && focoMostra(foco, item.href));
+    : NAV_ITEMS.filter(
+        (item) =>
+          podeVer(areas, item.href) &&
+          focoMostra(foco, item.href) &&
+          (item.href !== "/relatorio" || impersonating),
+      );
 
   // Repetido em cada rótulo: some quando recolhida, sem tirar do fluxo, para
   // o texto não reposicionar durante a transição.

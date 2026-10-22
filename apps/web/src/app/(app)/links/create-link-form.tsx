@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { createTrackingLink, CreateLinkState } from "./actions";
 import { Button } from "@/components/ui/button";
@@ -21,9 +20,12 @@ type Destino = "whatsapp" | "pagina";
  * pela plataforma escolhida, e mostrá-los abertos fazia a tela parecer um
  * formulário técnico que só quem entende de UTM consegue preencher.
  */
-export function CreateLinkForm() {
+export function CreateLinkForm({ plataformas: chaves }: { plataformas?: string[] } = {}) {
+  // Aberto de dentro de uma rede, o formulário só oferece as plataformas dela.
+  const opcoes = chaves?.length ? PLATAFORMAS.filter((p) => chaves.includes(p.chave)) : PLATAFORMAS;
   const [state, formAction, pending] = useActionState(createTrackingLink, initialState);
-  const [plataforma, setPlataforma] = useState(PLATAFORMAS[0]);
+  const [inicial] = useState(() => opcoes[0]);
+  const [plataforma, setPlataforma] = useState(inicial);
   const [destino, setDestino] = useState<Destino>("whatsapp");
   const [telefone, setTelefone] = useState("");
   const [mensagem, setMensagem] = useState("");
@@ -33,12 +35,12 @@ export function CreateLinkForm() {
   useEffect(() => {
     if (state.criadoEm) {
       form.current?.reset();
-      setPlataforma(PLATAFORMAS[0]);
+      setPlataforma(inicial);
       setTelefone("");
       setMensagem("");
       setPagina("");
     }
-  }, [state.criadoEm]);
+  }, [state.criadoEm, inicial]);
 
   const escreveAMao = plataforma.chave === "outro";
   const enderecoDoWhatsApp = destinoDoWhatsApp(telefone, mensagem || sugestaoDeMensagem(plataforma.rotulo));
@@ -54,7 +56,7 @@ export function CreateLinkForm() {
           o relatório passa a mostrar duas origens para a mesma coisa.
         */}
         <div className="flex flex-wrap gap-1.5">
-          {PLATAFORMAS.map((opcao) => {
+          {opcoes.map((opcao) => {
             const ativa = opcao.chave === plataforma.chave;
             return (
               <button
@@ -207,10 +209,7 @@ export function CreateLinkForm() {
           </p>
         ) : state.criadoEm ? (
           <p className="text-apoio text-success" role="status">
-            Link criado.{" "}
-            <Link href="/links?aba=links" className="font-medium underline underline-offset-2">
-              Ver e copiar em Seus links
-            </Link>
+            Link criado. Ele já está na lista abaixo, pronto para copiar.
           </p>
         ) : null}
       </div>

@@ -4,7 +4,7 @@ import { apiFetch } from "@/lib/api-client";
 import { BotaoCopiar } from "@/components/ui/copy-button";
 import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
 import { CreateLinkForm } from "./create-link-form";
-import { plataformaDe } from "./plataformas";
+import { plataformaDe, REDES, Rede, redeDe } from "./plataformas";
 
 interface TrackingLinkListItem {
   id: string;
@@ -26,30 +26,32 @@ interface PaginatedResult<T> {
   total: number;
 }
 
-type Aba = "links" | "criar" | "como-usar";
-
-const ABAS: { chave: Aba; rotulo: string }[] = [
-  { chave: "links", rotulo: "Seus links" },
-  { chave: "criar", rotulo: "Criar link" },
-  { chave: "como-usar", rotulo: "Como usar" },
-];
+type Aba = "todos" | Rede | "como-usar";
 
 /**
- * Links rastreáveis, em três abas.
+ * Links, com uma aba por rede.
  *
- * Era uma página só com explicação, formulário e tabela empilhados, e quem
- * entrava para copiar um link tinha de passar pelo formulário, enquanto quem
- * não sabia o que fazer não achava a explicação. Agora cada coisa tem o seu
- * lugar: a lista para o dia a dia, o passo a passo para criar e um guia para
- * quem nunca usou, com o código pronto para a landing page.
+ * Quem abre a tela pensa em onde vai colar o link ("o do Google", "o da
+ * bio"), e não numa lista única. Cada aba mostra os links daquela rede, uma
+ * orientação curta e o botão de criar já com a rede escolhida, o que também
+ * evita origem errada no relatório. "Como usar" é o guia para quem nunca usou.
  */
-export default async function LinksPage({ searchParams }: { searchParams: Promise<{ aba?: string }> }) {
+export default async function LinksPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ aba?: string; criar?: string }>;
+}) {
   const params = await searchParams;
-  const { items } = await apiFetch<PaginatedResult<TrackingLinkListItem>>("/tracking-links?limit=50");
+  const { items } = await apiFetch<PaginatedResult<TrackingLinkListItem>>("/tracking-links?limit=100");
 
-  // Sem link nenhum, a lista estaria vazia: a tela abre direto no criar.
-  const padrao: Aba = items.length ? "links" : "criar";
-  const aba: Aba = ABAS.some((opcao) => opcao.chave === params.aba) ? (params.aba as Aba) : padrao;
+  const validas: Aba[] = ["todos", ...REDES.map((r) => r.chave), "como-usar"];
+  const aba: Aba = validas.includes(params.aba as Aba) ? (params.aba as Aba) : items.length ? "todos" : "como-usar";
+  const rede = REDES.find((r) => r.chave === aba) ?? null;
+  const criando = params.criar === "1" || (aba !== "como-usar" && items.length === 0);
+
+  const daRede = (chave: Rede) => items.filter((item) => redeDe(item.defaultSource, item.defaultMedium) === chave);
+  const visiveis = rede ? daRede(rede.chave) : items;
+  const hrefDaAba = (chave: Aba) => `/links?aba=${chave}`;
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -59,47 +61,81 @@ export default async function LinksPage({ searchParams }: { searchParams: Promis
         ela veio.
       </p>
 
-      <nav className="mb-8 mt-6 flex gap-1 border-b border-line" aria-label="Seções de links">
-        {ABAS.map((opcao) => {
-          const ativa = opcao.chave === aba;
-          return (
-            <Link
-              key={opcao.chave}
-              href={`/links?aba=${opcao.chave}`}
-              aria-current={ativa ? "page" : undefined}
-              className={`focus-ring relative -mb-px rounded-t-lg px-3.5 py-2.5 text-corpo font-medium transition-colors ${
-                ativa ? "text-ink" : "text-ink-mute hover:text-ink-soft"
-              }`}
-            >
-              {opcao.rotulo}
-              {opcao.chave === "links" && items.length ? (
-                <span className="ml-1.5 rounded-full bg-panel-soft px-1.5 text-rotulo tabular-nums text-ink-mute">{items.length}</span>
-              ) : null}
-              {ativa ? <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-accent" /> : null}
-            </Link>
-          );
-        })}
+      <nav className="mb-8 mt-6 flex gap-1 overflow-x-auto border-b border-line" aria-label="Redes">
+        <Aba href={hrefDaAba("todos")} ativa={aba === "todos"} rotulo="Todos" quantos={items.length} />
+        {REDES.map((r) => (
+          <Aba key={r.chave} href={hrefDaAba(r.chave)} ativa={aba === r.chave} rotulo={r.rotulo} quantos={daRede(r.chave).length} cor={r.cor} />
+        ))}
+        <span className="ml-auto" />
+        <Aba href={hrefDaAba("como-usar")} ativa={aba === "como-usar"} rotulo="Como usar" />
       </nav>
 
-      {aba === "links" ? <SeusLinks items={items} /> : null}
-      {aba === "criar" ? <Criar /> : null}
-      {aba === "como-usar" ? <ComoUsar exemplo={items[0]?.publicUrl ?? null} /> : null}
+      {aba === "como-usar" ? (
+        <ComoUsar exemplo={items[0]?.publicUrl ?? null} />
+      ) : (
+        <>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-xl">
+              <h2 className="font-display text-xl font-semibold tracking-tight text-ink">{rede?.titulo ?? "Todos os links"}</h2>
+              <p className="mt-1 text-corpo leading-relaxed text-ink-mute">
+                {rede?.orientacao ?? "Os links de todas as redes. Abra a aba de uma rede para ver só os dela."}
+              </p>
+            </div>
+            {!criando ? (
+              <Link
+                href={`/links?aba=${aba}&criar=1`}
+                className="focus-ring shrink-0 rounded-full bg-ink px-4 py-2 text-corpo font-medium text-canvas"
+              >
+                {rede ? `Criar link do ${rede.chave === "site" ? "site" : rede.rotulo}` : "Criar link"}
+              </Link>
+            ) : null}
+          </div>
+
+          {criando ? (
+            <div className="mt-6">
+              <CreateLinkForm key={aba} plataformas={rede?.plataformas} />
+              {items.length ? (
+                <Link href={`/links?aba=${aba}`} className="mt-3 inline-block text-apoio text-ink-mute underline underline-offset-2">
+                  Fechar
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="mt-8">
+            <SeusLinks items={visiveis} rede={rede?.rotulo ?? null} />
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-function SeusLinks({ items }: { items: TrackingLinkListItem[] }) {
+function Aba({ href, ativa, rotulo, quantos, cor }: { href: string; ativa: boolean; rotulo: string; quantos?: number; cor?: string }) {
+  return (
+    <Link
+      href={href}
+      aria-current={ativa ? "page" : undefined}
+      className={`focus-ring relative -mb-px inline-flex shrink-0 items-center gap-1.5 rounded-t-lg px-3 py-2.5 text-corpo font-medium transition-colors ${
+        ativa ? "text-ink" : "text-ink-mute hover:text-ink-soft"
+      }`}
+    >
+      {cor ? <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cor }} aria-hidden /> : null}
+      {rotulo}
+      {quantos !== undefined ? (
+        <span className="rounded-full bg-panel-soft px-1.5 text-rotulo tabular-nums text-ink-mute">{quantos}</span>
+      ) : null}
+      {ativa ? <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-accent" /> : null}
+    </Link>
+  );
+}
+
+function SeusLinks({ items, rede }: { items: TrackingLinkListItem[]; rede: string | null }) {
   if (items.length === 0) {
     return (
-      <div className="py-12 text-center">
-        <p className="font-display text-xl font-semibold tracking-tight text-ink">Você ainda não tem links</p>
-        <p className="mx-auto mt-2 max-w-md text-corpo text-ink-mute">
-          Crie o primeiro para colar no Google, na bio do Instagram ou na sua página.
-        </p>
-        <Link href="/links?aba=criar" className="focus-ring mt-5 inline-flex rounded-full bg-ink px-4 py-2 text-corpo font-medium text-canvas">
-          Criar o primeiro link
-        </Link>
-      </div>
+      <p className="border-t border-line/70 py-10 text-center text-corpo text-ink-mute">
+        {rede ? `Nenhum link do ${rede} ainda.` : "Nenhum link ainda."}
+      </p>
     );
   }
 
@@ -161,33 +197,6 @@ function SeusLinks({ items }: { items: TrackingLinkListItem[] }) {
           );
         })}
       </ul>
-    </div>
-  );
-}
-
-function Criar() {
-  return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_17rem]">
-      <CreateLinkForm />
-      <aside className="space-y-5 text-corpo leading-relaxed text-ink-soft">
-        <div>
-          <p className="font-semibold text-ink">Antes de criar</p>
-          <p className="mt-1">
-            Anúncio da Meta que abre o WhatsApp direto não precisa de link: a própria Meta avisa de qual anúncio a pessoa
-            veio.
-          </p>
-        </div>
-        <div>
-          <p className="font-semibold text-ink">Um link por lugar</p>
-          <p className="mt-1">
-            Crie um para a bio, outro para o Google, outro para a página. É assim que o relatório separa o que cada lugar
-            trouxe.
-          </p>
-        </div>
-        <Link href="/links?aba=como-usar" className="inline-block font-medium text-accent underline underline-offset-2">
-          Ver o guia completo
-        </Link>
-      </aside>
     </div>
   );
 }
