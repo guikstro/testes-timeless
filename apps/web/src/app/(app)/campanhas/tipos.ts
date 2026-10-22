@@ -42,6 +42,9 @@ export interface DesempenhoDeCampanha {
   cpmCentavos: number | null;
   cpcCentavos: number | null;
   custoPorConversaCentavos: number | null;
+  /** Visualizações de vídeo (Meta). Ausente na API anterior; null quando nenhum dia trouxe o número. */
+  visualizacoesDeVideo?: number | null;
+  custoPorVisualizacaoCentavos?: number | null;
   leads: number;
   qualificados: number;
   vendas: number;

@@ -63,6 +63,11 @@ export class CampanhaDoEnvioDto {
   @Min(0)
   orcamentoMicros?: number | null;
 
+  /** Versão 5: o tipo da campanha no Google (SEARCH, PERFORMANCE_MAX, VIDEO...). */
+  @IsOptional()
+  @Matches(/^[A-Z_]{1,40}$/)
+  tipo?: string;
+
   @IsArray()
   @ArrayMaxSize(62)
   @ValidateNested({ each: true })

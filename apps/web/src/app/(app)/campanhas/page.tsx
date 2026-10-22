@@ -4,9 +4,9 @@ import { temPresencaLocal } from "@/lib/foco";
 import { inicioDaMedicao, medicaoDeLeads } from "@/lib/medicao-de-leads";
 import { intervaloDoMes, leIntervalo, mesAtual } from "@/lib/periodo";
 import { sessaoAtual } from "@/lib/sessao";
-import { GrupoDePilulas } from "@/components/ui/pill-group";
 import { Frescor } from "@/components/ui/frescor";
 import { CampanhasView } from "./campanhas-view";
+import type { AcoesLocais } from "./campanhas-simples";
 import { CampanhasDePresencaLocal, CampanhasLocaisView } from "./campanhas-locais";
 import { DesempenhoDeCampanhas } from "./tipos";
 import { leMetricas, metricasDoConjunto, sugereConjunto } from "@/lib/campanhas/metricas";
@@ -46,14 +46,13 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
   }
 
   // Os dois focos: a mesma tela com duas abas, e a aba vai no endereço.
+  // Quem mede leads e presença local vê uma tela só: as campanhas do Google
+  // que trazem ligação e rota entram na mesma lista, com o trabalho "trazer à
+  // loja". Eram duas abas, e cada uma mostrava metade das campanhas.
   const doisFocos = temPresencaLocal(organization.foco);
-  const aba = doisFocos && params.aba === "local" ? "local" : "leads";
-  const abas = doisFocos ? <AbasDoFoco ativa={aba} query={query} /> : undefined;
-
-  if (aba === "local") {
-    const dados = await apiFetch<CampanhasDePresencaLocal>(`/presenca-local/campanhas?${query.toString()}`);
-    return <CampanhasLocaisView dados={dados} abas={abas} aba="local" frescor={await frescor} />;
-  }
+  const locais = doisFocos
+    ? apiFetch<CampanhasDePresencaLocal>(`/presenca-local/campanhas?${query.toString()}`).catch(() => null)
+    : Promise.resolve(null);
 
   const [dados, conexao, fontes] = await Promise.all([
     apiFetch<DesempenhoDeCampanhas>(`/analytics/campanhas?${query.toString()}`),
@@ -83,8 +82,9 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
       dados={dados}
       medicao={medicao}
       desdeDoWhatsApp={conexao ? inicioDaMedicao(conexao) : null}
-      abas={abas}
       frescor={fontes}
+      comLoja={doisFocos}
+      acoesLocais={acoesLocaisDe(await locais)}
       metricas={escolhidas ?? metricasDoConjunto(sugestao.conjunto)}
       escolhaManual={escolhidas !== null}
       sugestao={sugestao}
@@ -93,21 +93,12 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
   );
 }
 
-/** Leads ou presença local, no mesmo mês e com a mesma comparação. */
-function AbasDoFoco({ ativa, query }: { ativa: "leads" | "local"; query: URLSearchParams }) {
-  const para = (aba: "leads" | "local") => {
-    const destino = new URLSearchParams(query);
-    if (aba === "local") destino.set("aba", "local");
-    return `/campanhas?${destino.toString()}`;
-  };
-  return (
-    <GrupoDePilulas
-      className="mb-5"
-      ativo={ativa}
-      opcoes={[
-        { chave: "leads", rotulo: "Leads", href: para("leads") },
-        { chave: "local", rotulo: "Presença local", href: para("local") },
-      ]}
-    />
+/** Ligações e rotas de cada campanha do Google, pelo id da campanha. */
+function acoesLocaisDe(dados: CampanhasDePresencaLocal | null): AcoesLocais | undefined {
+  if (!dados) return undefined;
+  return new Map(
+    dados.campanhas.flatMap((linha) =>
+      linha.atual ? [[linha.externalId, { ligacoes: linha.atual.ligacoes, rotas: linha.atual.rotas }] as const] : [],
+    ),
   );
 }

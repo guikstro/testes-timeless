@@ -30,6 +30,8 @@ export interface LinhaDeGasto {
    */
   impressoes?: number | null;
   cliques?: number | null;
+  /** Visualizações de vídeo do dia (Meta). Null quando o dia não trouxe o número. */
+  visualizacoesDeVideo?: number | null;
 }
 
 export interface CampanhaComGasto {
@@ -110,6 +112,10 @@ export interface DesempenhoDeCampanha {
   cpcCentavos: number | null;
   /** Custo por conversa iniciada, em centavos, sobre o gasto dos dias que trouxeram a contagem. */
   custoPorConversaCentavos: number | null;
+  /** Visualizações de vídeo somadas; null quando nenhum dia trouxe o número. */
+  visualizacoesDeVideo: number | null;
+  /** Custo por visualização de vídeo, em centavos (pode ser fração), sobre os dias que trouxeram o número. */
+  custoPorVisualizacaoCentavos: number | null;
   leads: number;
   qualificados: number;
   vendas: number;
@@ -166,6 +172,21 @@ function conversasDaPlataforma(gastos: LinhaDeGasto[]): { total: number | null; 
   return {
     total: conhecidos.reduce((soma, linha) => soma + (linha.conversasIniciadas ?? 0), 0),
     completas: conhecidos.length === gastos.length,
+  };
+}
+
+/** Visualizações de vídeo e o custo de cada uma, só sobre os dias que trouxeram o número. */
+export function videoDaCampanha(gastos: LinhaDeGasto[]): {
+  visualizacoesDeVideo: number | null;
+  custoPorVisualizacaoCentavos: number | null;
+} {
+  const comVideo = gastos.filter((linha) => typeof linha.visualizacoesDeVideo === "number");
+  if (comVideo.length === 0) return { visualizacoesDeVideo: null, custoPorVisualizacaoCentavos: null };
+  const total = comVideo.reduce((soma, linha) => soma + (linha.visualizacoesDeVideo ?? 0), 0);
+  const gasto = comVideo.reduce((soma, linha) => soma + linha.spendCents, 0);
+  return {
+    visualizacoesDeVideo: total,
+    custoPorVisualizacaoCentavos: total > 0 && gasto > 0 ? gasto / total : null,
   };
 }
 
@@ -277,6 +298,7 @@ export function agregaDesempenhoPorCampanha(
       cpmCentavos: entrega.cpmCentavos,
       cpcCentavos: entrega.cpcCentavos,
       custoPorConversaCentavos: entrega.custoPorConversaCentavos,
+      ...videoDaCampanha(campanha.spend),
       leads: 0,
       qualificados: 0,
       vendas: 0,

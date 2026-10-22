@@ -6,6 +6,7 @@ import {
   entregaDaCampanha,
   LeadAtribuido,
   LinhaDeGasto,
+  videoDaCampanha,
 } from "./campaign-performance";
 
 function campanha(over: Partial<CampanhaComGasto> = {}): CampanhaComGasto {
@@ -395,5 +396,13 @@ describe("totais de entrega", () => {
   it("levam o objetivo da campanha para a tela", () => {
     const { campanhas } = agregaDesempenhoPorCampanha([campanha({ objetivo: "OUTCOME_TRAFFIC" })], []);
     expect(campanhas[0].objetivo).toBe("OUTCOME_TRAFFIC");
+  });
+});
+
+describe("videoDaCampanha", () => {
+  it("soma as visualizações e divide o gasto só dos dias que trouxeram o número", () => {
+    const dia = (spendCents: number, visualizacoesDeVideo: number | null) => ({ date: new Date(), spendCents, conversasIniciadas: null, visualizacoesDeVideo });
+    expect(videoDaCampanha([dia(1000, 500), dia(1000, 500), dia(3000, null)])).toEqual({ visualizacoesDeVideo: 1000, custoPorVisualizacaoCentavos: 2 });
+    expect(videoDaCampanha([dia(1000, null)])).toEqual({ visualizacoesDeVideo: null, custoPorVisualizacaoCentavos: null });
   });
 });

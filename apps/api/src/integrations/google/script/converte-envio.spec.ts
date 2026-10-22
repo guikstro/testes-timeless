@@ -50,3 +50,11 @@ describe("scriptDoGoogleAds", () => {
     expect(script).toContain('"chave\\"com-aspas"');
   });
 });
+
+describe("o tipo da campanha do Google (script versão 5)", () => {
+  it("vira objetivo com o prefixo GOOGLE_, e fica null quando o script antigo não manda", () => {
+    const base = { id: "1", nome: "Busca", status: "ENABLED", dias: [] };
+    expect(converteCampanha({ ...base, tipo: "SEARCH" }).objetivo).toBe("GOOGLE_SEARCH");
+    expect(converteCampanha(base).objetivo).toBeNull();
+  });
+});

@@ -20,7 +20,7 @@ Google. A interface é minimalista e editorial. O fundo é marfim quente
 artes da marca. O texto é quase-preto quente, e a única cor viva é o verde da
 marca, reservada para ação e destaque. Estado (erro, atenção, sucesso,
 informação) tem cores próprias e nunca usa o verde. Cartões brancos com borda
-fina e sombra quase invisível; títulos em Manrope, todo o resto em Inter;
+fina e sombra quase invisível; títulos e números em Bricolage Grotesque, todo o resto em Instrument Sans;
 números com algarismos de mesma largura. A densidade só aumenta onde o dado
 pede: tabelas e painéis de números. Nada decorativo que não explique alguma
 coisa.
@@ -79,6 +79,12 @@ Tinta (texto e ícone), fundo suave e borda, com um valor por tema.
 | Informação, tinta | `info` | `#1D4ED8` | `#60A5FA` |
 | Informação, fundo | `info-soft` | `#EFF6FF` | `#151B2D` |
 | Informação, borda | `info-line` | `#BFDBFE` | `#1E3A8A` |
+| Trabalho "ser visto", tinta | `trabalho-visto` | `#534AB7` | `#AFA9EC` |
+| Trabalho "ser visto", fundo | `trabalho-visto-soft` | `#EEEDFE` | `#26215C` |
+| Trabalho "levar ao WhatsApp", tinta | `trabalho-conversa` | `#0E7490` | `#67E8F9` |
+| Trabalho "levar ao WhatsApp", fundo | `trabalho-conversa-soft` | `#ECFEFF` | `#083344` |
+| Trabalho "trazer à loja", tinta | `trabalho-loja` | `#B45309` | `#FBBF24` |
+| Trabalho "trazer à loja", fundo | `trabalho-loja-soft` | `#FFF7ED` | `#341E08` |
 
 **Exceção:** pontos sólidos de status (bolinha de 6 a 8px) usam
 `bg-emerald-500`, `bg-amber-500` e `bg-red-500`, que funcionam nos dois temas.
@@ -106,10 +112,14 @@ quando impresso do escuro.
 
 ## Tokens: tipografia
 
-- **Inter** (`font-sans`, `--font-sans`): tudo que não é título. Com
-  `font-feature-settings: "cv02", "cv03", "cv04", "ss01"`.
-- **Manrope** (`font-display`, `--font-display`): títulos de página, de cartão
-  e de seção. Peso 600, `tracking-tight`.
+- **Instrument Sans** (`font-sans`, `--font-sans`): tudo que não é título nem
+  número de destaque. Legível em tamanho pequeno e menos genérica que a Inter.
+- **Bricolage Grotesque** (`font-display`, `--font-display`): títulos de página
+  e de seção, frases de abertura e números grandes. Peso 500 ou 600,
+  `tracking-tight`.
+- Títulos em caixa normal. Nada de rótulo em maiúsculas espaçadas acima de
+  cada bloco, ponto separando informações ("A · B") ou seta no fim de botão:
+  são as marcas de tela gerada sem cuidado.
 
 Quatro degraus de texto, com nome de papel. Não existe 12,7px: se nenhum
 degrau serve, o problema é a hierarquia.
@@ -343,7 +353,7 @@ a primeira campanha acima").
 ### Faça
 - Use os papéis (`ink`, `panel`, `line`, `danger`), nunca tons do Tailwind.
 - Um botão `primary` por tela; o resto `secondary` ou `ghost`.
-- Títulos em Manrope 600 com `tracking-tight`; o resto em Inter.
+- Títulos e números em Bricolage Grotesque 600 com `tracking-tight`; o resto em Instrument Sans.
 - Números com `tabular-nums`, alinhados à direita nas tabelas.
 - Borda de 1px como estrutura; sombra só na medida da tabela de sombras.
 - Escreva a ausência por extenso e diga o motivo.

@@ -113,7 +113,7 @@ export default async function IntegrationsPage() {
             Traga as vendas do seu CRM, da plataforma de pagamento ou do sistema da empresa.
           </span>
         </span>
-        <span className="shrink-0 text-corpo font-medium text-accent">Configurar →</span>
+        <span className="shrink-0 text-corpo font-medium text-accent">Configurar</span>
       </Link>
     </div>
   );

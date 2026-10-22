@@ -180,8 +180,8 @@ export default async function DashboardPage({
       <div className="mx-auto max-w-6xl">
         <AtualizaAoVivo />
         <header className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-rotulo font-semibold uppercase tracking-[0.14em] text-ink-mute">
-            {days === 1 ? `Hoje · ${formataDia(ate)}` : `Últimos ${days} dias · ${formataDia(de)} a ${formataDia(ate)}`}
+          <p className="text-corpo text-ink-mute">
+            {days === 1 ? `Hoje, ${formataDia(ate)}` : `Últimos ${days} dias, de ${formataDia(de)} a ${formataDia(ate)}`}
           </p>
           <GrupoDePilulas
             ativo={String(days)}

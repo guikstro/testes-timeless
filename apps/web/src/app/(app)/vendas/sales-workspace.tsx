@@ -393,7 +393,7 @@ export function SalesWorkspace({
                   className="focus-ring rounded-full border border-warning-line bg-warning-soft px-4 py-2 text-corpo text-warning"
                 >
                   <span className="font-semibold">{summary.possibleSales}</span>{" "}
-                  {summary.possibleSales === 1 ? "venda a confirmar" : "vendas a confirmar"} →
+                  {summary.possibleSales === 1 ? "venda a confirmar" : "vendas a confirmar"}
                 </button>
               ) : null}
               {summary.requiresReview > 0 ? (
@@ -406,7 +406,7 @@ export function SalesWorkspace({
                   className="focus-ring rounded-full border border-danger-line bg-danger-soft px-4 py-2 text-corpo text-danger"
                 >
                   <span className="font-semibold">{summary.requiresReview}</span>{" "}
-                  {summary.requiresReview === 1 ? "com dúvida" : "com dúvida"} →
+                  {summary.requiresReview === 1 ? "com dúvida" : "com dúvida"}
                 </button>
               ) : null}
             </div>
@@ -568,7 +568,7 @@ export function SalesWorkspace({
                 ].map((h) => (
                   <th
                     key={h}
-                    className="px-4 py-3 text-rotulo font-semibold uppercase tracking-[0.09em] text-ink-mute"
+                    className="px-4 py-3 text-apoio font-medium text-ink-mute"
                   >
                     {h}
                   </th>

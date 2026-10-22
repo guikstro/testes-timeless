@@ -193,6 +193,9 @@ async function main() {
               utmSource: origem.link === "Bio do Instagram" ? "instagram" : "google",
               utmMedium: origem.link === "Bio do Instagram" ? "social" : "cpc",
               utmCampaign: origem.link === "Bio do Instagram" ? "bio-permanente" : "busca-marca",
+              // O clique do Google carrega o id da campanha de pesquisa, que é
+              // como o lead é ligado a ela na tela de campanhas.
+              ...(origem.link === "Bio do Instagram" ? {} : { campaignId: "demo-google-pesquisa", gclid: `demo-gclid-${criados}` }),
             },
           })
         : null;
@@ -332,6 +335,8 @@ async function main() {
     }
   }
 
+  await criaCampanhas(org.id);
+
   console.log(`\nOrganização "Demonstração" recriada com ${DIAS} dias de histórico.`);
   console.log(`  ${criados} leads`);
   console.log(`  ${contagem.qualificados} qualificados`);
@@ -347,3 +352,38 @@ main()
     process.exit(1);
   })
   .finally(() => prisma.$disconnect());
+
+/**
+ * Três campanhas com o desenho de uma conta real: um vídeo de alcance, uma de
+ * conversas no WhatsApp e uma de pesquisa no Google, cada uma com o gasto e a
+ * entrega de cada dia. É o que a tela de campanhas precisa para mostrar cada
+ * campanha julgada pelo próprio trabalho.
+ */
+async function criaCampanhas(organizationId: string) {
+  const campanhas = [
+    { externalId: "demo-meta-video", name: "Vídeo de apresentação do escritório", platform: "META" as const, objetivo: "OUTCOME_AWARENESS", gasto: [250, 450], impressoes: [1800, 3200], cliques: [4, 14], video: [380, 720], conversas: [0, 0] },
+    { externalId: "demo-meta-conversas", name: "Conversas no WhatsApp", platform: "META" as const, objetivo: "OUTCOME_ENGAGEMENT", gasto: [1800, 2600], impressoes: [2200, 3600], cliques: [30, 60], video: [0, 0], conversas: [1, 4] },
+    { externalId: "demo-google-pesquisa", name: "Pesquisa: advogado trabalhista", platform: "GOOGLE" as const, objetivo: "GOOGLE_SEARCH", gasto: [900, 1500], impressoes: [300, 600], cliques: [18, 40], video: null, conversas: null },
+  ];
+
+  for (const c of campanhas) {
+    const campanha = await prisma.campaign.create({
+      data: { organizationId, externalId: c.externalId, name: c.name, platform: c.platform, status: "ACTIVE", objetivo: c.objetivo, manual: false, lastSyncedAt: new Date() },
+    });
+    const hoje = new Date();
+    for (let d = 0; d < DIAS; d++) {
+      const dia = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), hoje.getUTCDate() - d));
+      await prisma.adSpend.create({
+        data: {
+          campaignId: campanha.id,
+          date: dia,
+          spendCents: entre(c.gasto[0], c.gasto[1]),
+          impressoes: entre(c.impressoes[0], c.impressoes[1]),
+          cliques: entre(c.cliques[0], c.cliques[1]),
+          visualizacoesDeVideo: c.video ? entre(c.video[0], c.video[1]) : null,
+          conversasIniciadas: c.conversas ? entre(c.conversas[0], c.conversas[1]) : null,
+        },
+      });
+    }
+  }
+}

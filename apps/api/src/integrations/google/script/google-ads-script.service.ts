@@ -240,6 +240,7 @@ export class GoogleAdsScriptService {
               platform: "GOOGLE",
               manual: false,
               orcamentoDiarioCentavos: campanha.orcamentoDiarioCentavos,
+              objetivo: campanha.objetivo,
               lastSyncedAt: agora,
             },
             update: {
@@ -248,6 +249,8 @@ export class GoogleAdsScriptService {
               platform: "GOOGLE",
               manual: false,
               orcamentoDiarioCentavos: campanha.orcamentoDiarioCentavos,
+              // Script antigo não manda o tipo: o que já se sabia continua.
+              ...(campanha.objetivo ? { objetivo: campanha.objetivo } : {}),
               lastSyncedAt: agora,
             },
           });

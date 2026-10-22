@@ -1599,6 +1599,8 @@ model AdSpend {
    */
   impressoes              Int?     @map("impressoes")
   cliques                 Int?     @map("cliques")
+  /// Visualizações de vídeo (3 segundos ou mais) que a Meta contou no dia. Null quando o dia não trouxe o número.
+  visualizacoesDeVideo    Int?     @map("visualizacoes_de_video")
   /**
    * Conversões como o Google conta; fracionárias com atribuição por dados.
    */

@@ -28,8 +28,12 @@
  * própria conta. Assim o Google passa a otimizar para quem virou cliente, sem
  * arquivo para baixar e sem login no Google. Uma falha aqui não derruba o
  * envio do gasto, e o que não subiu volta na próxima rodada.
+ *
+ * Versão 5: o tipo de cada campanha (pesquisa, Performance Max, vídeo,
+ * display). É ele que diz à tela o trabalho da campanha: vídeo se mede por
+ * quem viu, pesquisa por quem chamou e virou cliente.
  */
-export const VERSAO_DO_SCRIPT = 4;
+export const VERSAO_DO_SCRIPT = 5;
 
 /** O histórico de 13 meses chega desde a versão 3. */
 export const VERSAO_DO_HISTORICO = 3;
@@ -90,7 +94,7 @@ function main() {
 
 function leia(de, ate) {
   var linhas = AdsApp.search(
-    "SELECT campaign.id, campaign.name, campaign.status, campaign_budget.amount_micros, " +
+    "SELECT campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type, campaign_budget.amount_micros, " +
     "segments.date, metrics.cost_micros, metrics.impressions, metrics.clicks, " +
     "metrics.conversions, metrics.conversions_value " +
     "FROM campaign WHERE segments.date BETWEEN '" + de + "' AND '" + ate + "'"
@@ -105,6 +109,7 @@ function leia(de, ate) {
         id: id,
         nome: l.campaign.name,
         status: l.campaign.status,
+        tipo: l.campaign.advertisingChannelType || undefined,
         orcamentoMicros: l.campaignBudget ? Number(l.campaignBudget.amountMicros) : null,
         dias: []
       };

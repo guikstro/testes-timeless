@@ -4,7 +4,7 @@ import { EncryptionService } from "../../common/encryption/encryption.service";
 import { MetaGraphClient, InsightsRange } from "../../integrations/meta/meta-graph-client";
 import { MetaApiError, explicaErroDaMeta } from "../../integrations/meta/meta-api-error";
 import { normalizaRespostaDaConta } from "../../integrations/meta/saude-da-conta";
-import { conversasIniciadasDe, dataDaMeta } from "../../integrations/meta/conversas-iniciadas";
+import { conversasIniciadasDe, dataDaMeta, visualizacoesDeVideoDe } from "../../integrations/meta/conversas-iniciadas";
 import { NotificationsService } from "../../notifications/notifications.service";
 import { liberadaEm } from "../../integrations/meta/limite-da-meta";
 
@@ -164,7 +164,7 @@ export class MetaSyncService {
       */
       const totalPorCampanhaEDia = new Map<
         string,
-        { spendCents: number; conversasIniciadas: number; impressoes: number; cliques: number }
+        { spendCents: number; conversasIniciadas: number; impressoes: number; cliques: number; visualizacoesDeVideo: number }
       >();
 
       for (const insight of insights) {
@@ -175,18 +175,21 @@ export class MetaSyncService {
         const conversas = conversasIniciadasDe(insight.actions);
         const impressoes = Number(insight.impressions ?? 0) || 0;
         const cliques = Number(insight.clicks ?? 0) || 0;
+        const visualizacoes = visualizacoesDeVideoDe(insight.actions);
         const chave = `${insight.campaign_id}|${dia}`;
         const acumulado = totalPorCampanhaEDia.get(chave) ?? {
           spendCents: 0,
           conversasIniciadas: 0,
           impressoes: 0,
           cliques: 0,
+          visualizacoesDeVideo: 0,
         };
         totalPorCampanhaEDia.set(chave, {
           spendCents: acumulado.spendCents + centavos,
           conversasIniciadas: acumulado.conversasIniciadas + conversas,
           impressoes: acumulado.impressoes + impressoes,
           cliques: acumulado.cliques + cliques,
+          visualizacoesDeVideo: acumulado.visualizacoesDeVideo + visualizacoes,
         });
 
         // O detalhe por anúncio só existe para anúncio que conhecemos. Um id

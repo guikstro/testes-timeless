@@ -21,6 +21,7 @@ export interface CampanhaDoScript {
   status: string;
   orcamentoMicros?: number | null;
   dias: DiaDoScript[];
+  tipo?: string;
 }
 
 export interface GastoDoDia {
@@ -37,6 +38,8 @@ export interface CampanhaConvertida {
   nome: string;
   status: "ACTIVE" | "PAUSED" | "ARCHIVED";
   orcamentoDiarioCentavos: number | null;
+  /** `GOOGLE_SEARCH`, `GOOGLE_VIDEO`...: o tipo como objetivo, para a tela saber o trabalho da campanha. Null em script antigo. */
+  objetivo: string | null;
   dias: GastoDoDia[];
 }
 
@@ -73,6 +76,7 @@ export function converteCampanha(campanha: CampanhaDoScript): CampanhaConvertida
       campanha.orcamentoMicros === null || campanha.orcamentoMicros === undefined
         ? null
         : microsParaCentavos(campanha.orcamentoMicros),
+    objetivo: campanha.tipo ? `GOOGLE_${campanha.tipo}` : null,
     dias: [...porDia.values()],
   };
 }

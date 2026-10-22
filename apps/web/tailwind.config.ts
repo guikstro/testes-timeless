@@ -60,6 +60,14 @@ const config: Config = {
           soft: "rgb(var(--success-soft) / <alpha-value>)",
           line: "rgb(var(--success-line) / <alpha-value>)",
         },
+        trabalho: {
+          visto: "rgb(var(--trabalho-visto) / <alpha-value>)",
+          "visto-soft": "rgb(var(--trabalho-visto-soft) / <alpha-value>)",
+          conversa: "rgb(var(--trabalho-conversa) / <alpha-value>)",
+          "conversa-soft": "rgb(var(--trabalho-conversa-soft) / <alpha-value>)",
+          loja: "rgb(var(--trabalho-loja) / <alpha-value>)",
+          "loja-soft": "rgb(var(--trabalho-loja-soft) / <alpha-value>)",
+        },
         info: {
           DEFAULT: "rgb(var(--info) / <alpha-value>)",
           soft: "rgb(var(--info-soft) / <alpha-value>)",

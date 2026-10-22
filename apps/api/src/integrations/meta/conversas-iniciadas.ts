@@ -22,6 +22,17 @@ export function conversasIniciadasDe(acoes: MetaAcao[] | undefined): number {
   return Number.isFinite(valor) && valor > 0 ? Math.round(valor) : 0;
 }
 
+/** Visualização de vídeo de 3 segundos ou mais: a "Reproduções de vídeo" do Gerenciador. */
+export const ACAO_VISUALIZACAO_DE_VIDEO = "video_view";
+
+/** Quantas visualizações de vídeo a linha teve. Zero quando o tipo não aparece, pelo mesmo motivo das conversas. */
+export function visualizacoesDeVideoDe(acoes: MetaAcao[] | undefined): number {
+  const linha = acoes?.find((acao) => acao.action_type === ACAO_VISUALIZACAO_DE_VIDEO);
+  if (!linha) return 0;
+  const valor = Number(linha.value);
+  return Number.isFinite(valor) && valor > 0 ? Math.round(valor) : 0;
+}
+
 /**
  * Data como a Meta escreve, "2026-09-24T12:48:04+0000".
  *

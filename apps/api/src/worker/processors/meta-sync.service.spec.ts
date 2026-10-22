@@ -131,8 +131,9 @@ describe("MetaSyncService", () => {
         conversasIniciadas: 0,
         impressoes: 0,
         cliques: 0,
+        visualizacoesDeVideo: 0,
       },
-      update: { spendCents: 12345, conversasIniciadas: 0, impressoes: 0, cliques: 0 },
+      update: { spendCents: 12345, conversasIniciadas: 0, impressoes: 0, cliques: 0, visualizacoesDeVideo: 0 },
     });
   });
 
@@ -178,7 +179,7 @@ describe("MetaSyncService", () => {
 
       expect(prisma.adSpend.upsert).toHaveBeenCalledTimes(1);
       expect(prisma.adSpend.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({ update: { spendCents: 15050, conversasIniciadas: 0, impressoes: 0, cliques: 0 } }),
+        expect.objectContaining({ update: { spendCents: 15050, conversasIniciadas: 0, impressoes: 0, cliques: 0, visualizacoesDeVideo: 0 } }),
       );
     });
 
@@ -199,7 +200,7 @@ describe("MetaSyncService", () => {
       await service.sync("org-1");
 
       expect(prisma.adSpend.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({ update: { spendCents: 1500, conversasIniciadas: 0, impressoes: 1500, cliques: 25 } }),
+        expect.objectContaining({ update: { spendCents: 1500, conversasIniciadas: 0, impressoes: 1500, cliques: 25, visualizacoesDeVideo: 0 } }),
       );
     });
 
@@ -252,7 +253,7 @@ describe("MetaSyncService", () => {
 
       // Somar só o que conseguimos casar encolheria o total em silêncio.
       expect(prisma.adSpend.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({ update: { spendCents: 8000, conversasIniciadas: 0, impressoes: 0, cliques: 0 } }),
+        expect.objectContaining({ update: { spendCents: 8000, conversasIniciadas: 0, impressoes: 0, cliques: 0, visualizacoesDeVideo: 0 } }),
       );
       expect(prisma.adInsight.upsert).not.toHaveBeenCalled();
     });
@@ -423,5 +424,12 @@ describe("MetaSyncService", () => {
         expect.objectContaining({ type: "sistema.erro" }),
       );
     });
+  });
+
+  it("soma as visualizações de vídeo da Meta no total da campanha", async () => {
+    const { visualizacoesDeVideoDe } = await import("../../integrations/meta/conversas-iniciadas");
+    expect(visualizacoesDeVideoDe([{ action_type: "video_view", value: "321" }])).toBe(321);
+    expect(visualizacoesDeVideoDe([{ action_type: "link_click", value: "9" }])).toBe(0);
+    expect(visualizacoesDeVideoDe(undefined)).toBe(0);
   });
 });

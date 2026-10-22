@@ -82,7 +82,7 @@ export function ResumoSimples({
 
           <div className="pt-4 text-center">
             <Link href={relatorioCompleto} className="focus-ring rounded text-corpo font-medium text-accent hover:underline">
-              Abrir relatório completo →
+              Abrir relatório completo
             </Link>
             <p className="mt-1 text-apoio text-ink-mute">Funil detalhado, horários, atendimento e vendas</p>
           </div>
@@ -138,7 +138,7 @@ function FaixaDeEspera({ aguardando, mais }: { aguardando: number; mais: boolean
         </span>{" "}
         {aguardando === 1 && !mais ? "está esperando" : "estão esperando"} resposta há mais de 30 minutos
       </p>
-      <span className="text-corpo font-medium text-accent">Responder →</span>
+      <span className="text-corpo font-medium text-accent">Responder</span>
     </Link>
   );
 }
@@ -154,7 +154,7 @@ function Jornada({ etapas }: { etapas: { rotulo: string; valor: number }[] }) {
 
   return (
     <section className="surface p-5">
-      <h2 className="text-rotulo font-semibold uppercase tracking-[0.14em] text-ink-mute">A jornada até virar cliente</h2>
+      <h2 className="font-display text-lg font-semibold tracking-tight text-ink">A jornada até virar cliente</h2>
       <ol className="mt-4 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
         {etapas.map((etapa, i) => {
           const ultima = i === etapas.length - 1;
@@ -198,7 +198,7 @@ function DeOndeVem({ origens }: { origens: Overview["byOrigin"] }) {
   const linhas = origens.slice(0, 4);
   return (
     <section className="surface p-5">
-      <h2 className="text-rotulo font-semibold uppercase tracking-[0.14em] text-ink-mute">De onde vêm</h2>
+      <h2 className="font-display text-lg font-semibold tracking-tight text-ink">De onde vêm</h2>
       {linhas.length === 0 ? (
         <p className="mt-3 text-corpo text-ink-mute">Nenhum contato no período.</p>
       ) : (
@@ -220,7 +220,7 @@ function DeOndeVem({ origens }: { origens: Overview["byOrigin"] }) {
 function Anuncios({ gastoCentavos, contatos, clientes }: { gastoCentavos: number | null; contatos: number; clientes: number }) {
   return (
     <section className="surface p-5">
-      <h2 className="text-rotulo font-semibold uppercase tracking-[0.14em] text-ink-mute">Anúncios</h2>
+      <h2 className="font-display text-lg font-semibold tracking-tight text-ink">Anúncios</h2>
       {gastoCentavos === null || gastoCentavos === 0 ? (
         <p className="mt-3 text-corpo text-ink-mute">
           Sem gasto em anúncios no período, ou a conta de anúncios não está conectada.

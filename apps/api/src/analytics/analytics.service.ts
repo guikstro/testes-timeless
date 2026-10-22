@@ -631,7 +631,7 @@ export class AnalyticsService {
           objetivo: true,
           spend: {
             where: { date: { gte: deDia, lte: ateDia } },
-            select: { date: true, spendCents: true, conversasIniciadas: true, impressoes: true, cliques: true },
+            select: { date: true, spendCents: true, conversasIniciadas: true, impressoes: true, cliques: true, visualizacoesDeVideo: true },
           },
         },
       }),

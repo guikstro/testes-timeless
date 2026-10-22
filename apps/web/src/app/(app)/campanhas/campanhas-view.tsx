@@ -26,8 +26,9 @@ import {
   rotuloDoObjetivo,
 } from "@/lib/campanhas/metricas";
 import { CampanhaComparada, DesempenhoDeCampanha, DesempenhoDeCampanhas } from "./tipos";
-import { CampanhasSimples } from "./campanhas-simples";
-import { resumoDaMetrica, retorno, Resumo, SEM_DADO, SeletorDeMetricas, somaAnteriores } from "./metricas-ui";
+import { AcoesLocais, CampanhasSimples } from "./campanhas-simples";
+import { SeletorDeColunas } from "./seletor-de-colunas";
+import { resumoDaMetrica, retorno, Resumo, SEM_DADO, somaAnteriores } from "./metricas-ui";
 
 export { Resumo };
 
@@ -50,6 +51,8 @@ export function CampanhasView({
   escolhaManual = false,
   sugestao = { conjunto: "vendas", objetivo: null },
   busca = "",
+  acoesLocais,
+  comLoja = false,
 }: {
   dados: DesempenhoDeCampanhas;
   medicao: Medicao;
@@ -65,6 +68,9 @@ export function CampanhasView({
   sugestao?: { conjunto: Conjunto; objetivo: string | null };
   /** O período da URL, sem as métricas, para os links da escolha não o perderem. */
   busca?: string;
+  /** Ligações e rotas por campanha do Google, para quem também mede presença local. */
+  acoesLocais?: AcoesLocais;
+  comLoja?: boolean;
 }) {
   const { periodo, comparacao, campanhas, semCampanha, totais } = dados;
   const medido = medicao === "medido";
@@ -126,7 +132,7 @@ export function CampanhasView({
         className="mb-5"
       />
 
-      <CampanhasSimples dados={dados} medido={medido} />
+      <CampanhasSimples dados={dados} medido={medido} acoesLocais={acoesLocais} comLoja={comLoja} />
 
       {/*
         As métricas da plataforma ficam guardadas: quem cuida dos anúncios
@@ -141,17 +147,7 @@ export function CampanhasView({
           </svg>
         </summary>
 
-        <SeletorDeMetricas
-          metricas={metricas}
-          escolhaManual={escolhaManual}
-          sugestao={sugestao}
-          href={(lista) => {
-            const params = new URLSearchParams(busca);
-            if (lista) params.set("metricas", lista.join(","));
-            else params.delete("metricas");
-            return `/campanhas?${params.toString()}`;
-          }}
-        />
+        <SeletorDeColunas metricas={metricas} escolhaManual={escolhaManual} sugestao={sugestao} busca={busca} />
 
         <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <Resumo
