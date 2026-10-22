@@ -93,7 +93,7 @@ export function FormularioDeNovaSenha() {
     >
       <form onSubmit={enviar} className="mt-10 flex flex-col gap-7">
         <div>
-          <label htmlFor="nova-senha" className="mb-1.5 block text-apoio font-medium uppercase tracking-[0.12em] text-ink-mute">
+          <label htmlFor="nova-senha" className="mb-1.5 block text-apoio font-medium text-ink-mute">
             Nova senha
           </label>
           <div className="relative">
@@ -133,7 +133,7 @@ export function FormularioDeNovaSenha() {
         </div>
 
         <div>
-          <label htmlFor="repetir-senha" className="mb-1.5 block text-apoio font-medium uppercase tracking-[0.12em] text-ink-mute">
+          <label htmlFor="repetir-senha" className="mb-1.5 block text-apoio font-medium text-ink-mute">
             Repita a senha
           </label>
           <input
@@ -161,11 +161,7 @@ export function FormularioDeNovaSenha() {
               <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" className="opacity-30" />
               <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
             </svg>
-          ) : (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px] transition-transform duration-300 ease-soft group-hover:translate-x-1" aria-hidden>
-              <path d="M5 12h14M13 6l6 6-6 6" />
-            </svg>
-          )}
+          ) : null}
         </button>
       </form>
     </MolduraDeAutenticacao>

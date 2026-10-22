@@ -63,7 +63,7 @@ export function DataTable<T>({
                   key={coluna.chave}
                   scope="col"
                   className={cn(
-                    "whitespace-nowrap py-2 pr-4 text-rotulo font-semibold uppercase tracking-[0.08em] text-ink-mute last:pr-0",
+                    "whitespace-nowrap py-2 pr-4 text-apoio font-medium text-ink-mute last:pr-0",
                     direita(coluna) && "text-right",
                     coluna.className,
                   )}
@@ -106,7 +106,7 @@ export function DataTable<T>({
                   .filter((coluna) => coluna !== principal)
                   .map((coluna) => (
                     <div key={coluna.chave} className="flex min-w-0 flex-col">
-                      <dt className="text-rotulo uppercase tracking-[0.08em] text-ink-mute">{coluna.titulo}</dt>
+                      <dt className="text-apoio text-ink-mute">{coluna.titulo}</dt>
                       <dd className={cn("text-apoio text-ink-soft", direita(coluna) && "tnum")}>{coluna.celula(linha)}</dd>
                     </div>
                   ))}

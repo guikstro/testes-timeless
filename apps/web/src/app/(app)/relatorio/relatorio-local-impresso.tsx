@@ -28,7 +28,7 @@ export function RelatorioLocalImpresso({ dados }: { dados: DadosDePresencaLocal 
   return (
     <article className="space-y-8 print:space-y-6">
       <header className="border-b border-line pb-6">
-        <p className="flex items-center gap-2 text-rotulo font-semibold uppercase tracking-[0.14em] text-ink-mute">
+        <p className="flex items-center gap-2 text-apoio font-medium text-ink-mute">
           <Marca tamanho={14} className="shrink-0 text-accent" />
           Relatório de presença local
         </p>
@@ -36,7 +36,7 @@ export function RelatorioLocalImpresso({ dados }: { dados: DadosDePresencaLocal 
           {dados.cliente}
         </h2>
         <p className="mt-1 text-corpo text-ink-soft">
-          {formataDia(dados.periodo.de)} a {formataDia(dados.periodo.ate)} · {dados.periodo.dias} dias
+          {formataDia(dados.periodo.de)} a {formataDia(dados.periodo.ate)}, {dados.periodo.dias} dias
         </p>
         {frase ? <Conclusao frase={frase} /> : null}
       </header>
@@ -67,7 +67,7 @@ export function RelatorioLocalImpresso({ dados }: { dados: DadosDePresencaLocal 
         <Secao titulo="Por campanha">
           <table className="w-full text-left text-corpo">
             <thead>
-              <tr className="border-b border-line/70 text-rotulo uppercase tracking-[0.08em] text-ink-mute">
+              <tr className="border-b border-line/70 text-apoio text-ink-mute">
                 <th className="py-2 pr-4 font-semibold">Campanha</th>
                 <th className="py-2 pr-4 text-right font-semibold">Investido</th>
                 <th className="py-2 pr-4 text-right font-semibold">Ligações</th>

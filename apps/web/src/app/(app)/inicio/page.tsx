@@ -4,6 +4,8 @@ import { sessaoAtual } from "@/lib/sessao";
 import type { Foco } from "@/lib/foco";
 import { BotaoEntrar } from "../clientes/botao-entrar";
 
+export const metadata = { title: "Início" };
+
 interface ClienteDoPainel {
   id: string;
   name: string;

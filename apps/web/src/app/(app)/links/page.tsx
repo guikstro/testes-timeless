@@ -6,6 +6,8 @@ import { dataCompleta, tempoRelativo } from "@/lib/relative-time";
 import { CreateLinkForm } from "./create-link-form";
 import { plataformaDe, REDES, Rede, redeDe } from "./plataformas";
 
+export const metadata = { title: "Links" };
+
 interface TrackingLinkListItem {
   id: string;
   name: string;

@@ -390,7 +390,7 @@ export function AppNav({
           </span>
           <span className={`min-w-0 ${label}`}>
             {impersonating ? (
-              <span className="block text-rotulo font-semibold uppercase tracking-[0.14em] text-warning">
+              <span className="block text-apoio font-medium text-warning">
                 Dentro do cliente
               </span>
             ) : null}

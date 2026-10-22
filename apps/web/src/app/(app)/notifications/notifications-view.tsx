@@ -169,7 +169,7 @@ export function NotificationsView({
                   {linha.body ? (
                     <span className="mt-0.5 block text-apoio leading-relaxed text-ink-soft">{linha.body}</span>
                   ) : null}
-                  <span className="mt-1 block text-rotulo font-semibold uppercase tracking-[0.09em] text-ink-mute">
+                  <span className="mt-1 block text-apoio font-medium text-ink-mute">
                     {ROTULO_POR_TIPO[linha.type]}
                   </span>
                 </span>

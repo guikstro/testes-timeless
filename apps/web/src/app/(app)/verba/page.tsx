@@ -12,6 +12,8 @@ import { SaudeDaContaMeta } from "./saude-da-conta";
 import { Anuncios, SaudeDaConta, SituacaoDaVerba, Verba } from "./tipos";
 import { pode } from "@/lib/permissoes";
 
+export const metadata = { title: "Verba" };
+
 interface Busca {
   de?: string;
   ate?: string;
@@ -64,7 +66,7 @@ export default async function VerbaPage({ searchParams }: { searchParams: Promis
       <header>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-rotulo font-semibold uppercase tracking-[0.14em] text-ink-mute">
+            <p className="text-apoio font-medium text-ink-mute">
               {formataDia(periodo.de)} a {formataDia(periodo.ate)}
             </p>
             <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink">Verba</h1>

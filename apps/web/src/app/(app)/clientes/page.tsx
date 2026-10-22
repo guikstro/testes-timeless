@@ -3,6 +3,8 @@ import { apiFetch, ApiRequestError } from "@/lib/api-client";
 import type { Foco } from "@/lib/foco";
 import { CorDoCliente } from "./cor-do-cliente";
 
+export const metadata = { title: "Clientes" };
+
 interface Cliente {
   id: string;
   name: string;
@@ -75,7 +77,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
         </div>
       ) : (
         <ul className="divide-y divide-line/70 rounded-xl border border-line bg-panel">
-          <li className="px-4 py-3 text-apoio font-medium uppercase tracking-wide text-ink-mute">
+          <li className="px-4 py-3 text-apoio font-medium text-ink-mute">
             Nome do cliente <span className="ml-1 rounded bg-panel-soft px-1.5 py-0.5">{clientes.total}</span>
           </li>
           {clientes.items.map((cliente) => {

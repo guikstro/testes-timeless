@@ -114,7 +114,7 @@ const TONS = {
 function Dado({ rotulo, valor, nota }: { rotulo: string; valor: string; nota?: string }) {
   return (
     <div>
-      <dt className="text-rotulo font-semibold uppercase tracking-[0.1em] opacity-70">{rotulo}</dt>
+      <dt className="text-apoio font-medium opacity-70">{rotulo}</dt>
       <dd className="mt-0.5 font-medium tabular-nums">
         {valor}
         {nota ? <span className="ml-1.5 font-normal opacity-70">{nota}</span> : null}

@@ -92,7 +92,7 @@ export function PerfilDaEmpresaDoCliente({
 
   return (
     <section className="mt-6 rounded-xl border border-line bg-panel p-5">
-      <h2 className="text-corpo font-medium uppercase tracking-wide text-ink-mute">Perfil da Empresa no Google</h2>
+      <h2 className="text-corpo font-medium text-ink-mute">Perfil da Empresa no Google</h2>
       <p className="mt-1 text-apoio text-ink-mute">
         Ligações, pedidos de rota, cliques no site e visualizações do perfil na Busca e no Maps, no painel de presença
         local do cliente.
@@ -129,7 +129,7 @@ export function PerfilDaEmpresaDoCliente({
               <span className="min-w-0 break-words">Conta da equipe: {situacao.conta.email ?? "conectada"}</span>
             </span>
             <span className="text-ink-mute">
-              · desde {new Date(situacao.conta.conectadaEm).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
+             , desde {new Date(situacao.conta.conectadaEm).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
             </span>
             <button
               type="button"

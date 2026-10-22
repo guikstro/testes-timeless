@@ -46,7 +46,7 @@ export function NotificationBell() {
 
           <div className="absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] origin-top-right animate-rise-in overflow-hidden rounded-2xl border border-line bg-panel shadow-lifted">
             <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
-              <h2 className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">Avisos</h2>
+              <h2 className="text-apoio font-medium text-ink-mute">Avisos</h2>
               {naoLidas > 0 && (
                 <button
                   type="button"
@@ -78,7 +78,7 @@ export function NotificationBell() {
                         {linha.body ? (
                           <span className="mt-0.5 block truncate text-apoio text-ink-soft">{linha.body}</span>
                         ) : null}
-                        <span className="mt-0.5 block text-rotulo font-semibold uppercase tracking-[0.09em] text-ink-mute">
+                        <span className="mt-0.5 block text-apoio font-medium text-ink-mute">
                           {ROTULO_POR_TIPO[linha.type]}
                         </span>
                       </span>

@@ -5,6 +5,8 @@ import { hojeEmBrasilia, inicioDaMedicao, medicaoDeLeads } from "@/lib/medicao-d
 import { Caixa } from "@/lib/conversas/tipos";
 import { InboxView } from "./inbox-view";
 
+export const metadata = { title: "Conversas" };
+
 
 /**
  * Mesma regra da ficha do lead: responder exige uma conexão por QR Code ativa.

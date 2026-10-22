@@ -149,7 +149,7 @@ export function ImportarCsv({ campaignId }: { campaignId: string }) {
       ) : (
         <div className="animate-rise-in rounded-xl border border-line bg-panel-soft/40 p-4">
           <p className="text-apoio text-ink-soft">
-            <span className="font-medium text-ink">{nomeArquivo}</span> · {previa.totalLinhas} linha(s)
+            <span className="font-medium text-ink">{nomeArquivo}</span>, {previa.totalLinhas} linha(s)
           </p>
 
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -190,8 +190,8 @@ export function ImportarCsv({ campaignId }: { campaignId: string }) {
             <table className="w-full text-left text-apoio">
               <thead>
                 <tr className="border-b border-line/60">
-                  <th className="px-2.5 py-1.5 text-rotulo uppercase tracking-wide text-ink-mute">Data lida</th>
-                  <th className="px-2.5 py-1.5 text-rotulo uppercase tracking-wide text-ink-mute">Gasto lido</th>
+                  <th className="px-2.5 py-1.5 text-apoio text-ink-mute">Data lida</th>
+                  <th className="px-2.5 py-1.5 text-apoio text-ink-mute">Gasto lido</th>
                 </tr>
               </thead>
               <tbody>

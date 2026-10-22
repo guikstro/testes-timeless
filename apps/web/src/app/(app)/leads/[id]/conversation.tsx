@@ -71,9 +71,9 @@ export function Conversation({ messages }: { messages: Message[] }) {
                 title={dataCompleta(message.timestamp)}
               >
                 {tempoRelativo(message.timestamp)}
-                {nossa && message.outboundStatus === "PENDING" ? " · enviando" : null}
-                {nossa && message.outboundStatus === "SENT" ? " · enviada" : null}
-                {falhou ? " · não entregue" : null}
+                {nossa && message.outboundStatus === "PENDING" ? ", enviando" : null}
+                {nossa && message.outboundStatus === "SENT" ? ", enviada" : null}
+                {falhou ? ", não entregue" : null}
               </p>
               {falhou ? (
                 <p className="mt-1 text-rotulo font-medium text-danger">

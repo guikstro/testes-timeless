@@ -45,7 +45,7 @@ function Aviso({ evento, aoDispensar }: { evento: EventoDeNotificacao; aoDispens
         <IconeDaNotificacao tipo={evento.type} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-rotulo font-semibold uppercase tracking-[0.1em] text-ink-mute">
+        <span className="block text-apoio font-medium text-ink-mute">
           {ROTULO_POR_TIPO[evento.type]}
         </span>
         <span className="mt-0.5 block truncate text-corpo font-medium text-ink">{evento.title}</span>

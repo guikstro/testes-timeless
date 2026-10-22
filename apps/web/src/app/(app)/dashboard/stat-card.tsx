@@ -38,7 +38,7 @@ export function StatCard({
       {/* Halo revelado sob o ponteiro, na cor da marca. */}
       <span className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 ease-soft group-hover:opacity-100 [background:radial-gradient(120%_70%_at_50%_-10%,rgb(var(--accent)/0.10),transparent)]" />
 
-      <p className="relative text-rotulo font-medium uppercase tracking-[0.1em] text-ink-mute">{rotulo}</p>
+      <p className="relative text-apoio font-medium text-ink-mute">{rotulo}</p>
 
       <p className="relative mt-1.5 text-[26px] font-semibold leading-none tabular-nums text-ink">
         <CountUp value={numero} formato={formato} />

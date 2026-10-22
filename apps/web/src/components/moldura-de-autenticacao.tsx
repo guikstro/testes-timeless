@@ -31,9 +31,9 @@ export function MolduraDeAutenticacao({
       </div>
 
       <header className="relative z-10 flex items-center justify-between">
-        <p className="flex items-center gap-2.5 text-rotulo font-semibold uppercase tracking-[0.2em] text-ink-mute">
+        <p className="flex items-center gap-2.5 text-apoio font-medium text-ink-mute">
           <Marca tamanho={16} className="shrink-0 text-accent" />
-          Built to last
+          Timeless
         </p>
         <ThemeToggle />
       </header>
@@ -56,7 +56,7 @@ export function MolduraDeAutenticacao({
       </main>
 
       <footer className="relative z-10 text-rotulo text-ink-mute">
-        Tracking e atribuição de conversões
+        Do anúncio à venda, cada cliente com a origem provada.
       </footer>
     </div>
   );
@@ -85,6 +85,6 @@ export const CAMPO =
 
 /** O mesmo botão grande e redondo da entrada. */
 export const BOTAO =
-  "focus-ring group mt-1 inline-flex h-14 items-center justify-between gap-3 rounded-full bg-accent px-7 " +
+  "focus-ring group mt-1 inline-flex h-14 items-center justify-center gap-3 rounded-full bg-accent px-7 " +
   "text-destaque font-semibold text-accent-contrast transition-all duration-300 ease-soft " +
   "hover:brightness-110 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60";

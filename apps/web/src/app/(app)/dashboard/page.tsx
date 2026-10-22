@@ -24,6 +24,8 @@ import { temPresencaLocal } from "@/lib/foco";
 import { concluiPresencaLocal, PainelPresencaLocal, PresencaLocal } from "./painel-presenca-local";
 import { FILTRO_DE_RESPONSAVEL } from "@/lib/leads/acompanhamento";
 
+export const metadata = { title: "Resumo" };
+
 const PERIODOS = [1, 7, 30, 90];
 
 /** "1 dia" se lê "Hoje" na tela. */
@@ -214,7 +216,7 @@ export default async function DashboardPage({
       <header className="mb-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-rotulo font-semibold uppercase tracking-[0.14em] text-ink-mute">
+            <p className="text-apoio font-medium text-ink-mute">
               {formataDia(overview.period.from.slice(0, 10))} a {formataDia(overview.period.to.slice(0, 10))}
             </p>
             <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink">
@@ -311,26 +313,11 @@ export default async function DashboardPage({
             rastreável. Quem manda mensagem direto para o número não carrega essa evidência, e ela nunca é deduzida
             por aproximação.
           </p>
-          <ul className="mt-2 space-y-1">
-            {!setup.metaConnected ? (
-              <li>
-                · <Link href="/integrations/meta" className="underline">Conecte sua conta Meta</Link> para
-                identificar leads vindos de anúncios.
-              </li>
-            ) : null}
-            {setup.trackingLinkCount === 0 ? (
-              <li>
-                · <Link href="/links" className="underline">Crie um link rastreável</Link> para usar na bio e em
-                campanhas.
-              </li>
-            ) : null}
-            {!setup.whatsappConnected ? (
-              <li>
-                · <Link href="/integrations/whatsapp" className="underline">Conecte seu WhatsApp</Link> para receber
-                novos leads.
-              </li>
-            ) : null}
-          </ul>
+          {setup.trackingLinkCount === 0 ? (
+            <p className="mt-2">
+              <Link href="/links" className="underline">Crie um link rastreável</Link> para usar na bio e nas campanhas.
+            </p>
+          ) : null}
         </Alert>
       ) : null}
 
@@ -346,7 +333,7 @@ async function DashboardDePresencaLocal({ days }: { days: number }) {
     <div className="mx-auto max-w-6xl">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-rotulo font-semibold uppercase tracking-[0.14em] text-ink-mute">
+          <p className="text-apoio font-medium text-ink-mute">
             {formataDia(dados.periodo.de)} a {formataDia(dados.periodo.ate)}
           </p>
           <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink">Presença local</h1>

@@ -248,7 +248,7 @@ function Tabela({
   return (
     <div className="mt-5">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">Campanhas, {rotuloDoPeriodo}</h3>
+        <h3 className="text-apoio font-medium text-ink-mute">Campanhas, {rotuloDoPeriodo}</h3>
         <span className="text-corpo text-ink-mute">
           Gasto: <span className="font-semibold tabular-nums text-ink">{formatCentsAsBRL(total.gasto)}</span>
         </span>
@@ -256,7 +256,7 @@ function Tabela({
       <div className="overflow-x-auto rounded-xl border border-line/70">
         <table className="w-full min-w-[52rem] text-corpo">
           <thead>
-            <tr className="border-b border-line text-left text-rotulo font-semibold uppercase tracking-[0.09em] text-ink-mute">
+            <tr className="border-b border-line text-left text-apoio font-medium text-ink-mute">
               <th className="px-3 py-2.5 font-semibold">Campanha</th>
               <th className="px-3 py-2.5 text-right font-semibold">Gasto</th>
               <th className="px-3 py-2.5 text-right font-semibold">Impressões</th>

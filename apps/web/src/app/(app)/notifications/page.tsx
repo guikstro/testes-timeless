@@ -2,6 +2,8 @@ import { apiFetch } from "@/lib/api-client";
 import { PaginaDeNotificacoes, TipoDeNotificacao } from "@/lib/notifications/tipos";
 import { NotificationsView } from "./notifications-view";
 
+export const metadata = { title: "Avisos" };
+
 /** Os mesmos tipos que a API aceita, para um filtro inválido na URL ser ignorado. */
 const TIPOS: TipoDeNotificacao[] = [
   "lead.created",

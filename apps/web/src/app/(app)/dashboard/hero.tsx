@@ -50,7 +50,7 @@ export function Hero({
       <dl className="relative mt-7 flex flex-wrap gap-x-8 gap-y-3 border-t border-line/70 pt-5">
         {secundarios.map((item) => (
           <div key={item.rotulo}>
-            <dt className="text-rotulo font-semibold uppercase tracking-[0.1em] text-ink-mute">{item.rotulo}</dt>
+            <dt className="text-apoio font-medium text-ink-mute">{item.rotulo}</dt>
             <dd className="mt-0.5 font-display text-destaque font-semibold tabular-nums text-ink">
               {item.valor}
               {item.nota ? (
@@ -77,7 +77,7 @@ function Numero({
 }) {
   return (
     <div>
-      <p className="text-rotulo font-semibold uppercase tracking-[0.1em] text-ink-mute">{rotulo}</p>
+      <p className="text-apoio font-medium text-ink-mute">{rotulo}</p>
       <p
         className={`mt-1 font-display font-semibold leading-none tracking-tight tabular-nums text-ink ${
           menor ? "text-[clamp(1.6rem,3.4vw,2.4rem)]" : "text-[clamp(2.4rem,6vw,4rem)]"

@@ -8,7 +8,7 @@ type Convite =
   | { fase: "valido"; organizacao: string; email: string; contaExiste: boolean }
   | { fase: "invalido"; mensagem: string };
 
-const rotulo = "mb-1.5 block text-apoio font-medium uppercase tracking-[0.12em] text-ink-mute";
+const rotulo = "mb-1.5 block text-apoio font-medium text-ink-mute";
 
 export function AceitaConvite({ token }: { token: string }) {
   const [convite, setConvite] = useState<Convite>({ fase: "carregando" });

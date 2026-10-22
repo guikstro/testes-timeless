@@ -131,7 +131,7 @@ export function LeadBoard({ colunas }: { colunas: ColunaDoQuadro[] }) {
             >
               <header className="mb-3 flex items-center gap-2 px-1">
                 <span className={`h-2 w-2 rounded-full ${cor}`} aria-hidden />
-                <h2 className="text-apoio font-semibold uppercase tracking-[0.09em] text-ink-soft">{titulo}</h2>
+                <h2 className="text-apoio font-medium text-ink-soft">{titulo}</h2>
                 <span
                   className="ml-auto rounded-full bg-panel-soft px-2 py-0.5 text-rotulo tabular-nums text-ink-mute"
                   title={coluna.total > daColuna.length ? `${daColuna.length} de ${coluna.total} carregados` : undefined}

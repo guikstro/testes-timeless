@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 
 const inicial: EstadoDoMfa = {};
 
-const ROTULO = "mb-1.5 block text-apoio font-medium uppercase tracking-[0.12em] text-ink-mute";
+const ROTULO = "mb-1.5 block text-apoio font-medium text-ink-mute";
 const BOTAO =
   "h-11 rounded-xl bg-accent px-5 text-corpo font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60";
 

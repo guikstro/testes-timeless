@@ -102,7 +102,7 @@ function Linha({
           {souEu ? <Badge tone="neutral">Você</Badge> : null}
         </span>
         <span className="mt-0.5 block truncate text-rotulo text-ink-mute">
-          {membro.email} · entrou {tempoRelativo(membro.joinedAt)}
+          {membro.email}, entrou {tempoRelativo(membro.joinedAt)}
         </span>
       </span>
 

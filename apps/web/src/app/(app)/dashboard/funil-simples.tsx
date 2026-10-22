@@ -42,7 +42,7 @@ export function FunilSimples({ etapas }: { etapas: EtapaDoFunil[] }) {
             {anterior ? <Passagem anterior={anterior} etapa={etapa} /> : null}
 
             <div className="flex items-baseline justify-between gap-4">
-              <p className="text-rotulo font-semibold uppercase tracking-[0.1em] text-ink-mute">{etapa.rotulo}</p>
+              <p className="text-apoio font-medium text-ink-mute">{etapa.rotulo}</p>
               <p className="text-apoio tabular-nums text-ink-mute">
                 {i === 0 ? "todos que chegaram" : `${porCento(proporcao)} de quem chegou`}
               </p>

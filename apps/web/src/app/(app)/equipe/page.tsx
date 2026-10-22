@@ -4,6 +4,8 @@ import { apiFetch } from "@/lib/api-client";
 import { sessaoAtual } from "@/lib/sessao";
 import { AdicionaPessoa, RevogaAcesso } from "./formularios";
 
+export const metadata = { title: "Equipe e sócios" };
+
 interface PessoaDaEquipe {
   id: string;
   name: string;

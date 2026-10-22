@@ -13,8 +13,8 @@ const textos = Instrument_Sans({ subsets: ["latin"], display: "swap", variable: 
 const titulos = Bricolage_Grotesque({ subsets: ["latin"], display: "swap", variable: "--font-display" });
 
 export const metadata: Metadata = {
-  title: "Tracking Platform",
-  description: "Tracking e atribuição de conversões: anúncio → clique → WhatsApp → venda",
+  title: { default: "Timeless", template: "%s | Timeless" },
+  description: "Anúncios, conversas e vendas no mesmo lugar, com a origem de cada cliente provada.",
   manifest: "/manifest.webmanifest",
   // No iPhone, os avisos só chegam para o sistema instalado na tela inicial.
   appleWebApp: { capable: true, title: "Timeless" },

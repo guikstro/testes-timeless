@@ -11,6 +11,8 @@ import { CampanhasDePresencaLocal, CampanhasLocaisView } from "./campanhas-locai
 import { DesempenhoDeCampanhas } from "./tipos";
 import { leMetricas, metricasDoConjunto, sugereConjunto } from "@/lib/campanhas/metricas";
 
+export const metadata = { title: "Campanhas" };
+
 interface Busca {
   de?: string;
   ate?: string;

@@ -56,7 +56,7 @@ export function Procedencia({ overview }: { overview: Overview }) {
 function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
     <div>
-      <dt className="font-semibold uppercase tracking-[0.1em]">{rotulo}</dt>
+      <dt className="font-medium">{rotulo}</dt>
       <dd className="mt-0.5 text-ink-soft">{valor}</dd>
     </div>
   );

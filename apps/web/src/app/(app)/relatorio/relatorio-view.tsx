@@ -89,7 +89,7 @@ export function RelatorioView({
       ) : (
         <div className="print:hidden">
           <div className="surface mb-5 p-5">
-            <h2 className="mb-3 text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">
+            <h2 className="mb-3 text-apoio font-medium text-ink-mute">
               Dados desta execução
             </h2>
             <pre className="max-h-[24rem] overflow-auto whitespace-pre-wrap rounded-xl bg-panel-soft/60 p-4 font-mono text-[12px] leading-relaxed text-ink-soft">

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 
 const inicial: EstadoDaVerba = {};
 
-const ROTULO = "mb-1.5 block text-apoio font-medium uppercase tracking-[0.12em] text-ink-mute";
+const ROTULO = "mb-1.5 block text-apoio font-medium text-ink-mute";
 
 export function FormularioDaVerba({ verba }: { verba?: Verba }) {
   const [estado, acao, enviando] = useActionState(salvarVerba, inicial);

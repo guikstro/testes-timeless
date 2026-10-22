@@ -2,6 +2,8 @@ import { sessaoAtual } from "@/lib/sessao";
 import { SalesWorkspace } from "./sales-workspace";
 import { ExigeArea } from "@/components/exige-area";
 
+export const metadata = { title: "Vendas" };
+
 export default async function SalesPage() {
   const session = await sessaoAtual();
   return (

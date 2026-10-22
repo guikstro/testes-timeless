@@ -133,7 +133,7 @@ function Cartao({
   if (numero === null) {
     return (
       <div className="surface p-4">
-        <p className="text-rotulo font-medium uppercase tracking-[0.1em] text-ink-mute">{rotulo}</p>
+        <p className="text-apoio font-medium text-ink-mute">{rotulo}</p>
         <p className="mt-1.5 text-lg font-semibold text-ink-mute">Sem dado</p>
         <p className="mt-1 text-rotulo text-ink-mute">A Meta não mandou este número para o período.</p>
       </div>

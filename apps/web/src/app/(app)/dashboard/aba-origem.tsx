@@ -35,23 +35,23 @@ export function AbaOrigem({ overview }: { overview: Overview }) {
           />
           <div className="relative grid gap-6 sm:grid-cols-2">
             <div>
-              <p className="text-rotulo font-semibold uppercase tracking-[0.12em] text-ink-mute">Fecha melhor</p>
+              <p className="text-apoio font-medium text-ink-mute">Fecha melhor</p>
               <p className="mt-1.5 font-display text-[clamp(1.5rem,3vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
                 {melhorTaxa.label}
               </p>
               <p className="mt-1 text-corpo text-ink-soft">
-                {Math.round((melhorTaxa.won / Math.max(melhorTaxa.leads, 1)) * 100)}% dos leads viram cliente ·{" "}
+                {Math.round((melhorTaxa.won / Math.max(melhorTaxa.leads, 1)) * 100)}% dos leads viram cliente,{" "}
                 {formatCentsAsBRL(melhorTaxa.revenueCents)}
               </p>
             </div>
 
             <div className="sm:border-l sm:border-line/70 sm:pl-6">
-              <p className="text-rotulo font-semibold uppercase tracking-[0.12em] text-ink-mute">Traz mais gente</p>
+              <p className="text-apoio font-medium text-ink-mute">Traz mais gente</p>
               <p className="mt-1.5 font-display text-[clamp(1.5rem,3vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
                 {maiorVolume.label}
               </p>
               <p className="mt-1 text-corpo text-ink-soft">
-                {maiorVolume.leads} leads ·{" "}
+                {maiorVolume.leads} leads,{" "}
                 {maiorVolume.key === melhorTaxa.key
                   ? "e é também a que fecha melhor"
                   : `${Math.round((maiorVolume.won / Math.max(maiorVolume.leads, 1)) * 100)}% viram cliente`}

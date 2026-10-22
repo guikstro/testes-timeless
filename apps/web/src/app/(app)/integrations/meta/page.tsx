@@ -223,7 +223,7 @@ export default async function MetaIntegrationPage() {
                   <div className="mb-2 flex items-center justify-between">
                     <p className="font-medium text-ink">{campaign.name}</p>
                     <p className="text-corpo text-ink-mute">
-                      {campaign.status} · Investimento (30d): {formatCentsAsBRL(campaign.totalSpendCents)}
+                      {campaign.status}, Investimento (30d): {formatCentsAsBRL(campaign.totalSpendCents)}
                     </p>
                   </div>
                   {campaign.adSets.map((adSet) => (
@@ -233,7 +233,7 @@ export default async function MetaIntegrationPage() {
                       </p>
                       {adSet.ads.map((ad) => (
                         <p key={ad.id} className="ml-4 text-apoio text-ink-mute">
-                          {ad.name} · {ad.status}
+                          {ad.name}, {ad.status}
                         </p>
                       ))}
                     </div>
@@ -251,7 +251,7 @@ export default async function MetaIntegrationPage() {
           <div className="mb-4 rounded-xl border border-line bg-panel p-6 text-corpo text-ink-soft">
             {connection.hasCapiAccessToken ? (
               <p>
-                <span className="font-medium">Configurado</span> · Pixel ID {connection.pixelId} · enviando eventos de
+                <span className="font-medium">Configurado</span>, Pixel ID {connection.pixelId}, enviando eventos de
                 Lead, Lead qualificado e Venda automaticamente.
               </p>
             ) : (
@@ -276,7 +276,7 @@ export default async function MetaIntegrationPage() {
             ) : (
               <div className="overflow-x-auto rounded-xl border border-line bg-panel">
                 <table className="w-full text-left text-corpo">
-                  <thead className="border-b border-line text-apoio uppercase text-ink-mute">
+                  <thead className="border-b border-line text-apoio text-ink-mute">
                     <tr>
                       <th className="px-4 py-2">Lead</th>
                       <th className="px-4 py-2">Evento</th>

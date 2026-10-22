@@ -4,6 +4,8 @@ import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Textarea } from "@/components/ui/input";
+import { Dialog, Drawer } from "@/components/ui/dialog";
+import { GrupoDePilulas } from "@/components/ui/pill-group";
 import { formataTelefone } from "@/lib/telefone";
 
 type Evidence = {
@@ -157,7 +159,7 @@ export async function salesRequest<T>(
   if (!response.ok)
     throw new Error(
       Array.isArray(result.message)
-        ? result.message.join(" · ")
+        ? result.message.join(". ")
         : (result.message ?? "Não foi possível concluir. Tente novamente."),
     );
   return result as T;
@@ -318,78 +320,87 @@ export function SalesWorkspace({
     }
   }
 
+  const nomeDaVenda = (s: Sale) =>
+    s.lead?.name ??
+    s.customerName ??
+    (s.lead?.normalizedPhone ? formataTelefone(s.lead.normalizedPhone) : null) ??
+    (s.customerPhone ? formataTelefone(s.customerPhone) : null) ??
+    "Cliente não identificado";
+  const filtra = (valor: string) => {
+    setFilter(valor);
+    setOffset(0);
+  };
+  const ROTULO = "flex flex-col gap-1.5 text-apoio font-medium text-ink-soft";
+
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="mx-auto max-w-6xl">
+      <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Vendas</h1>
           <p className="mt-1 text-corpo text-ink-mute">
             As vendas registradas e as que o sistema percebeu nas conversas.
           </p>
         </div>
-        {canManage && (
-          <Button onClick={() => setShowForm(!showForm)}>
-            Registrar venda
-          </Button>
-        )}
-      </div>
+        {canManage && <Button onClick={() => setShowForm(true)}>Registrar venda</Button>}
+      </header>
+
       {error && (
-        <div
-          role="alert"
-          className="rounded-lg border border-danger-line bg-danger-soft p-4 text-danger"
-        >
-          {error}{" "}
-          <Button variant="ghost" onClick={() => void refresh()}>
-            Tentar novamente
+        <div role="alert" className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-danger-line bg-danger-soft px-4 py-3 text-corpo text-danger">
+          {error}
+          <Button variant="ghost" size="sm" onClick={() => void refresh()}>
+            Tentar de novo
           </Button>
         </div>
       )}
       {notice && (
-        <p role="status" className="text-success">
+        <p role="status" className="mt-6 border-l-2 border-accent pl-3 text-corpo text-ink-soft">
           {notice}
         </p>
       )}
+
+      {/*
+        A receita do período em uma linha, alinhada como o resto da tela. O
+        número gigante centralizado parecia capa de apresentação, não uma
+        tela de trabalho; o que pede decisão fica ao lado dele.
+      */}
       {summary && (
-        <section aria-label="Resumo de receita" className="py-4 text-center sm:py-6">
+        <section aria-label="Resumo de receita" className="mt-8 flex flex-wrap items-end justify-between gap-6 border-b border-line pb-7">
           {summary.currencies.length ? (
-            summary.currencies.map((c) => (
-              <div key={c.currency}>
-                <p className="font-display text-5xl font-semibold tracking-[-0.035em] text-ink sm:text-6xl">
-                  {money(c.revenueCents, c.currency)}
-                </p>
-                <p className="mt-3 text-lg text-ink">
-                  em {c.confirmedSales} {c.confirmedSales === 1 ? "venda confirmada" : "vendas confirmadas"}{" "}
-                  {rotuloDoPeriodo(from, to)}
-                </p>
-                <p className="mt-1 text-corpo text-ink-mute">
-                  {c.averageTicketCents !== null ? `Ticket médio ${money(c.averageTicketCents, c.currency)}` : null}
-                  {c.unknownValues > 0
-                    ? ` · ${c.unknownValues} ${c.unknownValues === 1 ? "venda sem valor registrado" : "vendas sem valor registrado"}`
-                    : ""}
-                </p>
-              </div>
-            ))
+            <div className="space-y-4">
+              {summary.currencies.map((c) => (
+                <div key={c.currency}>
+                  <p className="font-display text-4xl font-semibold tabular-nums tracking-tight text-ink">
+                    {money(c.revenueCents, c.currency)}
+                  </p>
+                  <p className="mt-1.5 text-corpo text-ink-soft">
+                    {c.confirmedSales} {c.confirmedSales === 1 ? "venda confirmada" : "vendas confirmadas"}{" "}
+                    {rotuloDoPeriodo(from, to)}
+                    {c.averageTicketCents !== null ? `, ticket médio de ${money(c.averageTicketCents, c.currency)}` : ""}.
+                    {c.unknownValues > 0
+                      ? ` ${c.unknownValues} ${c.unknownValues === 1 ? "venda está sem valor" : "vendas estão sem valor"}.`
+                      : ""}
+                  </p>
+                </div>
+              ))}
+            </div>
           ) : (
-            <>
+            <div>
               <p className="font-display text-xl font-semibold tracking-tight text-ink">
                 Nenhuma venda confirmada {rotuloDoPeriodo(from, to)}
               </p>
-              <p className="mx-auto mt-1 max-w-md text-corpo text-ink-mute">
-                As vendas aparecem aqui quando alguém registra uma, ou quando o sistema percebe uma na conversa.
+              <p className="mt-1 max-w-md text-corpo text-ink-mute">
+                Aparecem aqui quando alguém registra uma venda ou quando o sistema percebe uma na conversa.
               </p>
-            </>
+            </div>
           )}
 
-          {/* O que pede uma decisão de alguém. Clicar já filtra a lista abaixo. */}
+          {/* O que pede uma decisão de alguém. Clicar já filtra a lista. */}
           {summary.possibleSales > 0 || summary.requiresReview > 0 ? (
-            <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <div className="flex flex-wrap gap-2">
               {summary.possibleSales > 0 ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    setFilter("POSSIBLE");
-                    setOffset(0);
-                  }}
+                  onClick={() => filtra("POSSIBLE")}
                   className="focus-ring rounded-full border border-warning-line bg-warning-soft px-4 py-2 text-corpo text-warning"
                 >
                   <span className="font-semibold">{summary.possibleSales}</span>{" "}
@@ -399,177 +410,88 @@ export function SalesWorkspace({
               {summary.requiresReview > 0 ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    setFilter("review");
-                    setOffset(0);
-                  }}
+                  onClick={() => filtra("review")}
                   className="focus-ring rounded-full border border-danger-line bg-danger-soft px-4 py-2 text-corpo text-danger"
                 >
-                  <span className="font-semibold">{summary.requiresReview}</span>{" "}
-                  {summary.requiresReview === 1 ? "com dúvida" : "com dúvida"}
+                  <span className="font-semibold">{summary.requiresReview}</span> com dúvida
                 </button>
               ) : null}
             </div>
           ) : (
-            <p className="mt-4 text-apoio text-ink-mute">Nada esperando confirmação.</p>
+            <p className="text-apoio text-ink-mute">Nada esperando confirmação.</p>
           )}
         </section>
       )}
-      {showForm && (
-        <form
-          onSubmit={register}
-          className="surface space-y-4 p-5 [&_label]:flex [&_label]:flex-col [&_label]:gap-1.5 [&_label]:text-apoio [&_label]:font-medium [&_label]:text-ink-soft"
-        >
-          <h2 className="font-semibold">Registrar venda confirmada</h2>
-          <div className="grid gap-4 md:grid-cols-3">
-            <label>
-              Cliente
-              <Input name="name" required maxLength={200} />
+
+      <div className="mt-6 flex flex-wrap items-end justify-between gap-4">
+        <GrupoDePilulas
+          ativo={filter}
+          opcoes={[
+            { chave: "", rotulo: "Todas", aoClicar: () => filtra("") },
+            { chave: "CONFIRMED", rotulo: "Confirmadas", aoClicar: () => filtra("CONFIRMED") },
+            { chave: "POSSIBLE", rotulo: "A confirmar", aoClicar: () => filtra("POSSIBLE") },
+            { chave: "review", rotulo: "Com dúvida", aoClicar: () => filtra("review") },
+            { chave: "CANCELLED", rotulo: "Canceladas", aoClicar: () => filtra("CANCELLED") },
+          ]}
+        />
+        <div className="flex flex-wrap items-end gap-3">
+          {units.length > 0 && (
+            <label className={ROTULO}>
+              Unidade
+              <Select
+                value={unit}
+                onChange={(e) => {
+                  setUnit(e.target.value);
+                  setOffset(0);
+                }}
+              >
+                <option value="">Todas</option>
+                {units.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </Select>
             </label>
-            <label>
-              Telefone
-              <Input name="phone" type="tel" placeholder="(85) 99999-9999" />
-            </label>
-            <label>
-              Valor
-              <Input
-                name="value"
-                inputMode="decimal"
-                placeholder="850,00"
-                required
-              />
-            </label>
-            <label>
-              Moeda
-              <Input
-                name="currency"
-                defaultValue="BRL"
-                pattern="[A-Z]{3}"
-                required
-              />
-            </label>
-            <label>
-              Data e hora
-              <Input name="date" type="datetime-local" required />
-            </label>
-            {units.length > 0 && (
-              <label>
-                Unidade
-                <Select name="unit">
-                  <option value="">Organização</option>
-                  {units.map((u) => (
-                    <option key={u.id} value={u.code}>
-                      {u.name}
-                    </option>
-                  ))}
-                </Select>
-              </label>
-            )}
-            <label>
-              Produto ou serviço (opcional)
-              <Input name="product" maxLength={200} />
-            </label>
-          </div>
-          <label className="block">
-            Observações (opcional)
-            <Textarea name="notes" rows={2} maxLength={2000} />
-          </label>
-          <Button disabled={busy}>
-            {busy ? "Registrando…" : "Confirmar e registrar"}
-          </Button>
-          <p className="text-sm text-ink-mute">
-            O telefone é usado para procurar o lead e sua campanha de origem.
-          </p>
-        </form>
-      )}
-      <div className="flex flex-wrap items-end gap-3 [&_label]:flex [&_label]:flex-col [&_label]:gap-1.5 [&_label]:text-apoio [&_label]:font-medium [&_label]:text-ink-soft">
-        <label>
-          Estado
-          <Select
-            value={filter}
-            onChange={(e) => {
-              setFilter(e.target.value);
-              setOffset(0);
-            }}
-          >
-            <option value="">Todas</option>
-            <option value="review">Com dúvida</option>
-            {Object.entries(labels).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </Select>
-        </label>
-        {units.length > 0 && (
-          <label>
-            Unidade
-            <Select
-              value={unit}
+          )}
+          <label className={ROTULO}>
+            De
+            <Input
+              type="date"
+              value={from}
               onChange={(e) => {
-                setUnit(e.target.value);
+                setFrom(e.target.value);
                 setOffset(0);
               }}
-            >
-              <option value="">Todas</option>
-              {units.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
-            </Select>
+            />
           </label>
-        )}
-        <label>
-          De
-          <Input
-            type="date"
-            value={from}
-            onChange={(e) => {
-              setFrom(e.target.value);
-              setOffset(0);
-            }}
-          />
-        </label>
-        <label>
-          Até
-          <Input
-            type="date"
-            value={to}
-            onChange={(e) => {
-              setTo(e.target.value);
-              setOffset(0);
-            }}
-          />
-        </label>
-        <Button variant="ghost" onClick={() => void refresh()}>
-          Atualizar
-        </Button>
+          <label className={ROTULO}>
+            Até
+            <Input
+              type="date"
+              value={to}
+              onChange={(e) => {
+                setTo(e.target.value);
+                setOffset(0);
+              }}
+            />
+          </label>
+        </div>
       </div>
-      <section className="surface overflow-x-auto" aria-busy={loading}>
+
+      <section className="surface mt-4 overflow-x-auto" aria-busy={loading}>
         {loading ? (
-          <p role="status" className="p-8">
+          <p role="status" className="p-8 text-corpo text-ink-mute">
             Carregando vendas…
           </p>
         ) : !sales.length ? (
-          <p className="p-8 text-center text-corpo text-ink-mute">Nenhuma venda com estes filtros.</p>
+          <p className="p-10 text-center text-corpo text-ink-mute">Nenhuma venda com estes filtros.</p>
         ) : (
-          <table className="w-full text-left text-sm">
+          <table className="w-full text-left text-corpo">
             <thead>
               <tr className="border-b border-line">
-                {[
-                  "Cliente",
-                  "Situação",
-                  "Valor",
-                  "Data",
-                  "Como foi confirmada",
-                  ...(units.length > 0 ? ["Unidade"] : []),
-                  "",
-                ].map((h) => (
-                  <th
-                    key={h}
-                    className="px-4 py-3 text-apoio font-medium text-ink-mute"
-                  >
+                {["Cliente", "Situação", "Valor", "Data", "Como foi confirmada", ...(units.length > 0 ? ["Unidade"] : []), ""].map((h) => (
+                  <th key={h} className="px-4 py-3 text-apoio font-medium text-ink-mute">
                     {h}
                   </th>
                 ))}
@@ -578,12 +500,8 @@ export function SalesWorkspace({
             <tbody>
               {sales.map((s) => (
                 <tr key={s.id} className="border-b border-line/60 transition-colors last:border-0 hover:bg-panel-soft/50">
-                  <td className="p-4 font-medium text-ink">
-                    {s.lead?.name ??
-                      s.customerName ??
-                      s.lead?.normalizedPhone ??
-                      s.customerPhone ??
-                      "Cliente não identificado"}
+                  <td className="px-4 py-3.5 font-medium text-ink">
+                    {nomeDaVenda(s)}
                     {s.lead && (
                       <Link
                         className="block text-apoio font-normal text-ink-mute underline decoration-line underline-offset-2 hover:text-ink"
@@ -593,34 +511,26 @@ export function SalesWorkspace({
                       </Link>
                     )}
                   </td>
-                  <td className="p-4">
+                  <td className="px-4 py-3.5">
                     <span className={`inline-flex rounded-full px-2.5 py-0.5 text-apoio font-medium ${TOM_DA_SITUACAO[s.status] ?? "bg-panel-soft text-ink-soft"}`}>
                       {labels[s.status]}
                     </span>
-                    {s.needsReview && (
-                      <p className="mt-1 text-apoio text-warning">Com dúvida</p>
-                    )}
-                    {s.confidence !== null && (
-                      <p className="text-ink-mute">
-                        {Math.round(s.confidence * 100)}% de confiança
-                      </p>
-                    )}
+                    {s.needsReview && <p className="mt-1 text-apoio text-warning">Com dúvida</p>}
                   </td>
-                  <td className="p-4 tabular-nums">
+                  <td className="px-4 py-3.5 tabular-nums">
                     {s.amountCents === null ? <span className="text-ink-mute">Sem valor</span> : money(s.amountCents, s.currency)}
                   </td>
-                  <td className="p-4 tabular-nums text-ink-soft">
-                    {s.occurredAt ? new Date(s.occurredAt).toLocaleDateString("pt-BR") : "—"}
+                  <td className="px-4 py-3.5 tabular-nums text-ink-soft">
+                    {s.occurredAt ? new Date(s.occurredAt).toLocaleDateString("pt-BR") : <span className="text-ink-mute">Sem data</span>}
                   </td>
-                  <td className="p-4">
-                    {s.source?.type === s.confirmationSource
-                      ? s.source.name
-                      : sources[s.confirmationSource]}
+                  <td className="px-4 py-3.5 text-ink-soft">
+                    {s.source?.type === s.confirmationSource ? s.source.name : sources[s.confirmationSource]}
                   </td>
-                  {units.length > 0 ? <td className="p-4">{s.unit?.name ?? "Organização"}</td> : null}
-                  <td className="p-4">
+                  {units.length > 0 ? <td className="px-4 py-3.5 text-ink-soft">{s.unit?.name ?? "Organização"}</td> : null}
+                  <td className="px-4 py-3.5 text-right">
                     <Button
-                      variant="secondary"
+                      variant="ghost"
+                      size="sm"
                       disabled={busy}
                       onClick={async () => {
                         setBusy(true);
@@ -642,225 +552,259 @@ export function SalesWorkspace({
           </table>
         )}
       </section>
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-ink-mute">{total} vendas</span>
-        <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            disabled={offset === 0 || loading}
-            onClick={() => setOffset(offset - 20)}
-          >
-            Anterior
-          </Button>
-          <Button
-            variant="secondary"
-            disabled={offset + 20 >= total || loading}
-            onClick={() => setOffset(offset + 20)}
-          >
-            Próxima
-          </Button>
-        </div>
-      </div>
-      {selected && (
-        <section
-          className="surface space-y-4 p-6"
-          aria-label="Evidências da venda"
-        >
-          <div className="flex justify-between gap-4">
-            <h2 className="text-xl font-semibold">
-              {labels[selected.status]} ·{" "}
-              {money(selected.amountCents, selected.currency)}
-            </h2>
-            <Button variant="ghost" onClick={() => setSelected(null)}>
-              Fechar
+
+      {total > 20 ? (
+        <div className="mt-4 flex items-center justify-between">
+          <span className="text-apoio text-ink-mute">{total} vendas</span>
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" disabled={offset === 0 || loading} onClick={() => setOffset(offset - 20)}>
+              Anterior
+            </Button>
+            <Button variant="secondary" size="sm" disabled={offset + 20 >= total || loading} onClick={() => setOffset(offset + 20)}>
+              Próxima
             </Button>
           </div>
-          <p className="text-ink-soft">
-            {sources[selected.confirmationSource]}
-            {selected.confirmedAt
-              ? ` · Confirmada em ${new Date(selected.confirmedAt).toLocaleString("pt-BR")}`
-              : " · Sem confirmação"}
-          </p>
-          {!selected.lead && (
-            <p className="text-warning">
-              Sem lead associado. A receita está registrada, mas ainda não tem
-              campanha atribuída.
-            </p>
-          )}
-          {selected.attributionSnapshot?.trackingClick && (
-            <p className="text-sm text-ink-soft">
-              Campanha:{" "}
-              {selected.attributionSnapshot.trackingClick.utmCampaign ??
-                selected.attributionSnapshot.trackingClick.campaignId ??
-                "Não identificada"}{" "}
-              · Anúncio:{" "}
-              {selected.attributionSnapshot.trackingClick.adId ??
-                "Não identificado"}
-            </p>
-          )}
-          {!!selected.conflicts?.length && (
-            <div className="rounded border border-warning-line bg-warning-soft p-3">
-              <p className="font-semibold">Valores ou estados divergentes</p>
-              {selected.conflicts.map((c, i) => (
-                <p key={i}>
-                  {sources[c.source]}: {money(c.valueCents, c.currency)} ·{" "}
-                  {c.type}
-                </p>
-              ))}
-            </div>
-          )}
-          <ol className="space-y-3">
-            {selected.evidence?.map((e) => (
-              <li key={e.id} className="rounded border border-line p-4">
-                <p className="font-medium">
-                  {sources[e.source]} · {money(e.valueCents, e.currency)}
-                </p>
-                <p className="text-sm text-ink-mute">
-                  {new Date(e.occurredAt).toLocaleString("pt-BR")} ·{" "}
-                  {e.actorName ?? "Evento externo / sistema"}
-                </p>
-                {e.payload?.text && (
-                  <blockquote className="mt-2">“{e.payload.text}”</blockquote>
-                )}
-                {e.payload?.reason && <p>{e.payload.reason}</p>}
-                {e.payload?.notes && <p>{e.payload.notes}</p>}
-                {e.payload?.coverage && (
-                  <p className="text-sm text-ink-mute">
-                    Cobertura da conversa:{" "}
-                    {(
-                      {
-                        COMPLETE: "completa",
-                        PARTIAL: "parcial",
-                        UNKNOWN: "desconhecida",
-                      } as Record<string, string>
-                    )[e.payload.coverage] ?? e.payload.coverage}
+        </div>
+      ) : null}
+
+      <Dialog
+        aberto={showForm}
+        aoFechar={() => setShowForm(false)}
+        titulo="Registrar venda"
+        descricao="Pelo telefone o sistema encontra a conversa e a campanha de onde o cliente veio."
+      >
+        <form onSubmit={register} className="space-y-4 pb-3">
+          <label className={ROTULO}>
+            Cliente
+            <Input name="name" required maxLength={200} />
+          </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className={ROTULO}>
+              Telefone
+              <Input name="phone" type="tel" placeholder="(85) 99999-9999" />
+            </label>
+            <label className={ROTULO}>
+              Valor
+              <Input name="value" inputMode="decimal" placeholder="850,00" required />
+            </label>
+          </div>
+          {/* Real sempre: quem vende em outra moeda registra pela integração. */}
+          <input type="hidden" name="currency" value="BRL" />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className={ROTULO}>
+              Data e hora
+              <Input name="date" type="datetime-local" required />
+            </label>
+            {units.length > 0 && (
+              <label className={ROTULO}>
+                Unidade
+                <Select name="unit">
+                  <option value="">Organização</option>
+                  {units.map((u) => (
+                    <option key={u.id} value={u.code}>
+                      {u.name}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+            )}
+          </div>
+          <label className={ROTULO}>
+            Produto ou serviço (opcional)
+            <Input name="product" maxLength={200} />
+          </label>
+          <label className={ROTULO}>
+            Observação (opcional)
+            <Textarea name="notes" rows={2} maxLength={2000} />
+          </label>
+          <Button disabled={busy}>{busy ? "Registrando…" : "Confirmar e registrar"}</Button>
+        </form>
+      </Dialog>
+
+      <Drawer
+        aberto={selected !== null}
+        aoFechar={() => setSelected(null)}
+        titulo={selected ? nomeDaVenda(selected) : ""}
+        descricao={
+          selected
+            ? `${labels[selected.status]}, ${money(selected.amountCents, selected.currency)}. ${
+                selected.confirmedAt
+                  ? `${sources[selected.confirmationSource]}, confirmada em ${new Date(selected.confirmedAt).toLocaleString("pt-BR")}.`
+                  : "Ainda sem confirmação."
+              }`
+            : undefined
+        }
+      >
+        {selected ? (
+          <div className="space-y-5 pb-4 text-corpo">
+            {!selected.lead && (
+              <p className="rounded-xl bg-warning-soft px-3 py-2 text-warning">
+                Sem lead associado: a receita está registrada, mas ainda não tem campanha de origem.
+              </p>
+            )}
+            {selected.attributionSnapshot?.trackingClick && (
+              <p className="text-ink-soft">
+                Veio da campanha{" "}
+                <span className="font-medium text-ink">
+                  {selected.attributionSnapshot.trackingClick.utmCampaign ??
+                    selected.attributionSnapshot.trackingClick.campaignId ??
+                    "não identificada"}
+                </span>
+                {selected.attributionSnapshot.trackingClick.adId
+                  ? `, anúncio ${selected.attributionSnapshot.trackingClick.adId}`
+                  : ""}
+                .
+              </p>
+            )}
+            {!!selected.conflicts?.length && (
+              <div className="rounded-xl border border-warning-line bg-warning-soft p-3 text-warning">
+                <p className="font-semibold">Os sistemas discordam sobre esta venda</p>
+                {selected.conflicts.map((c, i) => (
+                  <p key={i}>
+                    {sources[c.source]} diz {money(c.valueCents, c.currency)} ({TIPOS[c.type] ?? c.type})
                   </p>
+                ))}
+              </div>
+            )}
+
+            {selected.evidence?.length ? (
+              <section>
+                <h3 className="text-apoio font-medium text-ink-mute">Como o sistema sabe</h3>
+                <ol className="mt-2 space-y-2.5">
+                  {selected.evidence.map((e) => (
+                    <li key={e.id} className="rounded-xl border border-line px-3.5 py-3">
+                      <p className="font-medium text-ink">
+                        {TIPOS[e.type] ?? sources[e.source]}
+                        {e.valueCents !== null ? `, ${money(e.valueCents, e.currency)}` : ""}
+                      </p>
+                      <p className="text-apoio text-ink-mute">
+                        {new Date(e.occurredAt).toLocaleString("pt-BR")}, {e.actorName ?? "registrado automaticamente"}
+                      </p>
+                      {e.payload?.text && <blockquote className="mt-2 border-l-2 border-line pl-3 text-ink-soft">“{e.payload.text}”</blockquote>}
+                      {e.payload?.reason && <p className="mt-1 text-ink-soft">{e.payload.reason}</p>}
+                      {e.payload?.notes && <p className="mt-1 text-ink-soft">{e.payload.notes}</p>}
+                      {e.payload?.coverage && e.payload.coverage !== "COMPLETE" && (
+                        <p className="mt-1 text-apoio text-ink-mute">
+                          {e.payload.coverage === "PARTIAL" ? "Só parte da conversa foi lida." : "Não se sabe quanto da conversa foi lido."}
+                        </p>
+                      )}
+                      {e.payload?.legacy && (
+                        <p className="mt-1 text-apoio text-warning">Registro do modelo anterior, sem nova confirmação.</p>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            ) : null}
+
+            {!!selected.conversionEvents?.length && (
+              <section>
+                <h3 className="text-apoio font-medium text-ink-mute">Avisado à Meta</h3>
+                <ul className="mt-2 space-y-1 text-ink-soft">
+                  {selected.conversionEvents.map((e, i) => (
+                    <li key={i}>
+                      {EVENTOS_DA_META[e.type] ?? e.type}:{" "}
+                      {e.status === "SENT" ? "enviado" : e.status === "FAILED" ? "não foi aceito" : "na fila"}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {canManage && (
+              <form onSubmit={review} className="space-y-4 border-t border-line pt-5">
+                {!selected.lead && (
+                  <div className="space-y-2">
+                    <label className={ROTULO}>
+                      De qual lead é esta venda
+                      {selected.identityCandidates?.length ? (
+                        <Select name="leadId">
+                          <option value="">Escolha o cliente</option>
+                          {selected.identityCandidates.map((lead) => (
+                            <option key={lead.id} value={lead.id}>
+                              {lead.name ? `${lead.name}, ${formataTelefone(lead.normalizedPhone)}` : formataTelefone(lead.normalizedPhone)}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : (
+                        <Input name="leadId" placeholder="Código do lead, do endereço da página dele" />
+                      )}
+                    </label>
+                    <Button name="action" value="LINK" variant="secondary" size="sm" disabled={busy}>
+                      Associar ao lead
+                    </Button>
+                  </div>
                 )}
-                {e.payload?.legacy && (
-                  <p className="text-warning">
-                    Registro preservado do modelo anterior; sem nova confirmação
-                    independente.
-                  </p>
-                )}
-              </li>
-            ))}
-          </ol>
-          {!!selected.conversionEvents?.length && (
-            <div className="text-sm text-ink-soft">
-              <p className="font-medium">Envio à Meta</p>
-              {selected.conversionEvents.map((e, i) => (
-                <p key={i}>
-                  {e.type} ·{" "}
-                  {e.status === "SENT"
-                    ? "Enviado"
-                    : e.status === "FAILED"
-                      ? "Falhou"
-                      : "Pendente"}
-                  {e.lastError ? ` · ${e.lastError}` : ""}
-                </p>
-              ))}
-            </div>
-          )}
-          {canManage && (
-            <form
-              onSubmit={review}
-              className="space-y-3 border-t border-line pt-4"
-            >
-              {!selected.lead && (
-                <div className="space-y-2">
-                  <label className="block">
-                    Associar ao lead
-                    {selected.identityCandidates?.length ? (
-                      <Select name="leadId">
-                        <option value="">Selecione o cliente correto</option>
-                        {selected.identityCandidates.map((lead) => (
-                          <option key={lead.id} value={lead.id}>
-                            {lead.name ?? formataTelefone(lead.normalizedPhone)} ·{" "}
-                            {formataTelefone(lead.normalizedPhone)}
+                <label className={ROTULO}>
+                  Valor confirmado
+                  <Input
+                    name="value"
+                    inputMode="decimal"
+                    defaultValue={selected.amountCents === null ? "" : (selected.amountCents / 100).toFixed(2).replace(".", ",")}
+                  />
+                </label>
+                <label className={ROTULO}>
+                  Observação
+                  <Textarea name="notes" rows={2} maxLength={2000} />
+                </label>
+                {!!selected.conflicts?.length && (
+                  <label className={ROTULO}>
+                    Qual informação vale
+                    <Select name="evidence">
+                      <option value="">Escolha para resolver</option>
+                      {selected.evidence
+                        ?.filter((e) => e.source !== "CONVERSATION")
+                        .map((e) => (
+                          <option key={e.id} value={e.id}>
+                            {sources[e.source]}, {money(e.valueCents, e.currency)}
                           </option>
                         ))}
-                      </Select>
-                    ) : (
-                      <Input name="leadId" placeholder="ID do lead" />
-                    )}
+                    </Select>
                   </label>
-                  <Button
-                    name="action"
-                    value="LINK"
-                    variant="secondary"
-                    disabled={busy}
-                  >
-                    Associar cliente
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <Button name="action" value="CONFIRM" disabled={busy}>
+                    Confirmar venda
+                  </Button>
+                  {!!selected.conflicts?.length && (
+                    <Button name="action" value="RESOLVE" variant="secondary" disabled={busy}>
+                      Resolver
+                    </Button>
+                  )}
+                  <Button name="action" value="REJECT" variant="ghost" disabled={busy}>
+                    Não foi venda
+                  </Button>
+                  <Button name="action" value="CANCEL" variant="ghost" disabled={busy}>
+                    Cancelar venda
                   </Button>
                 </div>
-              )}
-              <label className="block">
-                Valor confirmado ({selected.currency})
-                <Input
-                  name="value"
-                  inputMode="decimal"
-                  defaultValue={
-                    selected.amountCents === null
-                      ? ""
-                      : (selected.amountCents / 100).toFixed(2)
-                  }
-                />
-              </label>
-              <label className="block">
-                Motivo / observações
-                <Textarea name="notes" rows={2} maxLength={2000} />
-              </label>
-              {!!selected.conflicts?.length && (
-                <label className="block">
-                  Evidência que deve prevalecer
-                  <Select name="evidence">
-                    <option value="">Selecione para resolver o conflito</option>
-                    {selected.evidence
-                      ?.filter((e) => e.source !== "CONVERSATION")
-                      .map((e) => (
-                        <option key={e.id} value={e.id}>
-                          {sources[e.source]} ·{" "}
-                          {money(e.valueCents, e.currency)} · {e.type}
-                        </option>
-                      ))}
-                  </Select>
-                </label>
-              )}
-              <div className="flex flex-wrap gap-2">
-                <Button name="action" value="CONFIRM" disabled={busy}>
-                  Confirmar / corrigir valor
-                </Button>
-                <Button
-                  name="action"
-                  value="REJECT"
-                  variant="secondary"
-                  disabled={busy}
-                >
-                  Rejeitar
-                </Button>
-                <Button
-                  name="action"
-                  value="CANCEL"
-                  variant="secondary"
-                  disabled={busy}
-                >
-                  Cancelar venda
-                </Button>
-                {!!selected.conflicts?.length && (
-                  <Button
-                    name="action"
-                    value="RESOLVE"
-                    variant="secondary"
-                    disabled={busy}
-                  >
-                    Resolver conflito
-                  </Button>
-                )}
-              </div>
-            </form>
-          )}
-        </section>
-      )}
+              </form>
+            )}
+          </div>
+        ) : null}
+      </Drawer>
     </div>
   );
 }
+
+/** O que cada evidência é, em palavras de quem vende. */
+const TIPOS: Record<string, string> = {
+  MESSAGE: "Mensagem na conversa",
+  SALE_INTENT: "Cliente disse que vai fechar",
+  PAYMENT_INTENT: "Cliente falou em pagamento",
+  CRM_WON: "Ganha no CRM",
+  CRM_LOST: "Perdida no CRM",
+  PAYMENT_CONFIRMED: "Pagamento confirmado",
+  PAYMENT_REFUNDED: "Pagamento devolvido",
+  ERP_ORDER: "Pedido no sistema da empresa",
+  ECOMMERCE_ORDER: "Pedido na loja",
+  MANUAL_CONFIRMATION: "Confirmada por alguém da equipe",
+  MANUAL_REJECTION: "Recusada por alguém da equipe",
+  EXTERNAL_API: "Enviada por outro sistema",
+};
+
+const EVENTOS_DA_META: Record<string, string> = {
+  LEAD: "Lead",
+  QUALIFIED_LEAD: "Lead qualificado",
+  PURCHASE: "Compra",
+};

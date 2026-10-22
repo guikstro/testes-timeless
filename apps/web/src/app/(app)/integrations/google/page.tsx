@@ -108,7 +108,7 @@ export default async function GoogleAdsPage({
       ) : null}
 
       <div className="surface mb-6 p-5">
-        <h2 className="mb-4 text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">Nova campanha</h2>
+        <h2 className="mb-4 text-apoio font-medium text-ink-mute">Nova campanha</h2>
         <NovaCampanha />
       </div>
 
@@ -122,7 +122,7 @@ export default async function GoogleAdsPage({
       ) : (
         <>
           <div className="mb-3 flex items-baseline justify-between">
-            <h2 className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">
+            <h2 className="text-apoio font-medium text-ink-mute">
               Campanhas ({campanhas.length})
             </h2>
             <span className="text-corpo text-ink-mute">

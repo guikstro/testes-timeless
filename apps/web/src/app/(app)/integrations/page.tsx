@@ -6,6 +6,8 @@ import { sessaoAtual } from "@/lib/sessao";
 import { COR_DA_MARCA, LogoGoogleAds, LogoMeta, LogoWhatsApp } from "./logos";
 import { Cartao, Tom } from "./integration-card";
 
+export const metadata = { title: "Integrações" };
+
 interface ConexaoWhatsApp {
   provider: "CLOUD_API" | "EVOLUTION";
   status: "PENDING_QR" | "CONNECTED" | "DISCONNECTED";

@@ -34,13 +34,13 @@ export function HistoricoDeVerbas({ verbas, hoje }: { verbas: Verba[]; hoje: str
                     {formatCentsAsBRL(verba.amountCents)}
                   </span>
                   {vigente ? (
-                    <span className="rounded-full bg-brand-soft px-2 py-0.5 text-rotulo font-semibold uppercase tracking-[0.1em] text-brand-ink">
+                    <span className="rounded-full bg-brand-soft px-2 py-0.5 text-apoio font-medium text-brand-ink">
                       Em vigor
                     </span>
                   ) : null}
                 </p>
                 <p className="mt-0.5 truncate text-apoio text-ink-mute">
-                  {verba.label ? `${verba.label} · ` : ""}
+                  {verba.label ? `${verba.label}, ` : ""}
                   {formataDia(verba.startsOn)}
                   {/*
                     Verba sem fim não é verba mal preenchida: é o depósito de

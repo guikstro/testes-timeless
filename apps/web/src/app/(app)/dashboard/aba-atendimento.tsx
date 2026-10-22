@@ -22,7 +22,7 @@ export function AbaAtendimento({ overview }: { overview: Overview }) {
           className="pointer-events-none absolute -left-[6%] -top-[70%] h-[150%] w-[55%] rounded-full opacity-60 blur-[70px] [background:radial-gradient(closest-side,rgb(var(--accent)/0.18),transparent)]"
         />
         <div className="relative">
-          <p className="text-rotulo font-semibold uppercase tracking-[0.12em] text-ink-mute">
+          <p className="text-apoio font-medium text-ink-mute">
             Tempo típico até a primeira resposta
           </p>
           <p
@@ -42,7 +42,7 @@ export function AbaAtendimento({ overview }: { overview: Overview }) {
 
         <dl className="relative mt-7 flex flex-wrap gap-x-10 gap-y-4 border-t border-line/70 pt-5">
           <div>
-            <dt className="text-rotulo font-semibold uppercase tracking-[0.1em] text-ink-mute">Esperando agora</dt>
+            <dt className="text-apoio font-medium text-ink-mute">Esperando agora</dt>
             <dd className="mt-1 flex items-center gap-2 font-display text-[clamp(1.4rem,3vw,1.9rem)] font-semibold tabular-nums text-ink">
               {atendimento.aguardando}
               {atendimento.aguardando > 0 ? (
@@ -63,7 +63,7 @@ export function AbaAtendimento({ overview }: { overview: Overview }) {
           </div>
 
           <div>
-            <dt className="text-rotulo font-semibold uppercase tracking-[0.1em] text-ink-mute">Nunca respondidos</dt>
+            <dt className="text-apoio font-medium text-ink-mute">Nunca respondidos</dt>
             <dd className="mt-1 font-display text-[clamp(1.4rem,3vw,1.9rem)] font-semibold tabular-nums text-ink">
               {atendimento.semResposta}
             </dd>
@@ -71,7 +71,7 @@ export function AbaAtendimento({ overview }: { overview: Overview }) {
           </div>
 
           <div>
-            <dt className="text-rotulo font-semibold uppercase tracking-[0.1em] text-ink-mute">Respondidos</dt>
+            <dt className="text-apoio font-medium text-ink-mute">Respondidos</dt>
             <dd className="mt-1 font-display text-[clamp(1.4rem,3vw,1.9rem)] font-semibold tabular-nums text-ink">
               {atendimento.respondidos}
             </dd>

@@ -48,10 +48,12 @@ export function ResumoSimples({
       <section className="mx-auto flex max-w-xl items-stretch justify-center divide-x divide-line text-center">
         <Pequeno valor={String(totals.leads)} rotulo={totals.leads === 1 ? "chamou" : "chamaram"} />
         <Pequeno valor={String(totals.emConversa)} rotulo="em conversa" />
-        <Pequeno
-          valor={custoPorCliente !== null ? reais(Math.round(custoPorCliente)) : "—"}
-          rotulo={custoPorCliente !== null ? "por cliente" : "custo por cliente"}
-        />
+        {/* Sem cliente, não há custo por cliente: aí o terceiro número é o investido. */}
+        {custoPorCliente !== null ? (
+          <Pequeno valor={reais(Math.round(custoPorCliente))} rotulo="por cliente" />
+        ) : gastoCentavos ? (
+          <Pequeno valor={reais(gastoCentavos)} rotulo="investidos" />
+        ) : null}
       </section>
 
       {esperando ? <FaixaDeEspera aguardando={esperando.quantos} mais={esperando.mais} /> : null}
@@ -171,7 +173,7 @@ function Jornada({ etapas }: { etapas: { rotulo: string; valor: number }[] }) {
                   style={{ width: `${Math.max(parte * 100, etapa.valor > 0 ? 3 : 0)}%` }}
                 />
               </div>
-              <p className="mt-1 text-rotulo tabular-nums text-ink-mute">{total > 0 ? `${Math.round(parte * 100)}%` : "—"}</p>
+              <p className="mt-1 text-rotulo tabular-nums text-ink-mute">{total > 0 ? `${Math.round(parte * 100)}%` : "0%"}</p>
             </li>
           );
         })}
@@ -207,7 +209,7 @@ function DeOndeVem({ origens }: { origens: Overview["byOrigin"] }) {
             <li key={origem.key} className={`flex items-baseline justify-between gap-3 text-corpo ${origem.key === "unknown" ? "text-ink-mute" : "text-ink"}`}>
               <span className="truncate">{nomeDaOrigem(origem.key, origem.label)}</span>
               <span className="shrink-0 tabular-nums">
-                {origem.leads} · <span className={origem.clientes > 0 ? "text-accent" : ""}>{plural(origem.clientes, "cliente", "clientes")}</span>
+                {origem.leads}, <span className={origem.clientes > 0 ? "text-accent" : ""}>{plural(origem.clientes, "cliente", "clientes")}</span>
               </span>
             </li>
           ))}

@@ -50,8 +50,8 @@ function useRelogio(intervaloMs = 30_000) {
 }
 
 /**
- * De quando é o dado da tela, numa linha: "Ao vivo · Meta atualizada há 20 min
- * · Google Ads atualizado há 12 min".
+ * De quando é o dado da tela, numa linha: "Ao vivo, Meta atualizada há 20 min
+ *, Google Ads atualizado há 12 min".
  *
  * Um número sem data é lido como sendo de agora. Quando a sincronia para, a
  * tela continua cheia e ninguém percebe; esta linha é o que avisa. O ponto

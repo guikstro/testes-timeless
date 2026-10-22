@@ -175,8 +175,8 @@ function Linha({ item }: { item: RegistroDeAuditoria }) {
               distinguir das ações da própria equipe.
             */}
             {item.viaSuporte ? <Badge tone="warning">Suporte da plataforma</Badge> : null}
-            {item.aparelho ? <span>· {item.aparelho}</span> : null}
-            {item.ip ? <span>· IP {item.ip}</span> : null}
+            {item.aparelho ? <span>{item.aparelho}</span> : null}
+            {item.ip ? <span>IP {item.ip}</span> : null}
           </p>
         </div>
         <time className="shrink-0 text-apoio text-ink-mute" dateTime={item.createdAt} title={dataCompleta(item.createdAt)}>
@@ -219,7 +219,7 @@ function Estado({ titulo, valor }: { titulo: string; valor: unknown }) {
   const campos = temConteudo(valor) ? Object.entries(valor as Record<string, unknown>) : [];
   return (
     <div className="rounded-lg border border-line/60 bg-panel-soft/40 p-3">
-      <p className="text-rotulo font-semibold uppercase tracking-[0.09em] text-ink-mute">{titulo}</p>
+      <p className="text-apoio font-medium text-ink-mute">{titulo}</p>
       {campos.length === 0 ? (
         <p className="mt-1 text-apoio text-ink-mute">Nada</p>
       ) : (

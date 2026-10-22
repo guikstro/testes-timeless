@@ -172,9 +172,9 @@ export function LoginForm() {
           identidade sozinha: um marcador de posição com nome falso envelhece
           pior que a ausência dele.
         */}
-        <p className="flex items-center gap-2.5 text-rotulo font-semibold uppercase tracking-[0.2em] text-ink-mute">
+        <p className="flex items-center gap-2.5 text-apoio font-medium text-ink-mute">
           <Marca tamanho={16} className="shrink-0 text-accent" />
-          Built to last
+          Timeless
         </p>
         <ThemeToggle />
       </header>
@@ -250,7 +250,7 @@ export function LoginForm() {
               <div>
                 <label
                   htmlFor="login-codigo"
-                  className="mb-1.5 block text-apoio font-medium uppercase tracking-[0.12em] text-ink-mute"
+                  className="mb-1.5 block text-apoio font-medium text-ink-mute"
                 >
                   Código de verificação
                 </label>
@@ -283,7 +283,7 @@ export function LoginForm() {
                 type="submit"
                 disabled={loading}
                 aria-busy={loading || undefined}
-                className="focus-ring group mt-1 inline-flex h-14 items-center justify-between gap-3 rounded-full bg-accent px-7 text-destaque font-semibold text-accent-contrast transition-all duration-300 ease-soft hover:brightness-110 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60"
+                className="focus-ring group mt-1 inline-flex h-14 items-center justify-center gap-3 rounded-full bg-accent px-7 text-destaque font-semibold text-accent-contrast transition-all duration-300 ease-soft hover:brightness-110 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60"
               >
                 <span>{loading ? "Confirmando" : "Confirmar"}</span>
                 {loading ? (
@@ -291,11 +291,7 @@ export function LoginForm() {
                     <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" className="opacity-30" />
                     <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                   </svg>
-                ) : (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px] transition-transform duration-300 ease-soft group-hover:translate-x-1" aria-hidden>
-                    <path d="M5 12h14M13 6l6 6-6 6" />
-                  </svg>
-                )}
+                ) : null}
               </button>
 
               <button
@@ -313,7 +309,7 @@ export function LoginForm() {
           ) : (
           <form onSubmit={handleSubmit} className="mt-10 flex flex-col gap-7">
             <div className="relative">
-              <label htmlFor="login-email" className="mb-1.5 block text-apoio font-medium uppercase tracking-[0.12em] text-ink-mute">
+              <label htmlFor="login-email" className="mb-1.5 block text-apoio font-medium text-ink-mute">
                 E-mail
               </label>
               <input
@@ -329,7 +325,7 @@ export function LoginForm() {
             </div>
 
             <div className="relative">
-              <label htmlFor="login-password" className="mb-1.5 block text-apoio font-medium uppercase tracking-[0.12em] text-ink-mute">
+              <label htmlFor="login-password" className="mb-1.5 block text-apoio font-medium text-ink-mute">
                 Senha
               </label>
               <div className="relative">
@@ -391,7 +387,7 @@ export function LoginForm() {
               type="submit"
               disabled={loading}
               aria-busy={loading || undefined}
-              className="focus-ring group mt-1 inline-flex h-14 items-center justify-between gap-3 rounded-full bg-accent px-7 text-destaque font-semibold text-accent-contrast transition-all duration-300 ease-soft hover:brightness-110 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60"
+              className="focus-ring group mt-1 inline-flex h-14 items-center justify-center gap-3 rounded-full bg-accent px-7 text-destaque font-semibold text-accent-contrast transition-all duration-300 ease-soft hover:brightness-110 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60"
             >
               <span>{loading ? "Entrando" : "Entrar"}</span>
               {loading ? (
@@ -399,11 +395,7 @@ export function LoginForm() {
                   <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" className="opacity-30" />
                   <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                 </svg>
-              ) : (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px] transition-transform duration-300 ease-soft group-hover:translate-x-1" aria-hidden>
-                  <path d="M5 12h14M13 6l6 6-6 6" />
-                </svg>
-              )}
+              ) : null}
             </button>
           </form>
           )}
@@ -423,7 +415,7 @@ export function LoginForm() {
       </main>
 
       <footer className="relative z-10 text-rotulo text-ink-mute">
-        Tracking e atribuição de conversões
+        Do anúncio à venda, cada cliente com a origem provada.
       </footer>
     </div>
   );

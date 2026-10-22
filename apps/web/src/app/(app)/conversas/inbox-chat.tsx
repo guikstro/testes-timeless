@@ -86,7 +86,7 @@ export function InboxChat({
           <p className="truncate text-corpo font-semibold text-ink">{nomeDoLead(ficha)}</p>
           <p className="truncate text-rotulo tabular-nums text-ink-mute">
             {formataTelefone(ficha.normalizedPhone)}
-            {ficha.metrics.lastMessageAt ? ` · ${tempoRelativo(ficha.metrics.lastMessageAt)}` : ""}
+            {ficha.metrics.lastMessageAt ? `, ${tempoRelativo(ficha.metrics.lastMessageAt)}` : ""}
           </p>
         </div>
 

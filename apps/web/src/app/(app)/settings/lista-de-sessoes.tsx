@@ -100,12 +100,12 @@ function Linha({ sessao, aoErro }: { sessao: Sessao; aoErro?: (erro: string | nu
           <p className="flex flex-wrap items-center gap-2 text-corpo font-medium text-ink">
             {sessao.aparelho}
             {sessao.atual ? (
-              <span className="rounded-full bg-brand-soft px-2 py-0.5 text-rotulo font-semibold uppercase tracking-[0.1em] text-brand-ink">
+              <span className="rounded-full bg-brand-soft px-2 py-0.5 text-apoio font-medium text-brand-ink">
                 Esta sessão
               </span>
             ) : null}
             {sessao.visita ? (
-              <span className="rounded-full bg-warning-soft px-2 py-0.5 text-rotulo font-semibold uppercase tracking-[0.1em] text-warning">
+              <span className="rounded-full bg-warning-soft px-2 py-0.5 text-apoio font-medium text-warning">
                 Visita de suporte
               </span>
             ) : null}
@@ -117,8 +117,8 @@ function Linha({ sessao, aoErro }: { sessao: Sessao; aoErro?: (erro: string | nu
               há doze minutos seria fingir uma precisão que não existe.
             */}
             {sessao.atual ? "Ativa agora" : `Ativa ${quando(sessao.ultimaAtividadeEm)}`}
-            {sessao.ip ? ` · ${sessao.ip}` : ""}
-            {` · aberta em ${dataCurta(sessao.criadaEm)}`}
+            {sessao.ip ? `, ${sessao.ip}` : ""}
+            {`, aberta em ${dataCurta(sessao.criadaEm)}`}
           </p>
         </div>
       </div>

@@ -22,6 +22,15 @@ describe("SalesWorkspace form submissions", () => {
     conflicts: [],
   };
   const fetchMock = jest.fn();
+  beforeAll(() => {
+    // O jsdom não implementa o <dialog> modal; aqui basta abrir e fechar.
+    HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
+      this.open = true;
+    };
+    HTMLDialogElement.prototype.close = function (this: HTMLDialogElement) {
+      this.open = false;
+    };
+  });
   beforeEach(() => {
     Object.defineProperty(crypto, "randomUUID", {
       configurable: true,
@@ -80,7 +89,7 @@ describe("SalesWorkspace form submissions", () => {
     render(<SalesWorkspace canManage canAnalyze={false} />);
     fireEvent.click(await screen.findByRole("button", { name: "Ver detalhes" }));
     const button = await screen.findByRole("button", {
-      name: "Confirmar / corrigir valor",
+      name: "Confirmar venda",
     });
     // jsdom 20 does not populate SubmitEvent.submitter when clicking a button.
     const submission = new Event("submit", { bubbles: true, cancelable: true });

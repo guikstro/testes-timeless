@@ -363,7 +363,7 @@ function Tabela({
       <div className="overflow-x-auto">
         <table className={`w-full ${larguraMinima(metricas.length)} text-corpo`}>
           <thead>
-            <tr className="border-b border-line text-left text-rotulo font-semibold uppercase tracking-[0.09em] text-ink-mute">
+            <tr className="border-b border-line text-left text-apoio font-medium text-ink-mute">
               <th className="px-4 py-3 font-semibold">Campanha</th>
               <th className="px-4 py-3 text-right font-semibold">Investimento</th>
               {metricas.map((metrica) => (
@@ -433,8 +433,8 @@ function Linha({
           ) : null}
           <span>{PLATAFORMAS[linha.plataforma] ?? linha.plataforma}</span>
           {/* O objetivo diz por qual número a campanha deve ser julgada. */}
-          {objetivo ? <span>· {objetivo}</span> : null}
-          {linha.criadaNaPlataformaEm ? <span>· criada em {formataDia(linha.criadaNaPlataformaEm)}</span> : null}
+          {objetivo ? <span>{objetivo}</span> : null}
+          {linha.criadaNaPlataformaEm ? <span>criada em {formataDia(linha.criadaNaPlataformaEm)}</span> : null}
         </div>
         {dados.ativo && (
           <p className="mt-1 text-rotulo text-ink-mute">

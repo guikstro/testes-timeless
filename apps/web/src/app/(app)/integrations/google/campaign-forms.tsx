@@ -110,7 +110,7 @@ export function CartaoCampanha({
           <p className="truncate font-medium text-ink">{nome}</p>
           <p className="mt-0.5 text-rotulo text-ink-mute">
             {externalId.startsWith("manual:") ? "Sem ID informado" : `ID ${externalId}`}
-            {diasLancados > 0 ? ` · ${diasLancados} dia(s) lançado(s)` : " · sem gasto lançado"}
+            {diasLancados > 0 ? `, ${diasLancados} dia(s) lançado(s)` : ", sem gasto lançado"}
           </p>
         </div>
 
@@ -133,7 +133,7 @@ export function CartaoCampanha({
 
           <div className="my-4 flex items-center gap-3">
             <span className="h-px flex-1 bg-line/60" />
-            <span className="text-rotulo uppercase tracking-wide text-ink-mute">ou lance um dia</span>
+            <span className="text-apoio text-ink-mute">ou lance um dia</span>
             <span className="h-px flex-1 bg-line/60" />
           </div>
 

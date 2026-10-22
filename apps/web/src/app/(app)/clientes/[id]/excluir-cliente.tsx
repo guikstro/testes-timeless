@@ -31,7 +31,7 @@ export function ExcluirCliente({ organizationId, nome }: { organizationId: strin
 
   return (
     <section className="mt-6 rounded-xl border border-danger-line/70 bg-panel p-5">
-      <h2 className="text-corpo font-medium uppercase tracking-wide text-danger">Zona de perigo</h2>
+      <h2 className="text-corpo font-medium text-danger">Zona de perigo</h2>
 
       {!aberto ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
@@ -66,7 +66,7 @@ export function ExcluirCliente({ organizationId, nome }: { organizationId: strin
               inputMode="numeric"
               autoComplete="one-time-code"
               placeholder="000000"
-              className="w-40 tracking-widest"
+              className="w-40"
             />
           </div>
           {erro ? <p className="text-corpo text-danger">{erro}</p> : null}

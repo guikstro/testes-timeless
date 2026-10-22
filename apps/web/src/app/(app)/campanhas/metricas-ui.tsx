@@ -170,7 +170,7 @@ export function SeletorDeMetricas({
   return (
     <section aria-label="Métricas da tabela" className="mb-5 space-y-3">
       <div className="flex flex-wrap items-center gap-3">
-        <p className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">Métricas</p>
+        <p className="text-apoio font-medium text-ink-mute">Métricas</p>
         <GrupoDePilulas
           ativo={ativo}
           opcoes={[
@@ -264,7 +264,7 @@ export function Resumo({
 
   return (
     <div className="surface p-4">
-      <p className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">{titulo}</p>
+      <p className="text-apoio font-medium text-ink-mute">{titulo}</p>
       <p
         className={`mt-1.5 font-display font-semibold tabular-nums ${
           apagado ? "text-lg text-ink-mute" : "text-xl text-ink"

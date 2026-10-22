@@ -94,7 +94,7 @@ export function ArrivalHeatmap({ celulas }: { celulas: Celula[] }) {
               {DIAS[ativa.diaSemana]}, {String(ativa.faixa * 3).padStart(2, "0")}h às{" "}
               {String(ativa.faixa * 3 + 3).padStart(2, "0")}h
             </span>{" "}
-            · {ativa.leads} {ativa.leads === 1 ? "lead" : "leads"}
+           , {ativa.leads} {ativa.leads === 1 ? "lead" : "leads"}
           </>
         ) : (
           "Passe o mouse para ver um horário"

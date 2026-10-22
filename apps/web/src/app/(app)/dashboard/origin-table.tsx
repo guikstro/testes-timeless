@@ -53,14 +53,14 @@ export function OriginTable({ origens }: { origens: Origem[] }) {
       <table className="w-full text-left text-corpo">
         <thead>
           <tr className="border-b border-line/70">
-            <th className="py-2 pr-4 text-rotulo font-semibold uppercase tracking-[0.08em] text-ink-mute">Origem</th>
+            <th className="py-2 pr-4 text-apoio font-medium text-ink-mute">Origem</th>
             {colunas.map((coluna) => (
               <th key={coluna.chave} className="py-2 pr-3 text-right">
                 <button
                   type="button"
                   onClick={() => setCriterio(coluna.chave)}
                   aria-pressed={criterio === coluna.chave}
-                  className={`focus-ring rounded px-1 text-rotulo font-semibold uppercase tracking-[0.08em] transition-colors ${
+                  className={`focus-ring rounded px-1 text-apoio font-medium transition-colors ${
                     criterio === coluna.chave ? "text-accent" : "text-ink-mute hover:text-ink"
                   }`}
                 >

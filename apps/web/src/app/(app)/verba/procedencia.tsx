@@ -72,7 +72,7 @@ export function Procedencia({ dados, periodo }: { dados: Anuncios; periodo: { de
 function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
     <div className="flex gap-2">
-      <dt className="font-semibold uppercase tracking-[0.1em]">{rotulo}</dt>
+      <dt className="font-medium">{rotulo}</dt>
       <dd className="text-ink-soft">{valor}</dd>
     </div>
   );

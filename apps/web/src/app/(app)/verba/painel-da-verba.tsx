@@ -46,7 +46,7 @@ export function PainelDaVerba({
     <section className="surface p-6 sm:p-8">
       <div className="flex flex-wrap items-end justify-between gap-6">
         <div>
-          <p className="text-rotulo font-semibold uppercase tracking-[0.14em] text-ink-mute">
+          <p className="text-apoio font-medium text-ink-mute">
             Saldo da verba
           </p>
           <p
@@ -57,7 +57,7 @@ export function PainelDaVerba({
             {formatCentsAsBRL(situacao.saldoCentavos)}
           </p>
           <p className="mt-1 text-corpo text-ink-mute">
-            de {formatCentsAsBRL(situacao.amountCents)} · {formataDia(situacao.de)}
+            de {formatCentsAsBRL(situacao.amountCents)}, {formataDia(situacao.de)}
             {situacao.ate ? ` a ${formataDia(situacao.ate)}` : " em diante"}
           </p>
         </div>
@@ -114,7 +114,7 @@ export function PainelDaVerba({
                 situacao.diasCorridos === 1 ? "dia" : "dias"
               }`}
           {situacao.diasRestantes !== null
-            ? ` · ${situacao.diasRestantes} ${situacao.diasRestantes === 1 ? "dia restante" : "dias restantes"}`
+            ? `, ${situacao.diasRestantes} ${situacao.diasRestantes === 1 ? "dia restante" : "dias restantes"}`
             : ""}
         </p>
       </div>
@@ -137,7 +137,7 @@ export function PainelDaVerba({
 function Apoio({ rotulo, valor, nota }: { rotulo: string; valor: string; nota?: string }) {
   return (
     <div>
-      <dt className="text-rotulo font-semibold uppercase tracking-[0.1em] text-ink-mute">{rotulo}</dt>
+      <dt className="text-apoio font-medium text-ink-mute">{rotulo}</dt>
       <dd className="mt-0.5 font-display text-destaque font-semibold tabular-nums text-ink">
         {valor}
         {nota ? <span className="ml-2 font-sans text-rotulo font-normal text-ink-mute">{nota}</span> : null}

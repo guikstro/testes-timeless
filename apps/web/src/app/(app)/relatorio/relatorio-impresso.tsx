@@ -75,7 +75,7 @@ export function RelatorioImpresso({ dados }: { dados: DadosDoRelatorio }) {
           cabeçalho. O verde sobrevive à impressão porque o bloco de `@media
           print` redefine os neutros e não toca no acento.
         */}
-        <p className="flex items-center gap-2 text-rotulo font-semibold uppercase tracking-[0.14em] text-ink-mute">
+        <p className="flex items-center gap-2 text-apoio font-medium text-ink-mute">
           <Marca tamanho={14} className="shrink-0 text-accent" />
           Relatório de performance
         </p>
@@ -83,7 +83,7 @@ export function RelatorioImpresso({ dados }: { dados: DadosDoRelatorio }) {
           {dados.cliente}
         </h2>
         <p className="mt-1 text-corpo text-ink-soft">
-          {formataDia(dados.periodo.de)} a {formataDia(dados.periodo.ate)} · {dados.periodo.dias} dias
+          {formataDia(dados.periodo.de)} a {formataDia(dados.periodo.ate)}, {dados.periodo.dias} dias
         </p>
         {frase ? <Conclusao frase={frase} /> : null}
       </header>
@@ -119,7 +119,7 @@ export function RelatorioImpresso({ dados }: { dados: DadosDoRelatorio }) {
 
           <table className="mt-6 w-full text-left">
             <thead>
-              <tr className="border-b border-line text-rotulo font-semibold uppercase tracking-[0.09em] text-ink-mute">
+              <tr className="border-b border-line text-apoio font-medium text-ink-mute">
                 <th className="py-2 font-semibold">Campanha</th>
                 <th className="py-2 font-semibold">Plataforma</th>
                 <th className="py-2 text-right font-semibold">Dias ativos</th>
@@ -165,7 +165,7 @@ export function RelatorioImpresso({ dados }: { dados: DadosDoRelatorio }) {
         <Secao titulo="De onde vieram">
           <table className="w-full text-left">
             <thead>
-              <tr className="border-b border-line text-rotulo font-semibold uppercase tracking-[0.09em] text-ink-mute">
+              <tr className="border-b border-line text-apoio font-medium text-ink-mute">
                 <th className="py-2 font-semibold">Origem</th>
                 <th className="py-2 text-right font-semibold">Leads</th>
                 <th className="py-2 text-right font-semibold">Clientes</th>
@@ -246,7 +246,7 @@ export function Secao({ titulo, children }: { titulo: string; children: React.Re
     // `break-inside` evita a seção ser cortada ao meio na virada da página
     // impressa, que é o defeito mais comum de relatório feito para tela.
     <section className="break-inside-avoid">
-      <h3 className="mb-4 text-rotulo font-semibold uppercase tracking-[0.12em] text-ink-mute">{titulo}</h3>
+      <h3 className="mb-4 text-apoio font-medium text-ink-mute">{titulo}</h3>
       {children}
     </section>
   );
@@ -265,7 +265,7 @@ export function Numero({
 }) {
   return (
     <div>
-      <p className="text-rotulo font-semibold uppercase tracking-[0.1em] text-ink-mute">{rotulo}</p>
+      <p className="text-apoio font-medium text-ink-mute">{rotulo}</p>
       <p
         className={`mt-1 font-display font-semibold tabular-nums ${
           destaque ? "text-[clamp(1.5rem,3vw,1.9rem)] text-accent" : "text-[clamp(1.3rem,2.6vw,1.6rem)] text-ink"

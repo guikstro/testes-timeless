@@ -333,7 +333,7 @@ function SemMedida({
 }): ReactNode {
   return (
     <div className="flex flex-col rounded-2xl border border-line bg-panel p-4 shadow-subtle">
-      <p className="text-rotulo font-medium uppercase tracking-[0.1em] text-ink-mute">{rotulo}</p>
+      <p className="text-apoio font-medium text-ink-mute">{rotulo}</p>
       <p className="mt-1.5 text-[26px] font-semibold leading-none text-ink-mute">{titulo}</p>
       <p className="mt-1.5 text-rotulo text-ink-mute">{nota}</p>
     </div>

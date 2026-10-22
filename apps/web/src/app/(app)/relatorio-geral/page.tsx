@@ -3,6 +3,8 @@ import { apiFetch, ApiRequestError } from "@/lib/api-client";
 import { formatCentsAsBRL } from "@/lib/currency";
 import { CorDoCliente } from "../clientes/cor-do-cliente";
 
+export const metadata = { title: "Relatórios" };
+
 interface Cliente {
   id: string;
   name: string;
@@ -57,7 +59,7 @@ export default async function RelatorioGeralPage() {
       <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
         {cartoes.map((cartao) => (
           <div key={cartao.rotulo} className="rounded-xl border border-line bg-panel p-4">
-            <dt className="text-apoio font-medium uppercase tracking-wide text-ink-mute">{cartao.rotulo}</dt>
+            <dt className="text-apoio font-medium text-ink-mute">{cartao.rotulo}</dt>
             <dd className="mt-1 font-display text-xl font-semibold text-ink">{cartao.valor}</dd>
           </div>
         ))}
@@ -70,7 +72,7 @@ export default async function RelatorioGeralPage() {
       ) : (
         <div className="mt-6 overflow-x-auto rounded-xl border border-line bg-panel">
           <table className="w-full text-left text-corpo">
-            <thead className="border-b border-line text-apoio uppercase tracking-wide text-ink-mute">
+            <thead className="border-b border-line text-apoio text-ink-mute">
               <tr>
                 <th className="px-4 py-3 font-medium">Cliente</th>
                 <th className="px-4 py-3 text-right font-medium">Leads</th>
@@ -91,7 +93,7 @@ export default async function RelatorioGeralPage() {
                   <td className="px-4 py-3 text-right text-ink-soft">{cliente.leadCount}</td>
                   <td className="px-4 py-3 text-right text-ink-soft">{cliente.saleCount}</td>
                   <td className="px-4 py-3 text-right text-ink-soft">
-                    {cliente.leadCount ? `${Math.round((cliente.saleCount / cliente.leadCount) * 100)}%` : "—"}
+                    {cliente.leadCount ? `${Math.round((cliente.saleCount / cliente.leadCount) * 100)}%` : "0%"}
                   </td>
                   <td className="px-4 py-3 text-right font-medium text-ink">{formatCentsAsBRL(cliente.revenueCents)}</td>
                 </tr>

@@ -130,7 +130,7 @@ export default async function SaudePage() {
           valor={String(requisicoes.pedidos)}
           nota={
             requisicoes.pedidos
-              ? `${formataPorcento(requisicoes.taxaDeErro)} com erro · metade em até ${requisicoes.p50Ms} ms · 95% em até ${requisicoes.p95Ms} ms`
+              ? `${formataPorcento(requisicoes.taxaDeErro)} com erro, metade em até ${requisicoes.p50Ms} ms, 95% em até ${requisicoes.p95Ms} ms`
               : "Nenhum pedido desde a última publicação"
           }
         />
@@ -155,7 +155,7 @@ export default async function SaudePage() {
                       {erro.origem === "navegador" ? "Tela" : "API"}
                     </Badge>
                     <span>
-                      {erro.ocorrencias} {erro.ocorrencias === 1 ? "vez" : "vezes"} · última {tempoRelativo(erro.ultimaEm)} ·
+                      {erro.ocorrencias} {erro.ocorrencias === 1 ? "vez" : "vezes"}, última {tempoRelativo(erro.ultimaEm)},
                       primeira {tempoRelativo(erro.primeiraEm)}
                     </span>
                     {erro.contexto?.caminho ? <code className="text-rotulo">{erro.contexto.caminho}</code> : null}
@@ -201,12 +201,12 @@ export default async function SaudePage() {
             />
             {saude.filas.some((f) => f.ultimasFalhas.length > 0) ? (
               <div className="mt-5 space-y-2">
-                <p className="text-rotulo font-semibold uppercase tracking-[0.08em] text-ink-mute">Últimas falhas</p>
+                <p className="text-apoio font-medium text-ink-mute">Últimas falhas</p>
                 {saude.filas.flatMap((f) =>
                   f.ultimasFalhas.map((falha, i) => (
                     <p key={`${f.nome}-${i}`} className="text-apoio text-ink-soft">
                       <span className="font-medium text-ink">{NOME_DA_FILA[f.nome] ?? f.nome}</span>
-                      {falha.quando ? ` · ${tempoRelativo(falha.quando)}` : ""} · {falha.tentativas}{" "}
+                      {falha.quando ? `, ${tempoRelativo(falha.quando)}` : ""}, {falha.tentativas}{" "}
                       {falha.tentativas === 1 ? "tentativa" : "tentativas"}: <span className="text-danger">{falha.motivo}</span>
                     </p>
                   )),
@@ -222,7 +222,7 @@ export default async function SaudePage() {
           titulo="WhatsApp"
           parte={integracoes.whatsapp}
           resumo={(w) =>
-            `${w.conectados} de ${w.total} conectados${w.ultimoEventoEm ? ` · última mensagem ${tempoRelativo(w.ultimoEventoEm)}` : ""}`
+            `${w.conectados} de ${w.total} conectados${w.ultimoEventoEm ? `, última mensagem ${tempoRelativo(w.ultimoEventoEm)}` : ""}`
           }
           problemas={(w) => w.problemas}
           linha={(p) => `${p.situacao}${p.desde ? `, ${tempoRelativo(p.desde)}` : ""}`}
@@ -231,7 +231,7 @@ export default async function SaudePage() {
           titulo="Meta Ads"
           parte={integracoes.meta}
           resumo={(m) =>
-            `${m.sincronizando} de ${m.total} sincronizando${m.ultimaSincroniaEm ? ` · última ${tempoRelativo(m.ultimaSincroniaEm)}` : ""}`
+            `${m.sincronizando} de ${m.total} sincronizando${m.ultimaSincroniaEm ? `, última ${tempoRelativo(m.ultimaSincroniaEm)}` : ""}`
           }
           problemas={(m) => m.problemas}
           linha={(p) => `${p.situacao}${p.erro ? `: ${p.erro}` : ""}`}
@@ -266,7 +266,7 @@ function Indicador({ titulo, ok, valor, nota }: { titulo: string; ok: boolean; v
   return (
     <Card className="p-5">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-rotulo font-semibold uppercase tracking-[0.08em] text-ink-mute">{titulo}</p>
+        <p className="text-apoio font-medium text-ink-mute">{titulo}</p>
         <Badge tone={ok ? "success" : "danger"} dot>
           {ok ? "Bem" : "Atenção"}
         </Badge>

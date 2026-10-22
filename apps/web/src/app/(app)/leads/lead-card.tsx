@@ -128,7 +128,7 @@ export function LeadCard({
           <p className={`relative mt-2 truncate text-rotulo font-medium ${situacao ? COR_DA_PROXIMA_ACAO[situacao] : "text-ink-mute"}`}>
             {situacao === "atrasada" ? "Atrasada: " : situacao === "hoje" ? "Hoje: " : "Próxima: "}
             {lead.proximaAcao ?? "próxima ação"}
-            {situacao === "futura" && lead.proximaAcaoEm ? ` · ${formataDia(lead.proximaAcaoEm.slice(0, 10))}` : ""}
+            {situacao === "futura" && lead.proximaAcaoEm ? `, ${formataDia(lead.proximaAcaoEm.slice(0, 10))}` : ""}
           </p>
         ) : null}
 

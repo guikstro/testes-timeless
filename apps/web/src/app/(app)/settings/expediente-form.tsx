@@ -68,7 +68,7 @@ export function ExpedienteForm({
       </label>
 
       <fieldset className={ativo ? "" : "pointer-events-none opacity-45"} aria-disabled={!ativo}>
-        <legend className="mb-2 text-rotulo font-semibold uppercase tracking-[0.1em] text-ink-mute">
+        <legend className="mb-2 text-apoio font-medium text-ink-mute">
           Dias de atendimento
         </legend>
         <div className="flex flex-wrap gap-1.5">

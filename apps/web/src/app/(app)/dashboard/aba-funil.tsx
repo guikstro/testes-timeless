@@ -152,7 +152,7 @@ export function AbaFunil({ dados }: { dados: FunilDoPeriodo }) {
 function Resumo({ rotulo, valor, nota }: { rotulo: string; valor: string; nota: string }) {
   return (
     <div className="surface p-4">
-      <p className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">{rotulo}</p>
+      <p className="text-apoio font-medium text-ink-mute">{rotulo}</p>
       <p className="mt-1.5 font-display text-xl font-semibold tabular-nums text-ink">{valor}</p>
       <p className="mt-1 text-rotulo text-ink-mute">{nota}</p>
     </div>

@@ -10,6 +10,8 @@ import { LeadCartao } from "./lead-card";
 import { LeadsFilters } from "./leads-filters";
 import { FILTRO_DE_RESPONSAVEL, type Responsavel } from "@/lib/leads/acompanhamento";
 
+export const metadata = { title: "Leads" };
+
 interface PaginatedResult<T> {
   items: T[];
   total: number;

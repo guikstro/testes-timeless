@@ -9,6 +9,8 @@ import { Papel } from "./papeis";
 import { Capacidade, pode } from "@/lib/permissoes";
 import { Foco, temLeads } from "@/lib/foco";
 
+export const metadata = { title: "Configurações" };
+
 /*
   Na ordem em que se usa, e não na ordem em que foram escritas. Gatilhos e
   equipe mudam toda semana; logo, cor e senha se definem uma vez e quase não

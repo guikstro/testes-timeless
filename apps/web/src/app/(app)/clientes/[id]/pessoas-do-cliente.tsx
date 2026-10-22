@@ -30,7 +30,7 @@ export function PessoasDoCliente({ organizationId, pessoas }: { organizationId: 
 
   return (
     <section className="mt-6 rounded-xl border border-line bg-panel p-5">
-      <h2 className="text-corpo font-medium uppercase tracking-wide text-ink-mute">Pessoas com acesso</h2>
+      <h2 className="text-corpo font-medium text-ink-mute">Pessoas com acesso</h2>
 
       {pessoas.length === 0 ? (
         <p className="mt-3 text-corpo text-ink-soft">Ninguém além da equipe Timeless.</p>

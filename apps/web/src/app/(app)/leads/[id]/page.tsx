@@ -185,7 +185,7 @@ function Painel({ titulo, children, acao }: { titulo: string; children: ReactNod
   return (
     <section className="surface p-5">
       <div className="mb-4 flex items-baseline justify-between gap-3">
-        <h2 className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">{titulo}</h2>
+        <h2 className="text-apoio font-medium text-ink-mute">{titulo}</h2>
         {acao}
       </div>
       {children}
@@ -295,9 +295,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
         <section className="surface flex max-h-[42rem] flex-col p-5">
           <div className="mb-4 flex items-baseline justify-between gap-3">
-            <h2 className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">Conversa</h2>
+            <h2 className="text-apoio font-medium text-ink-mute">Conversa</h2>
             <span className="text-apoio text-ink-mute">
-              {metrics.inboundCount} recebidas · {metrics.outboundCount} enviadas
+              {metrics.inboundCount} recebidas, {metrics.outboundCount} enviadas
             </span>
           </div>
 

@@ -60,7 +60,7 @@ export function ConversionsExport({
       </div>
 
       <form action={salvar} className="mb-5 space-y-4 rounded-xl border border-line/70 bg-panel-soft/40 p-4">
-        <p className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">Nomes das ações</p>
+        <p className="text-apoio font-medium text-ink-mute">Nomes das ações</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Ação de lead qualificado" hint="Igual ao nome no Google Ads, letra por letra.">
             {(id) => (
@@ -131,7 +131,7 @@ export function ConversionsExport({
           <div className="max-h-80 overflow-auto">
             <table className="w-full min-w-[36rem] text-left">
               <thead className="sticky top-0 bg-panel">
-                <tr className="border-b border-line text-rotulo font-semibold uppercase tracking-[0.09em] text-ink-mute">
+                <tr className="border-b border-line text-apoio font-medium text-ink-mute">
                   <th className="px-3.5 py-2.5 font-semibold">Lead</th>
                   <th className="px-3.5 py-2.5 font-semibold">Conversão</th>
                   <th className="px-3.5 py-2.5 font-semibold">Quando</th>

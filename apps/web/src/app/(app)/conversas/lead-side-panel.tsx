@@ -42,7 +42,7 @@ export function LeadSidePanel({ ficha }: { ficha: FichaDoLead }) {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto border-l border-line/70 bg-panel">
       <div className="flex items-center justify-between gap-2 border-b border-line/60 px-4 py-2.5">
-        <h2 className="text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">Contexto</h2>
+        <h2 className="text-apoio font-medium text-ink-mute">Contexto</h2>
         <LinkParaFicha leadId={ficha.id} />
       </div>
 
@@ -57,7 +57,7 @@ export function LeadSidePanel({ ficha }: { ficha: FichaDoLead }) {
             <Numero rotulo="Do clique ao contato" valor={formatDuration(metrics.clickToContactSeconds)} />
           </div>
           <p className="mt-2 text-rotulo text-ink-mute">
-            {metrics.inboundCount} recebidas · {metrics.outboundCount} enviadas
+            {metrics.inboundCount} recebidas, {metrics.outboundCount} enviadas
           </p>
           {metrics.awaitingReply ? (
             <p className="mt-2 text-apoio font-medium text-warning">
@@ -97,7 +97,7 @@ export function LeadSidePanel({ ficha }: { ficha: FichaDoLead }) {
                 rotulo="Próxima ação"
                 valor={[ficha.proximaAcao, ficha.proximaAcaoEm ? formataDia(ficha.proximaAcaoEm.slice(0, 10)) : null]
                   .filter(Boolean)
-                  .join(" · ")}
+                  .join(", ")}
               />
             ) : null}
             <Linha
@@ -142,7 +142,7 @@ export function LeadSidePanel({ ficha }: { ficha: FichaDoLead }) {
 function Painel({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
     <section className="rounded-2xl border border-line/70 bg-panel-soft/40 p-3.5">
-      <h3 className="mb-2.5 text-rotulo font-semibold uppercase tracking-[0.11em] text-ink-mute">{titulo}</h3>
+      <h3 className="mb-2.5 text-apoio font-medium text-ink-mute">{titulo}</h3>
       {children}
     </section>
   );

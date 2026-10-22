@@ -37,7 +37,7 @@ export function TabelaDeAnuncios({
       <div className="overflow-x-auto">
         <table className="w-full min-w-[56rem] text-left">
           <thead>
-            <tr className="border-b border-line text-rotulo font-semibold uppercase tracking-[0.09em] text-ink-mute">
+            <tr className="border-b border-line text-apoio font-medium text-ink-mute">
               <th className="px-4 py-3 font-semibold">Anúncio</th>
               <th className="px-4 py-3 text-right font-semibold">Investido</th>
               <th className="px-4 py-3 text-right font-semibold">Leads</th>
@@ -60,7 +60,7 @@ export function TabelaDeAnuncios({
                     <p className="text-corpo font-medium text-ink">{anuncio.name}</p>
                     <p className="text-apoio text-ink-mute">
                       {anuncio.campanha}
-                      {anuncio.status !== "ACTIVE" ? ` · ${rotuloDeStatus(anuncio.status)}` : ""}
+                      {anuncio.status !== "ACTIVE" ? `, ${rotuloDeStatus(anuncio.status)}` : ""}
                     </p>
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-corpo text-ink">
@@ -80,18 +80,18 @@ export function TabelaDeAnuncios({
                     {anuncio.custoPorLeadCentavos === null
                       ? desperdicio
                         ? "Sem lead"
-                        : "—"
+                        : "-"
                       : formatCentsAsBRL(anuncio.custoPorLeadCentavos)}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-corpo text-ink">{anuncio.vendas}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-corpo text-ink">
                     {anuncio.custoPorVendaCentavos === null
-                      ? "—"
+                      ? "-"
                       : formatCentsAsBRL(anuncio.custoPorVendaCentavos)}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-corpo">
                     {anuncio.retorno === null ? (
-                      <span className="text-ink-mute">—</span>
+                      <span className="text-ink-mute">-</span>
                     ) : (
                       <span className={anuncio.retorno >= 1 ? "text-accent" : "text-ink"}>
                         {anuncio.retorno.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}x

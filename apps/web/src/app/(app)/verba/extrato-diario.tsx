@@ -49,7 +49,7 @@ export function ExtratoDiario({ dias }: { dias: DiaDeGasto[] }) {
               por dia em média
               {maisCaro ? (
                 <>
-                  {" · maior dia "}
+                  {", maior dia "}
                   <span className="font-medium text-ink">{formatCentsAsBRL(maisCaro.gastoCentavos ?? 0)}</span>
                   {` em ${diaCurto(maisCaro.dia)}`}
                 </>

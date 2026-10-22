@@ -422,7 +422,7 @@ export function LeadsAreaChart({
         >
           <p className="mb-1.5 text-rotulo font-medium text-ink-mute">
             {formatDay(active.date)}
-            {modo === "acumulado" ? " · acumulado" : ""}
+            {modo === "acumulado" ? ", acumulado" : ""}
           </p>
           {comRotulos.map((series) => (
             <div key={series.key} className="flex items-center gap-2 text-corpo">

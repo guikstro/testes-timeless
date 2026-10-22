@@ -79,12 +79,12 @@ export function WhatsAppDoCliente({ dados }: { dados: WhatsAppDoClienteDados }) 
 
   return (
     <section className="mt-6 rounded-xl border border-line bg-panel p-5">
-      <h2 className="text-corpo font-medium uppercase tracking-wide text-ink-mute">WhatsApp</h2>
+      <h2 className="text-corpo font-medium text-ink-mute">WhatsApp</h2>
 
       <p className="mt-3 flex items-center gap-2 text-ink" aria-live="polite">
         <span className={`inline-block h-2.5 w-2.5 rounded-full ${rotulo.cor}`} aria-hidden />
         {rotulo.texto}
-        {dados.conexao?.numero ? <span className="text-ink-mute">· {dados.conexao.numero}</span> : null}
+        {dados.conexao?.numero ? <span className="text-ink-mute">{dados.conexao.numero}</span> : null}
       </p>
 
       {link ? (

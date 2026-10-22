@@ -12,6 +12,8 @@ import { montaBlocoDePresencaLocal, DadosDePresencaLocal } from "@/lib/relatorio
 import { sessaoAtual } from "@/lib/sessao";
 import type { PresencaLocal } from "../dashboard/painel-presenca-local";
 
+export const metadata = { title: "Relatório" };
+
 interface Overview {
   period: { days: number; from: string; to: string };
   totals: {
