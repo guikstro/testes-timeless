@@ -36,6 +36,9 @@ export function LeadBoard({ colunas }: { colunas: ColunaDoQuadro[] }) {
   // quadro não recarregar por baixo e apagar o texto.
   const [ocupado, setOcupado] = useState(false);
   const [pendente, iniciar] = useTransition();
+  // No celular cabe uma etapa por vez: empilhadas, era preciso rolar todos os
+  // cartões de "Novos" para chegar em "Qualificados".
+  const [etapaNoCelular, setEtapaNoCelular] = useState<Estagio>(colunas[0]?.estagio ?? "NEW");
 
   const todos = colunas.flatMap((coluna) => coluna.itens);
   const leadArrastado = todos.find((lead) => lead.id === arrastando) ?? null;
@@ -75,6 +78,26 @@ export function LeadBoard({ colunas }: { colunas: ColunaDoQuadro[] }) {
         </p>
       ) : null}
 
+      <div role="tablist" aria-label="Etapas" className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:hidden">
+        {colunas.map((coluna) => {
+          const ativa = coluna.estagio === etapaNoCelular;
+          return (
+            <button
+              key={coluna.estagio}
+              type="button"
+              role="tab"
+              aria-selected={ativa}
+              onClick={() => setEtapaNoCelular(coluna.estagio)}
+              className={`focus-ring shrink-0 rounded-full border px-3 py-1.5 text-apoio font-medium ${
+                ativa ? "border-ink bg-ink text-canvas" : "border-line bg-panel text-ink-soft"
+              }`}
+            >
+              {APARENCIA[coluna.estagio].titulo} <span className="tabular-nums opacity-70">{coluna.total}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className={`grid grid-cols-1 gap-4 transition-opacity duration-300 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 ${pendente ? "opacity-60" : ""}`}>
         {colunas.map((coluna) => {
           const { titulo, cor } = APARENCIA[coluna.estagio];
@@ -96,7 +119,7 @@ export function LeadBoard({ colunas }: { colunas: ColunaDoQuadro[] }) {
                 evento.preventDefault();
                 soltar(coluna.estagio);
               }}
-              className={`flex min-h-[12rem] flex-col rounded-2xl border p-3 transition-all duration-300 ease-soft ${
+              className={`${coluna.estagio === etapaNoCelular ? "flex" : "hidden sm:flex"} min-h-[12rem] flex-col rounded-2xl border p-3 transition-all duration-300 ease-soft ${
                 sobre === coluna.estagio
                   ? "border-accent bg-accent/[0.06] ring-4 ring-accent/10"
                   : recebe

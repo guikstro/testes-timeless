@@ -60,7 +60,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           areas={session.areas}
           foco={session.organization.foco}
         />
-        <main className="min-w-0 flex-1">
+        <main className="min-w-0 flex-1 pb-20 md:pb-0">
           {/*
             Faixa fina no topo, grudada: o sino precisa estar visível de
             qualquer tela, porque o lead chega enquanto o operador está em

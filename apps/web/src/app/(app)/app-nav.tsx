@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { OrgLogo } from "@/components/ui/logo";
 import { podeVer } from "@/lib/areas";
 import { Foco, focoMostra } from "@/lib/foco";
@@ -52,7 +52,7 @@ const ICON_PROPS = {
   "aria-hidden": true,
 };
 
-const NAV_ITEMS: NavItem[] = [
+const TODOS_OS_ITENS: NavItem[] = [
   { href: "/vendas", label: "Vendas e receita", icon: <svg {...ICON_PROPS}><path d="M4 4h16v16H4zM8 9h8M8 13h5M8 17h8" /></svg> },
   {
     href: "/dashboard",
@@ -149,6 +149,36 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+/**
+ * A ordem e os nomes do menu do cliente.
+ *
+ * Primeiro o dia a dia (resumo, conversas, leads), depois o dinheiro
+ * (campanhas, vendas) e por fim o que se configura uma vez. "Verba" saiu do
+ * menu: ela é o planejamento das campanhas e fica a um clique de dentro de
+ * Campanhas, em vez de ser um terceiro lugar falando de investimento.
+ */
+const ORDEM_DO_MENU: { href: string; label?: string }[] = [
+  { href: "/dashboard", label: "Resumo" },
+  { href: "/conversas" },
+  { href: "/leads" },
+  { href: "/campanhas" },
+  { href: "/vendas", label: "Vendas" },
+  { href: "/links" },
+  { href: "/integrations" },
+  { href: "/relatorio" },
+  { href: "/settings" },
+];
+
+const NAV_ITEMS: NavItem[] = ORDEM_DO_MENU.flatMap(({ href, label }) => {
+  const item = TODOS_OS_ITENS.find((candidato) => candidato.href === href);
+  return item ? [{ ...item, label: label ?? item.label }] : [];
+});
+
+/** Quantos itens cabem na barra de baixo do celular; o resto vai para "Mais". */
+const NA_BARRA_DO_CELULAR = 4;
+
+const CHAVE_DO_MENU_FIXO = "timeless:menu-fixado";
+
 /** A lista de clientes da equipe Timeless. Só aparece para operadores da plataforma. */
 const ADMIN_ITEM: NavItem = {
   href: "/clientes",
@@ -216,6 +246,34 @@ export function AppNav({
   const [pinned, setPinned] = useState(false);
   const pathname = usePathname();
 
+  // Em tela grande o menu começa aberto, com os nomes à vista: só ícones
+  // obrigavam a adivinhar o que era cada desenho. A escolha de cada pessoa
+  // fica guardada neste navegador.
+  useEffect(() => {
+    let guardado: string | null = null;
+    try {
+      guardado = window.localStorage.getItem(CHAVE_DO_MENU_FIXO);
+    } catch {
+      // Navegação privada: vale o padrão pelo tamanho da tela.
+    }
+    setPinned(guardado === null ? window.matchMedia("(min-width: 1280px)").matches : guardado === "1");
+  }, []);
+
+  function alternaFixado() {
+    setPinned((atual) => {
+      try {
+        window.localStorage.setItem(CHAVE_DO_MENU_FIXO, atual ? "0" : "1");
+      } catch {
+        // Sem onde guardar, vale só para esta visita.
+      }
+      return !atual;
+    });
+  }
+
+  const itensVisiveis = showAdmin
+    ? ITENS_DA_TIMELESS
+    : NAV_ITEMS.filter((item) => podeVer(areas, item.href) && focoMostra(foco, item.href));
+
   // Repetido em cada rótulo: some quando recolhida, sem tirar do fluxo, para
   // o texto não reposicionar durante a transição.
   const label =
@@ -272,8 +330,9 @@ export function AppNav({
       mouse, que é momentâneo, mas fixar e continuar cobrindo cento e setenta
       pixels de toda tela tira o sentido de fixar.
     */
+    <>
     <div
-      className={`shrink-0 transition-[width] duration-300 ease-soft motion-reduce:transition-none ${
+      className={`hidden shrink-0 transition-[width] duration-300 ease-soft motion-reduce:transition-none md:block ${
         pinned ? "w-60" : "w-16"
       }`}
     >
@@ -315,12 +374,12 @@ export function AppNav({
           </span>
         </Identidade>
 
-        <nav className="flex flex-1 flex-col gap-1">{(showAdmin ? ITENS_DA_TIMELESS : NAV_ITEMS.filter((item) => podeVer(areas, item.href) && focoMostra(foco, item.href))).map((item) => renderItem(item))}</nav>
+        <nav className="flex flex-1 flex-col gap-1">{itensVisiveis.map((item) => renderItem(item))}</nav>
 
         <div className="flex flex-col gap-1 pt-2">
           <button
             type="button"
-            onClick={() => setPinned((current) => !current)}
+            onClick={alternaFixado}
             aria-pressed={pinned}
             title={pinned ? "Soltar o menu" : "Manter o menu aberto"}
             className="focus-ring flex items-center gap-3 rounded-xl px-3 py-2.5 text-corpo text-ink-mute transition-all duration-200 ease-soft hover:bg-panel-soft/80 hover:text-ink active:scale-[0.98]"
@@ -343,6 +402,110 @@ export function AppNav({
           </div>
         </div>
       </aside>
+    </div>
+
+    <MenuDoCelular
+      itens={itensVisiveis}
+      pathname={pathname}
+      impersonating={impersonating}
+    />
+    </>
+  );
+}
+
+/**
+ * No celular, o menu vai para baixo, onde o polegar alcança.
+ *
+ * A barra lateral ocupava uma faixa fixa de uma tela que já é estreita. Aqui
+ * ficam os quatro destinos do dia a dia, e "Mais" abre o resto.
+ */
+function MenuDoCelular({
+  itens,
+  pathname,
+  impersonating,
+}: {
+  itens: NavItem[];
+  pathname: string;
+  impersonating: boolean;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const principais = itens.slice(0, NA_BARRA_DO_CELULAR);
+  const resto = itens.slice(NA_BARRA_DO_CELULAR);
+  const restoAtivo = resto.some((item) => isActive(pathname, item.href));
+
+  useEffect(() => setAberto(false), [pathname]);
+
+  return (
+    <div className="md:hidden" data-imprimir="esconder">
+      {aberto ? (
+        <>
+          <button
+            type="button"
+            aria-label="Fechar o menu"
+            onClick={() => setAberto(false)}
+            className="fixed inset-0 z-40 bg-ink/20"
+          />
+          <div className="fixed inset-x-3 bottom-[4.75rem] z-50 rounded-2xl border border-line bg-panel p-2 shadow-lifted">
+            {resto.map((item) => {
+              const ativo = isActive(pathname, item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={ativo ? "page" : undefined}
+                  className={`focus-ring flex items-center gap-3 rounded-xl px-3 py-3 text-corpo ${
+                    ativo ? "bg-brand-soft font-medium text-brand-ink" : "text-ink-soft"
+                  }`}
+                >
+                  {item.icon}
+                  {item.label}
+                </Link>
+              );
+            })}
+            <div className="mt-1 border-t border-line/70 px-1 pt-2">
+              {impersonating ? <LeaveClientButton collapsedLabelClassName="" /> : null}
+              <LogoutButton collapsedLabelClassName="" />
+            </div>
+          </div>
+        </>
+      ) : null}
+
+      <nav
+        aria-label="Menu"
+        className="fixed inset-x-0 bottom-0 z-40 flex border-t border-line/70 bg-panel/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl"
+      >
+        {principais.map((item) => {
+          const ativo = isActive(pathname, item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={ativo ? "page" : undefined}
+              className={`focus-ring flex flex-1 flex-col items-center gap-0.5 py-2 text-[0.6875rem] ${
+                ativo ? "font-medium text-brand-ink" : "text-ink-mute"
+              }`}
+            >
+              {item.icon}
+              <span className="max-w-full truncate">{item.label}</span>
+            </Link>
+          );
+        })}
+        {resto.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => setAberto((atual) => !atual)}
+            aria-expanded={aberto}
+            className={`focus-ring flex flex-1 flex-col items-center gap-0.5 py-2 text-[0.6875rem] ${
+              restoAtivo || aberto ? "font-medium text-brand-ink" : "text-ink-mute"
+            }`}
+          >
+            <svg {...ICON_PROPS}>
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+            Mais
+          </button>
+        ) : null}
+      </nav>
     </div>
   );
 }

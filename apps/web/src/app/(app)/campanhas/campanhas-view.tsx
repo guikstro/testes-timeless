@@ -102,7 +102,10 @@ export function CampanhasView({
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Campanhas</h1>
           <p className="mt-1 max-w-2xl text-corpo text-ink-mute">
-            Quanto você investiu e o que cada campanha trouxe.
+            Quanto você investiu e o que cada campanha trouxe.{" "}
+            <Link href="/verba" className="underline decoration-line underline-offset-2 hover:text-ink">
+              Planejar a verba do mês
+            </Link>
           </p>
           <FrescorDosDados frescor={frescor} className="mt-2" />
         </div>
