@@ -21,7 +21,7 @@ export const CATEGORIAS = {
     ],
   },
   equipe: { rotulo: "Equipe e permissões", acoes: ["MEMBER_ROLE_CHANGED", "MEMBER_REMOVED", "INVITE_CREATED", "OWNERSHIP_TRANSFERRED"] },
-  suporte: { rotulo: "Acesso do suporte", acoes: ["IMPERSONATION_STARTED", "IMPERSONATION_ENDED"] },
+  suporte: { rotulo: "Acesso do suporte", acoes: ["IMPERSONATION_STARTED", "IMPERSONATION_ENDED", "OPERADORES_DO_CLIENTE_DEFINIDOS"] },
   conta: { rotulo: "Configurações e integrações", acoes: ["ORGANIZATION_UPDATED", "ORGANIZATION_CREATED", "ORGANIZATION_DELETED", "INTEGRATION_CONNECTED", "INTEGRATION_DISCONNECTED", "INTEGRATION_UPDATED", "CONNECTION_CHANGED"] },
   anuncios: {
     rotulo: "Anúncios e verba",
