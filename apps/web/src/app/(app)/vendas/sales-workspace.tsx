@@ -107,6 +107,15 @@ function rotuloDoPeriodo(de: string, ate: string): string {
   return de ? `desde ${formataDiaCurto(de)}` : `até ${formataDiaCurto(ate)}`;
 }
 
+/** A cor da situação, do jeito que se lê: verde fechou, âmbar falta confirmar, cinza saiu. */
+const TOM_DA_SITUACAO: Record<string, string> = {
+  CONFIRMED: "bg-success-soft text-success",
+  POSSIBLE: "bg-warning-soft text-warning",
+  PROBABLE: "bg-warning-soft text-warning",
+  REJECTED: "bg-panel-soft text-ink-mute",
+  CANCELLED: "bg-panel-soft text-ink-mute",
+};
+
 const labels: Record<string, string> = {
   POSSIBLE: "Possível",
   PROBABLE: "Provável",
@@ -313,10 +322,8 @@ export function SalesWorkspace({
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-ink">
-            Vendas e receita
-          </h1>
-          <p className="mt-1 text-ink-mute">
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Vendas</h1>
+          <p className="mt-1 text-corpo text-ink-mute">
             As vendas registradas e as que o sistema percebeu nas conversas.
           </p>
         </div>
@@ -343,49 +350,76 @@ export function SalesWorkspace({
         </p>
       )}
       {summary && (
-        <section
-          aria-label="Resumo de receita"
-          className="grid gap-4 md:grid-cols-3"
-        >
-          <div className="surface p-5">
-            <p className="text-ink-mute">Receita confirmada {rotuloDoPeriodo(from, to)}</p>
-            {summary.currencies.length ? (
-              summary.currencies.map((c) => (
-                <div key={c.currency}>
-                  <p className="text-2xl font-semibold tabular-nums">
-                    {money(c.revenueCents, c.currency)}
-                  </p>
-                  <p className="text-sm text-ink-soft">
-                    {c.confirmedSales} vendas · Ticket{" "}
-                    {money(c.averageTicketCents, c.currency)}
-                    {c.unknownValues > 0
-                      ? ` · ${c.unknownValues} sem valor`
-                      : ""}
-                  </p>
-                </div>
-              ))
-            ) : (
-              <p className="mt-2 text-ink-soft">
-                Nenhuma venda confirmada neste período.
+        <section aria-label="Resumo de receita" className="py-4 text-center sm:py-6">
+          {summary.currencies.length ? (
+            summary.currencies.map((c) => (
+              <div key={c.currency}>
+                <p className="font-display text-5xl font-semibold tracking-[-0.035em] text-ink sm:text-6xl">
+                  {money(c.revenueCents, c.currency)}
+                </p>
+                <p className="mt-3 text-lg text-ink">
+                  em {c.confirmedSales} {c.confirmedSales === 1 ? "venda confirmada" : "vendas confirmadas"}{" "}
+                  {rotuloDoPeriodo(from, to)}
+                </p>
+                <p className="mt-1 text-corpo text-ink-mute">
+                  {c.averageTicketCents !== null ? `Ticket médio ${money(c.averageTicketCents, c.currency)}` : null}
+                  {c.unknownValues > 0
+                    ? ` · ${c.unknownValues} ${c.unknownValues === 1 ? "venda sem valor registrado" : "vendas sem valor registrado"}`
+                    : ""}
+                </p>
+              </div>
+            ))
+          ) : (
+            <>
+              <p className="font-display text-xl font-semibold tracking-tight text-ink">
+                Nenhuma venda confirmada {rotuloDoPeriodo(from, to)}
               </p>
-            )}
-          </div>
-          <div className="surface p-5">
-            <p className="text-ink-mute">Vendas a confirmar</p>
-            <p className="text-2xl tabular-nums">{summary.possibleSales}</p>
-            <p className="text-sm text-ink-mute">O sistema achou na conversa, falta alguém confirmar</p>
-          </div>
-          <div className="surface p-5">
-            <p className="text-ink-mute">Com dúvida</p>
-            <p className="text-2xl tabular-nums">{summary.requiresReview}</p>
-            <p className="text-sm text-ink-mute">
-              Informações que não batem; só entram na receita depois de revisadas
-            </p>
-          </div>
+              <p className="mx-auto mt-1 max-w-md text-corpo text-ink-mute">
+                As vendas aparecem aqui quando alguém registra uma, ou quando o sistema percebe uma na conversa.
+              </p>
+            </>
+          )}
+
+          {/* O que pede uma decisão de alguém. Clicar já filtra a lista abaixo. */}
+          {summary.possibleSales > 0 || summary.requiresReview > 0 ? (
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              {summary.possibleSales > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilter("POSSIBLE");
+                    setOffset(0);
+                  }}
+                  className="focus-ring rounded-full border border-warning-line bg-warning-soft px-4 py-2 text-corpo text-warning"
+                >
+                  <span className="font-semibold">{summary.possibleSales}</span>{" "}
+                  {summary.possibleSales === 1 ? "venda a confirmar" : "vendas a confirmar"} →
+                </button>
+              ) : null}
+              {summary.requiresReview > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilter("review");
+                    setOffset(0);
+                  }}
+                  className="focus-ring rounded-full border border-danger-line bg-danger-soft px-4 py-2 text-corpo text-danger"
+                >
+                  <span className="font-semibold">{summary.requiresReview}</span>{" "}
+                  {summary.requiresReview === 1 ? "com dúvida" : "com dúvida"} →
+                </button>
+              ) : null}
+            </div>
+          ) : (
+            <p className="mt-4 text-apoio text-ink-mute">Nada esperando confirmação.</p>
+          )}
         </section>
       )}
       {showForm && (
-        <form onSubmit={register} className="surface space-y-4 p-5">
+        <form
+          onSubmit={register}
+          className="surface space-y-4 p-5 [&_label]:flex [&_label]:flex-col [&_label]:gap-1.5 [&_label]:text-apoio [&_label]:font-medium [&_label]:text-ink-soft"
+        >
           <h2 className="font-semibold">Registrar venda confirmada</h2>
           <div className="grid gap-4 md:grid-cols-3">
             <label>
@@ -448,7 +482,7 @@ export function SalesWorkspace({
           </p>
         </form>
       )}
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-end gap-3 [&_label]:flex [&_label]:flex-col [&_label]:gap-1.5 [&_label]:text-apoio [&_label]:font-medium [&_label]:text-ink-soft">
         <label>
           Estado
           <Select
@@ -508,7 +542,7 @@ export function SalesWorkspace({
             }}
           />
         </label>
-        <Button variant="secondary" onClick={() => void refresh()}>
+        <Button variant="ghost" onClick={() => void refresh()}>
           Atualizar
         </Button>
       </div>
@@ -518,20 +552,24 @@ export function SalesWorkspace({
             Carregando vendas…
           </p>
         ) : !sales.length ? (
-          <p className="p-8 text-ink-mute">Nenhuma venda com estes filtros.</p>
+          <p className="p-8 text-center text-corpo text-ink-mute">Nenhuma venda com estes filtros.</p>
         ) : (
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-line">
                 {[
                   "Cliente",
-                  "Estado",
+                  "Situação",
                   "Valor",
-                  "Confirmação",
-                  "Unidade",
+                  "Data",
+                  "Como foi confirmada",
+                  ...(units.length > 0 ? ["Unidade"] : []),
                   "",
                 ].map((h) => (
-                  <th key={h} className="p-4 font-medium text-ink-mute">
+                  <th
+                    key={h}
+                    className="px-4 py-3 text-rotulo font-semibold uppercase tracking-[0.09em] text-ink-mute"
+                  >
                     {h}
                   </th>
                 ))}
@@ -539,8 +577,8 @@ export function SalesWorkspace({
             </thead>
             <tbody>
               {sales.map((s) => (
-                <tr key={s.id} className="border-b border-line">
-                  <td className="p-4">
+                <tr key={s.id} className="border-b border-line/60 transition-colors last:border-0 hover:bg-panel-soft/50">
+                  <td className="p-4 font-medium text-ink">
                     {s.lead?.name ??
                       s.customerName ??
                       s.lead?.normalizedPhone ??
@@ -548,17 +586,19 @@ export function SalesWorkspace({
                       "Cliente não identificado"}
                     {s.lead && (
                       <Link
-                        className="block text-ink-mute underline"
+                        className="block text-apoio font-normal text-ink-mute underline decoration-line underline-offset-2 hover:text-ink"
                         href={`/leads/${s.lead.id}`}
                       >
-                        Ver lead e atribuição
+                        Ver lead
                       </Link>
                     )}
                   </td>
                   <td className="p-4">
-                    {labels[s.status]}
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-apoio font-medium ${TOM_DA_SITUACAO[s.status] ?? "bg-panel-soft text-ink-soft"}`}>
+                      {labels[s.status]}
+                    </span>
                     {s.needsReview && (
-                      <p className="text-warning">Revisão necessária</p>
+                      <p className="mt-1 text-apoio text-warning">Com dúvida</p>
                     )}
                     {s.confidence !== null && (
                       <p className="text-ink-mute">
@@ -567,14 +607,17 @@ export function SalesWorkspace({
                     )}
                   </td>
                   <td className="p-4 tabular-nums">
-                    {money(s.amountCents, s.currency)}
+                    {s.amountCents === null ? <span className="text-ink-mute">Sem valor</span> : money(s.amountCents, s.currency)}
+                  </td>
+                  <td className="p-4 tabular-nums text-ink-soft">
+                    {s.occurredAt ? new Date(s.occurredAt).toLocaleDateString("pt-BR") : "—"}
                   </td>
                   <td className="p-4">
                     {s.source?.type === s.confirmationSource
                       ? s.source.name
                       : sources[s.confirmationSource]}
                   </td>
-                  <td className="p-4">{s.unit?.name ?? "Organização"}</td>
+                  {units.length > 0 ? <td className="p-4">{s.unit?.name ?? "Organização"}</td> : null}
                   <td className="p-4">
                     <Button
                       variant="secondary"
@@ -590,7 +633,7 @@ export function SalesWorkspace({
                         }
                       }}
                     >
-                      Evidências
+                      Ver detalhes
                     </Button>
                   </td>
                 </tr>

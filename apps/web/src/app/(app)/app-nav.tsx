@@ -39,6 +39,8 @@ interface NavItem {
   href: string;
   label: string;
   icon: ReactNode;
+  /** Começa um grupo novo no menu: ganha um respiro acima. */
+  novoGrupo?: boolean;
 }
 
 const ICON_PROPS = {
@@ -152,26 +154,28 @@ const TODOS_OS_ITENS: NavItem[] = [
 /**
  * A ordem e os nomes do menu do cliente.
  *
- * Primeiro o dia a dia (resumo, conversas, leads), depois o dinheiro
- * (campanhas, vendas) e por fim o que se configura uma vez. "Verba" saiu do
- * menu: ela é o planejamento das campanhas e fica a um clique de dentro de
- * Campanhas, em vez de ser um terceiro lugar falando de investimento.
+ * Três grupos, na ordem em que o dono do negócio pensa: primeiro o
+ * resultado (resumo e vendas, lado a lado, porque são as duas telas que
+ * respondem "estou ganhando dinheiro?"), depois o trabalho do dia (conversas
+ * e leads), depois o que traz gente (campanhas e links) e por fim o que se
+ * configura uma vez. "Verba" saiu do menu: ela é o planejamento das campanhas
+ * e fica a um clique de dentro de Campanhas.
  */
-const ORDEM_DO_MENU: { href: string; label?: string }[] = [
+const ORDEM_DO_MENU: { href: string; label?: string; novoGrupo?: boolean }[] = [
   { href: "/dashboard", label: "Resumo" },
-  { href: "/conversas" },
-  { href: "/leads" },
-  { href: "/campanhas" },
   { href: "/vendas", label: "Vendas" },
+  { href: "/conversas", novoGrupo: true },
+  { href: "/leads" },
+  { href: "/campanhas", novoGrupo: true },
   { href: "/links" },
-  { href: "/integrations" },
+  { href: "/integrations", novoGrupo: true },
   { href: "/relatorio" },
   { href: "/settings" },
 ];
 
-const NAV_ITEMS: NavItem[] = ORDEM_DO_MENU.flatMap(({ href, label }) => {
+const NAV_ITEMS: NavItem[] = ORDEM_DO_MENU.flatMap(({ href, label, novoGrupo }) => {
   const item = TODOS_OS_ITENS.find((candidato) => candidato.href === href);
-  return item ? [{ ...item, label: label ?? item.label }] : [];
+  return item ? [{ ...item, label: label ?? item.label, novoGrupo }] : [];
 });
 
 /** Quantos itens cabem na barra de baixo do celular; o resto vai para "Mais". */
@@ -374,7 +378,7 @@ export function AppNav({
           </span>
         </Identidade>
 
-        <nav className="flex flex-1 flex-col gap-1">{itensVisiveis.map((item) => renderItem(item))}</nav>
+        <nav className="flex flex-1 flex-col gap-1">{itensVisiveis.map((item, i) => renderItem(item, item.novoGrupo && i > 0 ? "mt-3" : ""))}</nav>
 
         <div className="flex flex-col gap-1 pt-2">
           <button

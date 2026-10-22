@@ -78,7 +78,7 @@ describe("SalesWorkspace form submissions", () => {
 
   it("confirms an ordinary candidate without sending a null evidence ID", async () => {
     render(<SalesWorkspace canManage canAnalyze={false} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Evidências" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Ver detalhes" }));
     const button = await screen.findByRole("button", {
       name: "Confirmar / corrigir valor",
     });
