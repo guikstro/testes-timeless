@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { ListaDeCampanhas } from "./lista-de-campanhas";
 import { ORDEM_DOS_TRABALHOS, ROTULO_DO_TRABALHO, Trabalho, trabalhoDaCampanha } from "@/lib/campanhas/trabalho";
 import type { CampanhaComparada, DesempenhoDeCampanha, DesempenhoDeCampanhas } from "./tipos";
 
@@ -54,11 +54,6 @@ export function CampanhasSimples({
   // trabalho: custo por visualização entre vídeos, por cliente entre as de cliente.
   const referencia = referencias(linhas);
 
-  const ordenadas = [...linhas].sort(
-    (a, b) =>
-      ORDEM_DOS_TRABALHOS.indexOf(a.trabalho) - ORDEM_DOS_TRABALHOS.indexOf(b.trabalho) ||
-      b.atual.gastoCentavos - a.atual.gastoCentavos,
-  );
 
   return (
     <div className="mb-10">
@@ -95,94 +90,44 @@ export function CampanhasSimples({
         </dl>
       </section>
 
-      <h2 className="font-display text-xl font-semibold tracking-tight text-ink">Cada campanha, pelo trabalho dela</h2>
-      <ul className="mt-2">
-        {ordenadas.map(({ linha, atual, trabalho, locais }) => {
-          const juizo = julga(trabalho, atual, locais, referencia, medido);
-          return (
-            <li
-              key={linha.externalId}
-              className="grid grid-cols-[3rem_minmax(0,1fr)] items-start gap-x-4 gap-y-2 border-t border-line/70 py-5 sm:grid-cols-[3.5rem_minmax(0,1fr)_10rem]"
-            >
-              <span className={`flex h-12 w-12 items-center justify-center rounded-xl sm:h-14 sm:w-14 ${COR[trabalho].fundo} ${COR[trabalho].texto}`}>
-                {ICONE[trabalho]}
-              </span>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="truncate text-destaque font-semibold text-ink">{linha.nome}</span>
-                  <span className={`rounded-full px-2.5 py-0.5 text-rotulo font-medium ${COR[trabalho].fundo} ${COR[trabalho].texto}`}>
-                    {ROTULO_DO_TRABALHO[trabalho]}
-                  </span>
-                </div>
-                <p className="mt-0.5 text-apoio text-ink-mute">
-                  {PLATAFORMA[linha.plataforma] ?? linha.plataforma}
-                  {STATUS[linha.status] ? `, ${STATUS[linha.status]}` : ""}
-                </p>
-                <p className="mt-2 max-w-xl text-corpo leading-relaxed text-ink-soft">{juizo.frase}</p>
-              </div>
-              <div className="col-start-2 sm:col-start-3 sm:text-right">
-                <p className="font-display text-xl font-semibold tracking-tight text-ink">{reais(atual.gastoCentavos)}</p>
-                {juizo.veredito ? <p className={`mt-0.5 text-apoio font-medium ${TOM[juizo.tom]}`}>{juizo.veredito}</p> : null}
-              </div>
-            </li>
-          );
+      <ListaDeCampanhas
+        grupos={porTrabalho.map(({ trabalho, itens }) => {
+          const unidade = unidadeDoTrabalho(trabalho, itens.map((l) => l.atual));
+          return {
+            chave: trabalho,
+            titulo: porTrabalho.length > 1 ? ROTULO_DO_TRABALHO[trabalho] : undefined,
+            corDoTitulo: COR[trabalho].texto,
+            linhas: [...itens]
+              .sort((x, y) => y.atual.gastoCentavos - x.atual.gastoCentavos)
+              .map(({ linha, atual, locais }) => {
+                const juizo = julga(trabalho, atual, locais, referencia, medido);
+                return {
+                  id: linha.externalId,
+                  nome: linha.nome,
+                  detalhe: `${PLATAFORMA[linha.plataforma] ?? linha.plataforma}${STATUS[linha.status] ? `, ${STATUS[linha.status]}` : ""}`,
+                  gastoCentavos: atual.gastoCentavos,
+                  voltou: unidade.valor(atual, locais),
+                  unidade: unidade.nome,
+                  frase: juizo.frase,
+                  veredito: juizo.veredito,
+                  tom: juizo.tom,
+                };
+              }),
+          };
         })}
-      </ul>
+      />
     </div>
   );
 }
 
 type Tom = "bom" | "atencao" | "ruim" | "neutro";
 
-const TOM: Record<Tom, string> = {
-  bom: "text-success",
-  atencao: "text-warning",
-  ruim: "text-danger",
-  neutro: "text-ink-mute",
-};
 
 const COR: Record<Trabalho, { barra: string; fundo: string; texto: string }> = {
   visto: { barra: "bg-trabalho-visto", fundo: "bg-trabalho-visto-soft", texto: "text-trabalho-visto" },
   whatsapp: { barra: "bg-trabalho-conversa", fundo: "bg-trabalho-conversa-soft", texto: "text-trabalho-conversa" },
   cliente: { barra: "bg-accent", fundo: "bg-accent/10", texto: "text-accent" },
   loja: { barra: "bg-trabalho-loja", fundo: "bg-trabalho-loja-soft", texto: "text-trabalho-loja" },
-};
-
-const PROPS = {
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 1.8,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-  className: "h-6 w-6",
-  "aria-hidden": true,
-};
-
-const ICONE: Record<Trabalho, ReactNode> = {
-  visto: (
-    <svg {...PROPS}>
-      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  ),
-  whatsapp: (
-    <svg {...PROPS}>
-      <path d="M21 11.5a8.4 8.4 0 0 1-12.9 7.1L3 20l1.4-4.9A8.4 8.4 0 1 1 21 11.5z" />
-    </svg>
-  ),
-  cliente: (
-    <svg {...PROPS}>
-      <circle cx="10" cy="8" r="4" />
-      <path d="M2.5 20a7.5 7.5 0 0 1 12.6-5.5M16 18l2 2 4-4" />
-    </svg>
-  ),
-  loja: (
-    <svg {...PROPS}>
-      <path d="M12 21s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z" />
-      <circle cx="12" cy="9" r="2.5" />
-    </svg>
-  ),
 };
 
 const PLATAFORMA: Record<string, string> = { GOOGLE: "Google", META: "Facebook e Instagram", TIKTOK: "TikTok" };
@@ -372,4 +317,31 @@ function reaisCentavos(centavos: number): string {
 /** Custo de um centavo para baixo: "R$ 0,02" e não "R$ 0". */
 function centavosLegiveis(centavos: number): string {
   return centavos < 100 ? reaisCentavos(centavos) : reais(centavos);
+}
+
+/**
+ * O que conta como "o que voltou" em cada trabalho, com uma unidade só por
+ * grupo: barras de visualização e de exibição lado a lado mentiriam na escala.
+ */
+function unidadeDoTrabalho(
+  trabalho: Trabalho,
+  atuais: DesempenhoDeCampanha[],
+): { nome: [string, string]; valor: (atual: DesempenhoDeCampanha, locais?: Item["locais"]) => number | null } {
+  if (trabalho === "visto") {
+    return atuais.some((a) => (a.visualizacoesDeVideo ?? 0) > 0)
+      ? { nome: ["visualização", "visualizações"], valor: (a) => a.visualizacoesDeVideo ?? null }
+      : { nome: ["exibição", "exibições"], valor: (a) => a.impressoes ?? null };
+  }
+  if (trabalho === "whatsapp") {
+    return atuais.some((a) => a.conversasNaPlataforma !== null)
+      ? { nome: ["conversa", "conversas"], valor: (a) => a.conversasNaPlataforma ?? null }
+      : { nome: ["clique", "cliques"], valor: (a) => a.cliques ?? null };
+  }
+  if (trabalho === "loja") {
+    return {
+      nome: ["pessoa", "pessoas"],
+      valor: (_a, locais) => (locais ? (locais.ligacoes ?? 0) + (locais.rotas ?? 0) : null),
+    };
+  }
+  return { nome: ["contato", "contatos"], valor: (a) => a.leads };
 }

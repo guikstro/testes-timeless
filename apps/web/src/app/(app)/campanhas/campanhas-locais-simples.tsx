@@ -1,3 +1,5 @@
+import { ListaDeCampanhas, TomDaCampanha } from "./lista-de-campanhas";
+
 /**
  * A parte de cima de Campanhas para quem vive de presença local.
  *
@@ -59,51 +61,36 @@ export function CampanhasLocaisSimples({ campanhas }: { campanhas: CampanhaLocal
         ) : null}
       </section>
 
-      <h2 className="font-display text-xl font-semibold tracking-tight text-ink">Cada campanha</h2>
-      <ul className="mt-2">
-        {linhas.map(({ externalId, nome, status, atual }) => {
-          const daCampanha = (atual.ligacoes ?? 0) + (atual.rotas ?? 0);
-          const custo = daCampanha > 0 ? atual.gastoCentavos / daCampanha : null;
-          const cara = custo !== null && media !== null && custo > media * FOLGA;
-          const juizo =
-            daCampanha > 0
-              ? { veredito: cara ? "Mais cara que as outras" : "Trazendo gente", tom: cara ? "text-warning" : "text-success" }
-              : atual.gastoCentavos > 0
-                ? { veredito: "Sem ligação nem rota", tom: "text-danger" }
-                : null;
-          const partes = [
-            atual.ligacoes !== null ? contagem(atual.ligacoes, "ligação", "ligações") : null,
-            atual.rotas !== null ? contagem(atual.rotas, "pedido de rota", "pedidos de rota") : null,
-          ].filter(Boolean);
-
-          return (
-            <li
-              key={externalId}
-              className="grid grid-cols-[3rem_minmax(0,1fr)] items-start gap-x-4 gap-y-2 border-t border-line/70 py-5 sm:grid-cols-[3.5rem_minmax(0,1fr)_11rem]"
-            >
-              <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-trabalho-loja-soft text-trabalho-loja sm:h-14 sm:w-14">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6" aria-hidden>
-                  <path d="M12 21s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z" />
-                  <circle cx="12" cy="9" r="2.5" />
-                </svg>
-              </span>
-              <div className="min-w-0">
-                <p className="truncate text-destaque font-semibold text-ink">{nome}</p>
-                <p className="mt-0.5 text-apoio text-ink-mute">Google{STATUS[status] ? `, ${STATUS[status]}` : ""}</p>
-                <p className="mt-2 max-w-xl text-corpo leading-relaxed text-ink-soft">
-                  {partes.length
-                    ? `${partes.join(" e ")}${custo !== null ? `, a ${centavosLegiveis(custo)} cada` : ""}. ${contagem(atual.cliques, "clique", "cliques")} no anúncio.`
-                    : `${contagem(atual.cliques, "clique", "cliques")} no anúncio. Ligações e rotas ainda não estão sendo medidas.`}
-                </p>
-              </div>
-              <div className="col-start-2 sm:col-start-3 sm:text-right">
-                <p className="font-display text-xl font-semibold tracking-tight text-ink">{reais(atual.gastoCentavos)}</p>
-                {juizo ? <p className={`mt-0.5 text-apoio font-medium ${juizo.tom}`}>{juizo.veredito}</p> : null}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      <ListaDeCampanhas
+        grupos={[
+          {
+            chave: "loja",
+            linhas: linhas.map(({ externalId, nome, status, atual }) => {
+              const daCampanha = (atual.ligacoes ?? 0) + (atual.rotas ?? 0);
+              const custo = daCampanha > 0 ? atual.gastoCentavos / daCampanha : null;
+              const cara = custo !== null && media !== null && custo > media * FOLGA;
+              const partes = [
+                atual.ligacoes !== null ? contagem(atual.ligacoes, "ligação", "ligações") : null,
+                atual.rotas !== null ? contagem(atual.rotas, "pedido de rota", "pedidos de rota") : null,
+              ].filter(Boolean);
+              const medido = atual.ligacoes !== null || atual.rotas !== null;
+              return {
+                id: externalId,
+                nome,
+                detalhe: `Google${STATUS[status] ? `, ${STATUS[status]}` : ""}`,
+                gastoCentavos: atual.gastoCentavos,
+                voltou: medido ? daCampanha : null,
+                unidade: ["pessoa", "pessoas"] as [string, string],
+                frase: partes.length
+                  ? `${partes.join(" e ")}${custo !== null ? `, a ${centavosLegiveis(custo)} cada` : ""}. ${contagem(atual.cliques, "clique", "cliques")} no anúncio.`
+                  : `${contagem(atual.cliques, "clique", "cliques")} no anúncio. Ligações e rotas ainda não estão sendo medidas.`,
+                veredito: daCampanha > 0 ? (cara ? "Mais cara que as outras" : "Trazendo gente") : atual.gastoCentavos > 0 ? "Sem ligação nem rota" : null,
+                tom: (daCampanha > 0 ? (cara ? "atencao" : "bom") : atual.gastoCentavos > 0 ? "ruim" : "neutro") as TomDaCampanha,
+              };
+            }),
+          },
+        ]}
+      />
     </div>
   );
 }

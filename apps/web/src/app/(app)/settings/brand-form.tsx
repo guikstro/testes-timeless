@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { coresDaImagem } from "@/lib/cores-do-logo";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { OrgLogo } from "@/components/ui/logo";
@@ -49,6 +50,25 @@ export function BrandForm({
 
   const preview = brandPalette(color);
 
+  // As cores do próprio logo, sugeridas antes das prontas: é por elas que o
+  // sistema fica com a cara do cliente. O logo enviado pelo sistema é lido
+  // por uma rota deste domínio, porque o navegador não deixa ler os pixels de
+  // uma imagem de outro endereço.
+  const [doLogo, setDoLogo] = useState<string[]>([]);
+  useEffect(() => {
+    const endereco = url.trim();
+    if (!endereco) {
+      setDoLogo([]);
+      return;
+    }
+    const enviadoPeloSistema = endereco === logoUrl && /\/uploads\/[\w.-]+$/.test(endereco);
+    const imagem = new Image();
+    imagem.crossOrigin = "anonymous";
+    imagem.onload = () => setDoLogo(coresDaImagem(imagem) ?? []);
+    imagem.onerror = () => setDoLogo([]);
+    imagem.src = enviadoPeloSistema ? `/api/organizations/logo/arquivo?v=${encodeURIComponent(endereco)}` : endereco;
+  }, [url, logoUrl]);
+
   return (
     <form action={formAction} className="grid gap-6 sm:grid-cols-[1fr_auto]">
       <div className="flex flex-col gap-4">
@@ -66,7 +86,7 @@ export function BrandForm({
           )}
         </Field>
 
-        <Field label="Cor da marca" hint="Tinge botões, destaques e o item ativo do menu.">
+        <Field label="Cor da marca" hint="Tinge botões, destaques, gráficos e o item ativo do menu. As primeiras cores saem do seu logo.">
           {(id) => (
             <div className="flex flex-wrap items-center gap-2">
               <input
@@ -77,6 +97,23 @@ export function BrandForm({
                 onChange={(event) => setColor(event.target.value)}
                 className="h-10 w-14 cursor-pointer rounded-xl border border-line bg-panel p-1 shadow-subtle"
               />
+              {doLogo.length ? (
+                <span className="flex items-center gap-2 border-r border-line pr-3">
+                  <span className="text-apoio text-ink-mute">Do seu logo</span>
+                  {doLogo.map((hex) => (
+                    <button
+                      key={hex}
+                      type="button"
+                      onClick={() => setColor(hex)}
+                      title={hex}
+                      aria-label={`Usar a cor ${hex}, tirada do logo`}
+                      aria-pressed={color.toLowerCase() === hex.toLowerCase()}
+                      style={{ backgroundColor: hex }}
+                      className="focus-ring h-8 w-8 rounded-full shadow-subtle transition-transform duration-200 ease-soft hover:scale-110 active:scale-95 aria-pressed:ring-2 aria-pressed:ring-ink aria-pressed:ring-offset-2"
+                    />
+                  ))}
+                </span>
+              ) : null}
               {PRESETS.map((preset) => (
                 <button
                   key={preset.hex}

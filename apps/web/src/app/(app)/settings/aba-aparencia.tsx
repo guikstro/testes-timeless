@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/api-client";
 import { Card, CardHeader } from "@/components/ui/card";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { BrandForm } from "./brand-form";
 import { LogoUpload } from "./logo-upload";
 
@@ -21,6 +22,16 @@ export async function AbaAparencia() {
 
   return (
     <div className="space-y-5">
+      <Card className="p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <CardHeader
+            title="Tema"
+            description="Claro, escuro ou o mesmo do seu computador. Vale só para você, neste navegador."
+          />
+          <ThemeToggle />
+        </div>
+      </Card>
+
       <Card className="p-6">
         <CardHeader
           title="Logo"
