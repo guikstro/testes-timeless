@@ -1,3 +1,4 @@
+import { formataTelefone } from "@/lib/telefone";
 /** O que `GET /conversations` devolve. */
 
 export type EstagioDoLead = "NEW" | "IN_PROGRESS" | "QUALIFIED" | "MEETING_SCHEDULED" | "WON";
@@ -39,7 +40,7 @@ export const ESTAGIO_ROTULO: Record<EstagioDoLead, string> = {
 };
 
 export function nomeDoLead(lead: { name: string | null; normalizedPhone: string }): string {
-  return lead.name?.trim() || lead.normalizedPhone;
+  return lead.name?.trim() || formataTelefone(lead.normalizedPhone);
 }
 
 export const ESTAGIO_TOM: Record<EstagioDoLead, "neutral" | "info" | "warning" | "success"> = {

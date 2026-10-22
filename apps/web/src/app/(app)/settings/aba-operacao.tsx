@@ -58,8 +58,8 @@ export async function AbaOperacao() {
 
       <Card className="p-6">
         <CardHeader
-          title="Gatilhos de qualificação e venda"
-          description="Quando uma mensagem recebida contiver a frase exata, sem diferenciar maiúsculas de minúsculas, o lead muda de estágio sozinho."
+          title="Frases que avançam o lead"
+          description="Quando o cliente escrever uma destas frases, o lead muda de etapa sozinho. Ex.: \"quero contratar\" leva para Qualificado."
           className="mb-5"
         />
 

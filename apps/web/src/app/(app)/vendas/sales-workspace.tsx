@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Textarea } from "@/components/ui/input";
+import { formataTelefone } from "@/lib/telefone";
 
 type Evidence = {
   id: string;
@@ -731,8 +732,8 @@ export function SalesWorkspace({
                         <option value="">Selecione o cliente correto</option>
                         {selected.identityCandidates.map((lead) => (
                           <option key={lead.id} value={lead.id}>
-                            {lead.name ?? lead.normalizedPhone} ·{" "}
-                            {lead.normalizedPhone}
+                            {lead.name ?? formataTelefone(lead.normalizedPhone)} ·{" "}
+                            {formataTelefone(lead.normalizedPhone)}
                           </option>
                         ))}
                       </Select>

@@ -64,7 +64,6 @@ export default async function IntegrationsPage() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <Link href="/integrations/sales" className="surface mb-6 block p-5"><span className="font-semibold">Fontes de vendas</span><p className="mt-1 text-ink-mute">CRM, pagamentos, ERP e automações pela API universal.</p></Link>
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Integrações</h1>
       <p className="mb-6 mt-1 text-corpo text-ink-mute">
         {comLeads
@@ -97,6 +96,25 @@ export default async function IntegrationsPage() {
 
         {comLeads ? google : null}
       </div>
+
+      {/*
+        Para quem já usa outro sistema de vendas. Fica abaixo das três
+        conexões principais, como opção avançada: no topo, ele empurrava o
+        título da página para baixo e falava de "API" com quem só queria ligar
+        o WhatsApp.
+      */}
+      <Link
+        href="/integrations/sales"
+        className="focus-ring mt-8 flex items-center justify-between gap-4 rounded-2xl border border-line/70 bg-panel/60 px-5 py-4 transition-colors hover:bg-panel"
+      >
+        <span>
+          <span className="block text-corpo font-semibold text-ink">Vendas de outros sistemas</span>
+          <span className="mt-0.5 block text-apoio text-ink-mute">
+            Traga as vendas do seu CRM, da plataforma de pagamento ou do sistema da empresa.
+          </span>
+        </span>
+        <span className="shrink-0 text-corpo font-medium text-accent">Configurar →</span>
+      </Link>
     </div>
   );
 }

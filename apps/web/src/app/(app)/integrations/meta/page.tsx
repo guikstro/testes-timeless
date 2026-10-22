@@ -6,6 +6,7 @@ import { ConnectMetaForm } from "./connect-form";
 import { ConnectionActions } from "./connection-actions";
 import { ConnectMetaCapiForm } from "./capi-connect-form";
 import { PaginaDaMetaForm } from "./pagina-form";
+import { formataTelefone } from "@/lib/telefone";
 
 interface MetaConnection {
   id: string;
@@ -287,7 +288,7 @@ export default async function MetaIntegrationPage() {
                   <tbody>
                     {conversionEvents.items.map((event) => (
                       <tr key={event.id} className="border-b border-line/60 last:border-0">
-                        <td className="px-4 py-2">{event.lead.name ?? event.lead.normalizedPhone}</td>
+                        <td className="px-4 py-2">{event.lead.name ?? formataTelefone(event.lead.normalizedPhone)}</td>
                         <td className="px-4 py-2">{EVENT_TYPE_LABELS[event.type]}</td>
                         <td className="px-4 py-2">{formatCentsAsBRL(event.valueCents)}</td>
                         <td className={`px-4 py-2 ${EVENT_STATUS_COLORS[event.status]}`}>

@@ -7,6 +7,7 @@ import { ESTAGIO_ROTULO, ESTAGIO_TOM, FichaDoLead, nomeDoLead } from "@/lib/conv
 import { tempoRelativo } from "@/lib/relative-time";
 import { Conversation } from "../leads/[id]/conversation";
 import { ReplyBox } from "../leads/[id]/reply-box";
+import { formataTelefone } from "@/lib/telefone";
 
 /**
  * A coluna do meio.
@@ -84,7 +85,7 @@ export function InboxChat({
         <div className="min-w-0 flex-1">
           <p className="truncate text-corpo font-semibold text-ink">{nomeDoLead(ficha)}</p>
           <p className="truncate text-rotulo tabular-nums text-ink-mute">
-            {ficha.normalizedPhone}
+            {formataTelefone(ficha.normalizedPhone)}
             {ficha.metrics.lastMessageAt ? ` · ${tempoRelativo(ficha.metrics.lastMessageAt)}` : ""}
           </p>
         </div>

@@ -19,6 +19,7 @@ import { AtualizaAoVivo } from "@/components/notifications/atualiza-ao-vivo";
 import { Conversation } from "./conversation";
 import { DisqualifyForm, ManualEditForm } from "./manual-edit-form";
 import { ReplyBox } from "./reply-box";
+import { formataTelefone } from "@/lib/telefone";
 
 interface WhatsAppConnectionSummary {
   provider: "CLOUD_API" | "EVOLUTION";
@@ -262,7 +263,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           <h1 className="font-display text-[28px] font-semibold leading-tight tracking-tight text-ink">
             {lead.name ?? "Sem nome"}
           </h1>
-          <p className="mt-0.5 text-corpo tabular-nums text-ink-mute">{lead.normalizedPhone}</p>
+          <p className="mt-0.5 text-corpo tabular-nums text-ink-mute">{formataTelefone(lead.normalizedPhone)}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

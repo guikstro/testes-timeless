@@ -76,7 +76,7 @@ export function AcompanhamentoForm({
             id={id}
             name="valorPotencial"
             inputMode="decimal"
-            placeholder="1.500,00"
+            placeholder="Ex.: 1.500,00"
             defaultValue={textoDosCentavos(valorPotencialCentavos)}
             {...ligacao}
           />

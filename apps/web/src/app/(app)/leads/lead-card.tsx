@@ -9,6 +9,7 @@ import { Responsavel, situacaoDaProximaAcao } from "@/lib/leads/acompanhamento";
 import { formataDia } from "@/lib/periodo";
 import { Estagio } from "./estagios";
 import { QuickActions } from "./quick-actions";
+import { formataTelefone } from "@/lib/telefone";
 
 export interface LeadCartao {
   id: string;
@@ -99,7 +100,7 @@ export function LeadCard({
 
           <div className="min-w-0 flex-1">
             <p className="truncate text-corpo font-medium text-ink">{nome}</p>
-            <p className="truncate text-rotulo tabular-nums text-ink-mute">{lead.normalizedPhone}</p>
+            <p className="truncate text-rotulo tabular-nums text-ink-mute">{formataTelefone(lead.normalizedPhone)}</p>
           </div>
 
           {lead.sale?.amountCents ? (

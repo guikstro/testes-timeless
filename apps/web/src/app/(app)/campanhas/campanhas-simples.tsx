@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { CampanhaComparada, DesempenhoDeCampanha, DesempenhoDeCampanhas } from "./tipos";
 
 /**
@@ -16,6 +17,27 @@ export function CampanhasSimples({ dados, medido }: { dados: DesempenhoDeCampanh
   const ativas = dados.campanhas
     .filter((linha): linha is CampanhaComparada & { atual: DesempenhoDeCampanha } => linha.atual !== null)
     .sort((a, b) => compara(a.atual, b.atual));
+
+  // Sem gasto nenhum, "R$ 0 investidos, 0 contatos" parece defeito. O que
+  // falta é ligar a conta de anúncios, e a tela diz isso.
+  if (dados.campanhas.length === 0 && totais.gastoCentavos === 0) {
+    return (
+      <section className="mb-8 rounded-2xl border border-line/70 bg-panel px-6 py-10 text-center shadow-card">
+        <p className="font-display text-xl font-semibold tracking-tight text-ink">Nenhum anúncio neste período</p>
+        <p className="mx-auto mt-2 max-w-md text-corpo text-ink-soft">
+          Conecte a conta de anúncios para ver quanto cada campanha custou e quantos clientes trouxe.
+        </p>
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
+          <Link href="/integrations/meta" className="focus-ring rounded-full bg-ink px-4 py-2 text-corpo font-medium text-canvas">
+            Conectar Facebook/Instagram
+          </Link>
+          <Link href="/integrations/google" className="focus-ring rounded-full border border-line px-4 py-2 text-corpo font-medium text-ink-soft hover:text-ink">
+            Conectar Google
+          </Link>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <div className="mb-8">
