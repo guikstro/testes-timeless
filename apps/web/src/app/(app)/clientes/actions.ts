@@ -174,3 +174,16 @@ export async function lePerfilAgora(organizationId: string): Promise<{ error?: s
     return { error: mensagemDe(error, "Não foi possível pedir a leitura.") };
   }
 }
+
+/**
+ * Abre a empresa de exemplo e entra nela. A API cria ou renova a
+ * demonstração; a entrada é a mesma de qualquer cliente.
+ */
+export async function abreDemonstracao(): Promise<{ destino: string } | { error: string }> {
+  try {
+    const { id } = await apiFetch<{ id: string }>("/admin/demonstracao", { method: "POST" });
+    return entra(id);
+  } catch (error) {
+    return { error: mensagemDe(error, "Não foi possível preparar a demonstração.") };
+  }
+}

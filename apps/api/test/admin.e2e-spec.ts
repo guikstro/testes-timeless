@@ -454,6 +454,39 @@ describe("Administração da plataforma (e2e)", () => {
         expect(painel.body.map((c: { id: string }) => c.id)).toEqual([clientOrgId]);
       });
 
+      it("qualquer pessoa da equipe abre a demonstração, que fica fora da lista e do painel", async () => {
+        const aberta = await request(app.getHttpServer())
+          .post("/api/admin/demonstracao")
+          .set("Authorization", `Bearer ${supportToken}`)
+          .expect(201);
+        const id = aberta.body.id as string;
+
+        // Recente, não é recriada: a segunda pessoa a abrir vê a mesma.
+        const deNovo = await request(app.getHttpServer())
+          .post("/api/admin/demonstracao")
+          .set("Authorization", `Bearer ${adminToken}`)
+          .expect(201);
+        expect(deNovo.body.id).toBe(id);
+        expect(await prisma.lead.count({ where: { organizationId: id } })).toBeGreaterThan(50);
+
+        const lista = await request(app.getHttpServer())
+          .get("/api/admin/organizations")
+          .set("Authorization", `Bearer ${adminToken}`)
+          .expect(200);
+        expect(lista.body.items.map((o: { id: string }) => o.id)).not.toContain(id);
+        const painel = await request(app.getHttpServer())
+          .get("/api/admin/painel")
+          .set("Authorization", `Bearer ${adminToken}`)
+          .expect(200);
+        expect(painel.body.map((c: { id: string }) => c.id)).not.toContain(id);
+
+        // O SUPPORT não atende a demonstração e entra mesmo assim.
+        await request(app.getHttpServer())
+          .post(`/api/admin/organizations/${id}/impersonate`)
+          .set("Authorization", `Bearer ${supportToken}`)
+          .expect(201);
+      });
+
       it("o SUPPORT não consegue listar nem alterar operadores", async () => {
         const listagem = await request(app.getHttpServer())
           .get("/api/admin/operators")

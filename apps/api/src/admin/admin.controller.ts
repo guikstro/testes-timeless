@@ -155,6 +155,15 @@ export class AdminController {
     };
   }
 
+  /**
+   * A empresa de exemplo para reunião de venda. Qualquer pessoa da equipe abre:
+   * os dados são inventados, e nenhum cliente fica visível por aqui.
+   */
+  @Post("demonstracao")
+  abreDemonstracao() {
+    return this.adminService.abreDemonstracao();
+  }
+
   /** O Início da administração: os clientes do escopo, com o que cada um precisa. */
   @Get("painel")
   painel(@CurrentUser() user: AuthenticatedUser) {

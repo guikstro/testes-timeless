@@ -3,6 +3,7 @@ import { apiFetch } from "@/lib/api-client";
 import { sessaoAtual } from "@/lib/sessao";
 import type { Foco } from "@/lib/foco";
 import { BotaoEntrar } from "../clientes/botao-entrar";
+import { BotaoDaDemonstracao } from "./botao-da-demonstracao";
 
 export const metadata = { title: "Início" };
 
@@ -118,6 +119,22 @@ export default async function InicioDaAdministracao() {
           </div>
         </section>
       ) : null}
+
+      {/*
+        Para reunião de venda: mostrar um cliente de verdade expõe os dados
+        dele. A demonstração tem 45 dias de dados inventados e fica fora da
+        lista de clientes.
+      */}
+      <section className="mt-12 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line/70 bg-panel px-5 py-4">
+        <div className="max-w-xl">
+          <h2 className="text-corpo font-semibold text-ink">Demonstração</h2>
+          <p className="mt-0.5 text-apoio text-ink-mute">
+            Uma empresa de exemplo com 45 dias de anúncios, conversas e vendas inventados, para mostrar o sistema numa
+            reunião de venda sem abrir nenhum cliente.
+          </p>
+        </div>
+        <BotaoDaDemonstracao />
+      </section>
     </div>
   );
 }

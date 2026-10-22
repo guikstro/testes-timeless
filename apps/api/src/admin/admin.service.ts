@@ -13,6 +13,7 @@ import { CriaConviteDto } from "./dto/cria-convite.dto";
 import { MfaService } from "../auth/mfa/mfa.service";
 import { WhatsAppConnectionsService } from "../integrations/whatsapp/whatsapp-connections.service";
 import { LinkDeConexaoService, LinkGerado } from "../integrations/whatsapp/link-de-conexao.service";
+import { preencheDemonstracao } from "./demonstracao/preenche-demonstracao";
 
 /**
  * Prazo absoluto de uma visita a um cliente. Curto de propósito: o caso de
@@ -56,6 +57,8 @@ export class AdminService {
 
     const where: Prisma.OrganizationWhereInput = {
       deletedAt: null,
+      // A empresa de exemplo não é cliente: abre pelo botão do Início.
+      demonstracao: false,
       // A conta da própria equipe não é cliente: fora da lista, do relatório
       // geral e da escolha do convite, que leem todos daqui.
       ...(operadorId ? { memberships: { none: { userId: operadorId } } } : {}),
@@ -524,9 +527,57 @@ export class AdminService {
   /** Recusa o cliente que não é do operador. A mesma resposta de cliente inexistente, para não confirmar que ele existe. */
   async exigeAcesso(userId: string, organizationId: string): Promise<void> {
     const escopo = await this.escopoDoOperador(userId);
-    if (escopo && !escopo.includes(organizationId)) {
+    if (escopo && !escopo.includes(organizationId) && !(await this.ehDemonstracao(organizationId))) {
       throw new AppException("ORGANIZATION_NOT_FOUND", "Cliente não encontrado.", HttpStatus.NOT_FOUND);
     }
+  }
+
+  private async ehDemonstracao(organizationId: string): Promise<boolean> {
+    const org = await this.prisma.organization.findFirst({
+      where: { id: organizationId, demonstracao: true, deletedAt: null },
+      select: { id: true },
+    });
+    return org !== null;
+  }
+
+  /**
+   * A empresa de exemplo para reunião de venda, pronta para entrar.
+   *
+   * Recriada quando tem mais de um dia: os dados são contados a partir de
+   * hoje, e uma demonstração de semanas atrás mostraria o resumo de hoje
+   * vazio. Apaga só organizações marcadas como demonstração, e nada de
+   * cliente: a marca é o que separa, nunca o nome ou o endereço.
+   */
+  async abreDemonstracao(): Promise<{ id: string }> {
+    const umDia = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const atual = await this.prisma.organization.findFirst({
+      where: { demonstracao: true, deletedAt: null, createdAt: { gte: umDia } },
+      select: { id: true },
+    });
+    if (atual) return atual;
+
+    await this.prisma.organization.deleteMany({ where: { demonstracao: true } });
+    const org = await this.prisma.organization.create({
+      data: {
+        name: "Escritório Exemplo",
+        slug: await slugLivre(this.prisma, "demonstracao-timeless"),
+        demonstracao: true,
+        brandColor: "#007D5E",
+      },
+    });
+    const conexao = await this.prisma.whatsAppConnection.create({
+      data: {
+        organizationId: org.id,
+        provider: "EVOLUTION",
+        status: "CONNECTED",
+        instanceName: `demo-${org.id}`,
+        displayPhoneNumber: "+55 85 90000-0000",
+        connectedAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
+      },
+    });
+    // 45 dias bastam para o resumo, a comparação e o funil, e cabem numa requisição.
+    await preencheDemonstracao(this.prisma, org.id, conexao.id, { dias: 45 });
+    return { id: org.id };
   }
 
   /** Quem da equipe atende o cliente. */
@@ -574,6 +625,7 @@ export class AdminService {
     const clientes = await this.prisma.organization.findMany({
       where: {
         deletedAt: null,
+        demonstracao: false,
         memberships: { none: { userId: operadorId } },
         ...(escopo ? { id: { in: escopo } } : {}),
       },

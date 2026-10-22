@@ -143,6 +143,11 @@ model Organization {
    */
   relatorioSemanal Boolean @default(false) @map("relatorio_semanal")
   /**
+   * Empresa de exemplo, com dados inventados, para mostrar o sistema em reunião de venda.
+   * Fica fora da lista de clientes e do painel, qualquer pessoa da equipe entra, e é recriada quando envelhece.
+   */
+  demonstracao Boolean @default(false) @map("demonstracao")
+  /**
    * Dias atendidos. 0 é domingo, como no Date do JavaScript.
    */
   expedienteDias   Int[]   @default([1, 2, 3, 4, 5]) @map("expediente_dias")
