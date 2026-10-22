@@ -1,3 +1,4 @@
+import { diaCivilLocal } from "../common/tempo";
 import { ESTAGIOS_QUALIFICADOS } from "../leads/ordem-do-funil";
 import { AttributionMethod, LeadStatus } from "@prisma/client";
 
@@ -182,11 +183,13 @@ export function aggregateByOrigin(leads: AggregationLead[]): OriginBucket[] {
 }
 
 /** Data no fuso local, não em UTC: um lead das 21h em Brasília é de hoje, não de amanhã. */
+/** O dia em Brasília, e não no relógio do servidor (UTC no Render). */
 function toLocalDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return diaCivilLocal(date);
+}
+
+function diaSeguinte(dia: string): string {
+  return new Date(Date.parse(`${dia}T12:00:00Z`) + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 /**
@@ -196,11 +199,9 @@ function toLocalDateKey(date: Date): string {
 export function aggregateDaily(leads: AggregationLead[], from: Date, to: Date): DailyPoint[] {
   const points = new Map<string, DailyPoint>();
 
-  const cursor = new Date(from.getFullYear(), from.getMonth(), from.getDate());
-  const last = new Date(to.getFullYear(), to.getMonth(), to.getDate());
-  while (cursor <= last) {
-    points.set(toLocalDateKey(cursor), { date: toLocalDateKey(cursor), leads: 0, won: 0 });
-    cursor.setDate(cursor.getDate() + 1);
+  const ultimo = toLocalDateKey(to);
+  for (let dia = toLocalDateKey(from); dia <= ultimo; dia = diaSeguinte(dia)) {
+    points.set(dia, { date: dia, leads: 0, won: 0 });
   }
 
   for (const lead of leads) {

@@ -192,12 +192,12 @@ describe("agregação do dashboard", () => {
   });
 
   describe("aggregateDaily", () => {
-    const from = new Date("2026-01-10T00:00:00");
-    const to = new Date("2026-01-12T23:59:59");
+    const from = new Date("2026-01-10T00:00:00-03:00");
+    const to = new Date("2026-01-12T23:59:59-03:00");
 
     /** Dias vazios precisam existir, senão o gráfico sugere um fluxo constante que não houve. */
     it("inclui dias sem lead nenhum, com zero", () => {
-      const daily = aggregateDaily([lead({ firstContactAt: new Date("2026-01-10T09:00:00") })], from, to);
+      const daily = aggregateDaily([lead({ firstContactAt: new Date("2026-01-10T09:00:00-03:00") })], from, to);
 
       expect(daily).toHaveLength(3);
       expect(daily[0]).toMatchObject({ date: "2026-01-10", leads: 1 });
@@ -207,8 +207,8 @@ describe("agregação do dashboard", () => {
     it("conta vendas junto dos leads do dia", () => {
       const daily = aggregateDaily(
         [
-          lead({ firstContactAt: new Date("2026-01-11T10:00:00"), status: "WON" }),
-          lead({ firstContactAt: new Date("2026-01-11T11:00:00"), status: "NEW" }),
+          lead({ firstContactAt: new Date("2026-01-11T10:00:00-03:00"), status: "WON" }),
+          lead({ firstContactAt: new Date("2026-01-11T11:00:00-03:00"), status: "NEW" }),
         ],
         from,
         to,
@@ -219,13 +219,13 @@ describe("agregação do dashboard", () => {
 
     /** Um lead das 21h em Brasília é de hoje; em UTC viraria amanhã. */
     it("usa a data local, não UTC", () => {
-      const daily = aggregateDaily([lead({ firstContactAt: new Date("2026-01-10T21:00:00") })], from, to);
+      const daily = aggregateDaily([lead({ firstContactAt: new Date("2026-01-10T21:00:00-03:00") })], from, to);
 
       expect(daily[0]).toMatchObject({ date: "2026-01-10", leads: 1 });
     });
 
     it("ignora um lead fora da janela em vez de criar um ponto novo", () => {
-      const daily = aggregateDaily([lead({ firstContactAt: new Date("2025-12-01T10:00:00") })], from, to);
+      const daily = aggregateDaily([lead({ firstContactAt: new Date("2025-12-01T10:00:00-03:00") })], from, to);
 
       expect(daily).toHaveLength(3);
       expect(daily.every((point) => point.leads === 0)).toBe(true);

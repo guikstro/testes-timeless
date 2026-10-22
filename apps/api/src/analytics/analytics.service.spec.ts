@@ -1,3 +1,4 @@
+import { diaCivilLocal, inicioDoDia } from "../common/tempo";
 import { AnalyticsService } from "./analytics.service";
 import { PrismaService } from "../common/prisma/prisma.service";
 
@@ -87,15 +88,15 @@ describe("AnalyticsService", () => {
     const from = new Date(result.period.from);
     const to = new Date(result.period.to);
 
-    // Compara DATAS, não milissegundos: `to` é o instante atual, então à noite
-    // a diferença em milissegundos passa de 6,5 dias e arredondava para 7,
-    // fazendo o teste falhar conforme a hora em que rodasse.
-    const soData = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    // Compara os DIAS em Brasília, não milissegundos: `to` é o instante atual,
+    // e o servidor roda em UTC enquanto o dia do cliente é o de Brasília.
+    const soData = (d: Date) => Date.parse(`${diaCivilLocal(d)}T00:00:00Z`);
     const diasDeCalendario = Math.round((soData(to) - soData(from)) / 86_400_000);
 
     // 7 dias incluindo hoje são 6 dias completos para trás.
     expect(diasDeCalendario).toBe(6);
-    expect(from.getHours()).toBe(0);
+    // E começa à meia-noite de Brasília, qualquer que seja o fuso do servidor.
+    expect(from.getTime()).toBe(inicioDoDia(diaCivilLocal(from)).getTime());
   });
 
   /**
