@@ -56,6 +56,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           // Só na sessão própria do operador: de dentro de um cliente, o
           // caminho de volta é o botão "Sair do cliente".
           showAdmin={areaDaTimeless}
+          socio={session.user.platformRole === "ADMIN"}
           impersonating={session.impersonating}
           areas={session.areas}
           foco={session.organization.foco}

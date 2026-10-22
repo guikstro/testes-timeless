@@ -168,7 +168,16 @@ export class AdminService {
     return this.prisma.user.findMany({
       where: { platformRole: { not: null }, deletedAt: null },
       orderBy: [{ platformRole: "desc" }, { name: "asc" }],
-      select: { id: true, name: true, email: true, platformRole: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        platformRole: true,
+        clientesQueAtendo: {
+          where: { organization: { deletedAt: null } },
+          select: { organization: { select: { id: true, name: true } } },
+        },
+      },
     });
   }
 

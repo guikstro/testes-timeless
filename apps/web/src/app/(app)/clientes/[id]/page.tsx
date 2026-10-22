@@ -7,6 +7,8 @@ import { ExcluirCliente } from "./excluir-cliente";
 import { FocoDoCliente } from "./foco-do-cliente";
 import { PerfilDaEmpresaDoCliente, ResultadoDaConexao } from "./perfil-da-empresa-do-cliente";
 import type { PerfilDoCliente, SituacaoDoPerfil } from "../actions";
+import { sessaoAtual } from "@/lib/sessao";
+import { QuemAtende } from "../../equipe/formularios";
 
 export default async function ClientePage({
   params,
@@ -18,13 +20,21 @@ export default async function ClientePage({
 }) {
   const { id } = await params;
   const resultado = await searchParams;
-  const [dados, pessoas, situacaoDoPerfil, perfil] = await Promise.all([
+  const { user } = await sessaoAtual();
+  const socio = user.platformRole === "ADMIN";
+  const [dados, pessoas, situacaoDoPerfil, perfil, atendem, equipe] = await Promise.all([
     apiFetch<WhatsAppDoClienteDados>(`/admin/organizations/${id}/whatsapp`),
     apiFetch<PessoaDoCliente[]>(`/admin/organizations/${id}/pessoas`),
     // Opcionais: sem eles a página continua, só sem o cartão do perfil.
     apiFetch<SituacaoDoPerfil>("/admin/perfil-da-empresa").catch(semCartao),
     apiFetch<PerfilDoCliente>(`/admin/organizations/${id}/perfil-da-empresa`).catch(semCartao),
+    apiFetch<{ id: string; name: string; email: string }[]>(`/admin/organizations/${id}/operadores`).catch(() => []),
+    // A lista da equipe é só do sócio; para o operador basta saber quem atende.
+    socio
+      ? apiFetch<{ id: string; name: string; email: string; platformRole: string }[]>("/admin/operators").catch(() => [])
+      : Promise.resolve([]),
   ]);
+  const operadores = socio ? equipe.filter((p) => p.platformRole === "SUPPORT") : atendem;
 
   return (
     <div className="max-w-2xl">
@@ -46,6 +56,11 @@ export default async function ClientePage({
           resultado={{ perfil: texto(resultado.perfil), motivo: texto(resultado.motivo) }}
         />
       ) : null}
+      <section className="mt-8">
+        <h2 className="font-display text-lg font-semibold tracking-tight text-ink">Quem da equipe atende</h2>
+        <p className="mb-3 mt-1 text-corpo text-ink-mute">Operadores só veem e entram nos clientes que atendem.</p>
+        <QuemAtende organizationId={id} operadores={operadores} marcados={atendem.map((o) => o.id)} podeAlterar={socio} />
+      </section>
       <PessoasDoCliente organizationId={id} pessoas={pessoas} />
       <ExcluirCliente organizationId={id} nome={dados.organizacao.name} />
     </div>

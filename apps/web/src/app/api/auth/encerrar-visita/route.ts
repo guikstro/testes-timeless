@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
   }
 
   // `/clientes` passa pelo middleware, que troca o refresh guardado por uma sessão nova.
-  const resposta = NextResponse.json({ destino: daTimeless ? "/clientes" : "/login?motivo=saiu-do-cliente" });
+  const resposta = NextResponse.json({ destino: daTimeless ? "/inicio" : "/login?motivo=saiu-do-cliente" });
   resposta.cookies.delete(ACCESS_TOKEN_COOKIE);
   resposta.cookies.delete(ADMIN_REFRESH_TOKEN_COOKIE);
   if (daTimeless) {

@@ -29,7 +29,7 @@ export default async function RootPage() {
   let destino = "/dashboard";
   try {
     const sessao = await apiFetch<Sessao>("/auth/session");
-    destino = sessao.user.platformRole && !sessao.impersonating ? "/clientes" : telaInicial(sessao.areas, sessao.organization?.foco);
+    destino = sessao.user.platformRole && !sessao.impersonating ? "/inicio" : telaInicial(sessao.areas, sessao.organization?.foco);
   } catch {
     // Sessão vencida ou API fora: o painel cuida disso (renova ou manda ao login).
   }

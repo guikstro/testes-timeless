@@ -201,14 +201,26 @@ const doCliente = (href: string) => NAV_ITEMS.find((item) => item.href === href)
  * conversas, leads e o resto são de cada cliente e aparecem ao entrar nele.
  */
 const ITENS_DA_TIMELESS: NavItem[] = [
+  { ...doCliente("/dashboard"), href: "/inicio", label: "Início" },
   ADMIN_ITEM,
-  { ...doCliente("/relatorio"), href: "/relatorio-geral", label: "Relatório geral" },
+  { ...doCliente("/relatorio"), href: "/relatorio-geral", label: "Relatórios" },
   {
     href: "/saude",
-    label: "Saúde da plataforma",
+    label: "Saúde técnica",
     icon: (
       <svg {...ICON_PROPS}>
         <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+      </svg>
+    ),
+  },
+  {
+    href: "/equipe",
+    label: "Equipe e sócios",
+    novoGrupo: true,
+    icon: (
+      <svg {...ICON_PROPS}>
+        <circle cx="9" cy="8" r="3.5" />
+        <path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6" />
       </svg>
     ),
   },
@@ -235,6 +247,7 @@ export function AppNav({
   organizationName,
   logoUrl,
   showAdmin,
+  socio = false,
   impersonating = false,
   areas = null,
   foco = "LEADS",
@@ -242,6 +255,8 @@ export function AppNav({
   organizationName: string;
   logoUrl?: string | null;
   showAdmin: boolean;
+  /** Sócio da Timeless: só ele vê Equipe e sócios. */
+  socio?: boolean;
   impersonating?: boolean;
   areas?: string[] | null;
   /** O foco do cliente: presença local tira do menu o que é de lead. */
@@ -277,7 +292,7 @@ export function AppNav({
   // O relatório é trabalho da equipe Timeless, que o monta e envia ao
   // cliente: aparece para ela dentro do cliente, e não para o cliente.
   const itensVisiveis = showAdmin
-    ? ITENS_DA_TIMELESS
+    ? ITENS_DA_TIMELESS.filter((item) => item.href !== "/equipe" || socio)
     : NAV_ITEMS.filter(
         (item) =>
           podeVer(areas, item.href) &&
@@ -367,7 +382,7 @@ export function AppNav({
           estou", então é aqui que a resposta precisa estar.
         */}
         <Identidade
-          href={showAdmin ? "/clientes" : null}
+          href={showAdmin ? "/inicio" : null}
           className="focus-ring mb-6 flex items-center gap-3 rounded-xl px-0.5"
         >
           <span className={impersonating ? "rounded-[14px] ring-2 ring-amber-500 ring-offset-2 ring-offset-panel" : undefined}>
