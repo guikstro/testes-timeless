@@ -14,6 +14,7 @@ const TIPOS: TipoDeNotificacao[] = [
   "message.failed",
   "sistema.erro",
   "conta.nova",
+  "relatorio.semanal",
 ];
 
 export default async function NotificationsPage({

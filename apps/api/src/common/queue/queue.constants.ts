@@ -37,3 +37,7 @@ export const PERFIL_DA_EMPRESA_QUEUE = "perfil-da-empresa";
 export const LEITURA_DOS_PERFIS = "ler-todos-os-perfis";
 /** A leitura dos perfis de um cliente. */
 export const LEITURA_DO_PERFIL = "ler-perfil";
+
+/** O resumo da semana: uma agenda toda segunda, um trabalho para todas as organizações. */
+export const RELATORIO_QUEUE = "relatorio-semanal";
+export const RELATORIO_DE_TODAS = "relatorio-de-todas";

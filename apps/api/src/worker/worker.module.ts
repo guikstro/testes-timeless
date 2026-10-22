@@ -10,11 +10,15 @@ import {
   EMAIL_QUEUE,
   META_SYNC_QUEUE,
   PERFIL_DA_EMPRESA_QUEUE,
+  RELATORIO_QUEUE,
   WHATSAPP_EVENTS_QUEUE,
   WHATSAPP_SEND_QUEUE,
 } from "../common/queue/queue.constants";
 import { AgendaDeSincronia } from "./agenda-de-sincronia";
 import { AgendaDoPerfil } from "./agenda-do-perfil";
+import { AgendaDoRelatorio, RelatorioSemanalProcessor } from "./relatorio-semanal/agenda-do-relatorio";
+import { RelatorioSemanalService } from "./relatorio-semanal/relatorio-semanal.service";
+import { AnalyticsService } from "../analytics/analytics.service";
 import { EmailProcessor } from "./processors/email.processor";
 import { AgendaDeFaxina } from "./manutencao/agenda-de-faxina";
 import { FaxinaProcessor } from "./manutencao/faxina.processor";
@@ -63,12 +67,17 @@ import { PerfilDaEmpresaSyncService } from "./processors/perfil-da-empresa-sync.
       { name: MANUTENCAO_QUEUE },
       { name: EMAIL_QUEUE },
       { name: PERFIL_DA_EMPRESA_QUEUE },
+      { name: RELATORIO_QUEUE },
     ),
   ],
   providers: [
     AgendaDeSincronia,
     AgendaDeFaxina,
     AgendaDoPerfil,
+    AgendaDoRelatorio,
+    RelatorioSemanalProcessor,
+    RelatorioSemanalService,
+    AnalyticsService,
     PerfilDaEmpresaProcessor,
     PerfilDaEmpresaSyncService,
     FaxinaProcessor,

@@ -138,6 +138,11 @@ model Organization {
    */
   confirmaVendaDaConversa Boolean @default(true) @map("confirma_venda_da_conversa")
   /**
+   * Manda o resumo da semana toda segunda de manhã: no sino, no celular e por e-mail ao dono.
+   * Desligado por padrão: ninguém recebe e-mail novo sem alguém ter pedido.
+   */
+  relatorioSemanal Boolean @default(false) @map("relatorio_semanal")
+  /**
    * Dias atendidos. 0 é domingo, como no Date do JavaScript.
    */
   expedienteDias   Int[]   @default([1, 2, 3, 4, 5]) @map("expediente_dias")

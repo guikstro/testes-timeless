@@ -11,7 +11,9 @@ export type TipoDeNotificacao =
   /** Algo que a operação precisa resolver: integração caída, sincronia falhando. */
   | "sistema.erro"
   /** Alguém se cadastrou e criou uma organização: só a equipe Timeless recebe. */
-  | "conta.nova";
+  | "conta.nova"
+  /** O resumo da semana, toda segunda de manhã, para quem ligou o relatório. */
+  | "relatorio.semanal";
 
 /** O que chega pelo cano de tempo real. */
 export interface EventoDeNotificacao {
@@ -54,4 +56,5 @@ export const ROTULO_POR_TIPO: Record<TipoDeNotificacao, string> = {
   "message.sent": "Resposta enviada",
   "sistema.erro": "Problema no sistema",
   "conta.nova": "Conta nova",
+  "relatorio.semanal": "Resumo da semana",
 };

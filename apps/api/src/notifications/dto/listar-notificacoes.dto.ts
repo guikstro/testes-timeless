@@ -11,6 +11,7 @@ const TIPOS = [
   // Faltava: o filtro "Sistema" da tela pedia este tipo e recebia 400.
   "sistema.erro",
   "conta.nova",
+  "relatorio.semanal",
 ] as const;
 
 export class ListarNotificacoesDto {

@@ -60,6 +60,10 @@ export class UpdateOrganizationDto {
   @IsBoolean()
   confirmaVendaDaConversa?: boolean;
 
+  @IsOptional()
+  @IsBoolean()
+  relatorioSemanal?: boolean;
+
   /** Dias atendidos, de 0 (domingo) a 6. */
   @IsOptional()
   @IsArray()

@@ -6,6 +6,7 @@ import { CreateRuleForm } from "./create-rule-form";
 import { DeleteRuleButton } from "./delete-rule-button";
 import { ExpedienteForm } from "./expediente-form";
 import { VendaPelaConversaForm } from "./venda-pela-conversa-form";
+import { RelatorioSemanalForm } from "./relatorio-semanal-form";
 
 interface Organizacao {
   expedienteAtivo: boolean;
@@ -13,6 +14,7 @@ interface Organizacao {
   expedienteInicio: number;
   expedienteFim: number;
   confirmaVendaDaConversa?: boolean;
+  relatorioSemanal?: boolean;
 }
 
 interface ClassificationRule {
@@ -37,6 +39,15 @@ export async function AbaOperacao() {
 
   return (
     <div className="space-y-5">
+      <Card className="p-6">
+        <CardHeader
+          title="Resumo da semana"
+          description="Os números da semana entregues toda segunda, para acompanhar sem abrir o sistema."
+          className="mb-5"
+        />
+        <RelatorioSemanalForm ligado={organizacao.relatorioSemanal ?? false} />
+      </Card>
+
       {/*
         O horário vem antes dos gatilhos porque ele muda a leitura de um
         número que está na abertura do dashboard, enquanto os gatilhos mexem
