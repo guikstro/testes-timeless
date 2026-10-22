@@ -39,7 +39,9 @@ async function busca<T>(caminho: string): Promise<T | null> {
 }
 
 export default async function IntegrationsPage() {
-  const { organization } = await sessaoAtual();
+  const { organization, user } = await sessaoAtual();
+  // Ligar outro sistema de vendas é configuração técnica: quem faz é a equipe Timeless.
+  const daEquipe = Boolean(user.platformRole);
   // Presença local não usa WhatsApp: o que importa é o Google, e ele vem primeiro.
   const comLeads = temLeads(organization.foco);
 
@@ -105,18 +107,20 @@ export default async function IntegrationsPage() {
         título da página para baixo e falava de "API" com quem só queria ligar
         o WhatsApp.
       */}
-      <Link
-        href="/integrations/sales"
-        className="focus-ring mt-8 flex items-center justify-between gap-4 rounded-2xl border border-line/70 bg-panel/60 px-5 py-4 transition-colors hover:bg-panel"
-      >
-        <span>
-          <span className="block text-corpo font-semibold text-ink">Vendas de outros sistemas</span>
-          <span className="mt-0.5 block text-apoio text-ink-mute">
-            Traga as vendas do seu CRM, da plataforma de pagamento ou do sistema da empresa.
+      {daEquipe ? (
+        <Link
+          href="/integrations/sales"
+          className="focus-ring mt-8 flex items-center justify-between gap-4 rounded-2xl border border-line/70 bg-panel/60 px-5 py-4 transition-colors hover:bg-panel"
+        >
+          <span>
+            <span className="block text-corpo font-semibold text-ink">Vendas de outros sistemas</span>
+            <span className="mt-0.5 block text-apoio text-ink-mute">
+              Traga as vendas do seu CRM, da plataforma de pagamento ou do sistema da empresa.
+            </span>
           </span>
-        </span>
-        <span className="shrink-0 text-corpo font-medium text-accent">Configurar</span>
-      </Link>
+          <span className="shrink-0 text-corpo font-medium text-accent">Configurar</span>
+        </Link>
+      ) : null}
     </div>
   );
 }

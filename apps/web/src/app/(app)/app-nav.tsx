@@ -240,6 +240,8 @@ function Identidade({ href, className, children }: { href: string | null; classN
 
 function isActive(pathname: string, href: string): boolean {
   // Prefixo, não igualdade: /leads/<id> continua marcando "Leads".
+  // A verba do mês é uma aba de Campanhas, e marca Campanhas.
+  if (href === "/campanhas" && (pathname === "/verba" || pathname.startsWith("/verba/"))) return true;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

@@ -34,8 +34,21 @@ function comCaminho(resposta: NextResponse, caminho: string): NextResponse {
   return resposta;
 }
 
+/**
+ * Este site foi desligado: tudo o que ele fazia (clientes, operadores,
+ * acessos) está na área da Timeless do site principal, em Início e em Equipe
+ * e sócios. Qualquer endereço daqui leva para lá. Redirecionamento
+ * temporário, para religar sem cache velho caso seja preciso.
+ */
+const SITE_PRINCIPAL = process.env.NEXT_PUBLIC_WEB_APP_URL;
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (SITE_PRINCIPAL) {
+    const destino = pathname.startsWith("/operadores") || pathname.startsWith("/acessos") ? "/equipe" : "/inicio";
+    return NextResponse.redirect(new URL(destino, SITE_PRINCIPAL), 307);
+  }
 
   const seguir = () => {
     const requisicao = new Headers(request.headers);

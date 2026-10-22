@@ -11,8 +11,9 @@ import { Procedencia } from "./procedencia";
 import { SaudeDaContaMeta } from "./saude-da-conta";
 import { Anuncios, SaudeDaConta, SituacaoDaVerba, Verba } from "./tipos";
 import { pode } from "@/lib/permissoes";
+import { AbasDeCampanhas } from "../campanhas/abas-de-campanhas";
 
-export const metadata = { title: "Verba" };
+export const metadata = { title: "Verba do mês" };
 
 interface Busca {
   de?: string;
@@ -63,13 +64,14 @@ export default async function VerbaPage({ searchParams }: { searchParams: Promis
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
+      <AbasDeCampanhas ativa="verba" />
       <header>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-apoio font-medium text-ink-mute">
               {formataDia(periodo.de)} a {formataDia(periodo.ate)}
             </p>
-            <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink">Verba</h1>
+            <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink">Verba do mês</h1>
             {/*
               O subtítulo conclui em vez de descrever: com números na mão, ele
               diz o que aconteceu no período, não o nome da tela.

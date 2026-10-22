@@ -1,8 +1,11 @@
+import { notFound } from "next/navigation";
 import { sessaoAtual } from "@/lib/sessao";
 import { SalesSources } from "./sales-sources";
 
 export default async function Page() {
   const session = await sessaoAtual();
+  // Configuração técnica, feita pela equipe Timeless (inclusive ao entrar como o cliente).
+  if (!session.user.platformRole) notFound();
   const publicApi =
     process.env.PUBLIC_SALES_API_URL ??
     (process.env.PUBLIC_TRACKING_BASE_URL

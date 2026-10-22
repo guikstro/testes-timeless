@@ -6,6 +6,7 @@ import { intervaloDoMes, leIntervalo, mesAtual } from "@/lib/periodo";
 import { sessaoAtual } from "@/lib/sessao";
 import { Frescor } from "@/components/ui/frescor";
 import { CampanhasView } from "./campanhas-view";
+import { AbasDeCampanhas } from "./abas-de-campanhas";
 import type { AcoesLocais } from "./campanhas-simples";
 import { CampanhasDePresencaLocal, CampanhasLocaisView } from "./campanhas-locais";
 import { DesempenhoDeCampanhas } from "./tipos";
@@ -91,6 +92,7 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
       escolhaManual={escolhidas !== null}
       sugestao={sugestao}
       busca={query.toString()}
+      abas={<AbasDeCampanhas ativa="desempenho" />}
     />
   );
 }
