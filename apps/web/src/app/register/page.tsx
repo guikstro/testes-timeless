@@ -29,6 +29,7 @@ export default function RegisterPage() {
   const [organizationName, setOrganizationName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [aceita, setAceita] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
 
@@ -41,7 +42,7 @@ export default function RegisterPage() {
       const resposta = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, organizationName, email, password }),
+        body: JSON.stringify({ name, organizationName, email, password, aceitaOsTermos: aceita }),
       });
 
       if (!resposta.ok) {
@@ -146,6 +147,28 @@ export default function RegisterPage() {
             {erro}
           </p>
         ) : null}
+
+        <label htmlFor="aceita-termos" className="flex items-start gap-3 text-corpo leading-relaxed text-ink-soft">
+          <input
+            id="aceita-termos"
+            type="checkbox"
+            required
+            checked={aceita}
+            onChange={(evento) => setAceita(evento.target.checked)}
+            className="mt-1 h-4 w-4 shrink-0 accent-[rgb(var(--accent))]"
+          />
+          <span>
+            Li e aceito os{" "}
+            <Link href="/termos" target="_blank" className="font-medium text-ink underline decoration-line underline-offset-4">
+              termos de uso
+            </Link>{" "}
+            e a{" "}
+            <Link href="/privacidade" target="_blank" className="font-medium text-ink underline decoration-line underline-offset-4">
+              política de privacidade
+            </Link>
+            .
+          </span>
+        </label>
 
         <button type="submit" disabled={carregando} aria-busy={carregando || undefined} className={BOTAO}>
           <span>{carregando ? "Criando" : "Criar organização"}</span>

@@ -414,8 +414,12 @@ export function LoginForm() {
         </div>
       </main>
 
-      <footer className="relative z-10 text-rotulo text-ink-mute">
-        Do anúncio à venda, cada cliente com a origem provada.
+      <footer className="relative z-10 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-rotulo text-ink-mute">
+        <span>Do anúncio à venda, cada cliente com a origem provada.</span>
+        <span className="flex gap-4">
+          <Link href="/termos" className="underline decoration-line underline-offset-4 hover:text-ink">Termos de uso</Link>
+          <Link href="/privacidade" className="underline decoration-line underline-offset-4 hover:text-ink">Privacidade</Link>
+        </span>
       </footer>
     </div>
   );

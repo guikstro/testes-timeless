@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BOTAO, CAMPO, LinkDaEntrada, MolduraDeAutenticacao } from "@/components/moldura-de-autenticacao";
 
@@ -185,6 +186,18 @@ export function AceitaConvite({ token }: { token: string }) {
             {erro}
           </p>
         ) : null}
+        <p className="text-apoio leading-relaxed text-ink-mute">
+          Ao criar a senha, você aceita os{" "}
+          <Link href="/termos" target="_blank" className="underline decoration-line underline-offset-4 hover:text-ink">
+            termos de uso
+          </Link>{" "}
+          e a{" "}
+          <Link href="/privacidade" target="_blank" className="underline decoration-line underline-offset-4 hover:text-ink">
+            política de privacidade
+          </Link>
+          .
+        </p>
+
         <button type="submit" disabled={enviando} aria-busy={enviando || undefined} className={BOTAO}>
           {enviando ? "Criando conta" : "Criar conta e entrar"}
         </button>

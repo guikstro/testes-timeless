@@ -9,6 +9,7 @@ import { AppException } from "../common/exceptions/app-exception";
 import { MfaService } from "./mfa/mfa.service";
 import { EmailService } from "../common/email/email.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { VERSAO_DOS_TERMOS } from "./versao-dos-termos";
 
 // bcrypt's native binding exports non-configurable properties, so
 // jest.spyOn(bcrypt, "compare") fails with "Cannot redefine property".
@@ -122,6 +123,24 @@ describe("AuthService", () => {
       expect(prisma.refreshToken.create).toHaveBeenCalledTimes(1);
       // Cadastro nunca vira operador da plataforma: só o convite da equipe faz isso.
       expect(criaUsuario).toHaveBeenCalledWith({ data: expect.objectContaining({ platformRole: null }) });
+    });
+
+    it("grava quando e qual versão dos termos a pessoa aceitou", async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      const criaUsuario = jest.fn().mockResolvedValue({ id: "user-1" });
+      prisma.$transaction.mockImplementationOnce(async (callback: (tx: unknown) => unknown) =>
+        callback({
+          organization: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: "org-1", slug: "acme" }) },
+          user: { create: criaUsuario },
+          membership: { create: jest.fn().mockResolvedValue({ organizationId: "org-1", userId: "user-1", role: "OWNER" }) },
+        }),
+      );
+
+      await service.register({ name: "Ana", email: "ana@example.com", password: "password123", organizationName: "Acme", aceitaOsTermos: true });
+
+      expect(criaUsuario).toHaveBeenCalledWith({
+        data: expect.objectContaining({ termosAceitosEm: expect.any(Date), versaoDosTermos: VERSAO_DOS_TERMOS }),
+      });
     });
 
     /** Uma transação de cadastro que dá certo, para os testes do aviso. */

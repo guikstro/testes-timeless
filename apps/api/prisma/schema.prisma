@@ -211,6 +211,13 @@ model User {
    * ser operador é a exceção, e nunca é concedido por cadastro público.
    */
   platformRole PlatformRole? @map("platform_role")
+  /**
+   * Quando aceitou os termos de uso e a política de privacidade, e qual
+   * versão deles. Nulo para quem entrou antes de existir o aceite ou por
+   * convite: o registro é a prova do consentimento que a LGPD pede.
+   */
+  termosAceitosEm DateTime? @map("termos_aceitos_em")
+  versaoDosTermos String?   @map("versao_dos_termos")
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
   deletedAt    DateTime?     @map("deleted_at")

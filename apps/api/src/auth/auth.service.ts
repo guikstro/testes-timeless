@@ -30,6 +30,7 @@ import {
 import { AuditoriaService } from "../auditoria/auditoria.service";
 import { AuthenticatedUser, JwtPayload } from "./jwt-payload.interface";
 import { capacidadesDe } from "../common/permissoes/capacidades";
+import { VERSAO_DOS_TERMOS } from "./versao-dos-termos";
 
 const ACCESS_TOKEN_TTL = "15m";
 const REFRESH_TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
@@ -116,7 +117,13 @@ export class AuthService {
         });
 
         const user = await tx.user.create({
-          data: { name: dto.name, email: dto.email, passwordHash, platformRole: null },
+          data: {
+            name: dto.name,
+            email: dto.email,
+            passwordHash,
+            platformRole: null,
+            ...(dto.aceitaOsTermos ? { termosAceitosEm: new Date(), versaoDosTermos: VERSAO_DOS_TERMOS } : {}),
+          },
         });
 
         const membership = await tx.membership.create({
