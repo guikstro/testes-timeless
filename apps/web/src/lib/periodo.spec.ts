@@ -1,4 +1,4 @@
-import { intervaloDoMes, leIntervalo, mesAnterior, mesDoIntervalo, rotuloDoIntervalo } from "./periodo";
+import { intervaloDoMes, leIntervalo, mesAnterior, mesDoIntervalo, periodoEquivalente, rotuloDoIntervalo } from "./periodo";
 
 describe("intervaloDoMes", () => {
   it("cobre o mês inteiro", () => {
@@ -49,5 +49,20 @@ describe("leIntervalo", () => {
     expect(leIntervalo("2026-03-31", "2026-03-01")).toBeNull();
     expect(leIntervalo("ontem", "hoje")).toBeNull();
     expect(leIntervalo(undefined, "2026-03-01")).toBeNull();
+  });
+});
+
+describe("periodoEquivalente", () => {
+  it("o começo do mês compara com os mesmos dias do mês anterior", () => {
+    expect(periodoEquivalente({ de: "2026-10-01", ate: "2026-10-23" })).toEqual({ de: "2026-09-01", ate: "2026-09-23" });
+  });
+  it("o mês inteiro compara com o mês anterior inteiro", () => {
+    expect(periodoEquivalente({ de: "2026-03-01", ate: "2026-03-31" })).toEqual({ de: "2026-02-01", ate: "2026-02-28" });
+  });
+  it("dia 31 sem par no mês anterior para no último dia dele", () => {
+    expect(periodoEquivalente({ de: "2026-03-01", ate: "2026-03-30" })).toEqual({ de: "2026-02-01", ate: "2026-02-28" });
+  });
+  it("intervalo solto compara com os mesmos dias logo antes", () => {
+    expect(periodoEquivalente({ de: "2026-10-10", ate: "2026-10-16" })).toEqual({ de: "2026-10-03", ate: "2026-10-09" });
   });
 });

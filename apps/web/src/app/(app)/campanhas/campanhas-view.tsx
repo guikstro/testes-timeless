@@ -4,7 +4,7 @@ import { AvisoDeMedicao } from "@/components/aviso-de-medicao";
 import { AvisoDeCobertura, comparavel } from "@/components/aviso-de-cobertura";
 import { Badge } from "@/components/ui/badge";
 import { Delta } from "@/components/ui/delta";
-import { Frescor, FrescorDosDados } from "@/components/ui/frescor";
+import { Frescor } from "@/components/ui/frescor";
 import { GrupoDePilulas } from "@/components/ui/pill-group";
 import { formatCentsAsBRL } from "@/lib/currency";
 import { Medicao } from "@/lib/medicao-de-leads";
@@ -26,7 +26,10 @@ import {
   rotuloDoObjetivo,
 } from "@/lib/campanhas/metricas";
 import { CampanhaComparada, DesempenhoDeCampanha, DesempenhoDeCampanhas } from "./tipos";
-import { AcoesLocais, CampanhasSimples } from "./campanhas-simples";
+import { CampanhasPorResultado } from "./campanhas-por-resultado";
+import { CanaisConectados } from "./canais-conectados";
+import type { LinhaDeCampanha } from "./linhas-por-resultado";
+import { reais, type Objetivo } from "@/lib/campanhas/resultado";
 import { SeletorDeColunas } from "./seletor-de-colunas";
 import { resumoDaMetrica, retorno, Resumo, SEM_DADO, somaAnteriores } from "./metricas-ui";
 
@@ -51,8 +54,10 @@ export function CampanhasView({
   escolhaManual = false,
   sugestao = { conjunto: "vendas", objetivo: null },
   busca = "",
-  acoesLocais,
-  comLoja = false,
+  nomeDoCliente,
+  linhas,
+  objetivoInicial = null,
+  comparacaoEscolhida,
 }: {
   dados: DesempenhoDeCampanhas;
   medicao: Medicao;
@@ -68,11 +73,20 @@ export function CampanhasView({
   sugestao?: { conjunto: Conjunto; objetivo: string | null };
   /** O período da URL, sem as métricas, para os links da escolha não o perderem. */
   busca?: string;
-  /** Ligações e rotas por campanha do Google, para quem também mede presença local. */
-  acoesLocais?: AcoesLocais;
-  comLoja?: boolean;
+  /** O nome do cliente, no cabeçalho. */
+  nomeDoCliente?: string;
+  /** As campanhas por resultado, já montadas no servidor. */
+  linhas: LinhaDeCampanha[];
+  objetivoInicial?: Objetivo | null;
+  /**
+   * A comparação que a pessoa escolheu. Os dados podem vir com outra (o
+   * período equivalente, para o detalhe da campanha), mas a tabela técnica e
+   * o seletor seguem só a escolhida.
+   */
+  comparacaoEscolhida: Intervalo | null;
 }) {
-  const { periodo, comparacao, campanhas, semCampanha, totais } = dados;
+  const { periodo, campanhas, semCampanha, totais } = dados;
+  const comparacao = comparacaoEscolhida;
   const medido = medicao === "medido";
 
   // Com um dos períodos começando antes do primeiro dia com número, a
@@ -100,17 +114,18 @@ export function CampanhasView({
 
   // O investimento abre sempre; os outros quatro cartões seguem a escolha.
   const cartoes = metricas.slice(0, 4);
+  const totalInvestido = linhas.reduce((soma, l) => soma + l.gastoCentavos, 0);
+  const canais = new Set(linhas.map((l) => l.plataforma)).size;
 
   return (
     <div className="mx-auto max-w-6xl">
       {abas}
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
+      {/* Cabeçalho compacto: de quem é, o que é e de quando é. */}
+      <header className="mb-5 flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          {nomeDoCliente ? <p className="truncate text-apoio text-ink-mute">{nomeDoCliente}</p> : null}
           <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Campanhas</h1>
-          <p className="mt-1 max-w-2xl text-corpo text-ink-mute">
-            Quanto você investiu e o que cada campanha trouxe.
-          </p>
-          <FrescorDosDados frescor={frescor} className="mt-2" />
+          <p className="mt-0.5 text-corpo text-ink-mute">Da origem ao resultado.</p>
         </div>
         <SeletorDePeriodo
           periodo={periodo}
@@ -129,7 +144,27 @@ export function CampanhasView({
         className="mb-5"
       />
 
-      <CampanhasSimples dados={dados} medido={medido} acoesLocais={acoesLocais} comLoja={comLoja} />
+      <CanaisConectados frescor={frescor} porPlataforma={porPlataforma(linhas)} />
+
+      {linhas.length ? (
+        <p className="mb-4 mt-4 text-destaque text-ink-soft">
+          <span className="font-display font-semibold tabular-nums text-ink">{reais(totalInvestido)}</span>{" "}
+          investidos em {linhas.length} {linhas.length === 1 ? "campanha" : "campanhas"}
+          {canais > 1 ? ` e ${canais} canais` : ""}.
+        </p>
+      ) : (
+        <div className="mt-4" />
+      )}
+
+      <div className="mb-10">
+        <CampanhasPorResultado
+          linhas={linhas}
+          objetivoInicial={objetivoInicial}
+          medido={medido}
+          rotuloDoPeriodo={rotuloDoIntervalo(periodo)}
+          rotuloDaComparacao={dados.comparacao ? rotuloDoIntervalo(dados.comparacao) : null}
+        />
+      </div>
 
       {/*
         As métricas da plataforma ficam guardadas: quem cuida dos anúncios
@@ -668,4 +703,14 @@ export function Numero({
       {nota && <span className="mt-0.5 block whitespace-normal text-rotulo font-normal text-ink-mute">{nota}</span>}
     </td>
   );
+}
+
+/** Gasto e campanhas de cada canal no período, para os cartões dos canais. */
+function porPlataforma(linhas: LinhaDeCampanha[]): Map<string, { gastoCentavos: number; campanhas: number }> {
+  const mapa = new Map<string, { gastoCentavos: number; campanhas: number }>();
+  for (const linha of linhas) {
+    const atual = mapa.get(linha.plataforma) ?? { gastoCentavos: 0, campanhas: 0 };
+    mapa.set(linha.plataforma, { gastoCentavos: atual.gastoCentavos + linha.gastoCentavos, campanhas: atual.campanhas + 1 });
+  }
+  return mapa;
 }

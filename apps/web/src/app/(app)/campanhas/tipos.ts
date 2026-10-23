@@ -55,6 +55,30 @@ export interface DesempenhoDeCampanha {
   custoPorLeadCentavos: number | null;
   custoPorVendaCentavos: number | null;
   roas: number | null;
+  /** A campanha dia a dia, em ordem. Ausente na API anterior. */
+  porDia?: DiaDaCampanha[];
+}
+
+/** Um dia da campanha: o gasto e o que a plataforma e o sistema contaram nele. */
+export interface DiaDaCampanha {
+  dia: string;
+  gastoCentavos: number;
+  impressoes: number | null;
+  visualizacoes: number | null;
+  conversas: number | null;
+  leads: number;
+  vendas: number;
+}
+
+/** Um anúncio da campanha no período, para o detalhe. Só a Meta informa anúncio por anúncio. */
+export interface AnuncioDaCampanha {
+  externalId: string;
+  name: string;
+  status: string;
+  imagemUrl: string | null;
+  gastoCentavos: number;
+  leads: number;
+  vendas: number;
 }
 
 export interface CampanhaComparada {

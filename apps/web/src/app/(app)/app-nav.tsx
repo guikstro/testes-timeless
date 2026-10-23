@@ -320,7 +320,7 @@ export function AppNav({
           target="_blank"
           rel="noopener noreferrer"
           title={item.label}
-          className={`focus-ring group/item relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-corpo text-ink-soft transition-all duration-200 ease-soft hover:bg-panel-soft/80 hover:text-ink active:scale-[0.98] ${extraClasses}`}
+          className={`focus-ring group/item relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-corpo text-nav-ink-mute transition-all duration-200 ease-soft hover:bg-nav-soft hover:text-nav-ink active:scale-[0.98] ${extraClasses}`}
         >
           {item.icon}
           <span className={label}>{item.label}</span>
@@ -336,8 +336,8 @@ export function AppNav({
         title={item.label}
         className={`focus-ring group/item relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-corpo transition-all duration-200 ease-soft active:scale-[0.98] ${
           active
-            ? "bg-brand-soft font-medium text-brand-ink"
-            : "text-ink-soft hover:bg-panel-soft/80 hover:text-ink"
+            ? "bg-nav-soft font-medium text-nav-ink"
+            : "text-nav-ink-mute hover:bg-nav-soft/70 hover:text-nav-ink"
         } ${extraClasses}`}
       >
         {/* Barra na borda esquerda marca a página atual mesmo recolhida, onde
@@ -376,7 +376,7 @@ export function AppNav({
           flutua sobre ela, 50 para o que precisa vencer tudo (avisos, gaveta
           de notificação, faixa de impersonação).
         */
-        className="group fixed bottom-0 left-0 top-0 z-40 flex w-16 flex-col overflow-hidden border-r border-line/70 bg-panel/80 px-3 py-5 backdrop-blur-xl transition-[width,box-shadow] duration-300 ease-soft hover:w-60 hover:shadow-lifted has-[:focus-visible]:w-60 data-[pinned=true]:w-60 data-[pinned=true]:shadow-none motion-reduce:transition-none"
+        className="group fixed bottom-0 left-0 top-0 z-40 flex w-16 flex-col overflow-hidden border-r border-nav-line bg-nav px-3 py-5 transition-[width,box-shadow] duration-300 ease-soft hover:w-60 hover:shadow-lifted has-[:focus-visible]:w-60 data-[pinned=true]:w-60 data-[pinned=true]:shadow-none motion-reduce:transition-none"
       >
         {/*
           Segundo sinal: a identidade no topo do menu passa a ser a do cliente,
@@ -387,16 +387,16 @@ export function AppNav({
           href={showAdmin ? "/inicio" : null}
           className="focus-ring mb-6 flex items-center gap-3 rounded-xl px-0.5"
         >
-          <span className={impersonating ? "rounded-[14px] ring-2 ring-amber-500 ring-offset-2 ring-offset-panel" : undefined}>
+          <span className={impersonating ? "rounded-[14px] ring-2 ring-amber-500 ring-offset-2 ring-offset-nav" : undefined}>
             <OrgLogo name={organizationName} logoUrl={logoUrl} />
           </span>
           <span className={`min-w-0 ${label}`}>
             {impersonating ? (
-              <span className="block text-apoio font-medium text-warning">
+              <span className="block text-apoio font-medium text-nav-ink-mute">
                 Dentro do cliente
               </span>
             ) : null}
-            <span className="block truncate font-display text-corpo font-semibold tracking-tight text-ink">
+            <span className="block truncate font-display text-corpo font-semibold tracking-tight text-nav-ink">
               {organizationName}
             </span>
           </span>
@@ -410,7 +410,7 @@ export function AppNav({
             onClick={alternaFixado}
             aria-pressed={pinned}
             title={pinned ? "Soltar o menu" : "Manter o menu aberto"}
-            className="focus-ring flex items-center gap-3 rounded-xl px-3 py-2.5 text-corpo text-ink-mute transition-all duration-200 ease-soft hover:bg-panel-soft/80 hover:text-ink active:scale-[0.98]"
+            className="focus-ring flex items-center gap-3 rounded-xl px-3 py-2.5 text-corpo text-nav-ink-mute transition-all duration-200 ease-soft hover:bg-nav-soft hover:text-nav-ink active:scale-[0.98]"
           >
             <svg {...ICON_PROPS}>
               {pinned ? (

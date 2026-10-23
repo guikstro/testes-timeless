@@ -16,18 +16,18 @@
 :root {
   color-scheme: light;
 
-  --canvas: 255 249 237;
+  --canvas: 247 247 245;
   --panel: 255 255 255;
-  --panel-soft: 250 245 235;
-  --line: 226 219 205;
+  --panel-soft: 241 241 238;
+  --line: 225 225 220;
 
   /* Altura da faixa do topo. A caixa de entrada desconta isto para ocupar
      o resto da janela, e um número solto nos dois lugares separaria. */
   --faixa-do-topo: 45px;
 
-  --ink: 12 11 10;
-  --ink-soft: 82 76 68;
-  --ink-mute: 133 125 113;
+  --ink: 18 19 21;
+  --ink-soft: 72 75 80;
+  --ink-mute: 110 113 119;
 
   /**
    * Verde da marca, medido no material do Creative Studio. Cada tema recebe
@@ -49,8 +49,8 @@
    */
   --serie-1: 0 125 94;
   --serie-2: 217 119 6;
-  --grade: 226 219 205;
-  --guia: 148 141 128;
+  --grade: 225 225 220;
+  --guia: 150 153 159;
 
   /**
    * Estados: erro, atenção, sucesso e informação. Cada um tem a tinta (texto
@@ -77,19 +77,26 @@
   --trabalho-conversa-soft: 236 254 255;
   --trabalho-loja: 180 83 9;
   --trabalho-loja-soft: 255 247 237;
+
+  /* A barra lateral, grafite nos dois temas: a navegação é moldura, não conteúdo. */
+  --nav: 30 32 36;
+  --nav-soft: 49 52 58;
+  --nav-line: 52 55 61;
+  --nav-ink: 240 241 243;
+  --nav-ink-mute: 156 160 167;
 }
 
 .dark {
   color-scheme: dark;
 
-  --canvas: 3 4 3;
-  --panel: 20 20 19;
-  --panel-soft: 28 28 26;
-  --line: 48 47 44;
+  --canvas: 13 14 15;
+  --panel: 21 22 24;
+  --panel-soft: 29 30 33;
+  --line: 45 47 51;
 
-  --ink: 240 234 223;
-  --ink-soft: 176 169 157;
-  --ink-mute: 130 124 114;
+  --ink: 238 239 241;
+  --ink-soft: 174 177 183;
+  --ink-mute: 128 132 139;
 
   --accent: 0 168 123;
   --accent-contrast: 3 4 3;
@@ -100,8 +107,8 @@
 
   --serie-1: 0 125 94;
   --serie-2: 217 119 6;
-  --grade: 48 47 44;
-  --guia: 130 124 114;
+  --grade: 45 47 51;
+  --guia: 128 132 139;
 
   --danger: 248 113 113;
   --danger-soft: 40 16 15;
@@ -121,6 +128,13 @@
   --trabalho-conversa-soft: 8 51 68;
   --trabalho-loja: 251 191 36;
   --trabalho-loja-soft: 52 30 8;
+
+  /* A barra lateral, grafite nos dois temas: a navegação é moldura, não conteúdo. */
+  --nav: 18 19 21;
+  --nav-soft: 38 40 44;
+  --nav-line: 40 42 46;
+  --nav-ink: 238 239 241;
+  --nav-ink-mute: 140 144 151;
 }
 
 body {

@@ -15,10 +15,10 @@ teste (`apps/web/src/lib/design-md.spec.ts`).
 
 A Timeless é um CRM de marketing: leads que chegam pelo WhatsApp, o gasto que
 os trouxe, e para clientes de presença local, ligações e rotas vindas do
-Google. A interface é minimalista e editorial. O fundo é marfim quente
-(#FFF9ED) no claro e quase-preto (#030403) no escuro, os dois tirados das
-artes da marca. O texto é quase-preto quente, e a única cor viva é o verde da
-marca, reservada para ação e destaque. Estado (erro, atenção, sucesso,
+Google. A interface é clara e organizada, com a navegação lateral em
+grafite. O fundo é um cinza frio quase branco (#F7F7F5) no claro e quase-preto
+(#0D0E0F) no escuro. O texto é quase-preto neutro, e a única cor viva é a cor
+do cliente, reservada para ação e destaque. Estado (erro, atenção, sucesso,
 informação) tem cores próprias e nunca usa o verde. Cartões brancos com borda
 fina e sombra quase invisível; títulos e números em Bricolage Grotesque, todo o resto em Instrument Sans;
 números com algarismos de mesma largura. A densidade só aumenta onde o dado
@@ -36,13 +36,28 @@ As telas usam o **papel** (`text-ink`, `bg-panel`, `border-line`), nunca o tom
 
 | Papel | Token | Claro | Escuro | Uso |
 |---|---|---|---|---|
-| Fundo da página | `canvas` | `#FFF9ED` | `#030403` | Marfim da marca; nunca branco puro na página |
-| Cartão | `panel` | `#FFFFFF` | `#141413` | Cartões, campos, menus, diálogos |
-| Área interna | `panel-soft` | `#FAF5EB` | `#1C1C1A` | Fundo de trilho de pílulas, linha em destaque, campo desabilitado |
-| Borda | `line` | `#E2DBCD` | `#302F2C` | Bordas de 1px; em cartão, com 70% de opacidade (`border-line/70`) |
-| Texto principal | `ink` | `#0C0B0A` | `#F0EADF` | Títulos, números, texto que se lê |
-| Texto secundário | `ink-soft` | `#524C44` | `#B0A99D` | Descrições, valores de tabela |
-| Texto de apoio | `ink-mute` | `#857D71` | `#827C72` | Rótulos, notas, datas, "Sem medida" |
+| Fundo da página | `canvas` | `#F7F7F5` | `#0D0E0F` | Fundo da área principal; nunca branco puro na página |
+| Cartão | `panel` | `#FFFFFF` | `#151618` | Cartões, campos, menus, diálogos |
+| Área interna | `panel-soft` | `#F1F1EE` | `#1D1E21` | Fundo de trilho de pílulas, linha em destaque, campo desabilitado |
+| Borda | `line` | `#E1E1DC` | `#2D2F33` | Bordas de 1px; em cartão, com 70% de opacidade (`border-line/70`) |
+| Texto principal | `ink` | `#121315` | `#EEEFF1` | Títulos, números, texto que se lê |
+| Texto secundário | `ink-soft` | `#484B50` | `#AEB1B7` | Descrições, valores de tabela |
+| Texto de apoio | `ink-mute` | `#6E7177` | `#80848B` | Rótulos, notas, datas, "Sem medida" |
+
+### Navegação
+
+A barra lateral é grafite nos dois temas, para a tela separar a moldura do
+conteúdo. Ela não muda com a cor do cliente: só a barrinha do item ativo usa
+`brand`. A saída de dentro do cliente usa `text-amber-300`, que se lê sobre o
+grafite nos dois temas, como o anel âmbar do logo.
+
+| Papel | Token | Claro | Escuro | Uso |
+|---|---|---|---|---|
+| Fundo da barra | `nav` | `#1E2024` | `#121315` | Fundo da barra lateral |
+| Item ativo e passar do mouse | `nav-soft` | `#31343A` | `#26282C` | Fundo do item da página atual |
+| Borda da barra | `nav-line` | `#34373D` | `#282A2E` | Divisória entre a barra e a tela |
+| Texto da barra | `nav-ink` | `#F0F1F3` | `#EEEFF1` | Item ativo, nome do cliente |
+| Texto de apoio da barra | `nav-ink-mute` | `#9CA0A7` | `#8C9097` | Itens inativos, ícones |
 
 ### Marca
 
@@ -101,8 +116,8 @@ a cor do cliente e são iguais nos dois temas.
 |---|---|---|---|
 | Série principal | `serie-1` | `#007D5E` | `#007D5E` |
 | Série de comparação | `serie-2` | `#D97706` | `#D97706` |
-| Grade | `grade` | `#E2DBCD` | `#302F2C` |
-| Linha guia, eixo | `guia` | `#948D80` | `#827C72` |
+| Grade | `grade` | `#E1E1DC` | `#2D2F33` |
+| Linha guia, eixo | `guia` | `#96999F` | `#80848B` |
 
 ### Impressão
 
@@ -190,8 +205,8 @@ movimento recebe menos (`prefers-reduced-motion` zera tudo).
 | 2 | Vidro | `.glass` = borda `line/50`, `bg-panel/70`, `shadow-lifted`, desfoque | Toast; a faixa do topo usa o mesmo efeito (`bg-canvas/80 backdrop-blur-xl`) |
 | 3 | Flutuante | `bg-panel shadow-pop` | Menu, diálogo, tooltip |
 
-No escuro a elevação vem mais do passo de tom (`#030403`, `#141413`,
-`#1C1C1A`) que da sombra.
+No escuro a elevação vem mais do passo de tom (`#0D0E0F`, `#151618`,
+`#1D1E21`) que da sombra.
 
 ## Layout
 
@@ -375,10 +390,10 @@ a primeira campanha acima").
 ## Guia para gerar telas (IA)
 
 **Referência rápida (tema claro, o escuro troca sozinho pelos papéis):**
-- fundo da página: `bg-canvas` (#FFF9ED)
-- cartão: `.surface` (#FFFFFF, borda #E2DBCD a 70%)
+- fundo da página: `bg-canvas` (#F7F7F5)
+- cartão: `.surface` (#FFFFFF, borda #E1E1DC a 70%)
 - texto principal / secundário / apoio: `text-ink` / `text-ink-soft` / `text-ink-mute`
-- ação principal: `Button variant="primary"` (fundo #0C0B0A)
+- ação principal: `Button variant="primary"` (fundo #121315)
 - ação da marca: `Button variant="accent"` (#007D5E, muda por cliente)
 - erro / atenção / sucesso / informação: `danger` / `warning` / `success` / `info`
 

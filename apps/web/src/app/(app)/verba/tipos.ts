@@ -18,6 +18,9 @@ export interface DesempenhoDoAnuncio {
   name: string;
   status: string;
   campanha: string;
+  /** Ausentes na API anterior. */
+  campanhaExternalId?: string | null;
+  imagemUrl?: string | null;
   gastoCentavos: number;
   impressoes: number;
   cliques: number;

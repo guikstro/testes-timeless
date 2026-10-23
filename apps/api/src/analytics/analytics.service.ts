@@ -668,6 +668,7 @@ export class AnalyticsService {
       this.prisma.lead.findMany({
         where: { organizationId, firstContactAt: { gte: de, lte: ate } },
         select: {
+          firstContactAt: true,
           qualifiedAt: true,
           wonAt: true,
           meetingScheduledAt: true,
@@ -702,6 +703,10 @@ export class AnalyticsService {
       wonAt: lead.sales.length ? lead.sales[0].occurredAt : null,
       meetingScheduledAt: lead.meetingScheduledAt,
       sale: lead.sales.length ? { amountCents: lead.sales.reduce((sum, s) => sum + (s.amountCents ?? 0), 0) } : null,
+      // O dia civil em Brasília, que é o dia em que o gasto também é contado.
+      primeiroContato: lead.firstContactAt
+        ? new Date(`${lead.firstContactAt.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })}T00:00:00.000Z`)
+        : null,
     }));
 
     const comAtividade = new Set(atribuidos.map((lead) => lead.campaignExternalId));
@@ -783,7 +788,8 @@ export class AnalyticsService {
               externalId: true,
               name: true,
               status: true,
-              adSet: { select: { campaign: { select: { name: true } } } },
+              imagemUrl: true,
+              adSet: { select: { campaign: { select: { name: true, externalId: true } } } },
             },
           },
         },
@@ -841,6 +847,8 @@ export class AnalyticsService {
         name: linha.ad.name,
         status: linha.ad.status,
         campanha: linha.ad.adSet.campaign.name,
+        campanhaExternalId: linha.ad.adSet.campaign.externalId,
+        imagemUrl: linha.ad.imagemUrl,
         spendCents: linha.spendCents,
         impressions: linha.impressions,
         clicks: linha.clicks,

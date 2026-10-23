@@ -36,6 +36,13 @@ const config: Config = {
         panel: "rgb(var(--panel) / <alpha-value>)",
         "panel-soft": "rgb(var(--panel-soft) / <alpha-value>)",
         line: "rgb(var(--line) / <alpha-value>)",
+        nav: {
+          DEFAULT: "rgb(var(--nav) / <alpha-value>)",
+          soft: "rgb(var(--nav-soft) / <alpha-value>)",
+          line: "rgb(var(--nav-line) / <alpha-value>)",
+          ink: "rgb(var(--nav-ink) / <alpha-value>)",
+          "ink-mute": "rgb(var(--nav-ink-mute) / <alpha-value>)",
+        },
         accent: {
           DEFAULT: "rgb(var(--accent) / <alpha-value>)",
           contrast: "rgb(var(--accent-contrast) / <alpha-value>)",

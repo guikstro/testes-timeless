@@ -58,6 +58,19 @@ export interface LeadAtribuido {
   /** Reunião marcada. Junto com a venda, é o "virou cliente" das telas simples. */
   meetingScheduledAt?: Date | null;
   sale: { amountCents: number | null } | null;
+  /** Quando chegou, para a série por dia. Opcional: sem ele, o lead só não entra na série. */
+  primeiroContato?: Date | null;
+}
+
+/** Um dia da campanha: o gasto e o que a plataforma e o sistema contaram nele. */
+export interface DiaDaCampanha {
+  dia: string;
+  gastoCentavos: number;
+  impressoes: number | null;
+  visualizacoes: number | null;
+  conversas: number | null;
+  leads: number;
+  vendas: number;
 }
 
 export interface PeriodoAtivo {
@@ -131,6 +144,8 @@ export interface DesempenhoDeCampanha {
   custoPorLeadCentavos: number | null;
   custoPorVendaCentavos: number | null;
   roas: number | null;
+  /** A campanha dia a dia, em ordem, para a evolução no detalhe. Só os dias com gasto ou lead. */
+  porDia: DiaDaCampanha[];
 }
 
 export interface DesempenhoPorCampanha {
@@ -308,6 +323,15 @@ export function agregaDesempenhoPorCampanha(
       custoPorLeadCentavos: null,
       custoPorVendaCentavos: null,
       roas: null,
+      porDia: campanha.spend.map((linha) => ({
+        dia: diaCivil(linha.date),
+        gastoCentavos: linha.spendCents,
+        impressoes: linha.impressoes ?? null,
+        visualizacoes: linha.visualizacoesDeVideo ?? null,
+        conversas: linha.conversasIniciadas,
+        leads: 0,
+        vendas: 0,
+      })),
     });
   }
 
@@ -321,6 +345,16 @@ export function agregaDesempenhoPorCampanha(
     }
 
     linha.leads += 1;
+    if (lead.primeiroContato) {
+      const dia = lead.primeiroContato.toISOString().slice(0, 10);
+      let doDia = linha.porDia.find((d) => d.dia === dia);
+      if (!doDia) {
+        doDia = { dia, gastoCentavos: 0, impressoes: null, visualizacoes: null, conversas: null, leads: 0, vendas: 0 };
+        linha.porDia.push(doDia);
+      }
+      doDia.leads += 1;
+      if (lead.wonAt) doDia.vendas += 1;
+    }
     if (lead.qualifiedAt) linha.qualificados += 1;
     if (lead.wonAt || lead.meetingScheduledAt) linha.clientes += 1;
     if (lead.wonAt) {
@@ -344,6 +378,7 @@ export function agregaDesempenhoPorCampanha(
       custoPorLeadCentavos: linha.gastoCentavos > 0 && cpl !== null ? Math.round(cpl) : null,
       custoPorVendaCentavos: linha.gastoCentavos > 0 && cpa !== null ? Math.round(cpa) : null,
       roas: divide(linha.receitaCentavos, linha.gastoCentavos),
+      porDia: [...linha.porDia].sort((x, y) => x.dia.localeCompare(y.dia)),
     };
   });
 

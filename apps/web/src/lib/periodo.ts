@@ -101,3 +101,29 @@ function ehDiaCivil(valor: string): boolean {
   const data = new Date(`${valor}T00:00:00.000Z`);
   return !Number.isNaN(data.getTime()) && diaCivil(data) === valor;
 }
+
+/**
+ * O período equivalente imediatamente anterior, para comparar sem a pessoa
+ * escolher: de 1 a 23 de outubro compara com 1 a 23 de setembro, o mês
+ * inteiro com o mês anterior inteiro, e um intervalo solto com o mesmo
+ * número de dias logo antes dele.
+ */
+export function periodoEquivalente(periodo: Intervalo): Intervalo {
+  const [anoDe, mesDe, diaDe] = periodo.de.split("-").map(Number);
+  const [anoAte, mesAte, diaAte] = periodo.ate.split("-").map(Number);
+  if (diaDe === 1 && anoDe === anoAte && mesDe === mesAte) {
+    const antes = mesAnterior(anoDe, mesDe);
+    const doMes = intervaloDoMes(antes.ano, antes.mes);
+    const ultimoDia = Number(doMes.ate.slice(8, 10));
+    const mesCheio = Number(intervaloDoMes(anoDe, mesDe).ate.slice(8, 10)) === diaAte;
+    return mesCheio ? doMes : { de: doMes.de, ate: `${doMes.de.slice(0, 8)}${String(Math.min(diaAte, ultimoDia)).padStart(2, "0")}` };
+  }
+  const dia = 86_400_000;
+  const de = Date.UTC(anoDe, mesDe - 1, diaDe);
+  const ate = Date.UTC(anoAte, mesAte - 1, diaAte);
+  const dias = Math.round((ate - de) / dia) + 1;
+  return {
+    de: new Date(de - dias * dia).toISOString().slice(0, 10),
+    ate: new Date(de - dia).toISOString().slice(0, 10),
+  };
+}

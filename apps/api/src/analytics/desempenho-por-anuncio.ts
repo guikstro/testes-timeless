@@ -16,6 +16,9 @@ export interface GastoDoAnuncio {
   name: string;
   status: string;
   campanha: string;
+  /** O id da campanha na plataforma, para o detalhe da campanha achar os anúncios dela. */
+  campanhaExternalId?: string;
+  imagemUrl?: string | null;
   spendCents: number;
   impressions: number;
   clicks: number;
@@ -35,6 +38,8 @@ export interface DesempenhoDoAnuncio {
   name: string;
   status: string;
   campanha: string;
+  campanhaExternalId: string | null;
+  imagemUrl: string | null;
   gastoCentavos: number;
   impressoes: number;
   cliques: number;
@@ -81,6 +86,8 @@ export function agregaDesempenhoPorAnuncio(
       name: gasto.name,
       status: gasto.status,
       campanha: gasto.campanha,
+      campanhaExternalId: gasto.campanhaExternalId ?? null,
+      imagemUrl: gasto.imagemUrl ?? null,
       gastoCentavos: gasto.spendCents,
       impressoes: gasto.impressions,
       cliques: gasto.clicks,

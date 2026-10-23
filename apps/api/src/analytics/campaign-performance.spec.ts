@@ -406,3 +406,34 @@ describe("videoDaCampanha", () => {
     expect(videoDaCampanha([dia(1000, null)])).toEqual({ visualizacoesDeVideo: null, custoPorVisualizacaoCentavos: null });
   });
 });
+
+describe("porDia", () => {
+  it("põe o gasto e os leads de cada dia em ordem, inclusive o dia com lead e sem gasto", () => {
+    const resultado = agregaDesempenhoPorCampanha(
+      [
+        {
+          id: "c1",
+          externalId: "ext-1",
+          name: "Campanha",
+          platform: "META",
+          status: "ACTIVE",
+          criadaNaPlataformaEm: null,
+          spend: [
+            { date: new Date("2026-10-03T00:00:00.000Z"), spendCents: 300, conversasIniciadas: 1, visualizacoesDeVideo: null },
+            { date: new Date("2026-10-01T00:00:00.000Z"), spendCents: 100, conversasIniciadas: null },
+          ],
+        },
+      ],
+      [
+        { campaignExternalId: "ext-1", qualifiedAt: null, wonAt: new Date("2026-10-05T12:00:00.000Z"), sale: { amountCents: 5000 }, primeiroContato: new Date("2026-10-02T00:00:00.000Z") },
+        { campaignExternalId: "ext-1", qualifiedAt: null, wonAt: null, sale: null, primeiroContato: new Date("2026-10-03T00:00:00.000Z") },
+      ],
+    );
+
+    expect(resultado.campanhas[0].porDia.map((d) => [d.dia, d.gastoCentavos, d.leads, d.vendas])).toEqual([
+      ["2026-10-01", 100, 0, 0],
+      ["2026-10-02", 0, 1, 1],
+      ["2026-10-03", 300, 1, 0],
+    ]);
+  });
+});

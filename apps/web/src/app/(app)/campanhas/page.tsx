@@ -2,7 +2,7 @@ import { apiFetch } from "@/lib/api-client";
 import { conexaoDoWhatsApp } from "@/lib/conexao-do-whatsapp";
 import { temPresencaLocal } from "@/lib/foco";
 import { inicioDaMedicao, medicaoDeLeads } from "@/lib/medicao-de-leads";
-import { intervaloDoMes, leIntervalo, mesAtual } from "@/lib/periodo";
+import { intervaloDoMes, leIntervalo, mesAtual, periodoEquivalente } from "@/lib/periodo";
 import { sessaoAtual } from "@/lib/sessao";
 import { Frescor } from "@/components/ui/frescor";
 import { CampanhasView } from "./campanhas-view";
@@ -11,6 +11,9 @@ import type { AcoesLocais } from "./campanhas-simples";
 import { CampanhasDePresencaLocal, CampanhasLocaisView } from "./campanhas-locais";
 import { DesempenhoDeCampanhas } from "./tipos";
 import { leMetricas, metricasDoConjunto, sugereConjunto } from "@/lib/campanhas/metricas";
+import { leObjetivo } from "@/lib/campanhas/resultado";
+import { anunciosPorCampanha, linhasPorResultado } from "./linhas-por-resultado";
+import type { Anuncios } from "../verba/tipos";
 
 export const metadata = { title: "Campanhas" };
 
@@ -20,6 +23,8 @@ interface Busca {
   compararDe?: string;
   compararAte?: string;
   aba?: string;
+  /** O filtro de objetivo: vendas, local ou audiencia. */
+  objetivo?: string;
   /** As colunas da tabela, separadas por vírgula. Sem elas, vale a sugestão pelo objetivo. */
   metricas?: string;
 }
@@ -33,11 +38,24 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
   const periodo = leIntervalo(params.de, params.ate) ?? intervaloDoMes(agora.ano, agora.mes);
   const comparacao = leIntervalo(params.compararDe, params.compararAte);
 
+  // O detalhe de cada campanha sempre compara com alguma coisa: a escolhida
+  // ou, sem escolha, o período equivalente logo antes. O mês corrente conta
+  // só até hoje, para não comparar 23 dias com um mês inteiro.
+  const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const paraComparar =
+    comparacao ?? periodoEquivalente({ de: periodo.de, ate: periodo.ate > hoje && periodo.de <= hoje ? hoje : periodo.ate });
+
   const query = new URLSearchParams({ de: periodo.de, ate: periodo.ate });
   if (comparacao) {
     query.set("compararDe", comparacao.de);
     query.set("compararAte", comparacao.ate);
   }
+  const consultaComparada = new URLSearchParams({
+    de: periodo.de,
+    ate: periodo.ate,
+    compararDe: paraComparar.de,
+    compararAte: paraComparar.ate,
+  });
 
   // De quando é o gasto. Opcional: sem ele a tela continua, só sem a linha.
   const frescor = apiFetch<Frescor>("/analytics/frescor").catch(() => null);
@@ -54,11 +72,15 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
   // loja". Eram duas abas, e cada uma mostrava metade das campanhas.
   const doisFocos = temPresencaLocal(organization.foco);
   const locais = doisFocos
-    ? apiFetch<CampanhasDePresencaLocal>(`/presenca-local/campanhas?${query.toString()}`).catch(() => null)
+    ? apiFetch<CampanhasDePresencaLocal>(`/presenca-local/campanhas?${consultaComparada.toString()}`).catch(() => null)
     : Promise.resolve(null);
 
+  // Os anúncios de cada campanha, para o detalhe. Opcional: sem eles, o
+  // detalhe só não lista os anúncios.
+  const anuncios = apiFetch<Anuncios>(`/analytics/anuncios?de=${periodo.de}&ate=${periodo.ate}`).catch(() => null);
+
   const [dados, conexao, fontes] = await Promise.all([
-    apiFetch<DesempenhoDeCampanhas>(`/analytics/campanhas?${query.toString()}`),
+    apiFetch<DesempenhoDeCampanhas>(`/analytics/campanhas?${consultaComparada.toString()}`),
     conexaoDoWhatsApp(),
     frescor,
   ]);
@@ -79,6 +101,15 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
     ),
   );
   const escolhidas = leMetricas(params.metricas);
+  const dosLocais = await locais;
+  const linhas = linhasPorResultado({
+    dados,
+    medido: medicao === "medido",
+    comLoja: doisFocos,
+    acoesLocais: acoesLocaisDe(dosLocais),
+    acoesLocaisAnteriores: acoesLocaisDe(dosLocais, "anterior"),
+    anuncios: anunciosPorCampanha((await anuncios)?.anuncios ?? []),
+  });
 
   return (
     <CampanhasView
@@ -86,23 +117,26 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
       medicao={medicao}
       desdeDoWhatsApp={conexao ? inicioDaMedicao(conexao) : null}
       frescor={fontes}
-      comLoja={doisFocos}
-      acoesLocais={acoesLocaisDe(await locais)}
       metricas={escolhidas ?? metricasDoConjunto(sugestao.conjunto)}
       escolhaManual={escolhidas !== null}
       sugestao={sugestao}
       busca={query.toString()}
       abas={<AbasDeCampanhas ativa="desempenho" />}
+      nomeDoCliente={organization.name}
+      linhas={linhas}
+      objetivoInicial={leObjetivo(params.objetivo)}
+      comparacaoEscolhida={comparacao}
     />
   );
 }
 
 /** Ligações e rotas de cada campanha do Google, pelo id da campanha. */
-function acoesLocaisDe(dados: CampanhasDePresencaLocal | null): AcoesLocais | undefined {
+function acoesLocaisDe(dados: CampanhasDePresencaLocal | null, lado: "atual" | "anterior" = "atual"): AcoesLocais | undefined {
   if (!dados) return undefined;
   return new Map(
-    dados.campanhas.flatMap((linha) =>
-      linha.atual ? [[linha.externalId, { ligacoes: linha.atual.ligacoes, rotas: linha.atual.rotas }] as const] : [],
-    ),
+    dados.campanhas.flatMap((linha) => {
+      const numeros = linha[lado];
+      return numeros ? [[linha.externalId, { ligacoes: numeros.ligacoes, rotas: numeros.rotas }] as const] : [];
+    }),
   );
 }
