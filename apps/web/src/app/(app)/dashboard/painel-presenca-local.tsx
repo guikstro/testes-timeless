@@ -76,7 +76,14 @@ const PARTE: Record<string, string> = { ligacoes: "as ligações dos anúncios",
  * O que não está sendo medido aparece como "sem medida", e não como zero: um
  * zero diria que ninguém ligou, quando o certo é que o sistema não sabe.
  */
-export function PainelPresencaLocal({ dados }: { dados: PresencaLocal }) {
+export function PainelPresencaLocal({
+  dados,
+  campanhas,
+}: {
+  dados: PresencaLocal;
+  /** A lista padrão de campanhas, a mesma da tela de Campanhas. Sem ela, a tabela simples daqui. */
+  campanhas?: ReactNode;
+}) {
   const { totais, investimento, custo } = dados;
   const serieDe = (campo: "ligacoes" | "rotas") => dados.serie.map((d) => d[campo] ?? 0);
   // O período anterior começando antes do primeiro dia com número: sem porcentagem.
@@ -138,49 +145,50 @@ export function PainelPresencaLocal({ dados }: { dados: PresencaLocal }) {
         </section>
       ) : null}
 
-      <Card className="p-6">
-        <CardHeader
-          title="Por campanha"
-          description="O que cada campanha do Google gastou e o que trouxe no período."
-          className="mb-4"
-        />
-        <DataTable
-          legenda="Campanhas do Google Ads"
-          linhas={dados.campanhas}
-          chaveDaLinha={(c) => c.externalId}
-          vazio={<p className="text-corpo text-ink-mute">Nenhuma campanha do Google com gasto no período.</p>}
-          colunas={[
-            { chave: "nome", titulo: "Campanha", principal: true, celula: (c) => c.nome },
-            { chave: "gasto", titulo: "Gasto", alinhar: "direita", celula: (c) => formatCentsAsBRL(c.gastoCentavos) },
-            { chave: "lig", titulo: "Ligações", alinhar: "direita", celula: (c) => c.ligacoes ?? <SemMedidaNaCelula /> },
-            { chave: "rot", titulo: "Rotas", alinhar: "direita", celula: (c) => c.rotas ?? <SemMedidaNaCelula /> },
-            {
-              chave: "cpl",
-              titulo: "Custo por ligação",
-              alinhar: "direita",
-              // Escrito por extenso: um traço numa célula é lido como zero.
-              celula: (c) =>
-                c.ligacoes === null ? (
-                  <SemMedidaNaCelula />
-                ) : c.ligacoes > 0 ? (
-                  formatCentsAsBRL(Math.round(c.gastoCentavos / c.ligacoes))
-                ) : (
-                  <span className="text-apoio text-ink-mute">Sem ligação</span>
-                ),
-            },
-            { chave: "cli", titulo: "Cliques", alinhar: "direita", celula: (c) => c.cliques },
-          ]}
-        />
-      </Card>
-
-      {dados.perfil ? (
-        <SecaoDoPerfil perfil={dados.perfil} />
+      {campanhas ? (
+        <section>
+          <h2 className="mb-3 font-display text-destaque font-semibold tracking-tight text-ink">Por campanha</h2>
+          {campanhas}
+        </section>
       ) : (
-        <p className="text-apoio text-ink-mute">
-          As ligações, rotas e visualizações do Perfil da Empresa no Google aparecem aqui quando a equipe Timeless
-          ligar o perfil deste cliente.
-        </p>
+        <Card className="p-6">
+          <CardHeader
+            title="Por campanha"
+            description="O que cada campanha do Google gastou e o que trouxe no período."
+            className="mb-4"
+          />
+          <DataTable
+            legenda="Campanhas do Google Ads"
+            linhas={dados.campanhas}
+            chaveDaLinha={(c) => c.externalId}
+            vazio={<p className="text-corpo text-ink-mute">Nenhuma campanha do Google com gasto no período.</p>}
+            colunas={[
+              { chave: "nome", titulo: "Campanha", principal: true, celula: (c) => c.nome },
+              { chave: "gasto", titulo: "Gasto", alinhar: "direita", celula: (c) => formatCentsAsBRL(c.gastoCentavos) },
+              { chave: "lig", titulo: "Ligações", alinhar: "direita", celula: (c) => c.ligacoes ?? <SemMedidaNaCelula /> },
+              { chave: "rot", titulo: "Rotas", alinhar: "direita", celula: (c) => c.rotas ?? <SemMedidaNaCelula /> },
+              {
+                chave: "cpl",
+                titulo: "Custo por ligação",
+                alinhar: "direita",
+                // Escrito por extenso: um traço numa célula é lido como zero.
+                celula: (c) =>
+                  c.ligacoes === null ? (
+                    <SemMedidaNaCelula />
+                  ) : c.ligacoes > 0 ? (
+                    formatCentsAsBRL(Math.round(c.gastoCentavos / c.ligacoes))
+                  ) : (
+                    <span className="text-apoio text-ink-mute">Sem ligação</span>
+                  ),
+              },
+              { chave: "cli", titulo: "Cliques", alinhar: "direita", celula: (c) => c.cliques },
+            ]}
+          />
+        </Card>
       )}
+
+      {/* Sem o perfil ligado, a seção não aparece: o convite para ligar mora em Integrações. */}
+      {dados.perfil ? <SecaoDoPerfil perfil={dados.perfil} /> : null}
     </div>
   );
 }
@@ -252,13 +260,9 @@ export function SituacaoDaMedicao({ medicao: dados }: { medicao: MedicaoLocal })
       </ButtonLink>
     </SePuderAbrir>
   );
-  if (dados.situacao === "sem-google-ads") {
-    return (
-      <Alert tom="warning" titulo="Nenhuma conta do Google Ads ligada" acao={irAoGoogle}>
-        As ligações, rotas e o investimento vêm do script do Google Ads desta conta.
-      </Alert>
-    );
-  }
+  // Sem Google Ads ligado não há aviso: o convite para ligar mora em
+  // Integrações, e quem não ligou sabe que não ligou.
+  if (dados.situacao === "sem-google-ads") return null;
   if (dados.situacao === "script-desatualizado") {
     return (
       <Alert tom="warning" titulo="O script colado no Google Ads é o antigo" acao={irAoGoogle}>
@@ -346,7 +350,7 @@ function SemMedidaNaCelula() {
 
 /** A linha que conclui o painel, no lugar da pergunta. */
 export function concluiPresencaLocal(dados: PresencaLocal): string {
-  if (dados.situacao === "sem-google-ads") return "Ligue o Google Ads para medir ligações e rotas.";
+  if (dados.situacao === "sem-google-ads") return "Sem dados do Google Ads neste período.";
   if (dados.situacao === "script-desatualizado") return "O script do Google Ads precisa ser colado de novo para medir ligações e rotas.";
   const ligacoes = dados.totais.LIGACOES_DOS_ANUNCIOS.atual;
   const rotas = dados.totais.ROTAS.atual;

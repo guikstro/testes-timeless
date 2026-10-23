@@ -5,10 +5,10 @@ import { GrupoDePilulas } from "@/components/ui/pill-group";
 import { apiFetch } from "@/lib/api-client";
 import { conexaoDoWhatsApp } from "@/lib/conexao-do-whatsapp";
 import { medicaoDeLeads } from "@/lib/medicao-de-leads";
-import { DesempenhoDeCampanhas } from "../campanhas/tipos";
 import { formataDia } from "@/lib/periodo";
 import { ResumoSimples } from "./resumo-simples";
-import { CampanhasSimples } from "../campanhas/campanhas-simples";
+import { CampanhasPorResultado } from "../campanhas/campanhas-por-resultado";
+import { buscaCampanhas, BuscaDeCampanhas, montaLinhas } from "../campanhas/dados-por-resultado";
 import { AbaFunil } from "./aba-funil";
 import { AbaOrigem } from "./aba-origem";
 import { AbaAtendimento } from "./aba-atendimento";
@@ -20,7 +20,7 @@ import { leMetricas } from "@/lib/campanhas/metricas";
 import { Alert } from "@/components/ui/alert";
 import { Frescor, FrescorDosDados } from "@/components/ui/frescor";
 import { sessaoAtual } from "@/lib/sessao";
-import { temPresencaLocal } from "@/lib/foco";
+import { Foco, temPresencaLocal } from "@/lib/foco";
 import { concluiPresencaLocal, PainelPresencaLocal, PresencaLocal } from "./painel-presenca-local";
 import { FILTRO_DE_RESPONSAVEL } from "@/lib/leads/acompanhamento";
 
@@ -114,7 +114,8 @@ export default async function DashboardPage({
 
   // Os números dos anúncios só entram no resumo, que é onde aparecem.
   const simples = !local && !naPagina && (aba === "geral" || medicao !== "medido");
-  const anuncios = simples ? await buscaAnuncios(de, ate, days) : null;
+  const busca = simples ? await buscaAnuncios(de, ate, days, organization.foco) : null;
+  const anuncios = busca?.dados ?? null;
 
   // A escolha de métricas de Campanhas vai junto ao trocar de período e de aba.
   const escolhidas = leMetricas(params.metricas);
@@ -189,10 +190,17 @@ export default async function DashboardPage({
             sabe o que conectou.
           */
           <div className="mt-8">
-            {anuncios ? (
+            {busca ? (
               <>
-                <CampanhasSimples dados={anuncios} medido={false} comLoja={false} />
-                <Link href="/campanhas" className="text-corpo font-medium text-accent underline underline-offset-2">
+                {/* A mesma lista de Campanhas, com o mesmo detalhe: um desenho só no sistema inteiro. */}
+                <CampanhasPorResultado
+                  linhas={montaLinhas(busca, { medido: false, foco: organization.foco })}
+                  objetivoInicial={null}
+                  medido={false}
+                  rotuloDoPeriodo={days === 1 ? "hoje" : `os últimos ${days} dias`}
+                  rotuloDaComparacao={days === 1 ? "ontem" : `os ${days} dias anteriores`}
+                />
+                <Link href="/campanhas" className="mt-4 inline-flex text-corpo font-medium text-accent underline underline-offset-2">
                   Ver todas as campanhas
                 </Link>
               </>
@@ -273,7 +281,7 @@ export default async function DashboardPage({
         ) : null}
       </header>
 
-      {local ? <PainelPresencaLocal dados={local} /> : null}
+      {local ? <PainelPresencaLocal dados={local} campanhas={await listaLocal(local, days, organization.foco)} /> : null}
 
       {naPagina ? (
         pagina ? (
@@ -345,7 +353,7 @@ async function DashboardDePresencaLocal({ days }: { days: number }) {
           opcoes={PERIODOS.map((opcao) => ({ chave: String(opcao), rotulo: rotuloDoPeriodo(opcao), href: `/dashboard?days=${opcao}` }))}
         />
       </header>
-      <PainelPresencaLocal dados={dados} />
+      <PainelPresencaLocal dados={dados} campanhas={await listaLocal(dados, days, "PRESENCA_LOCAL")} />
     </div>
   );
 }
@@ -389,17 +397,11 @@ async function buscaFunil(days: number, recortes: Record<string, string>): Promi
  * nele, ou null quando a consulta falha: sem eles a seção some, e o resto do
  * painel continua. A sessão encerrada passa adiante (`unstable_rethrow`).
  */
-async function buscaAnuncios(de: string, ate: string, days: number): Promise<DesempenhoDeCampanhas | null> {
+async function buscaAnuncios(de: string, ate: string, days: number, foco: Foco): Promise<BuscaDeCampanhas | null> {
   const dia = (base: string, deslocamento: number) =>
     new Date(Date.parse(`${base}T12:00:00.000Z`) + deslocamento * 86_400_000).toISOString().slice(0, 10);
-  const consulta = new URLSearchParams({
-    de,
-    ate,
-    compararDe: dia(de, -days),
-    compararAte: dia(de, -1),
-  });
   try {
-    return await apiFetch<DesempenhoDeCampanhas>(`/analytics/campanhas?${consulta.toString()}`);
+    return await buscaCampanhas({ periodo: { de, ate }, comparacao: { de: dia(de, -days), ate: dia(de, -1) }, foco });
   } catch (erro) {
     unstable_rethrow(erro);
     return null;
@@ -423,4 +425,29 @@ async function buscaPagina(days: number): Promise<InsightsDaPagina | null> {
 /** De quando é o dado. Opcional: sem ele a tela continua, só sem a linha. */
 function buscaFrescor(): Promise<Frescor | null> {
   return apiFetch<Frescor>("/analytics/frescor").catch(() => null);
+}
+
+/**
+ * As campanhas de presença local na lista padrão, no mesmo período do painel.
+ * Se a consulta falhar, o painel mostra a própria tabela, como antes.
+ */
+async function listaLocal(dados: PresencaLocal, days: number, foco: Foco) {
+  const anterior = dados.periodoAnterior ?? null;
+  if (!anterior) return undefined;
+  try {
+    const busca = await buscaCampanhas({ periodo: dados.periodo, comparacao: anterior, foco });
+    const linhas = montaLinhas(busca, { medido: false, foco }).filter((l) => l.objetivo === "local");
+    return (
+      <CampanhasPorResultado
+        linhas={linhas}
+        objetivoInicial={null}
+        medido={false}
+        rotuloDoPeriodo={days === 1 ? "hoje" : `os últimos ${days} dias`}
+        rotuloDaComparacao={days === 1 ? "ontem" : `os ${days} dias anteriores`}
+      />
+    );
+  } catch (erro) {
+    unstable_rethrow(erro);
+    return undefined;
+  }
 }

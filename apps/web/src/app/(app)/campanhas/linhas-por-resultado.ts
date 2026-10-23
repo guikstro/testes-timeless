@@ -7,7 +7,7 @@ import {
   Resultado,
   resultadoDaCampanha,
 } from "@/lib/campanhas/resultado";
-import type { AcoesLocais } from "./campanhas-simples";
+import type { AcoesLocais } from "./dados-por-resultado";
 import type { AnuncioDaCampanha, DesempenhoDeCampanha, DesempenhoDeCampanhas, DiaDaCampanha } from "./tipos";
 
 /** Uma linha da lista de Campanhas por resultado, pronta para a tela. */
@@ -34,6 +34,7 @@ export function linhasPorResultado({
   dados,
   medido,
   comLoja,
+  soLocal = false,
   acoesLocais,
   acoesLocaisAnteriores,
   anuncios,
@@ -41,6 +42,11 @@ export function linhasPorResultado({
   dados: DesempenhoDeCampanhas;
   medido: boolean;
   comLoja: boolean;
+  /**
+   * O cliente só mede presença local: sem conversa nenhuma para medir venda,
+   * a campanha do Google que não é de audiência trabalha para trazer gente à loja.
+   */
+  soLocal?: boolean;
   acoesLocais?: AcoesLocais;
   acoesLocaisAnteriores?: AcoesLocais;
   anuncios: Map<string, AnuncioDaCampanha[]>;
@@ -54,7 +60,9 @@ export function linhasPorResultado({
       acoesLocais: (locais?.ligacoes ?? 0) + (locais?.rotas ?? 0),
       comLoja,
     });
-    const objetivo = objetivoDoTrabalho(trabalho);
+    const doTrabalho = objetivoDoTrabalho(trabalho);
+    // Ligação e rota só existem no Google: a campanha da Meta segue medida pelo que a Meta conta.
+    const objetivo = soLocal && doTrabalho === "vendas" && linha.plataforma === "GOOGLE" ? "local" : doTrabalho;
     const numeros = numerosDe(linha.atual, linha.plataforma);
     const anteriores = linha.anterior ? numerosDe(linha.anterior, linha.plataforma) : null;
     return [
