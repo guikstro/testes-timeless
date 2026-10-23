@@ -1,6 +1,7 @@
 import { apiFetch } from "@/lib/api-client";
 import { GrupoDePilulas } from "@/components/ui/pill-group";
 import { AbaOperacao } from "./aba-operacao";
+import { AbaNegocio } from "./aba-negocio";
 import { AbaAparencia } from "./aba-aparencia";
 import { AbaSeguranca } from "./aba-seguranca";
 import { AbaEquipe } from "./aba-equipe";
@@ -18,6 +19,7 @@ export const metadata = { title: "Configurações" };
 */
 const ABAS = [
   { chave: "operacao", rotulo: "Operação" },
+  { chave: "negocio", rotulo: "Perfil do negócio" },
   { chave: "equipe", rotulo: "Equipe" },
   { chave: "aparencia", rotulo: "Aparência" },
   { chave: "seguranca", rotulo: "Segurança" },
@@ -27,6 +29,7 @@ const ABAS = [
 /** O que cada aba pede. A API decide quem tem; a tela só esconde a aba de quem não tem. */
 const PRECISA: Record<(typeof ABAS)[number]["chave"], Capacidade | null> = {
   operacao: "settings.read",
+  negocio: "settings.read",
   equipe: "member.read",
   aparencia: "settings.manage",
   seguranca: null,
@@ -106,6 +109,7 @@ export default async function SettingsPage({
 
       {/* Cada aba busca só o que ela mostra, em vez de a página buscar tudo. */}
       {atual === "operacao" ? <AbaOperacao /> : null}
+      {atual === "negocio" ? <AbaNegocio podeEditar={pode(sessao, "settings.manage")} /> : null}
       {atual === "aparencia" ? <AbaAparencia /> : null}
       {atual === "seguranca" ? (
         <AbaSeguranca

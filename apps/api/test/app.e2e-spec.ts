@@ -120,6 +120,42 @@ describe("Auth & multi-tenancy (e2e)", () => {
     expect(orgB.body.name).toBe(orgBUser.organizationName);
   });
 
+  it("o perfil do negócio é de cada organização, e o texto em branco vira ausência", async () => {
+    const loginA = await request(app.getHttpServer())
+      .post("/api/auth/login")
+      .send({ email: orgAUser.email, password: orgAUser.password })
+      .expect(200);
+    const loginB = await request(app.getHttpServer())
+      .post("/api/auth/login")
+      .send({ email: orgBUser.email, password: orgBUser.password })
+      .expect(200);
+
+    const salvo = await request(app.getHttpServer())
+      .put("/api/organizations/current/perfil")
+      .set("Authorization", `Bearer ${loginA.body.accessToken}`)
+      .send({ tipoDeNegocio: "Cafeteria", oferta: "  ", objetivoPrincipal: "VENDAS", objetivosSecundarios: ["PRESENCA_LOCAL", "AUDIENCIA"], margemPercentual: 35 })
+      .expect(200);
+    expect(salvo.body).toMatchObject({ tipoDeNegocio: "Cafeteria", oferta: null, objetivoPrincipal: "VENDAS", margemPercentual: 35 });
+
+    const deA = await request(app.getHttpServer())
+      .get("/api/organizations/current/perfil")
+      .set("Authorization", `Bearer ${loginA.body.accessToken}`)
+      .expect(200);
+    expect(deA.body.perfil.objetivosSecundarios).toEqual(["PRESENCA_LOCAL", "AUDIENCIA"]);
+
+    const deB = await request(app.getHttpServer())
+      .get("/api/organizations/current/perfil")
+      .set("Authorization", `Bearer ${loginB.body.accessToken}`)
+      .expect(200);
+    expect(deB.body.perfil).toBeNull();
+
+    await request(app.getHttpServer())
+      .put("/api/organizations/current/perfil")
+      .set("Authorization", `Bearer ${loginA.body.accessToken}`)
+      .send({ margemPercentual: 150 })
+      .expect(400);
+  });
+
   it("revokes the refresh token on logout so it cannot be reused", async () => {
     const login = await request(app.getHttpServer())
       .post("/api/auth/login")

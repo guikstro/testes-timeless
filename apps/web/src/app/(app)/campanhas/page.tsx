@@ -14,6 +14,7 @@ import { leMetricas, metricasDoConjunto, sugereConjunto } from "@/lib/campanhas/
 import { leObjetivo } from "@/lib/campanhas/resultado";
 import { anunciosPorCampanha, linhasPorResultado } from "./linhas-por-resultado";
 import type { Anuncios } from "../verba/tipos";
+import { OBJETIVOS_DO_NEGOCIO, PerfilDoNegocio } from "@/lib/perfil-do-negocio";
 
 export const metadata = { title: "Campanhas" };
 
@@ -78,6 +79,9 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
   // Os anúncios de cada campanha, para o detalhe. Opcional: sem eles, o
   // detalhe só não lista os anúncios.
   const anuncios = apiFetch<Anuncios>(`/analytics/anuncios?de=${periodo.de}&ate=${periodo.ate}`).catch(() => null);
+  const perfil = apiFetch<{ perfil: PerfilDoNegocio | null }>("/organizations/current/perfil")
+    .then((r) => r.perfil)
+    .catch(() => null);
 
   const [dados, conexao, fontes] = await Promise.all([
     apiFetch<DesempenhoDeCampanhas>(`/analytics/campanhas?${consultaComparada.toString()}`),
@@ -126,6 +130,7 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
       linhas={linhas}
       objetivoInicial={leObjetivo(params.objetivo)}
       comparacaoEscolhida={comparacao}
+      perfilDoNegocio={resumoDoPerfil(await perfil)}
     />
   );
 }
@@ -139,4 +144,17 @@ function acoesLocaisDe(dados: CampanhasDePresencaLocal | null, lado: "atual" | "
       return numeros ? [[linha.externalId, { ligacoes: numeros.ligacoes, rotas: numeros.rotas }] as const] : [];
     }),
   );
+}
+
+/** O que a análise vai saber do negócio, numa frase; null quando ninguém preencheu. */
+function resumoDoPerfil(perfil: PerfilDoNegocio | null): string | null {
+  if (!perfil) return null;
+  const nome = (chave: string) => OBJETIVOS_DO_NEGOCIO.find((o) => o.chave === chave)?.rotulo.toLowerCase();
+  const partes = [
+    perfil.tipoDeNegocio,
+    perfil.objetivoPrincipal ? `objetivo principal ${nome(perfil.objetivoPrincipal)}` : null,
+    perfil.regiao ? `região ${perfil.regiao}` : null,
+    perfil.margemPercentual !== null ? `margem de ${perfil.margemPercentual}%` : null,
+  ].filter(Boolean);
+  return partes.length ? partes.join(", ") : null;
 }

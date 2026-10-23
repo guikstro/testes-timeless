@@ -4,6 +4,7 @@ import { AppException } from "../common/exceptions/app-exception";
 import { MembershipRole } from "@prisma/client";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { UpdateOrganizationDto } from "./dto/update-organization.dto";
+import { SalvaPerfilDoNegocioDto } from "./dto/salva-perfil-do-negocio.dto";
 import { ArmazenamentoService } from "./upload/armazenamento.service";
 import { ErroDaImagem, validaImagem } from "./upload/imagem-enviada";
 import { Autor, AuditoriaService, autorDe } from "../auditoria/auditoria.service";
@@ -35,6 +36,41 @@ export class OrganizationsService {
       throw new AppException("NOT_FOUND", "Organização não encontrada.", HttpStatus.NOT_FOUND);
     }
     return organization;
+  }
+
+  /** O perfil do negócio, ou null quando ninguém preencheu ainda. */
+  async perfilDoNegocio(organizationId: string) {
+    return this.prisma.perfilDoNegocio.findUnique({ where: { organizationId } });
+  }
+
+  /** Grava o perfil inteiro, e registra na auditoria só os campos que mudaram. */
+  async salvaPerfilDoNegocio(autor: Autor, dto: SalvaPerfilDoNegocioDto) {
+    const organizationId = autor.organizationId;
+    const antes = await this.perfilDoNegocio(organizationId);
+    // Texto em branco é ausência, e não um valor.
+    const limpo = Object.fromEntries(
+      Object.entries(dto).map(([campo, valor]) => [campo, typeof valor === "string" && valor.trim() === "" ? null : typeof valor === "string" ? valor.trim() : valor]),
+    ) as SalvaPerfilDoNegocioDto;
+    const dados = { ...limpo, atualizadoPorId: autor.userId };
+    const depois = await this.prisma.perfilDoNegocio.upsert({
+      where: { organizationId },
+      create: { organizationId, ...dados },
+      update: dados,
+    });
+
+    const campos = (Object.keys(limpo) as (keyof SalvaPerfilDoNegocioDto)[]).filter(
+      (c) => JSON.stringify(antes?.[c] ?? null) !== JSON.stringify(depois[c] ?? null),
+    );
+    if (campos.length) {
+      await this.auditoria.registra(autor, {
+        acao: "ORGANIZATION_UPDATED",
+        entidade: "PerfilDoNegocio",
+        entidadeId: organizationId,
+        antes: Object.fromEntries(campos.map((c) => [c, antes?.[c] ?? null])),
+        depois: Object.fromEntries(campos.map((c) => [c, depois[c] ?? null])),
+      });
+    }
+    return depois;
   }
 
   async updateCurrent(autor: Autor, dto: UpdateOrganizationDto) {

@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { Requer } from "../common/permissoes/requer.decorator";
 import { AuthenticatedUser } from "../auth/jwt-payload.interface";
 import { OrganizationsService } from "./organizations.service";
 import { UpdateOrganizationDto } from "./dto/update-organization.dto";
+import { SalvaPerfilDoNegocioDto } from "./dto/salva-perfil-do-negocio.dto";
 import { UpdateMemberDto } from "./dto/update-member.dto";
 import { autorDe } from "../auditoria/auditoria.service";
 import { EnviarLogoDto } from "./dto/enviar-logo.dto";
@@ -27,6 +28,20 @@ export class OrganizationsController {
   @Patch("current")
   updateCurrent(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateOrganizationDto) {
     return this.organizationsService.updateCurrent(autorDe(user), dto);
+  }
+
+  /** O contexto do negócio, que a análise da IA considera. Quem é da conta lê. */
+  @Requer()
+  @Get("current/perfil")
+  async perfilDoNegocio(@CurrentUser() user: AuthenticatedUser) {
+    // Embrulhado: um null solto chegaria como corpo vazio, e não como JSON.
+    return { perfil: await this.organizationsService.perfilDoNegocio(user.organizationId) };
+  }
+
+  @Requer("settings.manage")
+  @Put("current/perfil")
+  salvaPerfilDoNegocio(@CurrentUser() user: AuthenticatedUser, @Body() dto: SalvaPerfilDoNegocioDto) {
+    return this.organizationsService.salvaPerfilDoNegocio(autorDe(user), dto);
   }
 
   /** Quem da equipe da plataforma entrou nesta conta — visível para o próprio cliente. */

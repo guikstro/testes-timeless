@@ -175,6 +175,7 @@ model Organization {
   whatsappConnection   WhatsAppConnection?
   mensagensForaDaRegra MensagemForaDaRegra[]
   googleAdsConexao     GoogleAdsConexao?
+  perfilDoNegocio      PerfilDoNegocio?
   leads                Lead[]
   attributions         Attribution[]
   classificationRules  ClassificationRule[]
@@ -1955,4 +1956,44 @@ model OperadorDoCliente {
   @@id([organizationId, userId])
   @@index([userId])
   @@map("operadores_do_cliente")
+}
+
+/** O que a campanha ou o negócio quer: vender, trazer gente à loja, ser visto. */
+enum ObjetivoDoNegocio {
+  VENDAS
+  PRESENCA_LOCAL
+  AUDIENCIA
+}
+
+/**
+ * O contexto do negócio de cada cliente, para a análise da IA.
+ *
+ * Preenchido por quem cuida da conta, e não deduzido do nicho: uma cafeteria
+ * pode vender online, trazer gente à loja e crescer a audiência ao mesmo
+ * tempo. O objetivo de cada campanha continua valendo para ela; o perfil dá
+ * o contexto. Unidades e fontes de confirmação de venda já moram em `Unit` e
+ * `SalesSource`, e não se repetem aqui. Tudo é opcional.
+ */
+model PerfilDoNegocio {
+  organizationId            String              @id @map("organization_id")
+  tipoDeNegocio             String?             @map("tipo_de_negocio")
+  oferta                    String?
+  objetivoPrincipal         ObjetivoDoNegocio?  @map("objetivo_principal")
+  objetivosSecundarios      ObjetivoDoNegocio[] @default([]) @map("objetivos_secundarios")
+  publico                   String?
+  regiao                    String?
+  definicaoDeSucesso        String?             @map("definicao_de_sucesso")
+  metaVendasPorMes          Int?                @map("meta_vendas_por_mes")
+  metaCustoPorVendaCentavos Int?                @map("meta_custo_por_venda_centavos")
+  metaReceitaMensalCentavos Int?                @map("meta_receita_mensal_centavos")
+  cicloDeVendaDias          Int?                @map("ciclo_de_venda_dias")
+  /** Margem sobre a venda, de 0 a 100. Só com ela dá para falar de lucro. */
+  margemPercentual          Int?                @map("margem_percentual")
+  custoMedioCentavos        Int?                @map("custo_medio_centavos")
+  atualizadoEm              DateTime            @updatedAt @map("atualizado_em")
+  atualizadoPorId           String?             @map("atualizado_por_id")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("perfis_do_negocio")
 }

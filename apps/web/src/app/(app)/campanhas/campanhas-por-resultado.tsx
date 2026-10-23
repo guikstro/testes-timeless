@@ -33,6 +33,7 @@ export function CampanhasPorResultado({
   medido,
   rotuloDoPeriodo,
   rotuloDaComparacao,
+  perfilDoNegocio = null,
 }: {
   linhas: LinhaDeCampanha[];
   objetivoInicial: Objetivo | null;
@@ -40,6 +41,7 @@ export function CampanhasPorResultado({
   rotuloDoPeriodo: string;
   /** O período com que o detalhe compara; null quando não há. */
   rotuloDaComparacao: string | null;
+  perfilDoNegocio?: string | null;
 }) {
   const [objetivo, setObjetivo] = useState<Objetivo | null>(objetivoInicial);
   const [busca, setBusca] = useState("");
@@ -163,7 +165,7 @@ export function CampanhasPorResultado({
         descricao={selecionada ? `Objetivo: ${ROTULO_DO_OBJETIVO[selecionada.objetivo].toLowerCase()}` : undefined}
         className="sm:max-w-lg"
       >
-        {selecionada ? <DetalheDaCampanha linha={selecionada} medido={medido} rotuloDoPeriodo={rotuloDoPeriodo} rotuloDaComparacao={rotuloDaComparacao} /> : null}
+        {selecionada ? <DetalheDaCampanha linha={selecionada} medido={medido} rotuloDoPeriodo={rotuloDoPeriodo} rotuloDaComparacao={rotuloDaComparacao} perfilDoNegocio={perfilDoNegocio} /> : null}
       </Drawer>
     </div>
   );

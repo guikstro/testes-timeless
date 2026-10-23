@@ -18,11 +18,13 @@ export function DetalheDaCampanha({
   medido,
   rotuloDoPeriodo,
   rotuloDaComparacao,
+  perfilDoNegocio = null,
 }: {
   linha: LinhaDeCampanha;
   medido: boolean;
   rotuloDoPeriodo: string;
   rotuloDaComparacao: string | null;
+  perfilDoNegocio?: string | null;
 }) {
   // No meio da frase: "investidos em outubro de 2026".
   const periodo = rotuloDoPeriodo.replace(/^./, (c) => c.toLowerCase());
@@ -115,7 +117,7 @@ export function DetalheDaCampanha({
         </Secao>
       ) : null}
 
-      <AnaliseDaIa linha={linha} rotuloDoPeriodo={periodo} />
+      <AnaliseDaIa linha={linha} rotuloDoPeriodo={periodo} perfilDoNegocio={perfilDoNegocio} />
     </div>
   );
 }
@@ -252,7 +254,15 @@ function Evolucao({ linha, medido }: { linha: LinhaDeCampanha; medido: boolean }
  * Um texto fixo fingindo análise seria pior que nenhum: a caixa diz o que
  * falta e o que a análise vai considerar quando existir.
  */
-function AnaliseDaIa({ linha, rotuloDoPeriodo }: { linha: LinhaDeCampanha; rotuloDoPeriodo: string }) {
+function AnaliseDaIa({
+  linha,
+  rotuloDoPeriodo,
+  perfilDoNegocio,
+}: {
+  linha: LinhaDeCampanha;
+  rotuloDoPeriodo: string;
+  perfilDoNegocio: string | null;
+}) {
   return (
     <section className="rounded-xl border border-dashed border-line px-4 py-4">
       <h3 className="text-corpo font-semibold text-ink">Análise da IA</h3>
@@ -263,6 +273,18 @@ function AnaliseDaIa({ linha, rotuloDoPeriodo }: { linha: LinhaDeCampanha; rotul
         Quando estiver ativa, vai considerar o objetivo {ROTULO_DO_OBJETIVO[linha.objetivo].toLowerCase()}, o período de{" "}
         {rotuloDoPeriodo} e o resultado rastreado
         {linha.resultado.custoCentavos !== null ? `, inclusive o custo de ${custo(linha.resultado.custoCentavos)} por ${linha.resultado.unidade[0]}` : ""}.
+      </p>
+      <p className="mt-2 text-apoio text-ink-mute">
+        {perfilDoNegocio ? (
+          <>Do perfil do negócio: {perfilDoNegocio}.</>
+        ) : (
+          <>
+            O perfil do negócio ainda não foi preenchido.{" "}
+            <Link href="/settings?aba=negocio" className="font-medium text-ink-soft underline underline-offset-2 hover:text-ink">
+              Preencher o perfil
+            </Link>
+          </>
+        )}
       </p>
     </section>
   );

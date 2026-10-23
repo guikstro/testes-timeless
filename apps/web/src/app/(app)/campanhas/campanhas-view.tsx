@@ -58,6 +58,7 @@ export function CampanhasView({
   linhas,
   objetivoInicial = null,
   comparacaoEscolhida,
+  perfilDoNegocio = null,
 }: {
   dados: DesempenhoDeCampanhas;
   medicao: Medicao;
@@ -84,6 +85,8 @@ export function CampanhasView({
    * o seletor seguem só a escolhida.
    */
   comparacaoEscolhida: Intervalo | null;
+  /** O perfil do negócio numa frase, para a análise dizer o que considera. */
+  perfilDoNegocio?: string | null;
 }) {
   const { periodo, campanhas, semCampanha, totais } = dados;
   const comparacao = comparacaoEscolhida;
@@ -163,6 +166,7 @@ export function CampanhasView({
           medido={medido}
           rotuloDoPeriodo={rotuloDoIntervalo(periodo)}
           rotuloDaComparacao={dados.comparacao ? rotuloDoIntervalo(dados.comparacao) : null}
+          perfilDoNegocio={perfilDoNegocio}
         />
       </div>
 
