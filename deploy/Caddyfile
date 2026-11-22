@@ -1,0 +1,21 @@
+{
+	email {$EMAIL_CERTIFICADO}
+}
+
+# Painel do cliente
+{$DOMINIO_APP} {
+	encode zstd gzip
+	reverse_proxy web:3000
+}
+
+# Painel da equipe
+{$DOMINIO_ADMIN} {
+	encode zstd gzip
+	reverse_proxy admin:3002
+}
+
+# Links rastreáveis (/r/<código>), webhooks e API pública
+{$DOMINIO_LINK} {
+	encode zstd gzip
+	reverse_proxy api:3001
+}

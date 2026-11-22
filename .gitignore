@@ -9,3 +9,6 @@ coverage/
 .DS_Store
 apps/api/prisma/dev.db
 .regas-main
+
+# Segredos de produção
+deploy/.env.prod

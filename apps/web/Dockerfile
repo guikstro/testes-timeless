@@ -18,6 +18,14 @@ FROM base AS build
 # e construir em modo de desenvolvimento gera um pacote diferente do que se
 # pretende servir.
 ENV NODE_ENV=production
+# Endereços que o Next grava no pacote durante a construção (NEXT_PUBLIC_*).
+# Vazio por padrão: o código cai no valor de desenvolvimento, como antes.
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_ADMIN_URL
+ARG NEXT_PUBLIC_WEB_APP_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
+    NEXT_PUBLIC_ADMIN_URL=$NEXT_PUBLIC_ADMIN_URL \
+    NEXT_PUBLIC_WEB_APP_URL=$NEXT_PUBLIC_WEB_APP_URL
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/web/package.json apps/web/package.json
 COPY packages/shared/package.json packages/shared/package.json

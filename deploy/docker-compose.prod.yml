@@ -1,0 +1,161 @@
+# Produção num servidor só (ex.: Oracle Cloud "Always Free").
+#
+# Sobe tudo o que a plataforma precisa, sem serviço pago:
+#   caddy     HTTPS automático (Let's Encrypt) e entrada única nas portas 80/443
+#   postgres  banco (dados num volume do servidor)
+#   redis     filas e cache, gravando em disco (não perde agenda ao reiniciar)
+#   api       NestJS + filas + WhatsApp por QR Code, sempre ligada
+#   web       painel do cliente
+#   admin     painel da equipe
+#   backup    cópia diária do banco, guardando 30 dias
+#
+# Uso (dentro de deploy/):
+#   cp .env.prod.example .env.prod   # e preencha
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+
+name: tracking
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMINIO_APP: ${DOMINIO_APP}
+      DOMINIO_ADMIN: ${DOMINIO_ADMIN}
+      DOMINIO_LINK: ${DOMINIO_LINK}
+      EMAIL_CERTIFICADO: ${EMAIL_CERTIFICADO}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - admin
+      - api
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tintim
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: tintim
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tintim"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Grava em disco e nunca descarta chave: a fila, os convites e as agendas
+    # sobrevivem a um reinício (o problema do Key Value gratuito do Render).
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+      target: production
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      NODE_ENV: production
+      TZ: America/Sao_Paulo
+      PORT: "3001"
+      # O Caddy fica na frente e repassa o IP de quem chamou.
+      TRUST_PROXY: "1"
+      DATABASE_URL: postgresql://tintim:${POSTGRES_PASSWORD}@postgres:5432/tintim
+      REDIS_URL: redis://redis:6379
+      WEB_APP_URL: https://${DOMINIO_APP}
+      ADMIN_APP_URL: https://${DOMINIO_ADMIN}
+      PUBLIC_TRACKING_BASE_URL: https://${DOMINIO_LINK}
+      PUBLIC_SALES_API_URL: https://${DOMINIO_LINK}/api
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    stop_grace_period: 20s
+    # Migrations antes de subir: o banco sempre na versão do código.
+    command: sh -c "pnpm prisma migrate deploy && node dist/src/main.js"
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      target: production
+      args:
+        NEXT_PUBLIC_API_URL: http://api:3001/api
+        NEXT_PUBLIC_ADMIN_URL: https://${DOMINIO_ADMIN}
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      NODE_ENV: production
+      TZ: America/Sao_Paulo
+      PORT: "3000"
+      NEXT_PUBLIC_API_URL: http://api:3001/api
+      NEXT_PUBLIC_ADMIN_URL: https://${DOMINIO_ADMIN}
+    depends_on:
+      - api
+
+  admin:
+    build:
+      context: ..
+      dockerfile: apps/admin/Dockerfile
+      target: production
+      args:
+        NEXT_PUBLIC_API_URL: http://api:3001/api
+        NEXT_PUBLIC_WEB_APP_URL: https://${DOMINIO_APP}
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      NODE_ENV: production
+      TZ: America/Sao_Paulo
+      PORT: "3002"
+      NEXT_PUBLIC_API_URL: http://api:3001/api
+      NEXT_PUBLIC_WEB_APP_URL: https://${DOMINIO_APP}
+    depends_on:
+      - api
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://tintim:${POSTGRES_PASSWORD}@postgres:5432/tintim
+      BACKUP_INTERVAL_SECONDS: "86400"
+      BACKUP_KEEP: "30"
+    volumes:
+      - ../docker/backup:/scripts:ro
+      - backups:/backups
+    entrypoint: ["/bin/sh", "/scripts/backup.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  caddy_data:
+  caddy_config:
+  postgres_data:
+  redis_data:
+  uploads:
+  backups:
