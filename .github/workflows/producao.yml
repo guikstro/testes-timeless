@@ -1,13 +1,15 @@
-# Publicação no servidor próprio (Oracle Always Free), sem Render.
+# Publicação no servidor próprio (Google Cloud e2-micro ou Oracle), sem Render.
 #
-# Quando o CI passa num envio para a main (ou para deploy-gratuito), entra no
-# servidor por SSH, roda deploy/instalar.sh (puxa o código, reconstrói e
-# reinicia sem perder dado) e confere a saúde de fora, como um visitante.
+# Quando o CI passa num envio para a main (ou para deploy-gratuito):
+#   1. constrói as imagens api/web/admin aqui no GitHub e publica no ghcr.io
+#      (o servidor de 1 GB não aguenta construir o Next);
+#   2. entra no servidor por SSH, roda deploy/instalar.sh (que baixa as
+#      imagens quando MODO_IMAGENS=sim) e confere a saúde de fora.
 #
 # Configuração (GitHub → Settings → Secrets and variables → Actions):
-#   Secrets:   SERVIDOR_HOST (IP), SERVIDOR_USUARIO (ex.: ubuntu), SERVIDOR_CHAVE_SSH (chave privada)
-#   Variables: DOMINIO_LINK (ex.: link.123.45.67.89.sslip.io)
-# Sem os secrets, o fluxo só avisa e termina verde: nada é publicado.
+#   Secrets:   SERVIDOR_HOST (IP), SERVIDOR_USUARIO, SERVIDOR_CHAVE_SSH (chave privada)
+#   Variables: DOMINIO_APP, DOMINIO_ADMIN, DOMINIO_LINK (os mesmos do .env.prod)
+# Sem DOMINIO_APP as imagens não são construídas; sem os secrets nada é publicado.
 name: Produção
 
 on:
@@ -23,19 +25,57 @@ concurrency:
 
 permissions:
   contents: read
+  packages: write
+
+env:
+  REGISTRO: ghcr.io/guikstro/testes-timeless
 
 jobs:
-  publicar:
-    name: Publicar e conferir
+  imagens:
+    name: Construir ${{ matrix.app }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ vars.DOMINIO_APP != '' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') }}
+    strategy:
+      matrix:
+        app: [api, web, admin]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/${{ matrix.app }}/Dockerfile
+          target: production
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.REGISTRO }}/${{ matrix.app }}:latest
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=http://api:3001/api
+            NEXT_PUBLIC_ADMIN_URL=https://${{ vars.DOMINIO_ADMIN }}
+            NEXT_PUBLIC_WEB_APP_URL=https://${{ vars.DOMINIO_APP }}
+
+  publicar:
+    name: Publicar e conferir
+    needs: imagens
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       HOST: ${{ secrets.SERVIDOR_HOST }}
       USUARIO: ${{ secrets.SERVIDOR_USUARIO }}
       CHAVE: ${{ secrets.SERVIDOR_CHAVE_SSH }}
       DOMINIO_LINK: ${{ vars.DOMINIO_LINK }}
       RAMO: ${{ github.event.workflow_run.head_branch || github.ref_name }}
+      TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Conferir configuração
         id: cfg
@@ -53,7 +93,9 @@ jobs:
           mkdir -p ~/.ssh
           printf '%s\n' "$CHAVE" > ~/.ssh/chave && chmod 600 ~/.ssh/chave
           ssh -i ~/.ssh/chave -o StrictHostKeyChecking=accept-new "${USUARIO:-ubuntu}@$HOST" \
-            "cd ~/tracking && git fetch origin && git switch '$RAMO' && git pull --ff-only && bash deploy/instalar.sh"
+            "D=docker; docker info >/dev/null 2>&1 || D='sudo docker'; \
+             echo '$TOKEN' | \$D login ghcr.io -u '${{ github.actor }}' --password-stdin && \
+             cd ~/tracking && git fetch origin && git switch '$RAMO' && git pull --ff-only && bash deploy/instalar.sh"
 
       - name: Conferir saúde de fora
         if: steps.cfg.outputs.pronto == 'sim' && env.DOMINIO_LINK != ''

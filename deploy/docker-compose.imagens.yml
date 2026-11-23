@@ -1,0 +1,40 @@
+# Servidor pequeno (ex.: Google Cloud e2-micro, 1 GB de RAM).
+#
+# Em vez de construir no servidor (o Next precisa de mais memória do que a
+# máquina tem), baixa as imagens prontas que o GitHub Actions publica no
+# ghcr.io, e limita a memória de cada peça para tudo caber em 1 GB + swap.
+#
+# Ligado pelo instalar.sh quando MODO_IMAGENS=sim no .env.prod.
+
+services:
+  postgres:
+    command: ["postgres", "-c", "shared_buffers=48MB", "-c", "max_connections=30", "-c", "work_mem=2MB"]
+    mem_limit: 160m
+
+  redis:
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction", "--maxmemory", "48mb"]
+    mem_limit: 80m
+
+  api:
+    image: ${REGISTRO:-ghcr.io/guikstro/testes-timeless}/api:${TAG:-latest}
+    pull_policy: always
+    environment:
+      NODE_OPTIONS: --max-old-space-size=320
+    mem_limit: 420m
+
+  web:
+    image: ${REGISTRO:-ghcr.io/guikstro/testes-timeless}/web:${TAG:-latest}
+    pull_policy: always
+    environment:
+      NODE_OPTIONS: --max-old-space-size=160
+    mem_limit: 220m
+
+  admin:
+    image: ${REGISTRO:-ghcr.io/guikstro/testes-timeless}/admin:${TAG:-latest}
+    pull_policy: always
+    environment:
+      NODE_OPTIONS: --max-old-space-size=128
+    mem_limit: 180m
+
+  caddy:
+    mem_limit: 60m

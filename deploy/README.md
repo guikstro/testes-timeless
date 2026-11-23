@@ -33,6 +33,30 @@ parecidos "dormem" sem uso. O Always Free da Oracle dá uma máquina ARM com at�
    - Source CIDR `0.0.0.0/0`, TCP, porta de destino `443`
 4. Anote o **IP público** da instância.
 
+## 1-B. Alternativa: Google Cloud e2-micro (grátis para sempre)
+
+Máquina menor (2 vCPU compartilhadas, 1 GB de RAM, 30 GB de disco), só nos
+EUA. Por isso as imagens são construídas no GitHub e o servidor só baixa.
+
+1. <https://console.cloud.google.com> → crie um projeto e ative o
+   faturamento (pede cartão; o e2-micro fica dentro do nível gratuito).
+2. **Compute Engine → VM instances → Create instance**
+   - Region: **us-central1**, **us-east1** ou **us-west1** (só essas são grátis)
+   - Machine type: **e2-micro**
+   - Boot disk: **Ubuntu 24.04 LTS**, **Standard persistent disk**, **30 GB**
+   - Firewall: marque **Allow HTTP** e **Allow HTTPS**
+3. **VPC network → IP addresses**: promova o IP externo para **estático**
+   (grátis enquanto estiver ligado à VM).
+4. Entre pelo botão **SSH** do console (abre no navegador).
+5. GitHub → Settings → Secrets and variables → Actions → **Variables**:
+   `DOMINIO_APP=app.IP.sslip.io`, `DOMINIO_ADMIN=admin.IP.sslip.io`,
+   `DOMINIO_LINK=link.IP.sslip.io`. Rode o fluxo **Produção** à mão
+   (Actions → Produção → Run workflow) para gerar as imagens.
+6. No servidor, siga o passo 2 abaixo, mas no `.env.prod` coloque também
+   `MODO_IMAGENS=sim` e os mesmos três domínios. Antes do `instalar.sh`,
+   entre no ghcr.io com um token do GitHub (`read:packages`):
+   `echo TOKEN | sudo docker login ghcr.io -u guikstro --password-stdin`
+
 ## 2. Instalar a plataforma (~10 min)
 
 ```bash

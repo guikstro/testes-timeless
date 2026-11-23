@@ -60,8 +60,16 @@ fi
 git -C .. pull --ff-only || true
 PERFIS=""
 grep -qE "^RCLONE_DESTINO=.+" .env.prod && PERFIS="--profile offsite"
-$DOCKER compose -f docker-compose.prod.yml --env-file .env.prod $PERFIS up -d --build --remove-orphans
-$DOCKER compose -f docker-compose.prod.yml --env-file .env.prod ps
+if grep -qE "^MODO_IMAGENS=sim" .env.prod; then
+  # Servidor pequeno: baixa as imagens prontas do ghcr.io em vez de construir.
+  ARQS="-f docker-compose.prod.yml -f docker-compose.imagens.yml"
+  $DOCKER compose $ARQS --env-file .env.prod pull api web admin
+  $DOCKER compose $ARQS --env-file .env.prod $PERFIS up -d --no-build --remove-orphans
+else
+  ARQS="-f docker-compose.prod.yml"
+  $DOCKER compose $ARQS --env-file .env.prod $PERFIS up -d --build --remove-orphans
+fi
+$DOCKER compose $ARQS --env-file .env.prod ps
 
 set -a; . ./.env.prod; set +a
 echo
