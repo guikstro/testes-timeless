@@ -89,8 +89,8 @@ export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
     // Em tudo: o identificador precisa existir antes de qualquer erro, e um
     // erro pode acontecer em qualquer rota.
-    consumer.apply(IdDaRequisicaoMiddleware).forRoutes("*");
+    consumer.apply(IdDaRequisicaoMiddleware).forRoutes("{*caminho}");
     // Também em tudo: é de onde a auditoria tira o IP e o aparelho.
-    consumer.apply(OrigemDaRequisicaoMiddleware).forRoutes("*");
+    consumer.apply(OrigemDaRequisicaoMiddleware).forRoutes("{*caminho}");
   }
 }

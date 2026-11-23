@@ -1,3 +1,4 @@
+import { NotificationsService } from "../../notifications/notifications.service";
 import { Prisma } from "@prisma/client";
 import { WhatsAppConnectionsService } from "./whatsapp-connections.service";
 import { PrismaService } from "../../common/prisma/prisma.service";
@@ -130,5 +131,48 @@ describe("WhatsAppConnectionsService", () => {
     await service.disconnect("org-1");
 
     expect(motor.desconecta).toHaveBeenCalledWith("org-org-1");
+  });
+});
+
+describe("WhatsAppConnectionsService — aviso de queda", () => {
+  it("avisa no sino quando uma conexão ativa cai sozinha", async () => {
+    const prisma = {
+      whatsAppConnection: {
+        findUnique: jest.fn().mockResolvedValue({ id: "c1", organizationId: "org-1", instanceName: "inst-1", status: "CONNECTED" }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+    };
+    const notifications = { notificar: jest.fn().mockResolvedValue(undefined) };
+    const service = new WhatsAppConnectionsService(
+      prisma as unknown as PrismaService,
+      {} as unknown as EncryptionService,
+      {} as unknown as MotorWhatsApp,
+      notifications as unknown as NotificationsService,
+    );
+
+    await service.syncEvolutionState("inst-1", "close");
+
+    expect(prisma.whatsAppConnection.update).toHaveBeenCalledWith({ where: { instanceName: "inst-1" }, data: { status: "PENDING_QR" } });
+    expect(notifications.notificar).toHaveBeenCalledWith(expect.objectContaining({ type: "sistema.erro", organizationId: "org-1", title: "WhatsApp desconectado" }));
+  });
+
+  it("não avisa quando a conexão já não estava ativa", async () => {
+    const prisma = {
+      whatsAppConnection: {
+        findUnique: jest.fn().mockResolvedValue({ id: "c1", organizationId: "org-1", instanceName: "inst-1", status: "PENDING_QR" }),
+        update: jest.fn(),
+      },
+    };
+    const notifications = { notificar: jest.fn() };
+    const service = new WhatsAppConnectionsService(
+      prisma as unknown as PrismaService,
+      {} as unknown as EncryptionService,
+      {} as unknown as MotorWhatsApp,
+      notifications as unknown as NotificationsService,
+    );
+
+    await service.syncEvolutionState("inst-1", "close");
+
+    expect(notifications.notificar).not.toHaveBeenCalled();
   });
 });

@@ -95,3 +95,73 @@ reconectar o WhatsApp e a Meta pelo painel.
 | Ver logs da API | `docker compose -f docker-compose.prod.yml --env-file .env.prod logs -f api` |
 | Reiniciar | `docker compose -f docker-compose.prod.yml --env-file .env.prod restart` |
 | Backups | volume `tracking_backups` (um `.sql.gz` por dia, 30 dias) |
+
+## 5. Ficar sabendo quando algo cai
+
+Três camadas, todas grátis:
+
+1. **Dentro do servidor:** a API tem healthcheck e o contêiner `autoheal`
+   reinicia sozinho o que travar. O `restart: unless-stopped` religa tudo
+   depois de um reboot.
+2. **WhatsApp:** quando a sessão cai sozinha (celular desligado, "sair" pelo
+   aparelho), a plataforma avisa no sino e por push: "WhatsApp desconectado".
+3. **De fora (UptimeRobot, grátis):** crie uma conta em <https://uptimerobot.com>
+   e adicione dois monitores HTTP(s) de 5 em 5 minutos, com aviso por e-mail
+   ou Telegram:
+   - `https://DOMINIO_LINK/health` (palavra-chave `"status":"ok"`)
+   - `https://DOMINIO_APP/login`
+
+## 6. Backup fora do servidor (recomendado)
+
+O backup diário fica no próprio servidor. Para não perder tudo se a máquina
+sumir, copie para o **Object Storage da Oracle** (20 GB grátis):
+
+1. Oracle → **Storage → Buckets → Create bucket** `tracking-backups`.
+2. **Perfil → Customer secret keys → Generate** (gera Access/Secret key).
+3. Preencha o bloco `RCLONE_*` em `.env.prod` (exemplo no `.env.prod.example`;
+   o `namespace` aparece na página do bucket) e rode `bash instalar.sh`.
+
+O contêiner `backup-offsite` copia os `.sql.gz` de hora em hora e nunca apaga
+nada no destino.
+
+## 7. Atualização automática pelo GitHub
+
+O fluxo `.github/workflows/producao.yml` publica sozinho: depois que o CI
+passa num envio para `main` ou `deploy-gratuito`, ele entra no servidor por
+SSH, roda `instalar.sh` e confere `/health` de fora.
+
+No GitHub → **Settings → Secrets and variables → Actions**:
+
+| Tipo | Nome | Valor |
+|---|---|---|
+| Secret | `SERVIDOR_HOST` | IP do servidor |
+| Secret | `SERVIDOR_USUARIO` | `ubuntu` |
+| Secret | `SERVIDOR_CHAVE_SSH` | conteúdo da chave privada |
+| Variable | `DOMINIO_LINK` | o mesmo do `.env.prod` |
+
+Sem esses valores o fluxo só avisa e não publica nada.
+
+## 8. Google Ads de um cliente (ex.: Quezado)
+
+A plataforma guarda o `gclid` de cada clique e devolve ao Google Ads os
+leads que viraram **qualificado** e **venda**. Assim o Google aprende com
+quem virou cliente, e não só com o clique.
+
+1. **Links:** em Links, crie um link por campanha (destino
+   `https://wa.me/55DDDNUMERO`, campanha = nome da campanha no Google Ads).
+   Use esse link no botão de WhatsApp da landing page. A página repassa o
+   `gclid` e os `utm_*` para ele.
+2. **Ações de conversão no Google Ads:** Metas → Conversões → Nova → Importar
+   → "Rastrear conversões de cliques". Crie duas: `Lead qualificado` e `Venda`.
+3. **Na plataforma:** Integrações → Google Ads, informe os mesmos dois nomes
+   e copie o script.
+4. **No Google Ads:** Ferramentas → Ações em massa → Scripts → novo script,
+   cole, autorize e programe **de hora em hora**.
+
+## Pendências conhecidas (não bloqueiam)
+
+- Aviso do Prisma sobre `package.json#prisma`: só vira problema no Prisma 7.
+  Migrar para `prisma.config.ts` muda a leitura do `.env`; fazer junto com a
+  troca de versão.
+- O ramo `teste-ia-vendas` (mede acerto e custo da IA de vendas) não foi
+  juntado à `main`.

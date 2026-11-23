@@ -94,6 +94,13 @@ services:
       redis:
         condition: service_healthy
     stop_grace_period: 20s
+    # O Docker sabe quando a API trava (não só quando o processo morre).
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
     # Migrations antes de subir: o banco sempre na versão do código.
     command: sh -c "pnpm prisma migrate deploy && node dist/src/main.js"
 
@@ -151,6 +158,30 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  # Cópia dos backups para fora do servidor (Oracle Object Storage, Google
+  # Drive, S3...). Só sobe com o perfil "offsite" e o rclone configurado.
+  backup-offsite:
+    image: rclone/rclone:1.68
+    restart: unless-stopped
+    profiles: ["offsite"]
+    env_file:
+      - .env.prod
+    volumes:
+      - backups:/backups:ro
+    entrypoint: ["/bin/sh", "-c"]
+    # De hora em hora copia os .sql.gz novos; nunca apaga nada do destino.
+    command:
+      - 'while true; do rclone copy /backups "$${RCLONE_DESTINO}" --include "*.sql.gz" --log-level INFO; sleep 3600; done'
+
+  # Reinicia sozinho um contêiner que o healthcheck marcou como travado.
+  autoheal:
+    image: willfarrell/autoheal:1.2.0
+    restart: unless-stopped
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: all
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
   caddy_data:

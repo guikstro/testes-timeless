@@ -39,6 +39,6 @@ import { SaudeDaPlataformaController } from "./saude.controller";
 })
 export class ObservabilidadeModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(MedeOsPedidos).forRoutes("*");
+    consumer.apply(MedeOsPedidos).forRoutes("{*caminho}");
   }
 }

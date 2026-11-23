@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { HttpStatus, Injectable, Optional } from "@nestjs/common";
 import { WhatsAppConnection } from "@prisma/client";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { EncryptionService } from "../../common/encryption/encryption.service";
@@ -7,6 +7,7 @@ import { isUniqueConstraintError } from "../../common/utils/is-unique-constraint
 import { normalizePhone } from "../../common/utils/normalize-phone";
 import { ConnectWhatsAppDto } from "./dto/connect-whatsapp.dto";
 import { MotorWhatsApp } from "./motor-whatsapp";
+import { NotificationsService } from "../../notifications/notifications.service";
 import { OrigemDosLeads } from "@prisma/client";
 import { hojeLocal } from "../../common/tempo";
 
@@ -19,6 +20,8 @@ export class WhatsAppConnectionsService {
     private readonly prisma: PrismaService,
     private readonly encryption: EncryptionService,
     private readonly motor: MotorWhatsApp,
+    // Opcional: quem monta o serviço sem o módulo de avisos (testes) segue igual.
+    @Optional() private readonly notifications?: NotificationsService,
   ) {}
 
   async regra(organizationId: string) {
@@ -198,8 +201,26 @@ export class WhatsAppConnectionsService {
         where: { instanceName },
         data: { status: "PENDING_QR" },
       });
+      await this.avisarQueda(connection.organizationId);
     }
     return null;
+  }
+
+  /**
+   * Sem o WhatsApp, nenhum lead novo entra e o cliente só percebe dias depois.
+   * Nunca lança: a queda já foi registrada, o aviso é um extra.
+   */
+  private async avisarQueda(organizationId: string): Promise<void> {
+    try {
+      await this.notifications?.notificar({
+        type: "sistema.erro",
+        organizationId,
+        title: "WhatsApp desconectado",
+        body: "A conexão caiu e as conversas novas não estão sendo registradas. Abra Integrações e leia o QR Code de novo.",
+      });
+    } catch {
+      // o aviso não pode derrubar o tratamento do evento
+    }
   }
 
   private async markConnected(connection: WhatsAppConnection): Promise<WhatsAppConnection> {

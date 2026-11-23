@@ -1,53 +1,67 @@
-# Depois que a main muda: espera o Render publicar este commit e confere a
-# produção de fora, como um visitante. Não cria conta nem mexe em dado.
+# Publicação no servidor próprio (Oracle Always Free), sem Render.
+#
+# Quando o CI passa num envio para a main (ou para deploy-gratuito), entra no
+# servidor por SSH, roda deploy/instalar.sh (puxa o código, reconstrói e
+# reinicia sem perder dado) e confere a saúde de fora, como um visitante.
+#
+# Configuração (GitHub → Settings → Secrets and variables → Actions):
+#   Secrets:   SERVIDOR_HOST (IP), SERVIDOR_USUARIO (ex.: ubuntu), SERVIDOR_CHAVE_SSH (chave privada)
+#   Variables: DOMINIO_LINK (ex.: link.123.45.67.89.sslip.io)
+# Sem os secrets, o fluxo só avisa e termina verde: nada é publicado.
 name: Produção
 
 on:
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main, deploy-gratuito]
+  workflow_dispatch:
 
 concurrency:
   group: producao
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
 
-env:
-  SITE: https://timeless-crm.onrender.com
-  API: https://crm-timeless.onrender.com
-
 jobs:
-  conferencia:
-    name: Publicação e fumaça em produção
+  publicar:
+    name: Publicar e conferir
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    env:
+      HOST: ${{ secrets.SERVIDOR_HOST }}
+      USUARIO: ${{ secrets.SERVIDOR_USUARIO }}
+      CHAVE: ${{ secrets.SERVIDOR_CHAVE_SSH }}
+      DOMINIO_LINK: ${{ vars.DOMINIO_LINK }}
+      RAMO: ${{ github.event.workflow_run.head_branch || github.ref_name }}
     steps:
-      # O Render diz qual commit está no ar (RENDER_GIT_COMMIT). Espera os dois
-      # serviços chegarem a este, até 30 minutos: é o tempo de build do Render,
-      # com folga para o plano gratuito acordar.
-      - name: Esperar o Render publicar ${{ github.sha }}
+      - name: Conferir configuração
+        id: cfg
         run: |
-          for i in $(seq 1 60); do
-            api=$(curl -s --max-time 60 "$API/health/versao" | sed -n 's/.*"commit":"\([0-9a-f]*\)".*/\1/p')
-            site=$(curl -s --max-time 60 "$SITE/api/versao" | sed -n 's/.*"commit":"\([0-9a-f]*\)".*/\1/p')
-            echo "tentativa $i: api=${api:-?} site=${site:-?}"
-            if [ "$api" = "$GITHUB_SHA" ] && [ "$site" = "$GITHUB_SHA" ]; then echo "publicado"; exit 0; fi
-            sleep 30
-          done
-          echo "::error::O Render não publicou $GITHUB_SHA em 30 minutos. Veja Events no painel do Render."
-          exit 1
+          if [ -z "$HOST" ] || [ -z "$CHAVE" ]; then
+            echo "Servidor não configurado (SERVIDOR_HOST / SERVIDOR_CHAVE_SSH). Nada publicado."
+            echo "pronto=nao" >> "$GITHUB_OUTPUT"
+          else
+            echo "pronto=sim" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Fumaça em produção
+      - name: Publicar ${{ env.RAMO }} no servidor
+        if: steps.cfg.outputs.pronto == 'sim'
         run: |
-          falhou=0
-          confere() { # rótulo, endereço, código esperado
-            codigo=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "$2")
-            if [ "$codigo" = "$3" ]; then echo "ok    $1 ($codigo)"; else echo "FALHA $1: esperado $3, veio $codigo"; falhou=1; fi
-          }
-          confere "API saudável"                 "$API/health" 200
-          confere "Entrada abre"                  "$SITE/login" 200
-          confere "Cadastro abre"                 "$SITE/register" 200
-          confere "Tela interna pede login"       "$SITE/dashboard" 307
-          confere "Rota protegida da API recusa"  "$API/api/auth/session" 401
-          exit $falhou
+          mkdir -p ~/.ssh
+          printf '%s\n' "$CHAVE" > ~/.ssh/chave && chmod 600 ~/.ssh/chave
+          ssh -i ~/.ssh/chave -o StrictHostKeyChecking=accept-new "${USUARIO:-ubuntu}@$HOST" \
+            "cd ~/tracking && git fetch origin && git switch '$RAMO' && git pull --ff-only && bash deploy/instalar.sh"
+
+      - name: Conferir saúde de fora
+        if: steps.cfg.outputs.pronto == 'sim' && env.DOMINIO_LINK != ''
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS "https://$DOMINIO_LINK/health" | grep -q '"status":"ok"'; then
+              echo "Plataforma no ar."; exit 0
+            fi
+            sleep 20
+          done
+          echo "A saúde não respondeu ok em 10 minutos."; exit 1

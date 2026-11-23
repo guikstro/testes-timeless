@@ -58,7 +58,9 @@ fi
 
 # 5. Sobe
 git -C .. pull --ff-only || true
-$DOCKER compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+PERFIS=""
+grep -qE "^RCLONE_DESTINO=.+" .env.prod && PERFIS="--profile offsite"
+$DOCKER compose -f docker-compose.prod.yml --env-file .env.prod $PERFIS up -d --build --remove-orphans
 $DOCKER compose -f docker-compose.prod.yml --env-file .env.prod ps
 
 set -a; . ./.env.prod; set +a
