@@ -66,6 +66,15 @@ const TODOS_OS_ITENS: NavItem[] = [
     ),
   },
   {
+    href: "/dashboard/meu-painel",
+    label: "Meu painel",
+    icon: (
+      <svg {...ICON_PROPS}>
+        <path d="M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z" />
+      </svg>
+    ),
+  },
+  {
     href: "/conversas",
     label: "Conversas",
     icon: (
@@ -163,6 +172,7 @@ const TODOS_OS_ITENS: NavItem[] = [
  */
 const ORDEM_DO_MENU: { href: string; label?: string; novoGrupo?: boolean }[] = [
   { href: "/dashboard", label: "Resumo" },
+  { href: "/dashboard/meu-painel" },
   { href: "/vendas", label: "Vendas" },
   { href: "/conversas", novoGrupo: true },
   { href: "/leads" },
@@ -241,6 +251,8 @@ function Identidade({ href, className, children }: { href: string | null; classN
 function isActive(pathname: string, href: string): boolean {
   // Prefixo, não igualdade: /leads/<id> continua marcando "Leads".
   // A verba do mês é uma aba de Campanhas, e marca Campanhas.
+  // "Meu painel" mora dentro de /dashboard, mas tem item próprio.
+  if (href === "/dashboard" && pathname.startsWith("/dashboard/meu-painel")) return false;
   if (href === "/campanhas" && (pathname === "/verba" || pathname.startsWith("/verba/"))) return true;
   return pathname === href || pathname.startsWith(`${href}/`);
 }

@@ -10,6 +10,7 @@ import { LivingBackground } from "@/components/living-background";
 import { AppNav } from "./app-nav";
 import { ImpersonationHairline } from "./impersonation-banner";
 import { AppMain } from "./app-main";
+import { BarraDePerguntas } from "@/components/assistente/barra-de-perguntas";
 import { ConnectionStatus } from "./connection-status";
 import { conexaoDoWhatsApp } from "@/lib/conexao-do-whatsapp";
 import { NotificationProvider } from "@/components/notifications/notification-provider";
@@ -80,6 +81,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               expande sobre este canto, e um indicador que some quando o mouse
               passa no menu não serve como sinal permanente.
             */}
+            {!podeVer(session.areas, "/conversas") ? null : <BarraDePerguntas />}
             {!mostraWhatsApp ? null : <ConnectionStatus conexao={conexao} podeAbrir={podeVer(session.areas, "/integrations")} />}
             <NotificationBell />
           </div>

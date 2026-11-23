@@ -14,6 +14,7 @@ import { AuthModule } from "./auth/auth.module";
 import { OrganizationsModule } from "./organizations/organizations.module";
 import { HealthModule } from "./health/health.module";
 import { TrackingLinksModule } from "./tracking-links/tracking-links.module";
+import { AssistenteModule } from "./assistente/assistente.module";
 import { TrackingModule } from "./tracking/tracking.module";
 import { WhatsAppWebhookModule } from "./whatsapp-webhook/whatsapp-webhook.module";
 import { WhatsAppConnectionsModule } from "./integrations/whatsapp/whatsapp-connections.module";
@@ -58,6 +59,7 @@ import { ObservabilidadeModule } from "./observabilidade/observabilidade.module"
     OrganizationsModule,
     HealthModule,
     TrackingLinksModule,
+    AssistenteModule,
     TrackingModule,
     WhatsAppWebhookModule,
     WhatsAppConnectionsModule,

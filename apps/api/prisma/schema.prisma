@@ -1997,3 +1997,16 @@ model PerfilDoNegocio {
 
   @@map("perfis_do_negocio")
 }
+
+/// O painel que cada pessoa monta arrastando blocos (tela "Meu painel").
+/// Um por pessoa em cada organização; `blocos` é a lista ordenada de blocos.
+model PainelPersonalizado {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  blocos         Json
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, userId])
+  @@map("paineis_personalizados")
+}
