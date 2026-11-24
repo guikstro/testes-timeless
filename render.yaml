@@ -1,0 +1,74 @@
+# Render (plano grátis): API + WhatsApp por QR Code + filas.
+# Painel e admin ficam na Vercel; o banco é o Neon (grátis, criado pela Vercel).
+#
+# Uso: Render → New → Blueprint → este repositório, ramo deploy-gratuito.
+# Depois, em Environment do serviço "tracking-api", cole:
+#   DATABASE_URL   (string do Neon, com ?sslmode=require)
+#   WEB_APP_URL    (endereço do painel na Vercel; pode ter vários, separados por vírgula)
+#   ADMIN_APP_URL  (endereço do admin na Vercel)
+#
+# O plano grátis dorme após 15 min sem acesso: um monitor (UptimeRobot)
+# chamando /health a cada 5 min mantém a API e o WhatsApp acordados.
+services:
+  - type: web
+    name: tracking-api
+    runtime: docker
+    plan: free
+    region: virginia
+    branch: deploy-gratuito
+    dockerfilePath: apps/api/Dockerfile
+    dockerContext: .
+    # Migrations antes de subir: o banco sempre na versão do código.
+    dockerCommand: sh -c "pnpm prisma migrate deploy && node dist/src/main.js"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TZ
+        value: America/Sao_Paulo
+      - key: PORT
+        value: "3001"
+      - key: TRUST_PROXY
+        value: "1"
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=384
+      - key: DATABASE_URL
+        sync: false
+      - key: WEB_APP_URL
+        sync: false
+      - key: ADMIN_APP_URL
+        sync: false
+      - key: PUBLIC_TRACKING_BASE_URL
+        value: https://tracking-api.onrender.com
+      - key: PUBLIC_SALES_API_URL
+        value: https://tracking-api.onrender.com/api
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: tracking-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      - key: WHATSAPP_WEBHOOK_VERIFY_TOKEN
+        generateValue: true
+      - key: WHATSAPP_APP_SECRET
+        generateValue: true
+      - key: WHATSAPP_INTEGRATION_ENABLED
+        value: "true"
+      - key: META_INTEGRATION_ENABLED
+        value: "true"
+      - key: WEBHOOK_SIGNING_ALGORITHM
+        value: sha256
+      - key: EMAIL_TRANSPORTE
+        value: registro
+
+  - type: keyvalue
+    name: tracking-redis
+    plan: free
+    region: virginia
+    # BullMQ não pode perder chave por falta de memória.
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
