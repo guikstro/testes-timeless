@@ -179,6 +179,11 @@ export default async function DashboardPage({
             overview={overview}
             gastoCentavos={anuncios?.totais.gastoCentavos ?? null}
             esperando={espera ? { quantos: espera.total, mais: espera.truncado } : null}
+            anuncios={
+              anuncios
+                ? { campanhas: anuncios.campanhas.length, cliques: anuncios.totais.cliques, gastoCentavos: anuncios.totais.gastoCentavos }
+                : null
+            }
             dias={days}
             relatorioCompleto={paraAba("funil")}
           />

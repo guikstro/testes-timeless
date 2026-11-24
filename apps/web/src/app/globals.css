@@ -95,8 +95,8 @@
   --line: 45 47 51;
 
   --ink: 238 239 241;
-  --ink-soft: 174 177 183;
-  --ink-mute: 128 132 139;
+  --ink-soft: 189 192 198;
+  --ink-mute: 154 158 166;
 
   --accent: 0 168 123;
   --accent-contrast: 3 4 3;
@@ -134,7 +134,7 @@
   --nav-soft: 38 40 44;
   --nav-line: 40 42 46;
   --nav-ink: 238 239 241;
-  --nav-ink-mute: 140 144 151;
+  --nav-ink-mute: 162 166 173;
 }
 
 body {

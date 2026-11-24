@@ -16,6 +16,7 @@ export function ResumoSimples({
   dias,
   relatorioCompleto,
   esperando,
+  anuncios,
 }: {
   overview: Overview;
   /** Gasto em anúncios no período; null quando não há conta de anúncios ligada. */
@@ -24,37 +25,58 @@ export function ResumoSimples({
   relatorioCompleto: string;
   /** Quem espera resposta há mais de 30 minutos; null quando a contagem não carregou. */
   esperando: { quantos: number; mais: boolean } | null;
+  /** O que os anúncios fizeram no período; null quando não há conta de anúncios ligada. */
+  anuncios: { campanhas: number; cliques: number | null; gastoCentavos: number } | null;
 }) {
   const { totals, comparacao, atendimento, byOrigin } = overview;
   const clientes = totals.clientes;
   const anterior = comparacao.clientes.anterior;
   const diferenca = clientes - anterior;
-  const custoPorCliente = gastoCentavos !== null && gastoCentavos > 0 && clientes > 0 ? gastoCentavos / clientes : null;
+  const custoPorContato = gastoCentavos !== null && gastoCentavos > 0 && totals.leads > 0 ? gastoCentavos / totals.leads : null;
+  const periodo = dias === 1 ? "hoje" : dias === 30 ? "este mês" : `nos últimos ${dias} dias`;
 
   return (
     <div className="mx-auto max-w-3xl">
       <section className="py-6 text-center sm:py-10">
+        {/*
+          O número grande é o que responde "as campanhas estão trazendo gente?".
+          Enquanto ninguém virou cliente, um zero gigante só desanima e não
+          informa: nesse caso o destaque é quem chamou, e os clientes ficam na
+          linha de baixo, onde o zero é só mais um dado.
+        */}
         <p className="font-display text-[5.5rem] font-semibold leading-none tracking-[-0.04em] text-ink sm:text-[7rem]">
-          {clientes}
+          {clientes > 0 ? clientes : totals.leads}
         </p>
         <p className="mt-3 text-lg text-ink">
-          {clientes === 1 ? "novo cliente" : "novos clientes"}{" "}
-          {dias === 1 ? "hoje" : dias === 30 ? "este mês" : `nos últimos ${dias} dias`}
+          {clientes > 0
+            ? `${clientes === 1 ? "novo cliente" : "novos clientes"} ${periodo}`
+            : `${totals.leads === 1 ? "pessoa chamou" : "pessoas chamaram"} no WhatsApp ${periodo}`}
         </p>
-        <p className="mt-1 text-apoio text-ink-mute">Contamos quem marcou reunião ou fechou contrato.</p>
-        <Variacao diferenca={diferenca} anterior={anterior} referencia={dias === 1 ? "ontem" : "no período anterior"} />
+        <p className="mt-1 text-apoio text-ink-mute">
+          {clientes > 0
+            ? "Contamos quem marcou reunião ou fechou contrato."
+            : "Ainda sem cliente fechado. Contamos como cliente quem marcou reunião ou fechou contrato."}
+        </p>
+        <Variacao
+          diferenca={clientes > 0 ? diferenca : totals.leads - comparacao.leads.anterior}
+          anterior={clientes > 0 ? anterior : comparacao.leads.anterior}
+          referencia={dias === 1 ? "ontem" : "no período anterior"}
+          unidade={clientes > 0 ? "" : " contato"}
+        />
       </section>
 
-      <section className="mx-auto flex max-w-xl items-stretch justify-center divide-x divide-line text-center">
-        <Pequeno valor={String(totals.leads)} rotulo={totals.leads === 1 ? "chamou" : "chamaram"} />
+      <section className="mx-auto grid max-w-2xl grid-cols-2 items-stretch gap-y-5 divide-line text-center sm:grid-cols-4 sm:divide-x">
+        {anuncios && anuncios.cliques !== null ? <Pequeno valor={String(anuncios.cliques)} rotulo="cliques nos anúncios" /> : null}
         <Pequeno valor={String(totals.emConversa)} rotulo="em conversa" />
-        {/* Sem cliente, não há custo por cliente: aí o terceiro número é o investido. */}
-        {custoPorCliente !== null ? (
-          <Pequeno valor={reais(Math.round(custoPorCliente))} rotulo="por cliente" />
+        {custoPorContato !== null ? (
+          <Pequeno valor={reais(Math.round(custoPorContato))} rotulo="por contato" />
         ) : gastoCentavos ? (
           <Pequeno valor={reais(gastoCentavos)} rotulo="investidos" />
         ) : null}
+        <Pequeno valor={String(clientes)} rotulo={clientes === 1 ? "cliente" : "clientes"} />
       </section>
+
+      <FaixaDeAnuncios anuncios={anuncios} contatos={totals.leads} />
 
       {esperando ? <FaixaDeEspera aguardando={esperando.quantos} mais={esperando.mais} /> : null}
 
@@ -94,12 +116,12 @@ export function ResumoSimples({
   );
 }
 
-function Variacao({ diferenca, anterior, referencia }: { diferenca: number; anterior: number; referencia: string }) {
+function Variacao({ diferenca, anterior, referencia, unidade = "" }: { diferenca: number; anterior: number; referencia: string; unidade?: string }) {
   if (anterior === 0 && diferenca === 0) return null;
   const texto =
     diferenca === 0
       ? `o mesmo que ${referencia}`
-      : `${Math.abs(diferenca)} a ${diferenca > 0 ? "mais" : "menos"} que ${referencia}`;
+      : `${Math.abs(diferenca)}${unidade} a ${diferenca > 0 ? "mais" : "menos"} que ${referencia}`;
   return (
     <p className={`mt-3 text-corpo font-medium ${diferenca > 0 ? "text-success" : diferenca < 0 ? "text-danger" : "text-ink-mute"}`}>
       {diferenca > 0 ? "↗ " : diferenca < 0 ? "↘ " : ""}
@@ -111,9 +133,43 @@ function Variacao({ diferenca, anterior, referencia }: { diferenca: number; ante
 function Pequeno({ valor, rotulo }: { valor: string; rotulo: string }) {
   return (
     <div className="flex-1 px-4 sm:px-8">
-      <p className="font-display text-2xl font-semibold tracking-tight text-ink">{valor}</p>
-      <p className="mt-0.5 text-apoio text-ink-mute">{rotulo}</p>
+      <p className="font-display text-3xl font-semibold tracking-tight text-ink">{valor}</p>
+      <p className="mt-0.5 text-corpo text-ink-mute">{rotulo}</p>
     </div>
+  );
+}
+
+/**
+ * O que os anúncios estão fazendo, em duas frases quando algo está errado.
+ *
+ * Sem isto, campanha parada e campanha ruim ficam iguais na tela: um zero.
+ * Só aparece quando há o que dizer; com tudo andando, não ocupa lugar.
+ */
+function FaixaDeAnuncios({ anuncios, contatos }: { anuncios: { campanhas: number; cliques: number | null; gastoCentavos: number } | null; contatos: number }) {
+  if (!anuncios || anuncios.campanhas === 0) return null;
+
+  let titulo: string | null = null;
+  let detalhe = "";
+  if (anuncios.gastoCentavos === 0) {
+    titulo = "Os anúncios não gastaram nada neste período";
+    detalhe = "Confira o saldo da conta e se os anúncios estão aprovados no Google Ads.";
+  } else if ((anuncios.cliques ?? 0) >= 10 && contatos === 0) {
+    titulo = `${anuncios.cliques} cliques e nenhum contato no WhatsApp`;
+    detalhe = "Vale testar o botão da página e conferir se o WhatsApp está conectado.";
+  }
+  if (!titulo) return null;
+
+  return (
+    <Link
+      href="/integrations"
+      className="focus-ring mt-8 flex items-start gap-3 rounded-2xl border border-warning-line bg-warning-soft px-5 py-4 transition-opacity hover:opacity-95"
+    >
+      <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-warning" aria-hidden />
+      <p className="flex-1 text-destaque text-ink">
+        <span className="font-semibold">{titulo}.</span> <span className="text-ink-soft">{detalhe}</span>
+      </p>
+      <span className="shrink-0 text-corpo font-medium text-accent">Ver</span>
+    </Link>
   );
 }
 

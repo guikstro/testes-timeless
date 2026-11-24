@@ -95,9 +95,9 @@ const config: Config = {
        */
       fontSize: {
         /** Rótulo de seção, carimbo de hora, legenda. */
-        rotulo: ["0.6875rem", { lineHeight: "1.45" }],
+        rotulo: ["0.75rem", { lineHeight: "1.45" }],
         /** Texto de apoio: descrições, prévias, notas de rodapé. */
-        apoio: ["0.78125rem", { lineHeight: "1.5" }],
+        apoio: ["0.8125rem", { lineHeight: "1.5" }],
         /** Corpo do produto: o que se lê de verdade. */
         corpo: ["0.84375rem", { lineHeight: "1.55" }],
         /** Número ou frase que precisa saltar dentro de um painel. */

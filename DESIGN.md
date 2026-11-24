@@ -41,8 +41,8 @@ As telas usam o **papel** (`text-ink`, `bg-panel`, `border-line`), nunca o tom
 | Área interna | `panel-soft` | `#F1F1EE` | `#1D1E21` | Fundo de trilho de pílulas, linha em destaque, campo desabilitado |
 | Borda | `line` | `#E1E1DC` | `#2D2F33` | Bordas de 1px; em cartão, com 70% de opacidade (`border-line/70`) |
 | Texto principal | `ink` | `#121315` | `#EEEFF1` | Títulos, números, texto que se lê |
-| Texto secundário | `ink-soft` | `#484B50` | `#AEB1B7` | Descrições, valores de tabela |
-| Texto de apoio | `ink-mute` | `#6E7177` | `#80848B` | Rótulos, notas, datas, "Sem medida" |
+| Texto secundário | `ink-soft` | `#484B50` | `#BDC0C6` | Descrições, valores de tabela |
+| Texto de apoio | `ink-mute` | `#6E7177` | `#9A9EA6` | Rótulos, notas, datas, "Sem medida" |
 
 ### Navegação
 
@@ -57,7 +57,7 @@ grafite nos dois temas, como o anel âmbar do logo.
 | Item ativo e passar do mouse | `nav-soft` | `#31343A` | `#26282C` | Fundo do item da página atual |
 | Borda da barra | `nav-line` | `#34373D` | `#282A2E` | Divisória entre a barra e a tela |
 | Texto da barra | `nav-ink` | `#F0F1F3` | `#EEEFF1` | Item ativo, nome do cliente |
-| Texto de apoio da barra | `nav-ink-mute` | `#9CA0A7` | `#8C9097` | Itens inativos, ícones |
+| Texto de apoio da barra | `nav-ink-mute` | `#9CA0A7` | `#A2A6AD` | Itens inativos, ícones |
 
 ### Marca
 
@@ -141,8 +141,8 @@ degrau serve, o problema é a hierarquia.
 
 | Papel | Classe | Tamanho | Altura de linha | Uso |
 |---|---|---|---|---|
-| Rótulo | `text-rotulo` | 11px | 1.45 | Rótulo de seção (maiúsculas, `tracking-[0.1em]`, `font-medium` ou `font-semibold`), data, legenda, selo |
-| Apoio | `text-apoio` | 12,5px | 1.5 | Descrição curta, nota de rodapé, texto de célula secundária |
+| Rótulo | `text-rotulo` | 12px | 1.45 | Rótulo de seção (maiúsculas, `tracking-[0.1em]`, `font-medium` ou `font-semibold`), data, legenda, selo |
+| Apoio | `text-apoio` | 13px | 1.5 | Descrição curta, nota de rodapé, texto de célula secundária |
 | Corpo | `text-corpo` | 13,5px | 1.55 | O texto do produto: tabelas, formulários, parágrafos |
 | Destaque | `text-destaque` | 15px | 1.4 | Título de cartão, frase que precisa saltar dentro de um painel |
 | Título de página | `font-display text-2xl font-semibold tracking-tight` | 24px | Tailwind | Um por tela, no `h1` |
