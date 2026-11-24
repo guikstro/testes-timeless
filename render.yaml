@@ -62,8 +62,10 @@ services:
         value: "true"
       - key: WEBHOOK_SIGNING_ALGORITHM
         value: sha256
+      # smtp: e-mail de verdade (avisos de lead, recuperação de senha). As chaves
+      # SMTP_* e AVISO_EMAIL_PARA são preenchidas no painel do Render.
       - key: EMAIL_TRANSPORTE
-        value: registro
+        value: smtp
 
   - type: keyvalue
     name: tracking-redis
