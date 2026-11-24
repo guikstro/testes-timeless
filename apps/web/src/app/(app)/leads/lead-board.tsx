@@ -27,6 +27,15 @@ export interface ColunaDoQuadro {
   total: number;
 }
 
+/** O que dizer numa coluna sem ninguém: quando e por que alguém aparece ali. */
+const DICA_DA_COLUNA_VAZIA: Partial<Record<string, string>> = {
+  NEW: "Quem chamar pelas campanhas aparece aqui.",
+  IN_PROGRESS: "Quando a equipe responder, o lead vem para cá.",
+  QUALIFIED: "Arraste para cá quem tem um caso para o escritório.",
+  MEETING_SCHEDULED: "Quem marcar reunião fica aqui.",
+  WON: "Quem fechar contrato fica aqui.",
+};
+
 export function LeadBoard({ colunas }: { colunas: ColunaDoQuadro[] }) {
   const router = useRouter();
   const [arrastando, setArrastando] = useState<string | null>(null);
@@ -155,8 +164,8 @@ export function LeadBoard({ colunas }: { colunas: ColunaDoQuadro[] }) {
                 ))}
 
                 {daColuna.length === 0 ? (
-                  <li className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-line/60 py-8 text-apoio text-ink-mute">
-                    {recebe ? "Solte aqui" : "Vazio"}
+                  <li className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-line/60 px-4 py-8 text-center text-apoio leading-snug text-ink-mute">
+                    {recebe ? "Solte aqui" : DICA_DA_COLUNA_VAZIA[coluna.estagio] ?? "Vazio"}
                   </li>
                 ) : null}
               </ul>

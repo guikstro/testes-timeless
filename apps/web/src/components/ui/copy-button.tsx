@@ -14,11 +14,14 @@ export function BotaoCopiar({
   texto,
   rotulo = "Copiar",
   className,
+  comTexto = false,
 }: {
   texto: string;
   /** Descrição para leitor de tela, já que o botão só mostra o ícone. */
   rotulo?: string;
   className?: string;
+  /** Mostra "Copiar link" escrito, em vez de só o ícone: para o gesto principal de uma tela. */
+  comTexto?: boolean;
 }) {
   const [estado, setEstado] = useState<"parado" | "copiado" | "falhou">("parado");
 
@@ -34,7 +37,11 @@ export function BotaoCopiar({
       onClick={() => void copiar()}
       title={estado === "falhou" ? "Não consegui copiar, selecione e copie à mão" : rotulo}
       aria-label={rotulo}
-      className={`focus-ring inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-ink-mute transition-all duration-200 ease-soft hover:bg-ink/[0.06] hover:text-ink active:scale-90 ${className ?? ""}`}
+      className={
+        comTexto
+          ? `focus-ring inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-line px-3.5 text-corpo font-medium text-ink transition-all duration-200 ease-soft hover:border-accent/50 hover:text-accent active:scale-95 ${className ?? ""}`
+          : `focus-ring inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-ink-mute transition-all duration-200 ease-soft hover:bg-ink/[0.06] hover:text-ink active:scale-90 ${className ?? ""}`
+      }
     >
       {estado === "copiado" ? (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden>
@@ -51,6 +58,7 @@ export function BotaoCopiar({
           <path d="M5 15V5a2 2 0 0 1 2-2h10" />
         </svg>
       )}
+      {comTexto ? <span aria-hidden>{estado === "copiado" ? "Copiado" : estado === "falhou" ? "Falhou" : "Copiar link"}</span> : null}
       <span className="sr-only" aria-live="polite">
         {estado === "copiado" ? "Copiado" : estado === "falhou" ? "Não foi possível copiar" : ""}
       </span>

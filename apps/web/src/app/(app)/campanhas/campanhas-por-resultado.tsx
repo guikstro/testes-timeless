@@ -1,5 +1,6 @@
 "use client";
 
+import { nomeLegivelDaCampanha } from "@/lib/campanhas/nome-legivel";
 import { useMemo, useState } from "react";
 import { Drawer } from "@/components/ui/dialog";
 import { GrupoDePilulas } from "@/components/ui/pill-group";
@@ -226,7 +227,7 @@ function NomeEFormato({ linha }: { linha: LinhaDeCampanha }) {
   return (
     <>
       <span className="block truncate text-corpo font-semibold text-ink" title={linha.nome}>
-        {linha.nome}
+        {nomeLegivelDaCampanha(linha.nome)}
       </span>
       <span className="block truncate text-apoio text-ink-mute">{linha.formato}</span>
     </>

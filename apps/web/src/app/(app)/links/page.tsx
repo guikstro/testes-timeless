@@ -179,20 +179,23 @@ function SeusLinks({ items, rede }: { items: TrackingLinkListItem[]; rede: strin
 
               {/* O link existe para ser colado: copiar é o gesto principal da tela. */}
               <div className="flex min-w-0 items-center gap-2">
-                <code className="min-w-0 flex-1 truncate rounded-lg border border-line bg-panel-soft px-3 py-2 font-mono text-apoio text-ink-soft">
-                  {item.publicUrl}
+                <code
+                  className="min-w-0 flex-1 truncate font-mono text-apoio text-ink-soft"
+                  title={item.publicUrl}
+                >
+                  <span className="text-ink-mute">…</span>/r/<span className="font-medium text-ink">{item.code}</span>
                 </code>
-                <BotaoCopiar texto={item.publicUrl} rotulo={`Copiar o link de ${item.name}`} />
+                <BotaoCopiar texto={item.publicUrl} rotulo={`Copiar o link de ${item.name}`} comTexto />
               </div>
 
               <div className="flex gap-6 md:justify-end md:text-right">
                 <div>
-                  <p className="font-display text-lg font-semibold tabular-nums text-ink">{inteiro(item._count.clicks)}</p>
-                  <p className="text-rotulo text-ink-mute">{item._count.clicks === 1 ? "clique" : "cliques"}</p>
+                  <p className="font-display text-2xl font-semibold tabular-nums text-ink">{inteiro(item._count.clicks)}</p>
+                  <p className="text-apoio text-ink-mute">{item._count.clicks === 1 ? "clique" : "cliques"}</p>
                 </div>
                 <div>
-                  <p className="font-display text-lg font-semibold tabular-nums text-accent">{inteiro(item.leads ?? 0)}</p>
-                  <p className="text-rotulo text-ink-mute">{item.leads === 1 ? "lead" : "leads"}</p>
+                  <p className="font-display text-2xl font-semibold tabular-nums text-accent">{inteiro(item.leads ?? 0)}</p>
+                  <p className="text-apoio text-ink-mute">{item.leads === 1 ? "lead" : "leads"}</p>
                 </div>
               </div>
             </li>
