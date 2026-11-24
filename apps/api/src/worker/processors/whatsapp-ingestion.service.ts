@@ -415,11 +415,34 @@ export class WhatsAppIngestionService {
       timestamp: occurredAt.toISOString(),
     };
 
+    // De onde veio: "Google · [campanha]" quando o clique trouxe gclid. Falha em silêncio.
+    let origemTexto = "";
+    if (leadWasCreated) {
+      try {
+        const atrib = await this.prisma.attribution.findUnique({
+          where: { leadId: leadAntes.id },
+          select: { trackingClick: { select: { gclid: true, utmSource: true, utmCampaign: true } } },
+        });
+        const clique = atrib?.trackingClick;
+        if (clique) {
+          const fonte = clique.gclid ? "Google" : clique.utmSource ? clique.utmSource : "link rastreado";
+          origemTexto = clique.utmCampaign ? `${fonte} · ${clique.utmCampaign.replace(/^\[TMLS\]\s*/, "")}` : fonte;
+        }
+      } catch {
+        origemTexto = "";
+      }
+    }
+
     // Lead novo recebe um aviso só: anunciar a criação e a primeira mensagem
     // separadamente encheria a tela com dois cartões sobre o mesmo fato.
     await this.notifications.notificar(
       leadWasCreated
-        ? { ...comum, type: "lead.created", title: `Novo lead: ${nome}`, body: previa }
+        ? {
+            ...comum,
+            type: "lead.created",
+            title: origemTexto ? `Novo lead (${origemTexto}): ${nome}` : `Novo lead: ${nome}`,
+            body: previa,
+          }
         : { ...comum, type: "message.received", title: `${nome} respondeu`, body: previa },
     );
 

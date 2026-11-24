@@ -5,9 +5,34 @@ import { criaConexaoRedis } from "../common/queue/redis-connection";
 import { canalDaOrganizacao, NotificationEvent } from "./notification-event";
 import { AppException } from "../common/exceptions/app-exception";
 import { PushService } from "./push.service";
+import { ProvedorDeEmail } from "../common/email/provedor-de-email";
 
 /** Só o que pede atenção de quem está longe da tela vira aviso no aparelho. */
 const TIPOS_COM_PUSH = new Set<NotificationEvent["type"]>(["lead.created", "message.received"]);
+
+/** O que também vai para o canal externo (celular, mesmo com o painel fechado). */
+const TIPOS_EXTERNOS = new Set<NotificationEvent["type"]>(["lead.created", "sistema.erro"]);
+
+/**
+ * Canal externo opcional, sem conta nem custo: com `AVISO_EXTERNO_URL` (ex.:
+ * https://ntfy.sh/um-nome-dificil-de-adivinhar), cada lead novo e cada queda
+ * do WhatsApp viram uma notificação no app ntfy do celular. Nunca lança.
+ */
+export async function avisoExterno(evento: Pick<NotificationEvent, "type" | "title" | "body">): Promise<void> {
+  const url = process.env.AVISO_EXTERNO_URL?.trim();
+  if (!url || !TIPOS_EXTERNOS.has(evento.type)) return;
+  try {
+    // Título dentro do corpo: cabeçalhos HTTP não aceitam acento.
+    await fetch(url, {
+      method: "POST",
+      headers: { Priority: evento.type === "sistema.erro" ? "high" : "default" },
+      body: evento.body && evento.body !== evento.title ? `${evento.title}\n${evento.body}` : evento.title,
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch {
+    /* sem rede ou canal fora do ar: o aviso do sino já foi dado */
+  }
+}
 
 /** De quem é a caixa: a pessoa, dentro da organização da sessão. */
 export interface DonoDaCaixa {
@@ -26,8 +51,29 @@ export class NotificationsService implements OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly push?: PushService,
+    @Optional() private readonly email?: ProvedorDeEmail,
   ) {
     this.publicador = criaConexaoRedis("NotificationsService");
+  }
+
+  /**
+   * E-mail para a equipe: lead novo e queda do WhatsApp, só para os endereços
+   * de `AVISO_EMAIL_PARA` (separados por vírgula). Sem a variável, não faz nada.
+   * Nunca lança: o aviso do sino já foi dado.
+   */
+  private async avisoPorEmail(evento: NotificationEvent): Promise<void> {
+    const destinos = process.env.AVISO_EMAIL_PARA?.split(",").map((e) => e.trim()).filter(Boolean) ?? [];
+    if (!this.email || destinos.length === 0 || !TIPOS_EXTERNOS.has(evento.type)) return;
+    const painel = (process.env.WEB_APP_URL?.split(",")[0] ?? "").trim();
+    const link = painel && evento.leadId ? `\n\nAbrir a conversa: ${painel}/conversas?lead=${evento.leadId}` : "";
+    const texto = `${evento.title}${evento.body && evento.body !== evento.title ? `\n\n${evento.body}` : ""}${link}`;
+    for (const para of destinos) {
+      try {
+        await this.email.enviar({ para, assunto: evento.title, texto });
+      } catch (erro) {
+        this.logger.warn(JSON.stringify({ event: "aviso_por_email_falhou", error: String(erro).slice(0, 160) }));
+      }
+    }
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -67,6 +113,9 @@ export class NotificationsService implements OnModuleDestroy {
         JSON.stringify({ event: "notification_publish_failed", type: completo.type, error: String(erro) }),
       );
     }
+
+    void avisoExterno(completo);
+    void this.avisoPorEmail(completo);
 
     if (this.push && TIPOS_COM_PUSH.has(completo.type)) {
       await this.push.enviarParaOrganizacao(
