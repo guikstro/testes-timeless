@@ -14,8 +14,14 @@ import { hojeLocal } from "../../common/tempo";
 /** A janela da contagem do que ficou fora da regra. */
 const DIAS_DA_CONTAGEM = 30;
 
+/** No máximo um aviso de queda por organização neste intervalo. */
+const PAUSA_ENTRE_AVISOS_DE_QUEDA_MS = 15 * 60 * 1000;
+
 @Injectable()
 export class WhatsAppConnectionsService {
+  /** Quando cada organização foi avisada da última queda, para não repetir o aviso. */
+  private readonly ultimoAvisoDeQueda = new Map<string, number>();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryption: EncryptionService,
@@ -211,6 +217,12 @@ export class WhatsAppConnectionsService {
    * Nunca lança: a queda já foi registrada, o aviso é um extra.
    */
   private async avisarQueda(organizationId: string): Promise<void> {
+    // Uma queda costuma vir em rajada (reinício do servidor, reconexão em
+    // vários passos): avisar a cada evento enchia a tela e a caixa de e-mail.
+    const agora = Date.now();
+    const ultimo = this.ultimoAvisoDeQueda.get(organizationId) ?? 0;
+    if (agora - ultimo < PAUSA_ENTRE_AVISOS_DE_QUEDA_MS) return;
+    this.ultimoAvisoDeQueda.set(organizationId, agora);
     try {
       await this.notifications?.notificar({
         type: "sistema.erro",

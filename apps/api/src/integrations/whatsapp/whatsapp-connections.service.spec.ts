@@ -156,6 +156,36 @@ describe("WhatsAppConnectionsService — aviso de queda", () => {
     expect(notifications.notificar).toHaveBeenCalledWith(expect.objectContaining({ type: "sistema.erro", organizationId: "org-1", title: "WhatsApp desconectado" }));
   });
 
+  it("avisa uma vez só quando a queda vem em rajada, e de novo depois da pausa", async () => {
+    jest.useFakeTimers();
+    try {
+      const prisma = {
+        whatsAppConnection: {
+          findUnique: jest.fn().mockResolvedValue({ id: "c1", organizationId: "org-1", instanceName: "inst-1", status: "CONNECTED" }),
+          update: jest.fn().mockResolvedValue({}),
+        },
+      };
+      const notifications = { notificar: jest.fn().mockResolvedValue(undefined) };
+      const service = new WhatsAppConnectionsService(
+        prisma as unknown as PrismaService,
+        {} as unknown as EncryptionService,
+        {} as unknown as MotorWhatsApp,
+        notifications as unknown as NotificationsService,
+      );
+
+      await service.syncEvolutionState("inst-1", "close");
+      await service.syncEvolutionState("inst-1", "close");
+      await service.syncEvolutionState("inst-1", "close");
+      expect(notifications.notificar).toHaveBeenCalledTimes(1);
+
+      jest.advanceTimersByTime(16 * 60 * 1000);
+      await service.syncEvolutionState("inst-1", "close");
+      expect(notifications.notificar).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("não avisa quando a conexão já não estava ativa", async () => {
     const prisma = {
       whatsAppConnection: {

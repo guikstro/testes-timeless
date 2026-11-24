@@ -22,6 +22,15 @@ services:
     dockerCommand: npm run start:render
     healthCheckPath: /health
     autoDeploy: true
+    # Só republica a API quando muda algo dela. Sem isto, qualquer envio ao
+    # GitHub (até uma mudança de tela) reiniciava a API e derrubava o WhatsApp.
+    buildFilter:
+      paths:
+        - apps/api/**
+        - packages/**
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
     envVars:
       - key: NODE_ENV
         value: production
