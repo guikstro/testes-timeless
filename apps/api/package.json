@@ -9,7 +9,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/src/main",
-    "start:render": "prisma migrate deploy && node dist/src/main.js",
+    "start:render": "prisma migrate deploy && node -e \"const c=require('crypto');const k=process.env.TOKEN_ENCRYPTION_KEY||'';if(!/^[0-9a-f]{64}$/i.test(k))process.env.TOKEN_ENCRYPTION_KEY=c.createHash('sha256').update(k).digest('hex');require('./dist/src/main.js')\"",
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "jest",

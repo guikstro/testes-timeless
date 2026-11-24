@@ -40,9 +40,9 @@ services:
       - key: ADMIN_APP_URL
         sync: false
       - key: PUBLIC_TRACKING_BASE_URL
-        value: https://tracking-api-c557.onrender.com
+        value: https://tracking-api-z557.onrender.com
       - key: PUBLIC_SALES_API_URL
-        value: https://tracking-api-c557.onrender.com/api
+        value: https://tracking-api-z557.onrender.com/api
       - key: REDIS_URL
         fromService:
           type: keyvalue
