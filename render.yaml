@@ -19,7 +19,7 @@ services:
     dockerfilePath: apps/api/Dockerfile
     dockerContext: .
     # Migrations antes de subir: o banco sempre na versão do código.
-    dockerCommand: sh -c "pnpm prisma migrate deploy && node dist/src/main.js"
+    dockerCommand: npm run start:render
     healthCheckPath: /health
     autoDeploy: true
     envVars:
@@ -40,9 +40,9 @@ services:
       - key: ADMIN_APP_URL
         sync: false
       - key: PUBLIC_TRACKING_BASE_URL
-        value: https://tracking-api.onrender.com
+        value: https://tracking-api-c557.onrender.com
       - key: PUBLIC_SALES_API_URL
-        value: https://tracking-api.onrender.com/api
+        value: https://tracking-api-c557.onrender.com/api
       - key: REDIS_URL
         fromService:
           type: keyvalue
