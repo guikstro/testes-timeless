@@ -48,8 +48,11 @@ services:
         sync: false
       - key: ADMIN_APP_URL
         sync: false
+      # Domínio da própria Quezado (CNAME ir → tracking-api-z557.onrender.com):
+      # os botões das LPs redirecionam pelo site do cliente, e não por um
+      # domínio gratuito de terceiros, que o Google Ads trata como suspeito.
       - key: PUBLIC_TRACKING_BASE_URL
-        value: https://tracking-api-z557.onrender.com
+        value: https://ir.quezadobrasil.com
       - key: PUBLIC_SALES_API_URL
         value: https://tracking-api-z557.onrender.com/api
       - key: REDIS_URL
